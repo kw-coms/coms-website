@@ -500,6 +500,8 @@ test('apps page surfaces companion service links away from the home dashboard', 
 // The server looks at the catalogue's links every ten minutes; the Apps page marks the ones
 // that did not answer, so a visitor does not find out from an error page.
 test('apps page marks an app whose link did not answer', async ({ page }) => {
+  // The link check is for members; guests are not asked.
+  await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   const project = (id, title, linkUrl) => ({ id, category: 'WEBSITE', categoryName: '웹사이트', title, eyebrow: '', description: `${title} 설명`, madeBy: '', linkUrl, displayUrl: '', position: id, files: [] })
   await page.route('**/api/club-projects/categories', route => route.fulfill({ json: [{ key: 'WEBSITE', name: '웹사이트', position: 0 }] }))
   await page.route('**/api/club-projects', route => route.fulfill({
@@ -527,6 +529,7 @@ test('apps page marks an app whose link did not answer', async ({ page }) => {
 })
 
 test('apps page does without the link check when it cannot be read', async ({ page }) => {
+  await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   await page.route('**/api/club-projects/categories', route => route.fulfill({ json: [{ key: 'WEBSITE', name: '웹사이트', position: 0 }] }))
   await page.route('**/api/club-projects', route => route.fulfill({
     json: [{ id: 1, category: 'WEBSITE', categoryName: '웹사이트', title: '열리는 앱', eyebrow: '', description: '', madeBy: '', linkUrl: 'https://up.example/', displayUrl: '', position: 1, files: [] }],
@@ -537,6 +540,31 @@ test('apps page does without the link check when it cannot be read', async ({ pa
   await expect(page.getByRole('link', { name: /열리는 앱/ })).toHaveAttribute('href', 'https://up.example/')
   await expect(page.getByText('프로젝트를 불러오지 못했습니다')).toHaveCount(0)
   await expect(page.getByText('응답 없음')).toHaveCount(0)
+})
+
+test('apps page does not ask guests for link status, members get it', async ({ page }) => {
+  const calls = []
+  await page.route('**/api/club-projects/categories', route => route.fulfill({ json: [{ key: 'WEBSITE', name: '웹사이트', position: 0 }] }))
+  await page.route('**/api/club-projects', route => route.fulfill({
+    json: [{ id: 1, category: 'WEBSITE', categoryName: '웹사이트', title: '죽은 앱', eyebrow: '', description: '', madeBy: '', linkUrl: 'https://down.example/', displayUrl: '', position: 1, files: [] }],
+  }))
+  await page.route('**/api/club-projects/link-status', (route) => {
+    calls.push(route.request().url())
+    return route.fulfill({ json: [{ projectId: 1, linkUrl: 'https://down.example/', state: 'DOWN', checkedAt: '2026-10-12T17:00:00' }] })
+  })
+
+  // Guest (the default mock answers /api/auth/me with 401): no call, no dots, no error.
+  await page.goto('/apps')
+  await expect(page.getByRole('link', { name: /죽은 앱/ })).toBeVisible()
+  await page.waitForLoadState('networkidle')
+  expect(calls).toHaveLength(0)
+  await expect(page.getByText('응답 없음')).toHaveCount(0)
+
+  // Member: the call is made and the dot shows.
+  await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
+  await page.goto('/apps')
+  await expect(page.getByRole('link', { name: /죽은 앱/ })).toContainText('지금 응답 없음')
+  expect(calls).toHaveLength(1)
 })
 
 test('club event page renders entries and ranking from real API data', async ({ page }) => {

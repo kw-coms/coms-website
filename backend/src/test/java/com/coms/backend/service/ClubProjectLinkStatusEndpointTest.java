@@ -7,6 +7,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationContext;
+import com.coms.backend.domain.Member;
+import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.security.JwtTokenProvider;
+import jakarta.servlet.http.Cookie;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,8 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * The catalogue link status through the real filter chain: anyone may read it, like the
- * catalogue itself, and it carries what the last look found. The fetch is a stand-in, so no
+ * The catalogue link status through the real filter chain: members only (guests get 401; the
+ * catalogue list and categories stay public), and it carries what the last look found. The fetch is a stand-in, so no
  * request leaves the machine. In the same package as the service to reach its fetch.
  */
 @SpringBootTest(properties = {
@@ -44,13 +48,18 @@ class ClubProjectLinkStatusEndpointTest {
     private ClubProjectLinkStatusService service;
     @Autowired
     private ApplicationContext context;
+    @Autowired
+    private MemberRepository memberRepository;
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
     @MockitoBean
     private LinkPreviewService linkPreviewService;
 
     @Test
-    void anyoneReadsWhatTheLastLookFound() throws Exception {
+    void aMemberReadsWhatTheLastLookFound() throws Exception {
+        Cookie member = memberCookie();
         // Before any look there is nothing to say, and that is not an error.
-        mockMvc.perform(get("/api/club-projects/link-status"))
+        mockMvc.perform(get("/api/club-projects/link-status").cookie(member))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
 
@@ -66,7 +75,7 @@ class ClubProjectLinkStatusEndpointTest {
 
         service.checkAll();
 
-        mockMvc.perform(get("/api/club-projects/link-status"))
+        mockMvc.perform(get("/api/club-projects/link-status").cookie(member))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(3))
                 .andExpect(jsonPath("$[0].projectId").value(up.getId()))
@@ -81,10 +90,29 @@ class ClubProjectLinkStatusEndpointTest {
     }
 
     @Test
+    void guestsAreTurnedAwayFromLinkStatusButStillSeeTheCatalogue() throws Exception {
+        mockMvc.perform(get("/api/club-projects/link-status")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/club-projects")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/club-projects/categories")).andExpect(status().isOk());
+    }
+
+    @Test
     void theTimerIsOffUnlessItIsSwitchedOn() {
         // Tests and a developer's machine make no requests to the outside: only the prod
         // profile turns the scheduled look on.
         assertThat(context.getBeansOfType(ClubProjectLinkStatusJob.class)).isEmpty();
+    }
+
+    private Cookie memberCookie() {
+        Member member = new Member();
+        member.setStudentId("2026000021");
+        member.setName("USER");
+        member.setEmail("2026000021@example.com");
+        member.setPassword("unused");
+        member.setRole(Member.Role.USER);
+        member.setEmailVerified(true);
+        memberRepository.save(member);
+        return new Cookie("token", jwtTokenProvider.generateToken("2026000021", 0));
     }
 
     private static ClubProject project(String title, String linkUrl) {

@@ -50,8 +50,8 @@ public class ClubProjectController {
         return ResponseEntity.ok(projectService.list());
     }
 
-    // Public like the list itself: whether each entry's link answered when the server last
-    // looked. Empty until the first look after a start, and wherever the check is switched off.
+    // Members only (SecurityConfig; guests do not need it): whether each entry's link answered
+    // when the server last looked. Empty until the first look after a start, and wherever the check is switched off.
     @GetMapping("/link-status")
     public ResponseEntity<List<ClubProjectLinkStatusResponse>> listClubProjectLinkStatuses() {
         return ResponseEntity.ok(linkStatusService.list());
