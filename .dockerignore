@@ -17,3 +17,5 @@ playwright-report
 blob-report
 *.log
 .DS_Store
+# Members-only photos live on the server (mounted into coms-frontend), never in an image or its build cache
+member-media

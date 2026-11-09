@@ -191,9 +191,20 @@ jobs:
 
             # Keep only persistent secrets/data; remove every other untracked or ignored build artifact.
             # secrets/ holds the optional Firebase service-account file mounted by docker-compose.yml.
-            # member-media/ holds the members-only photos mounted into coms-frontend (git-ignored, so
-            # `git clean -x` would delete them on every deploy).
-            git clean -fdx -e .env -e backend-data/ -e backend/uploads/ -e uploads/ -e secrets/ -e member-media/
+            # The members-only photos mounted into coms-frontend are git-ignored, so `git clean -x` would
+            # delete them on every deploy. Keep the directory COMS_MEMBER_MEDIA_DIR names (default
+            # member-media/). An absolute path, or one that climbs out of the checkout (../), is outside
+            # `git clean`'s reach already, so only a path inside the checkout needs an exclusion.
+            MEDIA_DIR="$([ -f .env ] && sed -n 's/^COMS_MEMBER_MEDIA_DIR=//p' .env | tail -n 1 || true)"
+            MEDIA_DIR="${MEDIA_DIR%\"}"
+            MEDIA_DIR="${MEDIA_DIR#\"}"
+            MEDIA_DIR="${MEDIA_DIR:-member-media}"
+            MEDIA_KEEP="member-media/"
+            case "$MEDIA_DIR" in
+              /*|../*) ;;
+              *) MEDIA_KEEP="${MEDIA_DIR#./}"; MEDIA_KEEP="${MEDIA_KEEP%/}/" ;;
+            esac
+            git clean -fdx -e .env -e backend-data/ -e backend/uploads/ -e uploads/ -e secrets/ -e "$MEDIA_KEEP"
 
             NEW_TAG="$(git rev-parse --short=12 HEAD)"
             export COMS_IMAGE_TAG="$NEW_TAG"
@@ -213,6 +224,15 @@ jobs:
                 echo "Back up the database and repair its Flyway history before deploying this release." >&2
                 exit 1
               fi
+            fi
+
+            # A missing or empty photo directory does not stop the deploy: Docker creates an empty root-owned
+            # directory for a missing bind source, and /activities then shows broken photos to members
+            # (guests never request them). Warn so it is noticed.
+            case "$MEDIA_DIR" in /*) MEDIA_PATH="$MEDIA_DIR" ;; *) MEDIA_PATH="$DEPLOY_PATH/$MEDIA_DIR" ;; esac
+            if [ -z "$(find "$MEDIA_PATH" -type f -print -quit 2>/dev/null)" ]; then
+              echo "::warning::Members-only photo directory $MEDIA_PATH is missing or empty. /activities photos will not load for members until the files are uploaded (see .env.example, COMS_MEMBER_MEDIA_DIR)." >&2
+              echo "WARNING: $MEDIA_PATH has no photos; /activities photos will not load for members." >&2
             fi
 
             # Backups live outside the checkout (docker-compose.yml mounts the same directory
