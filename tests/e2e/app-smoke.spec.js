@@ -3799,6 +3799,7 @@ test('apps page renders DB-driven club projects grouped by category', async ({ p
   await expect(attendCard.getByRole('link', { name: /다운로드/ })).toBeVisible()
   await expect(page.locator('.site-stats')).toContainText('프로젝트')
   await expect(page.locator('.site-stats')).toContainText('카테고리')
+  await expect(page.locator('.site-stats')).not.toContainText('만든 사람')
 })
 
 test('apps page cards keep one size whatever the text length or section count', async ({ page }) => {
@@ -3860,11 +3861,17 @@ test('apps page cards keep one size whatever the text length or section count', 
         const ok = await page.evaluate(() => {
           const a = document.activeElement
           const slot = a.closest('.app-card-more').getBoundingClientRect()
+          const scroller = a.closest('.app-card-files').getBoundingClientRect()
           const r = a.getBoundingClientRect()
-          return r.top - 2 >= slot.top && r.bottom + 2 <= slot.bottom
+          return [slot, scroller].every((c) => r.top - 2 >= c.top && r.bottom + 2 <= c.bottom && r.left - 2 >= c.left)
         })
         expect(ok).toBe(true)
         await expect(link).toHaveAttribute('title', /긴파일이름/)
+        // The filter keeps the page-wide size: one section alone is as tall as the whole page was.
+        await page.getByRole('button', { name: /^웹사이트/ }).click()
+        await expect(page.locator('.app-card')).toHaveCount(3)
+        const filtered = await page.locator('.app-card').first().evaluate((el) => el.getBoundingClientRect().height)
+        expect(Math.abs(filtered - boxes[0].h)).toBeLessThanOrEqual(1)
       }
     }
   }

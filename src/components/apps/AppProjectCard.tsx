@@ -134,7 +134,7 @@ export default function AppProjectCard({
         )}
 
         {files.length > 0 && (
-          <div className="app-card-files flex min-w-0 flex-1 gap-2 overflow-x-auto" aria-label="배포 파일">
+          <div className="app-card-files flex min-w-0 flex-1 gap-2" aria-label="배포 파일">
             {files.map((file) => {
               const size = formatFileSize(file.fileSize)
               const href = projectFileHref(file.url)
@@ -160,9 +160,7 @@ export default function AppProjectCard({
           </div>
         )}
         {files.length > 1 && (
-          <span className="shrink-0 text-xs font-bold text-[var(--app-subtle)]" aria-hidden="true" title={`파일 ${files.length}개: 옆으로 스크롤`}>
-            +{files.length - 1}
-          </span>
+          <span className="shrink-0 text-xs font-bold text-[var(--app-subtle)]">파일 {files.length}개</span>
         )}
       </div>
     </CardTag>
