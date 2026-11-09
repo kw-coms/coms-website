@@ -65,28 +65,10 @@ for (const width of [1440, 375]) {
   })
 }
 
-test('playground output frames and the practice preview grow with tall content', async ({ page }) => {
-  await mockOptionalApis(page)
-  await page.goto('/study/web/practice/web-html-headings')
-  const editor = page.locator('.ex-web-editor .cm-content')
-  await expect(editor).toBeVisible()
-  await editor.click()
-  await page.keyboard.press('ControlOrMeta+A')
-  await page.keyboard.insertText(Array.from({ length: 14 }, (_, i) => `<p>줄 ${i + 1}</p>`).join('\n'))
-  const preview = await page.locator('iframe.ex-web-preview').elementHandle()
-  await expect.poll(async () => { const m = await measure(preview); return m?.loaded ? m.content : 0 }, { message: 'preview shows the new code', timeout: 5000 }).toBeGreaterThan(300)
-  await expect.poll(settled(preview), { timeout: 5000 }).toBeNull()
+const tall = (n) => Array.from({ length: n }, (_, i) => `<p>줄 ${i + 1}</p>`).join('\n')
 
-  await page.goto('/study/web')
-  const stage = page.locator('.pg-stage').filter({ has: page.getByRole('button', { name: /직접 해보기/ }) }).first()
-  await stage.scrollIntoViewIfNeeded()
-  await stage.getByRole('button', { name: /직접 해보기/ }).click()
-  await stage.getByRole('button', { name: /실행/ }).first().click()
-  const out = await stage.locator('iframe.pg-frame').elementHandle()
-  await expect.poll(settled(out), { timeout: 5000 }).toBeNull()
-})
-
-test('content that follows its own frame height (min-height:100vh) grows to the cap and then stops reporting', async ({ page }) => {
+/** The practice page of a web problem, with its editor, its preview frame and a size-report log on window.__sizes. */
+async function openPractice(page) {
   await mockOptionalApis(page)
   await page.addInitScript(() => {
     window.__sizes = []
@@ -96,22 +78,49 @@ test('content that follows its own frame height (min-height:100vh) grows to the 
   const editor = page.locator('.ex-web-editor .cm-content')
   await expect(editor).toBeVisible()
   const preview = await page.locator('iframe.ex-web-preview').elementHandle()
-  // a frame scrolled out of view is not rendered by the browser, so it reports nothing until it is seen
-  await preview.scrollIntoViewIfNeeded()
-  const type = async (code, wait = 1500) => {
+  const type = async (code) => {
     await editor.click()
     await page.keyboard.press('ControlOrMeta+A')
     await page.keyboard.insertText(code)
     await page.evaluate(() => { window.__sizes.length = 0 })
-    await page.waitForTimeout(wait)
   }
-  // no margin: the content equals the frame, a fixed point, so it takes at most 2 reports and the frame stays put
+  return { preview, type }
+}
+
+test('the practice preview grows with tall content', async ({ page }) => {
+  const { preview, type } = await openPractice(page)
+  await type(tall(14))
+  await expect.poll(async () => { const m = await measure(preview); return m?.loaded ? m.content : 0 }, { message: 'preview shows the new code', timeout: 5000 }).toBeGreaterThan(300)
+  await expect.poll(settled(preview), { timeout: 5000 }).toBeNull()
+})
+
+test('a playground output frame fits its content', async ({ page }) => {
+  await mockOptionalApis(page)
+  await page.goto('/study/web')
+  const stage = page.locator('.pg-stage').filter({ has: page.getByRole('button', { name: /직접 해보기/ }) }).first()
+  await stage.scrollIntoViewIfNeeded()
+  await stage.getByRole('button', { name: /직접 해보기/ }).click()
+  await stage.getByRole('button', { name: /실행/ }).first().click()
+  const out = await stage.locator('iframe.pg-frame').elementHandle()
+  await expect.poll(settled(out), { timeout: 5000 }).toBeNull()
+})
+
+test('content that fills its frame exactly (min-height:100vh, no margin) takes at most 2 reports and stays put', async ({ page }) => {
+  const { preview, type } = await openPractice(page)
+  // a frame scrolled out of view is not rendered by the browser, so it reports nothing until it is seen
+  await preview.scrollIntoViewIfNeeded()
   await type('<style>html,body,p{margin:0}body{min-height:100vh;background:#eef}</style><p>안녕</p>')
-  expect(await page.evaluate(() => window.__sizes.length)).toBeLessThanOrEqual(2)
   await expect.poll(async () => { const m = await measure(preview); return m?.loaded ? m.height : Infinity }, { timeout: 5000 }).toBeLessThan(300)
-  // the default 12px margin never reaches a fixed point: the frame grows to the cap, stops there, and the reports end
+  await page.waitForTimeout(1000)
+  expect(await page.evaluate(() => window.__sizes.length)).toBeLessThanOrEqual(2)
+})
+
+test('content that follows its own frame height with the default margin grows to the cap and then stops reporting', async ({ page }) => {
+  const { preview, type } = await openPractice(page)
+  await preview.scrollIntoViewIfNeeded()
+  // no fixed point: the frame grows to the cap, stops there, and the reports end
   const t0 = Date.now()
-  await type('<style>body{min-height:100vh}</style><p>안녕</p>', 0)
+  await type('<style>body{min-height:100vh}</style><p>안녕</p>')
   await expect.poll(async () => (await measure(preview))?.height, { timeout: 10_000 }).toBe(CAP)
   console.log(`100vh ramp to the cap: ${Date.now() - t0}ms, ${await page.evaluate(() => window.__sizes.length)} reports`)
   await page.evaluate(() => { window.__sizes.length = 0 })
@@ -126,7 +135,6 @@ test('quick successive edits leave the frame as tall as the last content', async
   const editor = page.locator('.ex-web-editor .cm-content')
   await expect(editor).toBeVisible()
   await editor.click()
-  const tall = (n) => Array.from({ length: n }, (_, i) => `<p>줄 ${i + 1}</p>`).join('\n')
   // tall, short, tall again, each well inside the 400ms preview debounce, then the tallest
   for (const n of [14, 1, 10, 18]) {
     await page.keyboard.press('ControlOrMeta+A')
