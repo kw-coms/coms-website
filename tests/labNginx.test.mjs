@@ -116,9 +116,12 @@ for (const part of [/auth_request \/lab\/_auth;/, /alias \/usr\/share\/nginx\/me
 assert.doesNotMatch(memberMedia, /autoindex\s+on/, 'no directory listing')
 assert.ok(memberMedia.indexOf('limit_req zone=member_media_ip') < memberMedia.indexOf('auth_request'), 'rate-limit before the auth subrequest')
 assert.doesNotMatch(memberMedia, /Cache-Control[^\n]*public/, 'a shared cache must never keep a member photo')
-assert.match(compose, /- \$\{COMS_MEMBER_MEDIA_DIR:-\.\/member-media\}:\/usr\/share\/nginx\/member-media:ro/)
+assert.match(compose, /^\s+- \.\/member-media:\/usr\/share\/nginx\/member-media:ro$/m)
 assert.match(readFileSync(new URL('../.gitignore', import.meta.url), 'utf8'), /^member-media\/$/m, 'photos stay out of the public repo')
-assert.match(readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8'), /MEDIA_KEEP="member-media\/"[\s\S]*git clean -fdx [^\n]*-e "\$MEDIA_KEEP"/, 'the deploy must not delete the uploaded photos')
+assert.match(readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8'), /git clean -fdx [^\n]*-e member-media\//, 'the deploy must not delete the uploaded photos')
+for (const file of ['../docker-compose.yml', '../nginx.frontend.conf', '../.env.example', '../.github/workflows/deploy.yml', '../.github/workflows/ci.yml']) {
+  assert.doesNotMatch(readFileSync(new URL(file, import.meta.url), 'utf8'), /COMS_MEMBER_MEDIA_DIR/, `${file}: the photo directory is fixed, not configurable`)
+}
 assert.match(readFileSync(new URL('../.dockerignore', import.meta.url), 'utf8'), /^member-media$/m, 'photos stay out of the image build context')
 assert.match(nginx, /^limit_req_zone \$binary_remote_addr zone=member_media_ip:10m rate=600r\/m;/m)
 assert.match(nginx, /^limit_req_zone \$member_media_global zone=member_media:64k rate=3000r\/m;/m)

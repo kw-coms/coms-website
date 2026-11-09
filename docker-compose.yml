@@ -255,8 +255,10 @@ services:
       # The study runner's unix socket (see coms-study-runner); read-only is enough to connect.
       - study-runner-socket:/run/coms-study:ro
       # Members-only photos (served by nginx behind the session check, never part of the repo or the
-      # image). Upload the files to this host directory; override the path with COMS_MEMBER_MEDIA_DIR in .env.
-      - ${COMS_MEMBER_MEDIA_DIR:-./member-media}:/usr/share/nginx/member-media:ro
+      # image). Photos go in <deploy dir>/member-media/ (activities/2026/*.webp) and must be
+      # world-readable, since nginx's workers run as another user: chmod -R a+rX member-media
+      # The deploy's `git clean` keeps this directory and warns when it is missing or empty.
+      - ./member-media:/usr/share/nginx/member-media:ro
     healthcheck:
       # nginx:1.28-alpine has BusyBox wget but no curl. Use 127.0.0.1, not
       # localhost: in-container "localhost" resolution is unreliable (observed
