@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test'
 import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
 
+// The PWA service worker precaches the TourOverlay chunk. Once it controls the page, the chunk is
+// served from its cache and page.route never sees the request, so the chunk-failure tests would
+// depend on how fast the worker installs. The tour does not depend on the worker: keep it off here.
+test.use({ serviceWorkers: 'block' })
+
 // The site tour ("튜토리얼"): a guest tour and a member tour, each starting by itself once on
 // the home page and on request from the footer, quick jump and the mobile menu.
 //

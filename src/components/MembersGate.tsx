@@ -42,7 +42,7 @@ export function AuthCheckFailed() {
   const { retryAuth } = useAuth()
   return (
     <div role="alert" className="mx-auto my-10 flex max-w-xl flex-col items-center gap-3 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] p-8 text-center">
-      <p className="text-base font-bold text-[var(--app-text)]">로그인 상태를 확인하지 못했어요</p>
+      <h1 className="text-base font-bold text-[var(--app-text)]">로그인 상태를 확인하지 못했어요</h1>
       <button type="button" onClick={() => void retryAuth()} className="apple-action-secondary inline-flex min-h-10 items-center justify-center px-5 py-2 text-sm">다시 시도</button>
     </div>
   )

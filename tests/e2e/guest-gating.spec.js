@@ -69,7 +69,7 @@ test.describe('lock icons', () => {
     await skipIntro(page)
     await mockAdminApis(page)
     await page.goto('/about')
-    await expect(page.getByRole('button', { name: '로그아웃' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible()
     await expect(nav(page).locator(LOCK)).toHaveCount(0)
     await nav(page).getByRole('button', { name: 'Records' }).click()
     await expect(page.locator('#records-nav-panel').locator(LOCK)).toHaveCount(0)
@@ -158,7 +158,8 @@ test.describe('study for guests', () => {
     await skipIntro(page)
     await mockOptionalApis(page)
     await page.goto('/study/c/practice')
-    const row = page.getByRole('link', { name: /첫 이름표 출력/ })
+    // The list row (the page also has a "start here" link to the same problem).
+    const row = page.locator('a.ex-row', { hasText: '첫 이름표 출력' })
     await expect(row).toBeVisible()
     await expect(row.locator(LOCK)).toHaveCount(1)
     await expect(page.getByText('동아리 이름표에 적힌 번호를')).toHaveCount(0)
@@ -236,11 +237,30 @@ test.describe('study for guests', () => {
       ? route.fulfill({ status: 500, json: { message: 'boom' } })
       : route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } })))
     await page.goto('/study/c')
-    await expect(page.getByText('로그인 상태를 확인하지 못했어요')).toBeVisible()
+    // AuthProvider retries /me twice (600ms + 1500ms backoff) before it reports authError.
+    await expect(page.getByRole('heading', { name: '로그인 상태를 확인하지 못했어요' })).toBeVisible({ timeout: 10_000 })
     await expect(page.locator('[data-members-gate]')).toHaveCount(0)
+    await expect(page.getByText(LESSON_SENTENCE)).toHaveCount(0)
+    await expect(page.locator(LOCK)).toHaveCount(0)
     fail = false
     await page.getByRole('button', { name: '다시 시도' }).click()
     await expect(page.getByText(LESSON_SENTENCE)).toBeVisible()
+  })
+
+  test('a failed /api/auth/me on a problem: the retry state, no statement, and 다시 시도 recovers', async ({ page }) => {
+    await skipIntro(page)
+    await mockOptionalApis(page)
+    let fail = true
+    await page.route('**/api/auth/me', (route) => (fail
+      ? route.fulfill({ status: 500, json: { message: 'boom' } })
+      : route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } })))
+    await page.goto('/study/c/practice/c-start-badge')
+    await expect(page.getByRole('heading', { name: '로그인 상태를 확인하지 못했어요' })).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('[data-members-gate]')).toHaveCount(0)
+    await expect(page.getByText('동아리 이름표에 적힌 번호를')).toHaveCount(0)
+    fail = false
+    await page.getByRole('button', { name: '다시 시도' }).click()
+    await expect(page.getByText('동아리 이름표에 적힌 번호를')).toBeVisible()
   })
 
   test('a member opens the problem with its statement and editor', async ({ page }) => {
