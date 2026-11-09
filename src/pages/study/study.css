@@ -657,11 +657,10 @@
 .study-overview-resume:hover { background: var(--app-accent-border); }
 .study-overview-resume:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
 
-/* Five subject cards on a 6-column grid (3 + 2 wide), then the Circuit Lab banner across the whole row. */
+/* Five subject cards on a 6-column grid (3 + 2 wide). */
 .study-hub-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
 .study-hub-grid > li { grid-column: span 2; min-width: 0; }
 .study-hub-grid > li:nth-child(n+4):nth-child(-n+5) { grid-column: span 3; }
-.study-hub-grid > li.study-hub-lab { grid-column: 1 / -1; }
 .study-card {
   position: relative; display: flex; flex-direction: column; gap: 12px; height: 100%;
   padding: 20px; border-radius: 18px;
@@ -691,47 +690,24 @@
 .study-card-desc { color: var(--app-muted); font-size: 14.5px; line-height: 1.6; text-wrap: pretty; }
 .study-card-done { font-size: 12.5px; font-weight: 600; color: var(--app-muted); }
 
-/* Circuit Lab: a featured banner, copy on the left, the circuit it builds on the right. */
-.study-card-lab {
-  flex-direction: row; align-items: center; justify-content: space-between; gap: 32px; padding: 28px 32px; overflow: hidden;
-  background:
-    radial-gradient(34rem 16rem at 88% 50%, color-mix(in srgb, var(--app-accent) 16%, transparent), transparent 72%),
-    radial-gradient(circle, color-mix(in srgb, var(--app-text) 11%, transparent) 1px, transparent 1.4px) 0 0 / 23px 23px,
-    var(--app-surface);
-  border-color: var(--app-accent-border);
-}
-.study-lab-copy { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; max-width: 440px; }
-.study-lab-copy .study-card-head { padding-right: 0; }
-.study-lab-copy .study-card-title { font-size: 26px; }
-.study-tile-lab { background: var(--app-accent-soft); }
-.study-lab-open { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; border-radius: 99px; background: var(--app-text); color: var(--app-bg); font-size: 14px; font-weight: 700; transition: transform .18s ease; }
-.study-card-lab:hover .study-lab-open, .study-card-lab:focus-visible .study-lab-open { transform: translateX(2px); }
-.study-lab-art { flex: none; width: min(400px, 48%); height: auto; color: var(--app-accent-text); }
-.study-lab-part { fill: var(--app-surface); }
-.study-lab-glow { fill: var(--app-accent); opacity: .16; }
-.study-lab-flow { opacity: .85; animation: study-lab-flow 1.6s linear infinite; }
-@keyframes study-lab-flow { to { stroke-dashoffset: -28; } }
-
 @media (max-width: 899px) {
   .study-hub-head { grid-template-columns: 1fr; align-items: start; margin-bottom: 28px; }
   .study-hub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .study-hub-grid > li, .study-hub-grid > li:nth-child(n+4):nth-child(-n+5) { grid-column: span 1; }
-  .study-hub-grid > li:nth-child(5), .study-hub-grid > li.study-hub-lab { grid-column: 1 / -1; }
+  /* as specific as the reset above, so the odd fifth card spans the row instead of sitting alone */
+  .study-hub-grid > li:nth-child(5):nth-child(n+4):nth-child(-n+5) { grid-column: 1 / -1; }
 }
 @media (max-width: 640px) {
   .study-hub { padding: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top) + 28px) 16px 64px; }
   .study-hub-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .study-hub-grid > li, .study-hub-grid > li:nth-child(5), .study-hub-grid > li.study-hub-lab { grid-column: 1; }
+  .study-hub-grid > li, .study-hub-grid > li:nth-child(5):nth-child(n+4):nth-child(-n+5) { grid-column: 1; }
   .study-overview-stats > div { padding: 12px; }
   .study-overview-stats dd { font-size: 22px; }
   .study-card { padding: 18px; }
-  .study-card-lab { flex-direction: column; align-items: stretch; gap: 16px; padding: 20px; }
-  .study-lab-art { width: 100%; max-width: 300px; align-self: center; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .study-card, .study-card-go, .study-lab-open { transition: none; }
-  .study-card:hover, .study-card:has(.study-card-link:focus-visible), .study-card:focus-visible, .study-card:hover .study-card-go, .study-card-lab:hover .study-lab-open { transform: none; }
-  .study-lab-flow { animation: none; }
+  .study-card, .study-card-go { transition: none; }
+  .study-card:hover, .study-card:has(.study-card-link:focus-visible), .study-card:focus-visible, .study-card:hover .study-card-go { transform: none; }
 }
 
 /* ---------- 회로 그림 (circuits/): 약간 3D로 기울인 Tinkercad 스타일 SVG + 시뮬레이션 ----------
