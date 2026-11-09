@@ -2416,9 +2416,14 @@ test('Records and Tools toggles show the active underline on their pages', async
     expect(Math.abs(w[0] - widths.about[0]), `Records width on ${path}`).toBeLessThanOrEqual(0.5)
     expect(Math.abs(w[1] - widths.about[1]), `Tools width on ${path}`).toBeLessThanOrEqual(0.5)
   }
-  // The underline is centred on the label text, like Sponsors' (offset between the two centres must match).
+  // The underline is centred on the label text, like the other items' (offset between the two centres must match).
   await page.goto('/activity-log')
+  // boundingBox() does not wait for layout: wait until the header is drawn and Records is active first.
+  await expect(toggle('Records').locator('[data-nav-label]')).toBeVisible()
+  await expect(underline('Records')).toHaveCSS('opacity', '1')
+  await page.evaluate(() => document.fonts.ready)
   const offset = async (btn, line, label) => {
+    await expect(label).toBeVisible()
     const [l, u] = [await label.boundingBox(), await line.boundingBox()]
     return (u.x + u.width / 2) - (l.x + l.width / 2)
   }
