@@ -107,6 +107,8 @@ export interface MissionProgress {
 const BLANK_CODE = `void setup() {\n  pinMode(13, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n`;
 export { SAVE_KEY };
 export const THEME_KEY = 'coms-lab:theme';
+/** The main site's theme key (same origin); read-only here. */
+export const SITE_THEME_KEY = 'kwcoms-theme-mode:v2';
 export const BACKUP_KEY = 'coms-lab:scene:v1:backup';
 /** The backup that BACKUP_KEY held before a newer one replaced it (never lose the older one silently). */
 export const BACKUP_PREV_KEY = 'coms-lab:scene:v1:backup-prev';
@@ -149,6 +151,8 @@ function withGeneratedCode(s: Scene, analysis: Analysis, trusted = false): Scene
 function initialTheme(): Theme {
   const saved = getItem(THEME_KEY);
   if (saved === 'light' || saved === 'dark') return saved;
+  const site = getItem(SITE_THEME_KEY);
+  if (site === 'light' || site === 'dark') return site;
   return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 

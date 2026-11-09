@@ -54,6 +54,7 @@ export function App() {
   const quality = useStore((s) => s.quality);
   const notice = useStore((s) => s.qualityNotice);
   const aa = useStore((s) => s.antialias);
+  const tutorial = useStore((s) => s.tutorial);
   const restore = useStore((s) => s.restoreNotice);
   useShortcuts();
   useLayoutEffect(() => {
@@ -96,14 +97,14 @@ export function App() {
         </div>
         <SidePanel />
       </main>
-      {restore && (
+      {restore && !tutorial && (
         <div className="perf-notice restore" role="alert">
           <span>저장된 작업을 불러오지 못해 백업해 두었어요. 예제 회로로 시작했어요.</span>
           <button type="button" onClick={downloadBackup}>백업 다운로드</button>
           <button type="button" onClick={dismissRestoreNotice}>확인</button>
         </div>
       )}
-      {notice && (
+      {notice && !tutorial && (
         <div className="perf-notice" role="status">
           <span>{notice}{aa && ' 안티앨리어싱을 끄면 더 부드러워져요.'}</span>
           <button type="button" onClick={pinHighQuality}>고화질로 고정</button>

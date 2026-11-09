@@ -154,6 +154,57 @@ try {
   await lab(() => { window.__lab.loadScene({ version: 2, parts: [], wires: [], code: 'void setup(){}\nvoid loop(){}\n' }); window.__lab.addPart('oscilloscope', [0, -9, 0]); window.__lab.set({ sideTab: 'instruments', sideOpen: true }); });
   await page.locator('.inst-card select[aria-label="시간/칸"]:visible').first().selectOption('100');
   check('시간/칸 = 100 ms is stored in the part props', (await lab(() => window.__lab.getState().hist.present.parts.find((p) => p.kind === 'oscilloscope').props.timeDiv)) === 100);
+  // ---- toolbar never wraps or overflows; quality notice is a wrapped sheet that waits for the tutorial; theme follows the site ----
+  const fresh = async (width, height, init = () => {}, scheme = 'light') => {
+    const c = await browser.newContext({ viewport: { width, height }, colorScheme: scheme });
+    await c.addInitScript(init);
+    const p = await c.newPage();
+    await p.goto(base);
+    await p.waitForFunction(() => window.__lab?.EXAMPLES, null, { timeout: 30000 });
+    await p.waitForTimeout(500);
+    return { c, p };
+  };
+  const skipTutorial = () => { try { localStorage.setItem('coms-lab:tutorial-done', '1'); } catch { /* no storage */ } };
+  for (const w of [1440, 1280, 1100, 1024, 1001, 390]) {
+    const { c, p } = await fresh(w, 900, skipTutorial);
+    const m = await p.evaluate(() => {
+      const bar = document.querySelector('.toolbar');
+      const vis = [...bar.querySelectorAll('.tb, .brand strong, .speed select')].filter((e) => e.offsetParent !== null);
+      return { over: bar.scrollWidth - bar.clientWidth, barH: bar.getBoundingClientRect().height, tall: vis.filter((e) => e.getBoundingClientRect().height > 40).map((e) => e.textContent), n: vis.length, docOver: document.documentElement.scrollWidth - innerWidth, offscreen: vis.filter((e) => e.getBoundingClientRect().right > innerWidth + 1).length };
+    });
+    check(`toolbar at ${w}px: no wrapped button, no overflow`, m.over <= 1 && m.tall.length === 0 && m.barH < 56 && m.docOver <= 0 && m.offscreen === 0, JSON.stringify(m));
+    await c.close();
+  }
+  const longNotice = '그래픽 가속이 꺼져 있는 것 같아요(소프트웨어 렌더링 감지). 부드럽게 쓰도록 그림자·반사를 줄였어요. 고화질로 고정하면 저장되며, 위쪽 화질 메뉴에서 언제든 바꿀 수 있어요.';
+  for (const w of [390, 360]) {
+    const { c, p } = await fresh(w, 844);
+    await p.evaluate((t) => window.__lab.set({ tutorial: true, qualityNotice: t }), longNotice);
+    await p.waitForTimeout(200);
+    check(`notice at ${w}px stays hidden while the tutorial modal is open`, (await p.locator('.perf-notice').count()) === 0 && (await p.locator('[role=dialog]').count()) > 0);
+    await p.evaluate(() => window.__lab.set({ tutorial: false }));
+    await p.waitForTimeout(200);
+    const n = await p.evaluate(() => {
+      const r = document.querySelector('.perf-notice').getBoundingClientRect();
+      return { w: r.width, left: r.left, right: r.right, top: r.top, bottom: r.bottom, h: r.height, btn: [...document.querySelectorAll('.perf-notice button')].map((b) => b.getBoundingClientRect().height), vh: innerHeight, vw: innerWidth };
+    });
+    check(`notice at ${w}px is wide, on screen, wrapped, buttons not wrapped`, n.w >= Math.min(300, w - 20) && n.left >= 0 && n.right <= n.vw && n.bottom <= n.vh && n.btn.every((h) => h <= 40) && n.h < 260, JSON.stringify(n));
+    if (w === 390) await saveScreenshot(p, join(OUT, 'ui-v2-notice-390.png'));
+    await p.click('.perf-notice button:last-child');
+    check(`notice at ${w}px is dismissible`, (await p.locator('.perf-notice').count()) === 0);
+    await c.close();
+  }
+  {
+    const siteDark = () => { try { localStorage.setItem('kwcoms-theme-mode:v2', 'dark'); localStorage.setItem('coms-lab:tutorial-done', '1'); } catch { /* no storage */ } };
+    const a = await fresh(1440, 900, siteDark, 'light');
+    check('site theme dark + no Lab key: Lab opens dark', (await a.p.evaluate(() => document.documentElement.dataset.theme)) === 'dark');
+    await a.c.close();
+    const b = await fresh(1440, 900, () => { try { localStorage.setItem('kwcoms-theme-mode:v2', 'dark'); localStorage.setItem('coms-lab:theme', 'light'); localStorage.setItem('coms-lab:tutorial-done', '1'); } catch { /* no storage */ } }, 'dark');
+    check("Lab's own saved theme wins over the site's", (await b.p.evaluate(() => document.documentElement.dataset.theme)) === 'light');
+    await b.c.close();
+    const d = await fresh(1440, 900, skipTutorial, 'dark');
+    check('no keys at all: follows prefers-color-scheme', (await d.p.evaluate(() => document.documentElement.dataset.theme)) === 'dark');
+    await d.c.close();
+  }
   check('no console errors / AudioContext warnings', errs.length === 0, errs.slice(0, 3).join(' | '));
 } catch (e) {
   console.log('FAIL exception', e.message);
