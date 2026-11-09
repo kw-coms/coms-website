@@ -458,8 +458,19 @@ test('activities title remains readable across selectable fonts and viewport wid
   }
 })
 
+// The footer's appearance settings sit behind one "화면 설정" button that opens a dialog (popover on desktop, sheet on phones).
+const openAppearance = async (page) => {
+  const trigger = page.getByRole('button', { name: '화면 설정', exact: true })
+  await trigger.click()
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  const dialog = page.getByRole('dialog', { name: '화면 설정' })
+  await expect(dialog).toBeVisible()
+  return dialog
+}
+
 test('appearance panel explains guest font persistence scope', async ({ page }) => {
   await page.goto('/')
+  await openAppearance(page)
 
   await expect(page.locator('[aria-label="폰트 설정"]')).toBeVisible()
   await expect(page.getByText('이 브라우저에 임시 적용')).toBeVisible()
@@ -552,10 +563,14 @@ test('appearance panel directs signed-in users to account-saved font settings', 
   await mockAdminApis(page)
   await page.goto('/')
 
+  await openAppearance(page)
   const fontSettings = page.locator('[aria-label="폰트 설정"]')
   await expect(fontSettings).toContainText('내 계정에 저장됨')
   await fontSettings.getByRole('button', { name: '계정 설정에서 폰트 변경' }).click()
   await expect(page).toHaveURL(/\/settings$/)
+  // Choosing it closes the popover; open it again so the "no font select" check is not vacuously true.
+  await openAppearance(page)
+  await expect(fontSettings).toContainText('내 계정에 저장됨')
   await expect(fontSettings.getByRole('combobox', { name: '사이트 폰트 선택' })).toHaveCount(0)
   // The guest-local pick (Noto Sans KR) must NOT apply for a signed-in user
   // whose account has no font — the account default (site default Pretendard)
@@ -4742,6 +4757,7 @@ test.describe('lite rendering mode', () => {
     await expect(page.locator('html')).toHaveAttribute('data-perf', 'full')
     expect(await glassBlur(page)).toContain('blur')
 
+    await openAppearance(page)
     const group = page.getByRole('radiogroup', { name: '화면 효과' })
     await group.getByRole('radio', { name: '가볍게' }).click()
     await expect(page.locator('html')).toHaveAttribute('data-perf', 'lite')
@@ -4750,6 +4766,7 @@ test.describe('lite rendering mode', () => {
 
     await page.reload()
     await expect(page.locator('html')).toHaveAttribute('data-perf', 'lite')
+    await openAppearance(page)
 
     // Roving tabindex: only the chosen option is a tab stop, arrows move and apply.
     const lite = group.getByRole('radio', { name: '가볍게' })
@@ -4794,8 +4811,11 @@ test.describe('arduino study circuits', () => {
   const circuit = (page, id) => page.locator(`figure.circuit[data-circuit="${id}"]`)
   // The real site-wide screen-effects setting (perfMode.ts, in the footer): it sets <html data-perf> while the page is open.
   const setPerf = async (page, mode) => {
+    await openAppearance(page)
     await page.getByRole('radiogroup', { name: '화면 효과' }).getByRole('radio', { name: mode === 'lite' ? '가볍게' : '화려하게' }).click()
     await expect(page.locator('html')).toHaveAttribute('data-perf', mode)
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: '화면 설정' })).toHaveCount(0)
   }
 
   test('the LED blink simulation toggles the LED like the sketch', async ({ page }) => {

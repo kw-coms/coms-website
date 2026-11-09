@@ -1,0 +1,367 @@
+/* ===== Info pages: About / Activities / Projects / Apps / Sponsors ================ */
+/* The page head, stat strip and chips follow the study hub (pages/study/study.css) so the
+   public pages read as one site. Only --app-* tokens: light, dark and every accent work. */
+
+/* ---- Story pages (About, Activities, Projects) -------------------------------- */
+.coms-detail .detail-head {
+	max-width: 42rem;
+}
+.coms-detail .detail-head .coms-title {
+	margin-top: 0;
+	font-size: clamp(1.75rem, 3.4vw, 2.6rem);
+	line-height: 1.2;
+}
+/* A card label is a short phrase, not a code tag: sentence case, no tracking, readable size. */
+.coms-detail .coms-card-eyebrow {
+	font-family: inherit;
+	font-size: 0.84rem;
+	font-weight: 600;
+	line-height: 1.4;
+	letter-spacing: 0;
+	text-transform: none;
+	color: var(--app-accent-text);
+}
+.coms-detail .coms-timeline {
+	margin-left: 0;
+	margin-right: 0;
+}
+
+/* ---- Page frame + head (Apps) -------------------------------------------------- */
+.site-page {
+	min-height: 100vh;
+	padding: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top) + 48px) 24px 96px;
+	background:
+		radial-gradient(60rem 26rem at 50% -8rem, color-mix(in srgb, var(--app-accent) 14%, transparent), transparent 70%),
+		linear-gradient(180deg, transparent, var(--app-bg) 34rem),
+		radial-gradient(circle, color-mix(in srgb, var(--app-text) 13%, transparent) 1px, transparent 1.4px) 0 0 / 23px 23px,
+		var(--app-bg);
+	color: var(--app-text);
+}
+.site-page-inner {
+	max-width: 1080px;
+	margin: 0 auto;
+}
+.site-head {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+	gap: 24px 48px;
+	align-items: end;
+}
+.site-head h1 {
+	margin: 0 0 12px;
+	font-size: clamp(34px, 5.4vw, 52px);
+	font-weight: 900;
+	line-height: 1.15;
+	letter-spacing: -0.02em;
+	color: var(--app-text);
+}
+.site-head-lead {
+	margin: 0;
+	max-width: 32em;
+	color: var(--app-muted);
+	font-size: 16px;
+	line-height: 1.6;
+	text-wrap: pretty;
+	word-break: keep-all;
+}
+.site-stats {
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: minmax(0, 1fr);
+	margin: 0;
+	border: 1px solid var(--app-hairline);
+	border-radius: 16px;
+	background: color-mix(in srgb, var(--app-surface) 86%, transparent);
+	backdrop-filter: blur(6px);
+}
+.site-stats > div {
+	display: flex;
+	flex-direction: column-reverse;
+	gap: 2px;
+	min-width: 0;
+	padding: 14px 16px;
+}
+.site-stats > div + div {
+	border-left: 1px solid var(--app-hairline);
+}
+.site-stats dt {
+	font-size: 12.5px;
+	font-weight: 600;
+	color: var(--app-muted);
+}
+.site-stats dd {
+	margin: 0;
+	font-size: 26px;
+	font-weight: 800;
+	line-height: 1.2;
+	font-variant-numeric: tabular-nums;
+	overflow-wrap: anywhere;
+}
+/* ---- Apps: category chips --------------------------------------------------- */
+.apps-filter {
+	position: sticky;
+	top: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top));
+	z-index: 5;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 32px -24px 0;
+	padding: 12px 24px;
+	background: color-mix(in srgb, var(--app-bg) 88%, transparent);
+	backdrop-filter: blur(10px);
+	border-bottom: 1px solid var(--app-hairline);
+}
+/* Lite look: blur is off, so the bar must be solid or the cards show through it. */
+:root[data-perf='lite'] .apps-filter {
+	background: var(--app-bg);
+	backdrop-filter: none;
+}
+.apps-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 36px;
+	padding: 0 14px;
+	border: 1px solid var(--app-hairline-strong);
+	border-radius: 999px;
+	background: transparent;
+	color: var(--app-text);
+	font: inherit;
+	font-size: 14px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background-color 0.15s, border-color 0.15s;
+}
+.apps-chip span {
+	color: var(--app-muted);
+	font-variant-numeric: tabular-nums;
+}
+.apps-chip:hover {
+	border-color: var(--app-accent);
+}
+.apps-chip[aria-pressed='true'] {
+	border-color: var(--app-accent);
+	background: var(--app-accent-soft);
+	color: var(--app-text);
+}
+.apps-chip[aria-pressed='true'] span {
+	color: var(--app-accent-text);
+}
+.apps-chip:focus-visible,
+.app-card:focus-visible,
+.app-card a:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 2px;
+}
+
+/* ---- Apps: grid, no empty seats in the last row ---------------------------------- */
+.apps-group + .apps-group {
+	margin-top: 44px;
+}
+.apps-group-head {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	margin-bottom: 14px;
+}
+.apps-group-head h3 {
+	margin: 0;
+	font-size: 22px;
+	font-weight: 800;
+	color: var(--app-text);
+}
+.apps-group-head span {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--app-muted);
+	font-variant-numeric: tabular-nums;
+}
+.apps-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 12px;
+}
+@media (min-width: 641px) {
+	.apps-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.apps-grid > :last-child:nth-child(odd) {
+		grid-column: 1 / -1;
+	}
+}
+/* Six tracks, each card takes two; a short last row of one or two cards stretches to fill it. */
+@media (min-width: 1024px) {
+	.apps-grid {
+		grid-template-columns: repeat(6, minmax(0, 1fr));
+	}
+	.apps-grid > * {
+		grid-column: span 2;
+	}
+	.apps-grid > :last-child:nth-child(3n + 1) {
+		grid-column: 1 / -1;
+	}
+	.apps-grid > :last-child:nth-child(3n + 2),
+	.apps-grid > :nth-last-child(2):nth-child(3n + 1) {
+		grid-column: span 3;
+	}
+}
+
+/* ---- Apps: one card --------------------------------------------------------------- */
+.apple-product-panel.app-card {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	grid-template-areas:
+		'tile head open'
+		'desc desc desc'
+		'foot foot foot'
+		'more more more';
+	align-items: center;
+	align-content: start;
+	gap: 0 12px;
+	min-height: 0;
+	padding: 18px;
+	border-radius: 16px;
+	box-shadow: none;
+}
+.app-card-tile {
+	grid-area: tile;
+	display: grid;
+	width: 40px;
+	height: 40px;
+	place-items: center;
+	border-radius: 12px;
+	background: var(--app-accent-soft);
+	color: var(--app-accent-text);
+	font-size: 17px;
+	font-weight: 800;
+}
+.app-card-head {
+	grid-area: head;
+	min-width: 0;
+}
+.app-card-eyebrow {
+	margin: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--app-muted);
+	font-size: 12.5px;
+	font-weight: 600;
+}
+.app-card-title {
+	margin: 1px 0 0;
+	color: var(--app-text);
+	font-size: 18px;
+	font-weight: 700;
+	line-height: 1.3;
+	word-break: keep-all;
+	overflow-wrap: anywhere;
+}
+.app-card-open {
+	grid-area: open;
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	color: var(--app-accent-text);
+	font-size: 14px;
+	font-weight: 700;
+	text-decoration: none;
+}
+.app-card-desc {
+	grid-area: desc;
+	margin: 12px 0 0;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 14px;
+	font-weight: 500;
+	line-height: 1.6;
+	word-break: keep-all;
+}
+.app-card-foot {
+	grid-area: foot;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px 12px;
+	margin-top: 12px;
+	min-width: 0;
+	color: var(--app-subtle);
+	font-size: 12.5px;
+	font-weight: 600;
+}
+.app-card-host {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.app-card-more {
+	grid-area: more;
+}
+@media (max-width: 640px) {
+	.apple-product-panel.app-card {
+		padding: 12px 14px;
+		gap: 0 10px;
+	}
+	.app-card-tile {
+		width: 34px;
+		height: 34px;
+		border-radius: 10px;
+		font-size: 15px;
+	}
+	.app-card-title {
+		font-size: 16px;
+	}
+	.app-card-desc {
+		-webkit-line-clamp: 2;
+		margin-top: 8px;
+		font-size: 13.5px;
+		line-height: 1.5;
+	}
+	.app-card-foot {
+		margin-top: 8px;
+	}
+	/* The address is secondary: a phone shows the list, the card is the link. */
+	.app-card-host {
+		display: none;
+	}
+	.app-card-foot:not(:has(> :not(.app-card-host))) {
+		display: none;
+	}
+	.apps-grid {
+		gap: 8px;
+	}
+}
+
+@media (max-width: 900px) {
+	.site-head {
+		grid-template-columns: 1fr;
+		align-items: start;
+	}
+}
+@media (max-width: 640px) {
+	.site-page {
+		padding: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top) + 28px) 16px 64px;
+	}
+	.apps-filter {
+		margin: 20px -16px 0;
+		padding: 10px 16px;
+	}
+	.apps-group + .apps-group {
+		margin-top: 32px;
+	}
+	.site-stats > div {
+		padding: 12px;
+	}
+	.site-stats dd {
+		font-size: 22px;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.apps-chip {
+		transition: none;
+	}
+}

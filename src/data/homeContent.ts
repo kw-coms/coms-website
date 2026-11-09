@@ -295,12 +295,6 @@ export const aboutDetailCards = [
   },
 ]
 
-export const aboutDetailFlow = [
-  ['01', 'Learn together', '세미나와 스터디로 개발의 기본기를 함께 쌓습니다.'],
-  ['02', 'Make it real', '작은 실습을 프로젝트로 확장하며 결과물을 완성합니다.'],
-  ['03', 'Grow the community', '후기, 코드 리뷰, 자료 공유로 다음 활동의 기준을 높입니다.'],
-]
-
 export const aboutDetailPrinciples = [
   '처음 시작하는 사람도 편하게 질문할 수 있는 분위기',
   '작게 만들고 빠르게 공유하며 개선하는 제작 문화',

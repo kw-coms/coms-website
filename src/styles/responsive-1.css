@@ -453,7 +453,7 @@
 		display: block;
 	}
 
-	.appearance-color-row > div > button {
+	.appearance-swatches > button {
 		aspect-ratio: 1 / 1;
 	}
 }
