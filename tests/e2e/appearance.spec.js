@@ -34,6 +34,8 @@ test.describe('desktop popover', () => {
     await openFromFooter(page)
     await page.locator('.apple-footer-note').click()
     await expect(dialog(page)).toHaveCount(0)
+    await expect(trigger(page)).toHaveAttribute('aria-expanded', 'false')
+    await expect(trigger(page)).toBeFocused()
   })
 
   test('a route change closes it', async ({ page }) => {
@@ -45,6 +47,11 @@ test.describe('desktop popover', () => {
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL(/\/notices/)
     await expect(dialog(page)).toHaveCount(0)
+    // Back to the page it was opened on: it stays closed.
+    await page.goBack()
+    await expect(page).toHaveURL(/\/activities/)
+    await expect(dialog(page)).toHaveCount(0)
+    await expect(trigger(page)).toHaveAttribute('aria-expanded', 'false')
   })
 
   test('the low-power notice opens it with the screen-effects choice focused', async ({ page }) => {

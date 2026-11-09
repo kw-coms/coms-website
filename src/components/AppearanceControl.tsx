@@ -55,7 +55,10 @@ export default function AppearanceControl({
   const { pathname } = useLocation()
   // The footer outlives route changes: remembering the page it was opened on closes it when the page changes.
   const [openAt, setOpenAt] = useState<string | null>(null)
+  // Derived-state reset during render: coming back to the page it was opened on must not reopen it.
+  if (openAt !== null && openAt !== pathname) setOpenAt(null)
   const open = openAt === pathname
+  const focusFrameRef = useRef(0)
   const setOpen = useCallback((value: boolean) => setOpenAt(value ? pathname : null), [pathname])
 
   const close = useCallback((returnFocus: boolean) => {
@@ -63,6 +66,8 @@ export default function AppearanceControl({
     setOpen(false)
     if (returnFocus) buttonRef.current?.focus()
   }, [setOpen])
+
+  useEffect(() => () => window.cancelAnimationFrame(focusFrameRef.current), [])
 
   // Lets the "settings" button of the low-power notice open the panel from anywhere on the page.
   useEffect(() => {
@@ -110,10 +115,10 @@ export default function AppearanceControl({
       close(false)
       // The press then focuses whatever was clicked; only when focus falls back to <body> does it go back to the button.
       if (returnFocus) {
-        window.setTimeout(() => {
+        focusFrameRef.current = window.requestAnimationFrame(() => {
           const active = document.activeElement
           if (!active || active === document.body) buttonRef.current?.focus()
-        }, 50)
+        })
       }
     }
     document.addEventListener('keydown', onKeyDown)
