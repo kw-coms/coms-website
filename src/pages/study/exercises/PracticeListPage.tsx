@@ -6,6 +6,7 @@ import { exercisesFor } from './problems'
 import { useProgress } from './progress'
 import { labMissions, missionUrl } from './labMissions'
 import Dots from './Dots'
+import MemberLock from '../../../components/MemberLock'
 import { chapterOf, chapters, problemStatus, recommendProblem } from './navigation'
 import '../study.css'
 import './exercises.css'
@@ -63,7 +64,7 @@ export default function PracticeListPage() {
       </div>
       {chapter && <button type="button" className="ex-filter-chip" onClick={() => setChapter('')} aria-label={`장 필터 해제: ${chapter}`}>장: {chapter} ×</button>}
       <p role="status">{visible.length}개 문제</p>
-      <ul className="ex-list"><li className="ex-list-head" aria-hidden="true"><span>문제</span><span>난이도</span><span>주제</span>{mixedLangs && <span>언어</span>}<span>상태</span></li>{visible.map((p) => { const state = stateOf(progress[p.id]); return <li key={p.id}><Link className="ex-row" data-lang={mixedLangs || undefined} to={`/study/${id}/practice/${p.id}`}><strong>{p.title}</strong><Dots level={p.level} /><span className="ex-topics">{p.topics.join(' · ')}</span>{mixedLangs && <span className="ex-lang">{('langs' in p ? p.langs.map((l) => LANG_LABEL[l] ?? l) : ['HTML', 'CSS', 'JS']).join(' / ')}</span>}<span className="ex-state" data-state={state.key}>{state.key === 'new' ? <span className="ex-sr">{state.label}</span> : state.label}</span></Link></li> })}</ul>
+      <ul className="ex-list"><li className="ex-list-head" aria-hidden="true"><span>문제</span><span>난이도</span><span>주제</span>{mixedLangs && <span>언어</span>}<span>상태</span></li>{visible.map((p) => { const state = stateOf(progress[p.id]); return <li key={p.id}><Link className="ex-row" data-lang={mixedLangs || undefined} to={`/study/${id}/practice/${p.id}`}><strong>{p.title} <MemberLock /></strong><Dots level={p.level} /><span className="ex-topics">{p.topics.join(' · ')}</span>{mixedLangs && <span className="ex-lang">{('langs' in p ? p.langs.map((l) => LANG_LABEL[l] ?? l) : ['HTML', 'CSS', 'JS']).join(' / ')}</span>}<span className="ex-state" data-state={state.key}>{state.key === 'new' ? <span className="ex-sr">{state.label}</span> : state.label}</span></Link></li> })}</ul>
       {visible.length === 0 && <p className="ex-empty">{problems.length ? '조건에 맞는 문제가 없어요. 필터를 바꿔 보세요.' : '실습 문제를 준비하고 있어요.'}</p>}
       {problems.length > 0 && <details className="ex-stats"><summary>주제·난이도별 진행 상황</summary><ul>{topics.map((t) => { const group = problems.filter((p) => p.topics.includes(t)); return <li key={t}>{t}: {group.filter((p) => progress[p.id]?.solved).length} / {group.length}</li> })}{[1, 2, 3, 4, 5].map((n) => { const group = problems.filter((p) => p.level === n); return <li key={n}>난이도 {n}: {group.filter((p) => progress[p.id]?.solved).length} / {group.length}</li> })}</ul></details>}
     </>}

@@ -433,7 +433,7 @@ export const footerLinkGroups = [
 ]
 
 export const navExtraItems = [
-  { id: 'notices', label: 'Notices', path: '/notices' },
+  { id: 'notices', label: 'Notices', path: '/notices', auth: true },
   // 후원자 페이지는 로그아웃 상태에서도 열리므로 auth 플래그를 붙이지 않는다.
   { id: 'sponsors', label: 'Sponsors', path: '/sponsors' },
   { id: 'resources', label: 'Resources', path: '/resources', auth: true },
@@ -456,6 +456,7 @@ export const activitySectionNavItems = [
     hint: '활동 기록',
     path: '/activity-log',
     icon: Sparkles,
+    auth: true,
     accent: 'text-rose-400',
   },
   {
@@ -465,6 +466,7 @@ export const activitySectionNavItems = [
     hint: '월별 일정',
     path: '/monthly-calendar',
     icon: CalendarDays,
+    auth: true,
     accent: 'text-sky-500',
   },
   {
@@ -474,6 +476,7 @@ export const activitySectionNavItems = [
     hint: '회지·인기투표',
     path: '/activity-events',
     icon: Rocket,
+    auth: true,
     accent: 'text-violet-500',
   },
   {
@@ -483,6 +486,7 @@ export const activitySectionNavItems = [
     hint: '모임 신청',
     path: '/gatherings',
     icon: UserPlus,
+    auth: true,
     accent: 'text-sky-500',
   },
   {
@@ -492,6 +496,7 @@ export const activitySectionNavItems = [
     hint: '일정 조율',
     path: '/meet',
     icon: CalendarClock,
+    auth: true,
     accent: 'text-sky-500',
   },
   {
@@ -501,6 +506,7 @@ export const activitySectionNavItems = [
     hint: '출석 체크',
     path: '/attendance',
     icon: ClipboardCheck,
+    auth: true,
     accent: 'text-sky-500',
   },
   {

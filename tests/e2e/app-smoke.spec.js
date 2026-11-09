@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { Buffer } from 'node:buffer'
-import { mockAdminApis, mockOptionalApis, autoDriveModals } from './visualSupport.js'
+import { asMember, mockAdminApis, mockOptionalApis, autoDriveModals, expectMembersGate, trackRequests } from './visualSupport.js'
 
 const routeExpectations = [
   ['/', /KW COM's/],
@@ -2272,9 +2272,9 @@ test('quick jump is offered beside the menu button on a phone', async ({ page })
   const dialog = page.getByRole('dialog', { name: '빠른 이동' })
   await dialog.getByRole('combobox', { name: '어디로 갈까요?' }).fill('ㅎㄷ')
   await expect(dialog.getByRole('option')).toHaveText([/활동/, /활동 기록/])
-  // A tap goes there. The page is for members, so a guest lands on the login screen.
+  // A tap goes there. The page is for members, so a guest lands on its guide screen (not a redirect).
   await dialog.getByRole('option', { name: /활동 기록/ }).click()
-  await expect(page).toHaveURL(/\/login$/)
+  await expectMembersGate(page, '/activity-log')
   await expect(dialog).toHaveCount(0)
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   expect(overflow).toBeLessThanOrEqual(1)
@@ -2301,13 +2301,15 @@ const expectSiteFontPending = async (page) => {
 // the font request fails. First paint is measured while the font is pending, never after waiting for document.fonts.
 const HEADER_MIN_GAP = 12
 for (const siteFont of ['arriving', 'blocked']) {
-  for (const theme of ['light', 'dark']) {
-    test(`header brand keeps a gap to the desktop nav at 1024, 1152 and 1280, ${theme}, site font ${siteFont}`, async ({ page }) => {
+  for (const [theme, who] of [['light', 'member'], ['dark', 'member'], ['light', 'guest']]) {
+    // The guest variant draws a lock beside Notices, Resources and Community: the tightest the bar gets.
+    test(`header brand keeps a gap to the desktop nav at 1024, 1152 and 1280, ${theme}, site font ${siteFont}${who === 'guest' ? ', guest with locks' : ''}`, async ({ page }) => {
       await page.addInitScript((mode) => {
         try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
         try { localStorage.setItem('kwcoms-theme-mode:v2', mode) } catch { /* ignore */ }
       }, theme)
-      await mockAdminApis(page)
+      if (who === 'guest') await mockOptionalApis(page)
+      else await mockAdminApis(page)
       if (siteFont === 'blocked') await page.route(/pretendard/i, (route) => route.abort())
       else await holdSiteFont(page)
       for (const width of [1024, 1152, 1280]) {
@@ -2316,6 +2318,7 @@ for (const siteFont of ['arriving', 'blocked']) {
         const brand = page.locator('header').getByRole('button', { name: '홈으로 이동' })
         const firstItem = page.locator('header nav').first().getByRole('button').first()
         await expect(firstItem).toBeVisible()
+        if (who === 'guest') await expect(page.locator('header nav [data-member-lock]').first()).toBeVisible()
         const gap = async () => {
           const b = await brand.boundingBox()
           return (await firstItem.boundingBox()).x - (b.x + b.width)
@@ -2754,15 +2757,17 @@ test('activities page does not embed the activity log or monthly calendar', asyn
   await expect(page.getByRole('heading', { name: '동아리 일정 캘린더' })).toHaveCount(0)
 })
 
-test('activity records and calendar redirect guests to login', async ({ page }) => {
+test('activity records and calendar show guests the members-only guide', async ({ page }) => {
+  const requests = trackRequests(page, /\/api\/club-activities/)
   await page.goto('/activity-log')
-  await expect(page).toHaveURL(/\/login$/)
+  await expectMembersGate(page, '/activity-log')
   await expect(page.getByText('등록된 활동 기록이 없습니다.')).toHaveCount(0)
   await expect(page.getByText('알고리즘 스터디 진행')).toHaveCount(0)
   await expect(page.getByText('웹 프로젝트 발표회')).toHaveCount(0)
 
   await page.goto('/monthly-calendar')
-  await expect(page).toHaveURL(/\/login$/)
+  await expectMembersGate(page, '/monthly-calendar')
+  expect(requests).toEqual([])
 })
 
 test('signed-in members see real activity records and schedule events', async ({ page }) => {
@@ -4078,10 +4083,14 @@ test('admin can set and clear one-date recurring schedule exceptions', async ({ 
   await expect.poll(() => exceptionDelete).toBe('/api/admin/recurring-schedules/3/exceptions/2026-07-20')
 })
 
-test('guest visiting notices is redirected to login', async ({ page }) => {
+test('guest visiting notices sees the members-only guide', async ({ page }) => {
+  const requests = trackRequests(page, /\/api\/notices/)
   await page.goto('/notices')
-  await expect(page).toHaveURL(/\/login$/)
+  const gate = await expectMembersGate(page, '/notices')
+  await expect(gate.getByText('공지, 홍보, 소모임, 취업공고를 한곳에서 볼 수 있어요.')).toBeVisible()
   await expect(page.getByText('조회수 검증 공지')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '공지사항', exact: true })).toHaveCount(0)
+  expect(requests).toEqual([])
 })
 
 test('archive highlights repeat-visit search and category controls', async ({ page }) => {
@@ -4385,9 +4394,12 @@ test.describe('gatherings', () => {
     expect(calls).toEqual(['remove 2', 'close', 'delete'])
   })
 
-  test('a guest is sent to the login screen', async ({ page }) => {
+  test('a guest sees the members-only guide', async ({ page }) => {
+    const requests = trackRequests(page, /\/api\/gatherings/)
     await page.goto('/gatherings/7')
-    await expect(page).toHaveURL(/\/login$/)
+    await expectMembersGate(page, '/gatherings/7')
+    await expect(page.getByRole('heading', { name: '모임 신청' })).toHaveCount(0)
+    expect(requests).toEqual([])
   })
 })
 
@@ -4601,9 +4613,12 @@ test('whoever runs attendance sees how often each member came and exports it', a
   await expect(summary).toHaveCount(0)
 })
 
-test('guest visiting attendance is redirected to login', async ({ page }) => {
+test('guest visiting attendance sees the members-only guide', async ({ page }) => {
+  const requests = trackRequests(page, /\/api\/attendance/)
   await page.goto('/attendance')
-  await expect(page).toHaveURL(/\/login$/)
+  await expectMembersGate(page, '/attendance')
+  await expect(page.getByRole('heading', { name: '출석 체크' })).toHaveCount(0)
+  expect(requests).toEqual([])
 })
 
 // Meeting polls ("일정 조율"): open one from the list, paint free time with the mouse, the
@@ -4715,9 +4730,11 @@ test('a new meeting poll is sent with its dates and time window', async ({ page 
   await expect(page.getByRole('table', { name: '내 가능 시간' }).locator('[data-cell]')).toHaveCount(16)
 })
 
-test('guest visiting the meeting polls is redirected to login', async ({ page }) => {
+test('guest visiting the meeting polls sees the members-only guide', async ({ page }) => {
+  const requests = trackRequests(page, /\/api\/meeting-polls/)
   await page.goto('/meet')
-  await expect(page).toHaveURL(/\/login$/)
+  await expectMembersGate(page, '/meet')
+  expect(requests).toEqual([])
 })
 
 test('a best time of a meeting poll can be put on the club calendar by whoever may write to it', async ({ page }) => {
@@ -4840,6 +4857,8 @@ test.describe('lite rendering mode', () => {
 
 // /study/arduino draws each wiring table as an interactive circuit (separate chunk, loaded when the page has one).
 test.describe('arduino study circuits', () => {
+  // The study is for members; the file-wide beforeEach signs nobody in.
+  test.beforeEach(async ({ page }) => { await asMember(page) })
   const circuit = (page, id) => page.locator(`figure.circuit[data-circuit="${id}"]`)
   // The real site-wide screen-effects setting (perfMode.ts, in the footer): it sets <html data-perf> while the page is open.
   const setPerf = async (page, mode) => {

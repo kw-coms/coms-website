@@ -63,7 +63,7 @@ const sameLayout = (a: Layout | null, b: Layout) =>
  * A click on the dim area does nothing but flash the card, so a stray click never ends it; the
  * way out is the explicit 건너뛰기 (or Esc).
  */
-export default function TourOverlay({ kind, onClose }: { kind: TourKind; onClose: () => void }) {
+export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind; onClose: () => void; onShown?: () => void }) {
   const steps = TOUR_STEPS[kind]
   const [index, setIndex] = useState(0)
   const [layout, setLayout] = useState<Layout | null>(null)
@@ -79,13 +79,17 @@ export default function TourOverlay({ kind, onClose }: { kind: TourKind; onClose
   const startYRef = useRef(0)
   const nudgeTimerRef = useRef(0)
   const onCloseRef = useRef(onClose)
+  const onShownRef = useRef(onShown)
   const step = steps[index]
   const last = index === steps.length - 1
 
   useEffect(() => {
     indexRef.current = index
     onCloseRef.current = onClose
+    onShownRef.current = onShown
   })
+
+  useEffect(() => { onShownRef.current?.() }, [])
 
   // Skip, 완료 and Esc: the tour scrolled to a target (the footer), so leave the page where the
   // visitor was. Not done in the unmount cleanup: after a navigation that would scroll the new page.

@@ -1,3 +1,22 @@
+import { expect } from '@playwright/test'
+
+/** The members-only guide a guest gets on a RequireAuth route: shown in place (no redirect), with the login link and the recruit link. */
+export async function expectMembersGate(page, path) {
+  await expect(page).toHaveURL(new RegExp(`${path}$`))
+  const gate = page.locator('[data-members-gate]')
+  await expect(gate.getByRole('heading', { name: '동아리원 전용 공간이에요' })).toBeVisible()
+  await expect(gate.getByRole('link', { name: '로그인', exact: true })).toHaveAttribute('href', '/login')
+  await expect(gate.getByRole('link', { name: '가입 안내 보기' })).toHaveAttribute('href', '/recruit')
+  return gate
+}
+
+/** Records every request whose URL matches `pattern`; the page behind a gate must never have asked for its data. */
+export function trackRequests(page, pattern) {
+  const urls = []
+  page.on('request', (request) => { if (pattern.test(request.url())) urls.push(request.url()) })
+  return urls
+}
+
 export async function mockOptionalApis(page) {
   await page.route('**/api/auth/me', (route) => route.fulfill({ status: 401, json: { message: 'Unauthorized' } }))
   await page.route('**/api/auth/refresh', (route) => route.fulfill({ status: 401, json: { message: 'Unauthorized' } }))
@@ -260,4 +279,9 @@ export async function autoDriveModals(page, { promptValue = '' } = {}) {
     if (document.body) start()
     else window.addEventListener('DOMContentLoaded', start)
   }, promptValue)
+}
+
+/** A signed-in member on top of mockOptionalApis (routes are LIFO, so call it after): study content and exercises are members-only. */
+export async function asMember(page) {
+  await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
 }

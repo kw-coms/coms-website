@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
+import { asMember, mockAdminApis, mockOptionalApis } from './visualSupport.js'
 
 // Only serious/critical findings fail the suite; axe also reports minor/moderate
 // issues that we surface in the attachment but do not gate on yet.
@@ -280,9 +280,22 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 
   })
 }
 
+test('guest members-only guide (/resources) and guest study page (/study/c) have no serious accessibility violations', async ({ page }) => {
+  await mockOptionalApis(page)
+  await page.goto('/resources')
+  await expect(page.locator('[data-members-gate]')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
+  await assertNoSeriousViolations(page)
+  await page.goto('/study/c')
+  await expect(page.getByRole('list', { name: '목차' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
+  await assertNoSeriousViolations(page)
+})
+
 for (const theme of ['dark', 'light']) test(`study page (${theme}) with the playground editor, output and diagnostics has no serious or critical accessibility violations`, async ({ page }) => {
   await page.addInitScript((mode) => { try { localStorage.setItem('kwcoms-theme-mode:v2', mode) } catch { /* storage blocked */ } }, theme)
   await mockOptionalApis(page)
+  await asMember(page)
   await page.route('**/study/api/run', (route) => route.fulfill({
     json: { ok: false, stage: 'compile', stdout: 'a\n', stderr: "Broken.java:3: error: ';' expected", exitCode: null, signal: null, timedOut: false, truncated: true, timeMs: 410,
       diagnostics: [{ line: 3, column: 38, severity: 'error', message: "';' expected", hintKo: '문장 끝에 세미콜론(;)을 붙였는지 확인해 보세요.' }] },
@@ -309,6 +322,7 @@ for (const theme of ['light', 'dark']) {
         test(`${route} has no serious accessibility violation or horizontal overflow`, async ({ page }) => {
           await page.addInitScript((mode) => localStorage.setItem('kwcoms-theme-mode:v2', mode), theme)
           await mockOptionalApis(page)
+          await asMember(page)
           await page.goto(route)
           await expect(page.locator('.study-main')).toBeVisible()
           await page.waitForTimeout(600)

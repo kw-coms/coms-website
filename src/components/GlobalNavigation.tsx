@@ -26,6 +26,7 @@ import {
 import { scrollToTopInstant } from '../utils/themeColors'
 import { isFullPageLink } from '../utils/fullPageLink'
 import NotificationButton from './NotificationButton'
+import MemberLock from './MemberLock'
 import { openQuickSearch } from '../utils/quickSearch'
 import { startSiteTour } from './tour/tourState'
 import { ROLE_LABELS, canAccessOperationsPanel } from '../utils/roleAccess'
@@ -265,9 +266,11 @@ export default function GlobalNavigation() {
               type="button"
               data-tour="nav-notices"
               onClick={() => goNavItem(noticesNavItem)}
-              className={navClass(noticesNavItem.id)}
+              disabled={noticesNavItem.auth && authLoading}
+              className={`${navClass(noticesNavItem.id)} disabled:cursor-wait`}
             >
               {noticesNavItem.label}
+              <MemberLock />
               <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === noticesNavItem.id ? 'opacity-100' : 'opacity-0'}`} />
             </button>
           )}
@@ -309,7 +312,7 @@ export default function GlobalNavigation() {
                               <item.icon size={14} aria-hidden="true" />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="block text-left text-sm font-semibold text-[var(--app-text)]">{item.label}</span>
+                              <span className="block text-left text-sm font-semibold text-[var(--app-text)]">{item.label}{item.auth && <> <MemberLock /></>}</span>
                               <span className="block text-left text-xs font-medium text-[var(--app-subtle)]">{item.hint}</span>
                             </span>
                           </button>
@@ -331,6 +334,7 @@ export default function GlobalNavigation() {
               className={`${navClass(item.id)} disabled:cursor-wait`}
             >
               {item.label}
+              {item.auth && <MemberLock />}
               <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === item.id ? 'opacity-100' : 'opacity-0'}`} />
             </button>
           ))}
@@ -417,7 +421,7 @@ export default function GlobalNavigation() {
             ))}
             <button type="button" onClick={() => closeAndGo('/notices')} className="apple-mobile-menu-item">
               <Megaphone size={15} className="text-cyan-500" />
-              <span>Notices</span>
+              <span>Notices <MemberLock /></span>
               <span className="ml-auto text-xs text-[var(--app-muted)]">공지사항</span>
             </button>
             {activityNavGroups.map((group) => {
@@ -453,7 +457,7 @@ export default function GlobalNavigation() {
                               <item.icon size={13} aria-hidden="true" />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="block text-sm font-semibold text-[var(--app-text)]">{item.label}</span>
+                              <span className="block text-sm font-semibold text-[var(--app-text)]">{item.label}{item.auth && <> <MemberLock /></>}</span>
                               <span className="mt-0.5 block text-xs leading-relaxed text-[var(--app-muted)]">{item.hint}</span>
                             </span>
                           </button>
@@ -471,12 +475,12 @@ export default function GlobalNavigation() {
             </button>
             <button type="button" onClick={() => goProtected('/resources')} disabled={authLoading} className="apple-mobile-menu-item disabled:opacity-50">
               <CircuitBoard size={15} className="text-violet-400" />
-              <span>Resources</span>
+              <span>Resources <MemberLock /></span>
               <span className="ml-auto text-xs text-[var(--app-muted)]">자료실</span>
             </button>
             <button type="button" onClick={() => goProtected('/community')} disabled={authLoading} className="apple-mobile-menu-item disabled:opacity-50">
               <Sparkles size={15} className="text-rose-400" />
-              <span>Community</span>
+              <span>Community <MemberLock /></span>
               <span className="ml-auto text-xs text-[var(--app-muted)]">커뮤니티</span>
             </button>
             <button

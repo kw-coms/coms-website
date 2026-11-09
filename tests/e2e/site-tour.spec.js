@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test'
 import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
 
+// The PWA service worker precaches the TourOverlay chunk. Once it controls the page, the chunk is
+// served from its cache and page.route never sees the request, so the chunk-failure tests would
+// depend on how fast the worker installs. The tour does not depend on the worker: keep it off here.
+test.use({ serviceWorkers: 'block' })
+
 // The site tour ("튜토리얼"): a guest tour and a member tour, each starting by itself once on
 // the home page and on request from the footer, quick jump and the mobile menu.
 //
@@ -9,6 +14,8 @@ import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
 const FORCE_AUTO = 'coms.tour.force-auto:v1'
 
 const tour = (page) => page.locator('[data-site-tour][role="dialog"]')
+// The overlay's chunk (and its stylesheet): hashed under /assets/ in the build, a plain module path in the dev server.
+const TOUR_CHUNK = /\/(assets\/)?TourOverlay[-.].*\.(js|css)|\/TourOverlay\.(tsx|css)/
 const footerStart = (page) => page.getByRole('button', { name: '튜토리얼 시작' })
 
 const skipIntro = (page) => page.addInitScript(() => window.sessionStorage.setItem('coms.intro.played:v1', '1'))
@@ -112,7 +119,7 @@ test.describe('starting', () => {
   test('the app stays usable when the tour chunk cannot be loaded', async ({ page }) => {
     await mockOptionalApis(page)
     await skipIntro(page)
-    await page.route(/\/assets\/TourOverlay-.*\.(js|css)/, (route) => route.abort())
+    await page.route(TOUR_CHUNK, (route) => route.abort())
     await page.goto('/about')
     await footerStart(page).click()
     await neverAppears(page, 1500)
@@ -121,6 +128,27 @@ test.describe('starting', () => {
     // The rest of the page still answers.
     await page.getByRole('button', { name: '빠른 이동 열기' }).click()
     await expect(page.getByRole('dialog', { name: '빠른 이동' })).toBeVisible()
+  })
+
+  test('a failed chunk load does not use up the tour: the next start retries and opens it', async ({ page }) => {
+    await mockOptionalApis(page)
+    await skipIntro(page)
+    let aborted = 0
+    await page.route(TOUR_CHUNK, (route) => {
+      aborted += 1
+      return route.abort()
+    })
+    await page.goto('/about')
+    await footerStart(page).click()
+    await neverAppears(page, 1500)
+    expect(aborted).toBeGreaterThan(0)
+    // The tour was not marked seen by the failed attempt.
+    expect(await page.evaluate(() => window.localStorage.getItem('coms.tour.guest.seen:v1'))).toBeNull()
+    await page.unroute(TOUR_CHUNK)
+    await footerStart(page).click()
+    await expect(tour(page)).toBeVisible({ timeout: 10_000 })
+    // Now it is seen.
+    expect(await page.evaluate(() => window.localStorage.getItem('coms.tour.guest.seen:v1'))).toBe('1')
   })
 
   test('starts from the footer, and Esc gives focus back to the button', async ({ page }) => {

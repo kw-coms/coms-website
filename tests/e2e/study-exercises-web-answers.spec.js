@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { loadProblems } from '../../scripts/verify-exercises.mjs'
-import { mockOptionalApis } from './visualSupport.js'
+import { asMember, mockOptionalApis } from './visualSupport.js'
 
 const webProblems = (await loadProblems()).filter((problem) => !('langs' in problem))
 
@@ -19,6 +19,7 @@ test('shipped web problems exist', () => {
 for (const problem of webProblems) {
   test(`${problem.id}: solution passes and starter fails in the real sandbox`, async ({ page }) => {
     await mockOptionalApis(page)
+    await asMember(page)
     await page.goto(`/study/web/practice/${problem.id}`)
     await expect(page.getByRole('heading', { name: problem.title })).toBeVisible()
 

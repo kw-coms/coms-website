@@ -5,7 +5,9 @@ import { captureError } from '../../services/observability'
 import { START_TOUR_EVENT, autoStartAllowed, blockingUiOpen, hasSeenTour, homeStillSettling, markTourSeen, type TourKind } from './tourState'
 
 // The overlay, its steps and its stylesheet are fetched the first time a tour starts.
-const TourOverlay = lazy(() => import('./TourOverlay'))
+// React.lazy keeps a rejected import for good, so a failed load makes a new lazy() (see the boundary's onFail): the next start fetches again.
+const loadOverlay = () => import('./TourOverlay')
+let TourOverlay = lazy(loadOverlay)
 
 /**
  * The overlay is a lazy chunk: offline, or with a stale hashed file after a deploy, loading it
@@ -55,7 +57,6 @@ export default function SiteTour() {
       settled = !homeStillSettling() && !blockingUiOpen() && document.visibilityState === 'visible' ? settled + 1 : 0
       if (settled < SETTLED_POLLS) return
       window.clearInterval(id)
-      markTourSeen(forWho)
       setKind((current) => current ?? forWho)
     }, AUTO_POLL_MS)
     return () => window.clearInterval(id)
@@ -84,7 +85,6 @@ export default function SiteTour() {
         }
         window.clearInterval(id)
         const who = whoRef.current.forWho
-        markTourSeen(who)
         setKind((current) => current ?? who)
       }, POLL_MS)
     }
@@ -105,9 +105,10 @@ export default function SiteTour() {
 
   if (!kind) return null
   return (
-    <TourBoundary onFail={() => setKind(null)}>
+    <TourBoundary onFail={() => { TourOverlay = lazy(loadOverlay); setKind(null) }}>
       <Suspense fallback={null}>
-        <TourOverlay kind={kind} onClose={() => setKind(null)} />
+        {/* Seen only once the overlay is on screen: a failed chunk load must not use up the first-visit tour. */}
+        <TourOverlay kind={kind} onClose={() => setKind(null)} onShown={() => markTourSeen(kind)} />
       </Suspense>
     </TourBoundary>
   )
