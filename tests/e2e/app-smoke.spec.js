@@ -2148,6 +2148,11 @@ test('quick jump opens with Ctrl+K, finds pages and member content, and goes the
   await expect(box).toBeFocused()
   // With nothing typed it is a menu of the pages, the first one highlighted.
   await expect(options.first()).toContainText('홈')
+  // Circuit Lab is found once: its only page entry is the Lab tab (there is no Tools item for it any more).
+  await box.fill('circuit lab')
+  await expect(options).toHaveCount(1)
+  await expect(options.first()).toContainText('Lab')
+  await box.fill('')
   await expect(options.first()).toHaveAttribute('aria-selected', 'true')
   await expect(dialog.getByRole('option', { name: /운영 패널/ })).toHaveCount(1)
   await expect(dialog.getByRole('option', { name: /로그인/ })).toHaveCount(0)
@@ -2392,8 +2397,8 @@ test('top navigation groups activity log and monthly calendar under Records and 
   const toolsMenu = page.getByRole('navigation', { name: '참여 도구 메뉴' })
   await expect(toolsMenu.getByRole('button', { name: /Gather/ })).toBeVisible()
   await expect(toolsMenu.getByRole('button', { name: /Activity log/ })).toHaveCount(0)
-  // Circuit Lab is a separate app at /lab/: a Tools entry, and the Records panel does not list it.
-  await expect(toolsMenu.getByRole('button', { name: /Circuit Lab/ })).toBeVisible()
+  // Circuit Lab is reached from the top-nav Lab item and the study hub only, not from Tools.
+  await expect(toolsMenu.getByRole('button', { name: /Circuit Lab/ })).toHaveCount(0)
   await desktopNav.getByRole('button', { name: 'Records', exact: true }).click()
   await expect(toolsMenu).toBeHidden()
   await expect(activityMenu).toBeVisible()
@@ -2440,7 +2445,7 @@ test('top navigation groups activity log and monthly calendar under Records and 
   await mobileMenu.getByRole('button', { name: /^Tools/ }).click()
   await expect(mobileMenu.getByRole('button', { name: /Gather/ })).toBeVisible()
   await expect(mobileMenu.getByRole('button', { name: /Activity log/ })).toBeVisible()
-  await expect(mobileMenu.getByRole('button', { name: /Circuit Lab/ })).toBeVisible()
+  await expect(mobileMenu.getByRole('button', { name: /Circuit Lab/ })).toHaveCount(0)
   await expect(mobileMenu.getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
   // The two collapsibles are independent: closing Records leaves Tools open.
   await mobileMenu.getByRole('button', { name: /^Records/ }).click()
@@ -2451,16 +2456,6 @@ test('top navigation groups activity log and monthly calendar under Records and 
   const mobileSubitemBox = await mobileMenu.getByRole('button', { name: /Activity log/ }).boundingBox()
   expect(mobileSubitemBox.height).toBeGreaterThanOrEqual(44)
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
-})
-
-// /lab/ is not a route of the SPA: the menu entry must load the page from the server.
-test('Tools menu opens Circuit Lab with a full page load, not a router navigation', async ({ page }) => {
-  await mockAdminApis(page)
-  await page.goto('/')
-  await page.locator('header nav').first().getByRole('button', { name: 'Tools', exact: true }).click()
-  const labRequest = page.waitForRequest((request) => request.isNavigationRequest() && new URL(request.url()).pathname === '/lab/')
-  await page.getByRole('navigation', { name: '참여 도구 메뉴' }).getByRole('button', { name: /Circuit Lab/ }).click()
-  await labRequest
 })
 
 // Lab is a top-level item next to Study (not only inside Tools). At every desktop width the nav must fit:
@@ -2509,16 +2504,6 @@ for (const width of [1024, 1100, 1280, 1440]) {
   })
 }
 
-test('home hero Arduino pill is a link to /lab/ with a real page load', async ({ page }) => {
-  await mockAdminApis(page)
-  await page.goto('/')
-  const pill = page.getByRole('link', { name: 'Arduino — Circuit Lab 열기' })
-  await expect(pill).toHaveAttribute('href', '/lab/')
-  const labRequest = page.waitForRequest((request) => request.isNavigationRequest() && new URL(request.url()).pathname === '/lab/')
-  await pill.click()
-  await labRequest
-})
-
 test('mobile menu lists Lab at 375px without horizontal overflow and opens it with a full page load', async ({ page }) => {
   await mockAdminApis(page)
   await page.setViewportSize({ width: 375, height: 812 })
@@ -2537,7 +2522,7 @@ test('mobile menu lists Lab at 375px without horizontal overflow and opens it wi
   await labRequest
 })
 
-test('study hub has a Circuit Lab card and the Arduino page a banner, both plain links to /lab/', async ({ page }) => {
+test('study hub has a Circuit Lab card that is a plain link to /lab/, and the Arduino page has no banner', async ({ page }) => {
   await mockAdminApis(page)
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 900 })
@@ -2548,9 +2533,8 @@ test('study hub has a Circuit Lab card and the Arduino page a banner, both plain
     await expect(card).toContainText('브라우저에서 아두이노 회로를 만들고 코드를 바로 돌려 보세요')
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
     await page.goto('/study/arduino')
-    const banner = page.getByRole('link', { name: /Circuit Lab에서 열기/ })
-    await expect(banner).toBeVisible()
-    await expect(banner).toHaveAttribute('href', '/lab/')
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
+    await expect(page.getByRole('link', { name: /Circuit Lab에서 열기/ })).toHaveCount(0)
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   }
 })
