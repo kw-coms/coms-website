@@ -65,7 +65,7 @@ public class SponsorController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CACHE_CONTROL,
                         sponsorService.isBannerImage(id) ? "public, max-age=86400" : "private, no-cache")
-                .header(HttpHeaders.VARY, "Cookie")
+                .header(HttpHeaders.VARY, "Cookie", "Authorization")
                 .contentType(MediaType.parseMediaType(meta.getMime()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())

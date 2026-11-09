@@ -146,7 +146,8 @@ class SponsorSecurityIntegrationTest {
         mockMvc.perform(get("/api/sponsors/images/{id}", expired).cookie(userCookie)).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/sponsors/images/{id}", current).cookie(userCookie))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Cache-Control", "private, no-cache"));
+                .andExpect(header().string("Cache-Control", "private, no-cache"))
+                .andExpect(header().stringValues("Vary", hasItems("Cookie", "Authorization")));
         mockMvc.perform(get("/api/sponsors/images/{id}", banner))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "public, max-age=86400"));
