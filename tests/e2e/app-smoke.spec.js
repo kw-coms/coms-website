@@ -2550,20 +2550,40 @@ test('mobile menu lists Lab at 375px without horizontal overflow and opens it wi
   await labRequest
 })
 
-test('study hub has a Circuit Lab card that is a plain link to /lab/, and the Arduino page has no banner', async ({ page }) => {
+test('study hub has no Circuit Lab card and the Arduino page has no banner', async ({ page }) => {
   await mockAdminApis(page)
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/study')
-    const card = page.locator('a[href="/lab/"]')
-    await expect(card).toBeVisible()
-    await expect(card).toHaveAttribute('href', '/lab/')
-    await expect(card).toContainText('브라우저에서 아두이노 회로를 만들고 코드를 바로 돌려 보세요')
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
+    await expect(page.locator('a[href="/lab/"]')).toHaveCount(0)
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
     await page.goto('/study/arduino')
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: /Circuit Lab에서 열기/ })).toHaveCount(0)
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+  }
+})
+
+test('only the nav Lab button and the Arduino code-block buttons lead to /lab/', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  for (const path of ['/', '/study', '/study/arduino']) {
+    await page.goto(path)
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
+    // Playground buttons are injected imperatively after render: wait for them before counting.
+    if (path === '/study/arduino') await expect(page.getByRole('button', { name: 'Circuit Lab에서 열기' }).first()).toBeVisible()
+    await expect(page.locator('a[href*="/lab"]')).toHaveCount(0)
+    const names = await page.getByRole('button', { name: /Lab/ }).evaluateAll(
+      (els) => els.filter((el) => el.getClientRects().length > 0).map((el) => el.textContent.trim()))
+    const open = names.filter((name) => name !== 'Lab')
+    expect(names.filter((name) => name === 'Lab'), `${path}: nav Lab button`).toHaveLength(1)
+    if (path === '/study/arduino') {
+      expect(open.length, `${path}: playground buttons`).toBeGreaterThan(0)
+      expect(open.every((name) => name.includes('Circuit Lab에서 열기'))).toBe(true)
+    } else {
+      expect(open, `${path}: no other Lab buttons`).toEqual([])
+    }
   }
 })
 

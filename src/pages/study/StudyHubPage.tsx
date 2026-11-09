@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, ArrowUpRight, CircuitBoard, Coffee, Zap } from 'lucide-react'
+import { ArrowRight, CircuitBoard, Coffee } from 'lucide-react'
 import { STUDIES } from './studies'
 import { readProgress } from './exercises/progress'
 import './study.css'
@@ -74,32 +74,6 @@ export default function StudyHubPage() {
               </li>
             )
           })}
-          <li className="study-hub-lab">
-            {/* /lab/ is a separate app, not a router page: a plain link makes the browser load it. The card has no other link, so the whole card is the anchor. */}
-            <a href="/lab/" className="study-card study-card-lab">
-              <span className="study-lab-copy">
-                <span className="study-card-head">
-                  <span className="study-tile study-tile-lab" aria-hidden="true"><Zap size={22} strokeWidth={2} /></span>
-                  <span className="study-card-titles">
-                    <h2 className="study-card-title">Circuit Lab</h2>
-                    <span className="study-card-sub">Arduino 시뮬레이터</span>
-                  </span>
-                </span>
-                <span className="study-card-desc">브라우저에서 아두이노 회로를 만들고 코드를 바로 돌려 보세요</span>
-                <span className="study-lab-open">Circuit Lab 열기<ArrowUpRight size={16} aria-hidden="true" /></span>
-              </span>
-              <svg className="study-lab-art" viewBox="0 0 330 150" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                {/* D13 -> resistor -> LED -> back to GND; current dashes run along the wire, the LED glows. */}
-                <circle cx="245" cy="62" r="44" className="study-lab-glow" stroke="none" />
-                <path d="M30 62H84l8-13 12 26 12-26 12 26 12-26 8 13H160M160 62H224M224 44V80L254 62Z" className="study-lab-part" />
-                <path d="M258 44V80M258 62H300V120H30" />
-                <path d="M236 28l9-9M250 33l9-9" />
-                <path className="study-lab-flow" d="M30 62H84M160 62H224M258 62H300V120H30" strokeDasharray="3 11" strokeWidth="3.5" />
-                <circle cx="26" cy="62" r="5" fill="var(--app-surface)" />
-                <circle cx="26" cy="120" r="5" fill="var(--app-surface)" />
-              </svg>
-            </a>
-          </li>
         </ul>
       </div>
     </div>
