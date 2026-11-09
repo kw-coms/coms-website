@@ -280,6 +280,18 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 
   })
 }
 
+test('guest members-only guide (/resources) and guest study page (/study/c) have no serious accessibility violations', async ({ page }) => {
+  await mockOptionalApis(page)
+  await page.goto('/resources')
+  await expect(page.locator('[data-members-gate]')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
+  await assertNoSeriousViolations(page)
+  await page.goto('/study/c')
+  await expect(page.getByRole('list', { name: '목차' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
+  await assertNoSeriousViolations(page)
+})
+
 for (const theme of ['dark', 'light']) test(`study page (${theme}) with the playground editor, output and diagnostics has no serious or critical accessibility violations`, async ({ page }) => {
   await page.addInitScript((mode) => { try { localStorage.setItem('kwcoms-theme-mode:v2', mode) } catch { /* storage blocked */ } }, theme)
   await mockOptionalApis(page)

@@ -5,7 +5,7 @@ import NotFoundPage from '../../components/NotFoundPage'
 import { findStudy } from './studies'
 import { loadStudyChapters, loadStudyHtml } from './studyContent'
 import { useAuth } from '../../contexts/useAuth'
-import MembersGate from '../../components/MembersGate'
+import MembersGate, { AuthCheckFailed } from '../../components/MembersGate'
 import { initStudyPage } from './studyDemos'
 import { initPlayground } from './playground'
 import type { PageLang } from './playground/classify'
@@ -90,10 +90,10 @@ function StudyGuest({ id }: { id: string }) {
         <p className="mt-1 text-sm text-[var(--app-muted)]">{study.subtitle}</p>
         {chapters && chapters.length > 0 && (
           <ol aria-label="목차" className="mt-6 list-none space-y-1.5 p-0">
-            {chapters.map((title) => <li key={title} className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-semibold text-[var(--app-text)]">{title}</li>)}
+            {chapters.map((title, i) => <li key={`${i}-${title}`} className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-semibold text-[var(--app-text)]">{title}</li>)}
           </ol>
         )}
-        <MembersGate title="강의 본문은 동아리원만 볼 수 있어요">로그인하면 강의 본문과 예제, 실습 문제를 볼 수 있어요.</MembersGate>
+        <MembersGate heading="h2" title="강의 본문은 동아리원만 볼 수 있어요">로그인하면 강의 본문과 예제, 실습 문제를 볼 수 있어요.</MembersGate>
       </div>
     </div>
   )
@@ -101,11 +101,12 @@ function StudyGuest({ id }: { id: string }) {
 
 export default function StudyPage() {
   const { id } = useParams()
-  const { user, loading } = useAuth()
+  const { user, loading, authError } = useAuth()
   if (!findStudy(id)) return <NotFoundPage />
   if (loading) return <div className="study-page"><p className="study-loading" role="status">불러오는 중...</p></div>
   // ponytail: UI-only gate. The lesson HTML is still in the public JS bundle (studyContent.ts globs it), so a guest who reads the
   // bundle can see it. Upgrade path: serve lessons from an authenticated API instead of import.meta.glob.
+  if (!user && authError) return <div className="study-page"><AuthCheckFailed /></div>
   if (!user) return <StudyGuest key={id} id={id!} />
   return <StudyBody key={id} id={id!} />
 }

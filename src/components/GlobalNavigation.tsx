@@ -266,7 +266,8 @@ export default function GlobalNavigation() {
               type="button"
               data-tour="nav-notices"
               onClick={() => goNavItem(noticesNavItem)}
-              className={navClass(noticesNavItem.id)}
+              disabled={noticesNavItem.auth && authLoading}
+              className={`${navClass(noticesNavItem.id)} disabled:cursor-wait`}
             >
               {noticesNavItem.label}
               <MemberLock />

@@ -2301,13 +2301,15 @@ const expectSiteFontPending = async (page) => {
 // the font request fails. First paint is measured while the font is pending, never after waiting for document.fonts.
 const HEADER_MIN_GAP = 12
 for (const siteFont of ['arriving', 'blocked']) {
-  for (const theme of ['light', 'dark']) {
-    test(`header brand keeps a gap to the desktop nav at 1024, 1152 and 1280, ${theme}, site font ${siteFont}`, async ({ page }) => {
+  for (const [theme, who] of [['light', 'member'], ['dark', 'member'], ['light', 'guest']]) {
+    // The guest variant draws a lock beside Notices, Resources and Community: the tightest the bar gets.
+    test(`header brand keeps a gap to the desktop nav at 1024, 1152 and 1280, ${theme}, site font ${siteFont}${who === 'guest' ? ', guest with locks' : ''}`, async ({ page }) => {
       await page.addInitScript((mode) => {
         try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
         try { localStorage.setItem('kwcoms-theme-mode:v2', mode) } catch { /* ignore */ }
       }, theme)
-      await mockAdminApis(page)
+      if (who === 'guest') await mockOptionalApis(page)
+      else await mockAdminApis(page)
       if (siteFont === 'blocked') await page.route(/pretendard/i, (route) => route.abort())
       else await holdSiteFont(page)
       for (const width of [1024, 1152, 1280]) {
@@ -2316,6 +2318,7 @@ for (const siteFont of ['arriving', 'blocked']) {
         const brand = page.locator('header').getByRole('button', { name: '홈으로 이동' })
         const firstItem = page.locator('header nav').first().getByRole('button').first()
         await expect(firstItem).toBeVisible()
+        if (who === 'guest') await expect(page.locator('header nav [data-member-lock]').first()).toBeVisible()
         const gap = async () => {
           const b = await brand.boundingBox()
           return (await firstItem.boundingBox()).x - (b.x + b.width)

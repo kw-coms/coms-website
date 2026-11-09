@@ -98,7 +98,7 @@ test.describe('guide screen', () => {
     expect(await page.evaluate(() => history.state?.usr?.from?.pathname)).toBe('/resources')
   })
 
-  test('the guide is not a redirect, and an auth error still redirects', async ({ page }) => {
+  test('an auth error still redirects', async ({ page }) => {
     await skipIntro(page)
     await mockOptionalApis(page)
     await page.route('**/api/auth/me', (route) => route.fulfill({ status: 500, json: { message: 'boom' } }))
@@ -180,6 +180,67 @@ test.describe('study for guests', () => {
     await expect(page.getByRole('button', { name: '제출' })).toHaveCount(0)
     expect(runs).toEqual([])
     expect(await page.evaluate(() => document.body.textContent.includes('scanf("%d", &n)'))).toBe(false)
+  })
+
+  test('while /api/auth/me is pending nothing flashes: no lesson, no gate, no lock; then a member never sees the gate', async ({ page }) => {
+    await skipIntro(page)
+    await mockOptionalApis(page)
+    let release
+    const held = new Promise((resolve) => { release = resolve })
+    await page.route('**/api/auth/me', async (route) => {
+      await held
+      await route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } })
+    })
+    await page.goto('/study/c')
+    await expect(page.locator('.study-loading')).toBeVisible()
+    await page.waitForTimeout(500)
+    await expect(page.getByText(LESSON_SENTENCE)).toHaveCount(0)
+    await expect(page.locator('[data-members-gate]')).toHaveCount(0)
+    await expect(page.locator(LOCK)).toHaveCount(0)
+    const gateSeen = page.evaluate(() => new Promise((resolve) => {
+      const check = () => document.querySelector('[data-members-gate]') ? resolve(true) : undefined
+      new MutationObserver(check).observe(document.body, { childList: true, subtree: true })
+      setTimeout(() => resolve(false), 2500)
+    }))
+    release()
+    await expect(page.getByText(LESSON_SENTENCE)).toBeVisible()
+    expect(await gateSeen).toBe(false)
+    await expect(page.locator(LOCK)).toHaveCount(0)
+  })
+
+  test('while /api/auth/me is pending, then answers 401, a guest gets the gate only after it resolves', async ({ page }) => {
+    await skipIntro(page)
+    await mockOptionalApis(page)
+    let release
+    const held = new Promise((resolve) => { release = resolve })
+    await page.route('**/api/auth/me', async (route) => {
+      await held
+      await route.fulfill({ status: 401, json: { message: 'Unauthorized' } })
+    })
+    await page.goto('/study/c')
+    await expect(page.locator('.study-loading')).toBeVisible()
+    await page.waitForTimeout(500)
+    await expect(page.locator('[data-members-gate]')).toHaveCount(0)
+    await expect(page.locator(LOCK)).toHaveCount(0)
+    await expect(page.getByText(LESSON_SENTENCE)).toHaveCount(0)
+    release()
+    await expect(page.locator('[data-members-gate]')).toBeVisible()
+    await expect(page.getByText(LESSON_SENTENCE)).toHaveCount(0)
+  })
+
+  test('a failed /api/auth/me is not a guest: a retry state, not the gate, and 다시 시도 recovers', async ({ page }) => {
+    await skipIntro(page)
+    await mockOptionalApis(page)
+    let fail = true
+    await page.route('**/api/auth/me', (route) => (fail
+      ? route.fulfill({ status: 500, json: { message: 'boom' } })
+      : route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } })))
+    await page.goto('/study/c')
+    await expect(page.getByText('로그인 상태를 확인하지 못했어요')).toBeVisible()
+    await expect(page.locator('[data-members-gate]')).toHaveCount(0)
+    fail = false
+    await page.getByRole('button', { name: '다시 시도' }).click()
+    await expect(page.getByText(LESSON_SENTENCE)).toBeVisible()
   })
 
   test('a member opens the problem with its statement and editor', async ({ page }) => {
