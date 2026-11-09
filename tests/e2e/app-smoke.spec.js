@@ -2397,13 +2397,37 @@ for (const path of ['/', '/study/arduino']) {
 // Like Sponsors or Resources, the Records and Tools toggles draw the accent underline on their own pages (detail routes too).
 test('Records and Tools toggles show the active underline on their pages', async ({ page }) => {
   await mockAdminApis(page)
+  await page.route(/pretendard/i, (route) => route.abort()) // one face for every page, so widths are comparable
   await page.setViewportSize({ width: 1280, height: 800 })
-  const underline = (name) => page.locator('header nav').first().getByRole('button', { name, exact: true }).locator('span').last()
-  for (const [path, records, tools] of [['/activity-log', 1, 0], ['/meet', 0, 1], ['/meet/1', 0, 1], ['/about', 0, 0]]) {
+  const nav = page.locator('header nav').first()
+  const toggle = (name) => nav.getByRole('button', { name, exact: true })
+  const underline = (name) => toggle(name).locator('span').last()
+  const widths = {}
+  for (const [path, records, tools] of [
+    ['/about', 0, 0], ['/activity-log', 1, 0], ['/monthly-calendar', 1, 0], ['/activity-events', 1, 0],
+    ['/meet', 0, 1], ['/meet/1', 0, 1], ['/gatherings/1', 0, 1], ['/attendance', 0, 1], ['/draw', 0, 1],
+  ]) {
     await page.goto(path)
     await expect(underline('Records'), path).toHaveCSS('opacity', String(records))
     await expect(underline('Tools'), path).toHaveCSS('opacity', String(tools))
+    await page.evaluate(() => document.fonts.ready)
+    const w = [(await toggle('Records').boundingBox()).width, (await toggle('Tools').boundingBox()).width]
+    widths.about ??= w
+    expect(Math.abs(w[0] - widths.about[0]), `Records width on ${path}`).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(w[1] - widths.about[1]), `Tools width on ${path}`).toBeLessThanOrEqual(0.5)
   }
+  // The underline is centred on the label text, like Sponsors' (offset between the two centres must match).
+  await page.goto('/activity-log')
+  const offset = async (btn, line, label) => {
+    const [l, u] = [await label.boundingBox(), await line.boundingBox()]
+    return (u.x + u.width / 2) - (l.x + l.width / 2)
+  }
+  const recordsOffset = await offset(toggle('Records'), underline('Records'), toggle('Records').locator('[data-nav-label]'))
+  const sponsors = nav.getByRole('button', { name: 'Sponsors', exact: true })
+  const sponsorsOffset = await offset(sponsors, sponsors.locator('span').last(), sponsors)
+  expect(Math.abs(recordsOffset)).toBeLessThanOrEqual(1)
+  expect(Math.abs(recordsOffset - sponsorsOffset)).toBeLessThanOrEqual(1)
+  await page.screenshot({ path: '/private/tmp/claude-501/-Users-choi-Documents-project/d4bfde10-af0c-4ffc-9df2-e765aade3c1b/scratchpad/nav-records-active.png', clip: { x: 0, y: 0, width: 1280, height: 80 } })
 })
 
 test('top navigation groups activity log and monthly calendar under Records and Tools', async ({ page }) => {
