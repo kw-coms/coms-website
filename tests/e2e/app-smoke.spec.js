@@ -3837,18 +3837,18 @@ test('apps page cards keep one size whatever the text length or section count', 
       await page.setViewportSize(viewport)
       await page.goto('/apps')
       await expect(page.locator('.app-card')).toHaveCount(5)
-      // The file row is reserved per grid (section), so widths match everywhere and heights match within a section.
+      // One size across the whole page, sections included: the file row is reserved page-wide.
       const boxes = await page.locator('.app-card').evaluateAll((els) => els.map((el) => {
         const r = el.getBoundingClientRect()
-        return { w: r.width, h: r.height, grid: [...document.querySelectorAll('.apps-grid')].indexOf(el.parentElement) }
+        return { w: r.width, h: r.height, grid: 0 }
       }))
       for (const box of boxes) {
         expect(Math.abs(box.w - boxes[0].w)).toBeLessThanOrEqual(1)
-        expect(Math.abs(box.h - boxes.find((b) => b.grid === box.grid).h)).toBeLessThanOrEqual(1)
+        expect(Math.abs(box.h - boxes[0].h)).toBeLessThanOrEqual(1)
       }
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
       expect(overflow).toBeLessThanOrEqual(0)
-      heights[`${files}-${viewport.width}`] = boxes[boxes.length - 1].h // APP section, the one with the file
+      heights[`${files}-${viewport.width}`] = boxes[0].h
       // Every author is the same here: the old page showed a 만든 사람 stat in this case.
       await expect(page.locator('.site-stats')).not.toContainText('만든 사람')
       await expect(page.locator('.app-card').filter({ hasText: '만든 사람' })).toHaveCount(0)

@@ -108,7 +108,7 @@ function CompanionServicesSection() {
                 ))}
               </div>
             )}
-            <div className="mt-8">
+            <div className={`mt-8${projects.some((project) => project.files?.length) ? ' apps-has-files' : ''}`}>
               {shown.map((group) => (
                 <section key={group.key} className="apps-group">
                   <div className="apps-group-head">

@@ -296,6 +296,7 @@
 .app-card-more:not(:has(*)) {
 	display: none;
 }
+.apps-has-files .app-card-more,
 .apps-grid:has(.app-card-files, .app-card-badges) .app-card-more {
 	display: flex;
 }
