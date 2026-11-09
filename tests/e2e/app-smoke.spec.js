@@ -3799,7 +3799,6 @@ test('apps page renders DB-driven club projects grouped by category', async ({ p
   await expect(attendCard.getByRole('link', { name: /다운로드/ })).toBeVisible()
   await expect(page.locator('.site-stats')).toContainText('프로젝트')
   await expect(page.locator('.site-stats')).toContainText('카테고리')
-  await expect(page.locator('.site-stats')).not.toContainText('만든 사람')
 })
 
 test('apps page cards keep one size whatever the text length or section count', async ({ page }) => {
@@ -3810,38 +3809,68 @@ test('apps page cards keep one size whatever the text length or section count', 
     title, description, eyebrow: 'Web', madeBy: '홍길동',
     linkUrl: 'https://example.com/', displayUrl: 'a-very-long-domain-name.example.com/path', files: [], ...extra,
   })
+  const longFile = (id, name) => ({ id, url: `/api/club-projects/4/files/${id}`, originalName: name })
+  const fixture = (withFiles) => [
+    project(1, 'WEBSITE', long, longDesc),
+    project(2, 'WEBSITE', '짧은 제목', '짧은 설명', { eyebrow: '' }),
+    project(3, 'WEBSITE', '세 번째', '', { displayUrl: null }),
+    project(4, 'APP', long, longDesc, {
+      linkUrl: null,
+      files: withFiles ? [longFile(9, `${'긴파일이름'.repeat(10)}.apk`), longFile(10, 'second.zip'), longFile(11, 'third.zip')] : [],
+    }),
+    project(5, 'APP', '두 번째 앱', '설명'),
+  ]
   await page.route('**/api/club-projects/categories', (route) => route.fulfill({
     status: 200,
     json: [{ id: 1, key: 'WEBSITE', name: '웹사이트', position: 0 }, { id: 2, key: 'APP', name: '앱', position: 1 }],
   }))
+  let withFiles = true
   await page.route('**/api/club-projects', (route) => {
     if (route.request().method() !== 'GET') return route.fallback()
-    return route.fulfill({
-      status: 200,
-      json: [
-        project(1, 'WEBSITE', long, longDesc),
-        project(2, 'WEBSITE', '짧은 제목', '짧은 설명', { eyebrow: '' }),
-        project(3, 'WEBSITE', '세 번째', '', { displayUrl: null }),
-        project(4, 'APP', long, longDesc, { linkUrl: null, files: [{ id: 9, url: '/api/club-projects/4/files/9', originalName: `${'긴파일이름'.repeat(10)}.apk` }] }),
-        project(5, 'APP', '두 번째 앱', '설명'),
-      ],
-    })
+    return route.fulfill({ status: 200, json: fixture(withFiles) })
   })
 
-  for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
-    await page.setViewportSize(viewport)
-    await page.goto('/apps')
-    await expect(page.locator('.app-card')).toHaveCount(5)
-    const boxes = await page.locator('.app-card').evaluateAll((els) => els.map((el) => {
-      const r = el.getBoundingClientRect()
-      return { w: r.width, h: r.height }
-    }))
-    for (const box of boxes) {
-      expect(Math.abs(box.w - boxes[0].w)).toBeLessThanOrEqual(1)
-      expect(Math.abs(box.h - boxes[0].h)).toBeLessThanOrEqual(1)
+  const heights = {}
+  for (const files of [true, false]) {
+    withFiles = files
+    for (const viewport of [{ width: 1280, height: 900 }, { width: 800, height: 900 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport)
+      await page.goto('/apps')
+      await expect(page.locator('.app-card')).toHaveCount(5)
+      // The file row is reserved per grid (section), so widths match everywhere and heights match within a section.
+      const boxes = await page.locator('.app-card').evaluateAll((els) => els.map((el) => {
+        const r = el.getBoundingClientRect()
+        return { w: r.width, h: r.height, grid: [...document.querySelectorAll('.apps-grid')].indexOf(el.parentElement) }
+      }))
+      for (const box of boxes) {
+        expect(Math.abs(box.w - boxes[0].w)).toBeLessThanOrEqual(1)
+        expect(Math.abs(box.h - boxes.find((b) => b.grid === box.grid).h)).toBeLessThanOrEqual(1)
+      }
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      expect(overflow).toBeLessThanOrEqual(0)
+      heights[`${files}-${viewport.width}`] = boxes[boxes.length - 1].h // APP section, the one with the file
+      // Every author is the same here: the old page showed a 만든 사람 stat in this case.
+      await expect(page.locator('.site-stats')).not.toContainText('만든 사람')
+      await expect(page.locator('.app-card').filter({ hasText: '만든 사람' })).toHaveCount(0)
+
+      if (files && viewport.width === 1280) {
+        // The 2px focus ring of a file link must fit inside the clipping slot.
+        const link = page.locator('.app-card-files a').first()
+        await link.focus()
+        const ok = await page.evaluate(() => {
+          const a = document.activeElement
+          const slot = a.closest('.app-card-more').getBoundingClientRect()
+          const r = a.getBoundingClientRect()
+          return r.top - 2 >= slot.top && r.bottom + 2 <= slot.bottom
+        })
+        expect(ok).toBe(true)
+        await expect(link).toHaveAttribute('title', /긴파일이름/)
+      }
     }
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-    expect(overflow).toBeLessThanOrEqual(0)
+  }
+  // No file row reserved when no card has files: the cards are shorter.
+  for (const width of [1280, 800, 390]) {
+    expect(heights[`false-${width}`]).toBeLessThan(heights[`true-${width}`])
   }
 })
 

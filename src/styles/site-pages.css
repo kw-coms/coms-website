@@ -201,8 +201,9 @@
 		'desc desc'
 		'foot foot'
 		'more more';
+	/* desc takes any leftover height, so the domain line sits at the card bottom */
+	grid-template-rows: auto 1fr auto auto;
 	align-items: start;
-	align-content: start;
 	gap: 0 12px;
 	min-height: 0;
 	padding: 20px 20px 18px;
@@ -285,9 +286,22 @@
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	height: 34px;
-	margin-top: 12px;
+	box-sizing: border-box;
+	height: 40px;
+	/* 3px padding / -3px margin keep the 2px focus ring of a file link inside the clip */
+	padding: 3px;
+	margin: 9px -3px -3px;
 	overflow: hidden;
+}
+.app-card-more:not(:has(*)) {
+	display: none;
+}
+.apps-grid:has(.app-card-files, .app-card-badges) .app-card-more {
+	display: flex;
+}
+.app-card-files {
+	padding: 3px;
+	margin: -3px;
 }
 @media (max-width: 640px) {
 	.apple-product-panel.app-card {
@@ -303,9 +317,11 @@
 		line-height: 1.5;
 		height: 3em;
 	}
-	.app-card-foot,
-	.app-card-more {
+	.app-card-foot {
 		margin-top: 8px;
+	}
+	.app-card-more {
+		margin-top: 5px;
 	}
 	.apps-grid {
 		gap: 8px;

@@ -109,55 +109,61 @@ export default function AppProjectCard({
       {/* Fixed-size slots: every card is the same size however much text it carries. */}
       <p className="app-card-desc" title={project?.description || undefined}>{project?.description}</p>
       <div className="app-card-foot">
-          {notAnswering && (
-            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--app-hairline-strong)] px-2.5 py-0.5 text-xs font-bold text-[var(--app-text)]">
-              <span className="size-1.5 rounded-full bg-[var(--app-danger)]" aria-hidden="true" />
-              지금 응답 없음
-            </span>
-          )}
-          {host && <span className="app-card-host">{host}</span>}
-        </div>
+        {notAnswering && (
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--app-hairline-strong)] px-2.5 py-0.5 text-xs font-bold text-[var(--app-text)]">
+            <span className="size-1.5 rounded-full bg-[var(--app-danger)]" aria-hidden="true" />
+            지금 응답 없음
+          </span>
+        )}
+        {host && <span className="app-card-host">{host}</span>}
+      </div>
 
+      {/* Always rendered: CSS reserves the row only where some card in the grid has files or badges. */}
       <div className="app-card-more">
-      {badges.length > 0 && (
-        <div className="flex shrink-0 gap-1.5" aria-label="앱 상태">
-          {badges.map((badge) => (
-            <span
-              key={badge.key}
-              className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${STATUS_TONE_CLASS[badge.tone] || STATUS_TONE_CLASS.draft}`}
-            >
-              {badge.label}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {files.length > 0 && (
-        <div className="flex min-w-0 gap-2" aria-label="배포 파일">
-          {files.map((file) => {
-            const size = formatFileSize(file.fileSize)
-            const href = projectFileHref(file.url)
-            return (
-              <a
-                key={file.id || file.originalName || file.url}
-                href={href}
-                className="flex min-w-0 shrink items-center gap-2 rounded-lg border border-[var(--app-hairline-strong)] bg-[var(--app-surface-soft)] px-3 py-2 text-xs font-bold text-[var(--app-text)] no-underline transition hover:border-[var(--app-accent-text)] hover:text-[var(--app-accent-text)]"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  if (href === '#') event.preventDefault()
-                }}
+        {badges.length > 0 && (
+          <div className="app-card-badges flex shrink-0 gap-1.5" aria-label="앱 상태">
+            {badges.map((badge) => (
+              <span
+                key={badge.key}
+                className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${STATUS_TONE_CLASS[badge.tone] || STATUS_TONE_CLASS.draft}`}
               >
-                <FileText size={14} aria-hidden="true" className="shrink-0 text-[var(--app-subtle)]" />
-                <span className="min-w-0 flex-1 truncate">{fileLabel(file)}</span>
-                {size && <span className="shrink-0 text-[var(--app-subtle)]">{size}</span>}
-                <Download size={13} aria-hidden="true" className="shrink-0" />
-                <span className="sr-only">다운로드</span>
-              </a>
-            )
-          })}
-        </div>
-      )}
+                {badge.label}
+              </span>
+            ))}
+          </div>
+        )}
 
+        {files.length > 0 && (
+          <div className="app-card-files flex min-w-0 flex-1 gap-2 overflow-x-auto" aria-label="배포 파일">
+            {files.map((file) => {
+              const size = formatFileSize(file.fileSize)
+              const href = projectFileHref(file.url)
+              return (
+                <a
+                  key={file.id || file.originalName || file.url}
+                  href={href}
+                  title={fileLabel(file)}
+                  aria-label={`${fileLabel(file)} 다운로드`}
+                  className="flex min-w-0 max-w-[75%] shrink-0 items-center gap-2 rounded-lg border border-[var(--app-hairline-strong)] bg-[var(--app-surface-soft)] px-3 py-2 text-xs font-bold text-[var(--app-text)] no-underline transition hover:border-[var(--app-accent-text)] hover:text-[var(--app-accent-text)]"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    if (href === '#') event.preventDefault()
+                  }}
+                >
+                  <FileText size={14} aria-hidden="true" className="shrink-0 text-[var(--app-subtle)]" />
+                  <span className="min-w-0 flex-1 truncate">{fileLabel(file)}</span>
+                  {size && <span className="shrink-0 text-[var(--app-subtle)]">{size}</span>}
+                  <Download size={13} aria-hidden="true" className="shrink-0" />
+                </a>
+              )
+            })}
+          </div>
+        )}
+        {files.length > 1 && (
+          <span className="shrink-0 text-xs font-bold text-[var(--app-subtle)]" aria-hidden="true" title={`파일 ${files.length}개: 옆으로 스크롤`}>
+            +{files.length - 1}
+          </span>
+        )}
       </div>
     </CardTag>
   )
