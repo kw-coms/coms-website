@@ -2418,12 +2418,15 @@ test('Records and Tools toggles show the active underline on their pages', async
   }
   // The underline is centred on the label text, like the other items' (offset between the two centres must match).
   await page.goto('/activity-log')
-  // boundingBox() does not wait for layout: wait until the header is drawn and Records is active first.
+  // boundingBox() does not wait for layout: wait until the header is drawn and Records is active first,
+  // and for the web font, so the label width cannot change between the two measurements.
   await expect(toggle('Records').locator('[data-nav-label]')).toBeVisible()
   await expect(underline('Records')).toHaveCSS('opacity', '1')
   await page.evaluate(() => document.fonts.ready)
   const offset = async (btn, line, label) => {
+    // (an opacity-0 underline still counts as visible: it has a box)
     await expect(label).toBeVisible()
+    await expect(line).toBeVisible()
     const [l, u] = [await label.boundingBox(), await line.boundingBox()]
     return (u.x + u.width / 2) - (l.x + l.width / 2)
   }
@@ -2433,6 +2436,7 @@ test('Records and Tools toggles show the active underline on their pages', async
   expect(Math.abs(recordsOffset)).toBeLessThanOrEqual(1)
   expect(Math.abs(recordsOffset - sponsorsOffset)).toBeLessThanOrEqual(1)
   // ...and at the same height as Sponsors' underline (it now hangs from the label span, not the button).
+  await expect(sponsors.locator('span').last()).toBeVisible()
   const [recordsLine, sponsorsLine] = [await underline('Records').boundingBox(), await sponsors.locator('span').last().boundingBox()]
   expect(Math.abs(recordsLine.y - sponsorsLine.y)).toBeLessThanOrEqual(1)
 })
