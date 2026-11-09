@@ -628,35 +628,110 @@
 /* ---------- /study 허브 ---------- */
 .study-hub {
   min-height: 100vh;
-  padding: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top) + 40px) 24px 80px;
-  background: var(--app-bg);
+  padding: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top) + 48px) 24px 96px;
+  background:
+    radial-gradient(60rem 26rem at 50% -8rem, color-mix(in srgb, var(--app-accent) 14%, transparent), transparent 70%),
+    linear-gradient(180deg, transparent, var(--app-bg) 34rem),
+    radial-gradient(circle, color-mix(in srgb, var(--app-text) 13%, transparent) 1px, transparent 1.4px) 0 0 / 23px 23px,
+    var(--app-bg);
   color: var(--app-text);
 }
-.study-hub-inner { max-width: 1040px; margin: 0 auto; }
-.study-hub-eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .08em; color: var(--app-accent-text); margin: 0; }
-.study-hub h1 { font-size: clamp(30px, 5vw, 44px); line-height: 1.25; font-weight: 900; margin: 6px 0 12px; }
-.study-hub-lead { color: var(--app-muted); margin: 0 0 28px; }
-.study-hub-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.study-hub-inner { max-width: 1080px; margin: 0 auto; }
+
+/* Head: title and lead on the left, real totals (and a way back to the last problem) on the right. */
+.study-hub-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 24px 48px; align-items: center; margin-bottom: 36px; }
+.study-hub h1 { font-size: clamp(34px, 5.4vw, 52px); line-height: 1.15; font-weight: 900; letter-spacing: -.02em; margin: 0 0 12px; }
+.study-hub-lead { color: var(--app-muted); font-size: 16px; line-height: 1.6; margin: 0; max-width: 32em; text-wrap: pretty; }
+.study-overview { display: flex; flex-direction: column; gap: 10px; min-height: 82px; justify-content: flex-end; }
+.study-overview[data-reserve] { min-height: 132px; }
+.study-overview-stats { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; border: 1px solid var(--app-hairline); border-radius: 16px; background: color-mix(in srgb, var(--app-surface) 86%, transparent); backdrop-filter: blur(6px); }
+.study-overview-stats > div { display: flex; flex-direction: column-reverse; gap: 2px; padding: 14px 16px; min-width: 0; }
+.study-overview-stats > div + div { border-left: 1px solid var(--app-hairline); }
+.study-overview-stats dt { font-size: 12.5px; font-weight: 600; color: var(--app-muted); }
+.study-overview-stats dd { margin: 0; font-size: 26px; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.study-overview-resume { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 12px; background: var(--app-accent-soft); color: var(--app-text); font-size: 13.5px; text-decoration: none; transition: background-color .15s; }
+.study-overview-resume svg { flex: none; color: var(--app-accent-text); }
+.study-overview-resume span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.study-overview-resume b { font-weight: 800; margin-right: 4px; }
+.study-overview-resume:hover { background: var(--app-accent-border); }
+.study-overview-resume:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+
+/* Five subject cards on a 6-column grid (3 + 2 wide), then the Circuit Lab banner across the whole row. */
+.study-hub-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+.study-hub-grid > li { grid-column: span 2; min-width: 0; }
+.study-hub-grid > li:nth-child(n+4):nth-child(-n+5) { grid-column: span 3; }
+.study-hub-grid > li.study-hub-lab { grid-column: 1 / -1; }
 .study-card {
-  position: relative; display: flex; flex-direction: column; gap: 6px; height: 100%;
-  padding: 20px; border-radius: 16px;
+  position: relative; display: flex; flex-direction: column; gap: 12px; height: 100%;
+  padding: 20px; border-radius: 18px;
   background: var(--app-surface); border: 1px solid var(--app-hairline);
   color: inherit; text-decoration: none;
-  transition: transform .15s, box-shadow .15s, border-color .15s;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
+.study-card-head { display: flex; align-items: center; gap: 14px; padding-right: 36px; min-width: 0; }
+.study-card-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.study-tile {
+  flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px;
+  background: var(--app-accent-soft); color: color-mix(in srgb, var(--app-accent-text) 60%, var(--app-text));
+  box-shadow: inset 0 0 0 1px var(--app-accent-border);
+}
+.study-glyph-text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; font-weight: 800; letter-spacing: -.02em; }
+.study-glyph-big { font-size: 24px; font-family: var(--apple-font-family); font-weight: 900; }
 /* The card is a plain box with several links (nested <a> is invalid): the title link stretches over all of it. */
 .study-card-link { color: inherit; text-decoration: none; }
 .study-card-link::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
 .study-card-link:focus-visible { outline: none; }
-.study-card:has(.study-card-link:focus-visible) { outline: 2px solid var(--app-accent); outline-offset: 2px; }
-.study-card:hover, .study-card:focus-visible, .study-card:has(.study-card-link:focus-visible) { transform: translateY(-2px); border-color: var(--app-accent); box-shadow: 0 12px 30px rgba(0,0,0,.1); }
-.study-card-sub { font-size: 12.5px; font-weight: 700; color: var(--app-accent-text); }
-.study-card-title { font-size: 22px; font-weight: 900; line-height: 1.3; }
-.study-card-desc { color: var(--app-muted); font-size: 14.5px; line-height: 1.6; }
-.study-card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
-.study-card-tags span { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 99px; background: var(--app-accent-soft); color: var(--app-accent-text); }
-.study-card-foot { padding-top: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; font-weight: 700; color: var(--app-accent-text); }
-@media (prefers-reduced-motion: reduce) { .study-card { transition: none; } .study-card:hover { transform: none; } }
+.study-card:has(.study-card-link:focus-visible), .study-card:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 3px; }
+.study-card-go { pointer-events: none; position: absolute; top: 24px; right: 20px; box-sizing: content-box; padding: 6px; border-radius: 99px; color: var(--app-subtle); transition: transform .18s ease, color .18s ease, background-color .18s ease; }
+.study-card:hover, .study-card:has(.study-card-link:focus-visible), .study-card:focus-visible { transform: translateY(-3px); border-color: var(--app-accent-border); box-shadow: 0 14px 32px color-mix(in srgb, var(--app-text) 14%, transparent); }
+.study-card:hover .study-card-go, .study-card:has(.study-card-link:focus-visible) .study-card-go { transform: translateX(2px); color: var(--app-accent-text); background: var(--app-accent-soft); }
+.study-card-sub { font-size: 13px; font-weight: 500; color: var(--app-subtle); }
+.study-card-title { margin: 0; font-size: 21px; font-weight: 800; line-height: 1.3; letter-spacing: -.01em; }
+.study-card-desc { color: var(--app-muted); font-size: 14.5px; line-height: 1.6; text-wrap: pretty; }
+.study-card-done { font-size: 12.5px; font-weight: 600; color: var(--app-muted); }
+
+/* Circuit Lab: a featured banner, copy on the left, the circuit it builds on the right. */
+.study-card-lab {
+  flex-direction: row; align-items: center; justify-content: space-between; gap: 32px; padding: 28px 32px; overflow: hidden;
+  background:
+    radial-gradient(34rem 16rem at 88% 50%, color-mix(in srgb, var(--app-accent) 16%, transparent), transparent 72%),
+    radial-gradient(circle, color-mix(in srgb, var(--app-text) 11%, transparent) 1px, transparent 1.4px) 0 0 / 23px 23px,
+    var(--app-surface);
+  border-color: var(--app-accent-border);
+}
+.study-lab-copy { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; max-width: 440px; }
+.study-lab-copy .study-card-head { padding-right: 0; }
+.study-lab-copy .study-card-title { font-size: 26px; }
+.study-tile-lab { background: var(--app-accent-soft); }
+.study-lab-open { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; border-radius: 99px; background: var(--app-text); color: var(--app-bg); font-size: 14px; font-weight: 700; transition: transform .18s ease; }
+.study-card-lab:hover .study-lab-open, .study-card-lab:focus-visible .study-lab-open { transform: translateX(2px); }
+.study-lab-art { flex: none; width: min(400px, 48%); height: auto; color: var(--app-accent-text); }
+.study-lab-part { fill: var(--app-surface); }
+.study-lab-glow { fill: var(--app-accent); opacity: .16; }
+.study-lab-flow { opacity: .85; animation: study-lab-flow 1.6s linear infinite; }
+@keyframes study-lab-flow { to { stroke-dashoffset: -28; } }
+
+@media (max-width: 899px) {
+  .study-hub-head { grid-template-columns: 1fr; align-items: start; margin-bottom: 28px; }
+  .study-hub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .study-hub-grid > li, .study-hub-grid > li:nth-child(n+4):nth-child(-n+5) { grid-column: span 1; }
+  .study-hub-grid > li:nth-child(5), .study-hub-grid > li.study-hub-lab { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .study-hub { padding: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top) + 28px) 16px 64px; }
+  .study-hub-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .study-hub-grid > li, .study-hub-grid > li:nth-child(5), .study-hub-grid > li.study-hub-lab { grid-column: 1; }
+  .study-overview-stats > div { padding: 12px; }
+  .study-overview-stats dd { font-size: 22px; }
+  .study-card { padding: 18px; }
+  .study-card-lab { flex-direction: column; align-items: stretch; gap: 16px; padding: 20px; }
+  .study-lab-art { width: 100%; max-width: 300px; align-self: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .study-card, .study-card-go, .study-lab-open { transition: none; }
+  .study-card:hover, .study-card:has(.study-card-link:focus-visible), .study-card:focus-visible, .study-card:hover .study-card-go, .study-card-lab:hover .study-lab-open { transform: none; }
+  .study-lab-flow { animation: none; }
+}
 
 /* ---------- 회로 그림 (circuits/): 약간 3D로 기울인 Tinkercad 스타일 SVG + 시뮬레이션 ----------
    그림의 틀(버튼 줄, 그림 상자, 슬라이더, 상태 줄, 캡션 안내)은 content/arduino.html에 이미 들어 있고(circuits/chrome.ts로 생성),
@@ -788,8 +863,6 @@
 .study-page [data-scroll-region]:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 
 /* Circuit Lab: card on the hub and banner on the Arduino page (a link to the separate /lab/ app). */
-.study-lab-art { width: 100%; max-width: 240px; height: 64px; color: var(--app-accent-text); }
-.study-card-lab .study-lab-art { margin-bottom: 6px; }
 .study-lab-cta {
   display: flex; align-items: center; gap: 16px;
   max-width: 1132px; margin: 12px 24px 0; padding: 14px 20px; border-radius: 14px;
