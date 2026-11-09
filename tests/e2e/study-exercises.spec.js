@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { mockOptionalApis } from './visualSupport.js'
+import { asMember, mockOptionalApis } from './visualSupport.js'
 
 test('fixture build includes sample exercises when requested', async ({ page }) => {
   test.skip(process.env.STUDY_EXERCISE_FIXTURES !== '1', 'requires the opt-in study exercise fixtures')
+  await asMember(page)
   await page.goto('/study/c/practice/sample-echo')
   await expect(page.getByRole('heading', { name: '첫 인사 출력하기' })).toBeVisible()
 })
@@ -17,6 +18,8 @@ const result = (stdout) => ({ stdout, stderr: '', exitCode: 0, signal: null, tim
 
 async function mockGrader(page) {
   await mockOptionalApis(page)
+  // Practice problems open for signed-in members only (guests get the guide: guest-gating.spec.js).
+  await asMember(page)
   const calls = []
   await page.route('**/study/api/run', async (route) => {
     const body = route.request().postDataJSON()
@@ -81,6 +84,8 @@ test('function submission sends the harness and grades the student function', as
 
 test('web checks fail on starter CSS and pass after editing in the real sandbox', async ({ page }) => {
   await mockOptionalApis(page)
+  // Practice problems open for signed-in members only (guests get the guide: guest-gating.spec.js).
+  await asMember(page)
   await page.goto('/study/web/practice/sample-web-heading')
   await expect(page.locator('iframe.ex-web-preview')).toBeVisible()
   await expect(page.locator('iframe.ex-web-preview').contentFrame().getByText('안녕하세요')).toBeVisible()
@@ -96,6 +101,8 @@ test('web checks fail on starter CSS and pass after editing in the real sandbox'
 
 test('typing in a web exercise updates the live preview without waiting for Run, and no placeholder covers it', async ({ page }) => {
   await mockOptionalApis(page)
+  // Practice problems open for signed-in members only (guests get the guide: guest-gating.spec.js).
+  await asMember(page)
   await page.goto('/study/web/practice/sample-web-heading')
   await expect(page.locator('iframe.ex-web-preview').contentFrame().getByText('안녕하세요')).toBeVisible()
   await expect(page.locator('.ex-preview-empty')).toHaveCount(0)
@@ -106,6 +113,8 @@ test('typing in a web exercise updates the live preview without waiting for Run,
 
 test('shared web code stays idle until Run is clicked', async ({ page }) => {
   await mockOptionalApis(page)
+  // Practice problems open for signed-in members only (guests get the guide: guest-gating.spec.js).
+  await asMember(page)
   const files = { html: '<p id="shared-preview-marker">공유 실행 확인</p>', css: '', js: 'window.sharedCodeRan = true' }
   const hash = `#pg=0.${Buffer.from(JSON.stringify(files)).toString('base64url')}`
   await page.goto(`/study/web/practice/sample-web-heading${hash}`)
@@ -140,6 +149,8 @@ test('practice problem has no serious or critical axe violations', async ({ page
 
 test('inline chapter cards cap at four and open a persistent removable chapter filter', async ({ page }) => {
   await mockOptionalApis(page)
+  // Practice problems open for signed-in members only (guests get the guide: guest-gating.spec.js).
+  await asMember(page)
   await page.goto('/study/c/practice')
   const chapterSelect = page.getByRole('combobox', { name: '장', exact: true })
   await chapterSelect.selectOption('loop')
