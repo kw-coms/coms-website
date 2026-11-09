@@ -252,6 +252,7 @@
 	max-width: calc(100vw - 2.5rem);
 	max-height: var(--appearance-max-h, 80vh);
 	overflow-y: auto;
+	overscroll-behavior: contain;
 	padding: 1rem;
 	border: 1px solid var(--app-hairline-strong);
 	border-radius: 1.25rem;
@@ -265,11 +266,13 @@
 		display: block;
 		position: fixed;
 		inset: 0;
-		z-index: 59;
+		z-index: 99;
 		background: color-mix(in srgb, #000 55%, transparent);
 	}
 
+	/* Above the fixed header (80), tab bar (79), back-to-top (85) and the low-power notice (90); below toasts (120). */
 	.appearance-popover {
+		z-index: 100;
 		position: fixed;
 		inset: auto 0 0 0;
 		width: auto;

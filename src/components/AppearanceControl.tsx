@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Check, ChevronUp, Moon, Sun, X } from 'lucide-react'
 import { accentSwatches, footerLinkGroups } from '../data/homeContent'
 import { DEFAULT_ACCENT, normalizeHex } from '../utils/themeColors'
@@ -9,6 +10,14 @@ const PERF_CHOICES: { value: PerfPreference; label: string }[] = [
   { value: 'lite', label: '가볍게' },
   { value: 'full', label: '화려하게' },
 ]
+
+const SHEET_QUERY = '(max-width: 639px)'
+const subscribeSheet = (notify: () => void) => {
+  const mq = window.matchMedia(SHEET_QUERY)
+  mq.addEventListener('change', notify)
+  return () => mq.removeEventListener('change', notify)
+}
+const isSheet = () => window.matchMedia(SHEET_QUERY).matches
 
 export const OPEN_APPEARANCE_EVENT = 'coms:open-appearance'
 
@@ -37,24 +46,30 @@ export default function AppearanceControl({
   const isDark = themeMode === 'dark'
   const fontSelectValue = selectedFontId ? String(selectedFontId) : ''
   const perf = usePerfState()
-  const [open, setOpen] = useState(false)
   const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined)
   const dialogId = useId()
   const buttonRef = useRef<HTMLButtonElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const focusPerfRef = useRef(false)
+  const sheet = useSyncExternalStore(subscribeSheet, isSheet, () => false)
+  const { pathname } = useLocation()
+  // The footer outlives route changes: remembering the page it was opened on closes it when the page changes.
+  const [openAt, setOpenAt] = useState<string | null>(null)
+  const open = openAt === pathname
+  const setOpen = useCallback((value: boolean) => setOpenAt(value ? pathname : null), [pathname])
 
   const close = useCallback((returnFocus: boolean) => {
+    focusPerfRef.current = false
     setOpen(false)
     if (returnFocus) buttonRef.current?.focus()
-  }, [])
+  }, [setOpen])
 
   // Lets the "settings" button of the low-power notice open the panel from anywhere on the page.
   useEffect(() => {
     const openFromOutside = () => { focusPerfRef.current = true; setOpen(true) }
     window.addEventListener(OPEN_APPEARANCE_EVENT, openFromOutside)
     return () => window.removeEventListener(OPEN_APPEARANCE_EVENT, openFromOutside)
-  }, [])
+  }, [setOpen])
 
   useEffect(() => {
     if (!open) return undefined
@@ -65,10 +80,11 @@ export default function AppearanceControl({
     } else {
       dialog?.focus()
     }
-    // On desktop the popover opens upward from the footer: keep it inside the viewport.
+    // On desktop the popover opens upward from the footer: keep it below the fixed header, inside the viewport.
     const fit = () => {
       const top = buttonRef.current?.getBoundingClientRect().top ?? 0
-      setMaxHeight(Math.max(240, Math.floor(top - 16)))
+      const headerBottom = document.querySelector('.apple-global-nav')?.getBoundingClientRect().bottom ?? 0
+      setMaxHeight(Math.max(160, Math.floor(top - Math.max(headerBottom, 0) - 16)))
     }
     fit()
     const onKeyDown = (event: KeyboardEvent) => {
@@ -78,7 +94,7 @@ export default function AppearanceControl({
         return
       }
       // The bottom sheet covers the page, so Tab stays inside it. The desktop popover lets Tab leave.
-      if (event.key !== 'Tab' || !window.matchMedia('(max-width: 639px)').matches || !dialog) return
+      if (event.key !== 'Tab' || !isSheet() || !dialog) return
       const focusable = [...dialog.querySelectorAll<HTMLElement>('button, select, input, [tabindex="0"]')].filter((el) => !el.hasAttribute('disabled') && el.tabIndex >= 0)
       if (!focusable.length) return
       const first = focusable[0]
@@ -89,15 +105,26 @@ export default function AppearanceControl({
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node
       if (dialog?.contains(target) || buttonRef.current?.contains(target)) return
+      const onBackdrop = Boolean((target as Element).closest?.('.appearance-backdrop'))
+      const returnFocus = onBackdrop || Boolean(dialog?.contains(document.activeElement))
       close(false)
+      // The press then focuses whatever was clicked; only when focus falls back to <body> does it go back to the button.
+      if (returnFocus) {
+        window.setTimeout(() => {
+          const active = document.activeElement
+          if (!active || active === document.body) buttonRef.current?.focus()
+        }, 50)
+      }
     }
     document.addEventListener('keydown', onKeyDown)
     document.addEventListener('pointerdown', onPointerDown)
     window.addEventListener('resize', fit)
+    window.addEventListener('scroll', fit, { passive: true })
     return () => {
       document.removeEventListener('keydown', onKeyDown)
       document.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('resize', fit)
+      window.removeEventListener('scroll', fit)
     }
   }, [open, close])
 
@@ -106,7 +133,6 @@ export default function AppearanceControl({
   const segment = 'inline-flex items-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] p-1'
   const segmentOn = 'bg-[var(--app-text)] text-[var(--app-surface)]'
   const segmentOff = 'text-[var(--app-muted)] hover:text-[var(--app-text)]'
-  const ModeIcon = isDark ? Moon : Sun
 
   return (
     <footer className="appearance-control apple-footer-surface border-t border-[var(--app-hairline)] bg-[var(--app-surface-soft)] px-5 pb-6 pt-6 text-[var(--app-muted)]">
@@ -130,13 +156,12 @@ export default function AppearanceControl({
             <button
               ref={buttonRef}
               type="button"
-              onClick={() => setOpen((value) => !value)}
+              onClick={() => setOpen(!open)}
               aria-expanded={open}
               aria-controls={dialogId}
               aria-haspopup="dialog"
               className="appearance-trigger inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 sm:min-h-9 sm:flex-none"
             >
-              <ModeIcon size={14} aria-hidden="true" />
               <span className="size-3.5 rounded-full border border-[var(--app-hairline-strong)]" style={{ backgroundColor: accent }} aria-hidden="true" />
               화면 설정
               <ChevronUp size={14} aria-hidden="true" className={`transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -150,6 +175,7 @@ export default function AppearanceControl({
                   id={dialogId}
                   role="dialog"
                   aria-label="화면 설정"
+                  aria-modal={sheet ? true : undefined}
                   tabIndex={-1}
                   className="appearance-popover text-[var(--app-text)] focus:outline-none"
                   style={maxHeight ? { '--appearance-max-h': `${maxHeight}px` } as React.CSSProperties : undefined}
@@ -182,7 +208,7 @@ export default function AppearanceControl({
                       </div>
                     </div>
 
-                    <div role="group" aria-labelledby="perf-choice-label" className="py-3">
+                    <div className="py-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span id="perf-choice-label" className={groupLabel}>화면 효과</span>
                         <div
@@ -257,7 +283,7 @@ export default function AppearanceControl({
 
                     <div role="group" aria-labelledby={`${dialogId}-color`} className="appearance-color-row pt-3">
                       <span id={`${dialogId}-color`} className={groupLabel}>강조 색상</span>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-2">
+                      <div className="appearance-swatches mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-2">
                         {accentSwatches.map((swatch) => {
                           const active = accent === swatch.value
                           return (
@@ -276,7 +302,7 @@ export default function AppearanceControl({
                           )
                         })}
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <div className="appearance-color-actions mt-3 flex flex-wrap items-center gap-2">
                         <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)] focus-within:ring-2 focus-within:ring-[var(--app-accent)]/40 sm:min-h-9">
                           직접 선택
                           <span className="relative grid size-5 overflow-hidden rounded-full border border-[var(--app-hairline)] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]" style={{ backgroundColor: accent }}>
