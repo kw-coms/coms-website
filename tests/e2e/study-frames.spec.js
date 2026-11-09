@@ -108,7 +108,7 @@ test('content that follows its own frame height (min-height:100vh) grows to the 
   // no margin: the content equals the frame, a fixed point, so it takes at most 2 reports and the frame stays put
   await type('<style>html,body,p{margin:0}body{min-height:100vh;background:#eef}</style><p>안녕</p>')
   expect(await page.evaluate(() => window.__sizes.length)).toBeLessThanOrEqual(2)
-  await expect.poll(async () => (await measure(preview))?.height ?? Infinity, { timeout: 5000 }).toBeLessThan(300)
+  await expect.poll(async () => { const m = await measure(preview); return m?.loaded ? m.height : Infinity }, { timeout: 5000 }).toBeLessThan(300)
   // the default 12px margin never reaches a fixed point: the frame grows to the cap, stops there, and the reports end
   const t0 = Date.now()
   await type('<style>body{min-height:100vh}</style><p>안녕</p>', 0)
@@ -136,5 +136,5 @@ test('quick successive edits leave the frame as tall as the last content', async
   const preview = await page.locator('iframe.ex-web-preview').elementHandle()
   await expect.poll(async () => { const m = await measure(preview); return m?.loaded ? m.content : 0 }, { timeout: 5000 }).toBeGreaterThan(600)
   await expect.poll(settled(preview), { timeout: 5000 }).toBeNull()
-  await expect.poll(async () => { const m = await measure(preview); return !!m && m.height >= Math.min(m.content, CAP) }, { timeout: 5000 }).toBe(true)
+  await expect.poll(async () => { const m = await measure(preview); return !!m?.loaded && m.height >= Math.min(m.content, CAP) }, { timeout: 5000 }).toBe(true)
 })
