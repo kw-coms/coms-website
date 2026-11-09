@@ -7,7 +7,6 @@ import {
   DEFAULT_SPONSOR_ACCENT,
   defaultSponsorPageSettings,
   sponsorDisplayName,
-  sponsorInitial,
   sponsorPeriodLabel,
   visibleSponsorGroups,
   type SponsorSummary,
@@ -175,7 +174,7 @@ function TierSection({ group, layout, showTierLabels }: {
       >
         {group.sponsors.map((sponsor, index) => (
           <li key={sponsor.anonymous ? `anon-${index}` : sponsor.id}>
-            <SponsorCard sponsor={sponsor} tierColor={tierColor} layout={layout} />
+            <SponsorCard sponsor={sponsor} layout={layout} />
           </li>
         ))}
       </ul>
@@ -183,9 +182,8 @@ function TierSection({ group, layout, showTierLabels }: {
   )
 }
 
-function SponsorCard({ sponsor, tierColor, layout }: {
+function SponsorCard({ sponsor, layout }: {
   sponsor: SponsorSummary
-  tierColor: string
   layout: 'grid' | 'list'
 }) {
   const name = sponsorDisplayName(sponsor)
@@ -196,27 +194,14 @@ function SponsorCard({ sponsor, tierColor, layout }: {
 
   return (
     <article className={`flex h-full gap-4 rounded-2xl border border-[var(--app-hairline)] bg-[var(--app-surface)] p-4 transition hover:border-[color-mix(in_srgb,var(--sponsor-accent)_50%,var(--app-hairline))] ${layout === 'list' ? 'items-center' : 'flex-col items-start sm:p-5'}`}>
-      <div className={layout === 'list' ? 'shrink-0' : ''}>
-        {logoUrl ? (
-          <img
-            src={logoUrl}
-            alt={`${name} 로고`}
-            loading="lazy"
-            className="size-14 rounded-xl border border-[var(--app-hairline)] bg-white object-contain p-1.5"
-          />
-        ) : (
-          <span
-            aria-hidden="true"
-            className="flex size-14 items-center justify-center rounded-xl text-xl font-black"
-            style={{
-              color: readable(tierColor),
-              backgroundColor: `color-mix(in srgb, ${tierColor} 14%, transparent)`,
-            }}
-          >
-            {sponsorInitial(name)}
-          </span>
-        )}
-      </div>
+      {logoUrl && (
+        <img
+          src={logoUrl}
+          alt={`${name} 로고`}
+          loading="lazy"
+          className="size-14 shrink-0 rounded-xl border border-[var(--app-hairline)] bg-white object-contain p-1.5"
+        />
+      )}
       <div className="min-w-0 flex-1">
         <h3 className="text-base font-bold text-[var(--app-text)]">{name}</h3>
         {sponsor.description && (

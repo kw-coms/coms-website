@@ -209,31 +209,19 @@
 /* ---- Apps: one card --------------------------------------------------------------- */
 .apple-product-panel.app-card {
 	display: grid;
-	grid-template-columns: auto minmax(0, 1fr) auto;
+	grid-template-columns: minmax(0, 1fr) auto;
 	grid-template-areas:
-		'tile head open'
-		'desc desc desc'
-		'foot foot foot'
-		'more more more';
-	align-items: center;
+		'head open'
+		'desc desc'
+		'foot foot'
+		'more more';
+	align-items: start;
 	align-content: start;
 	gap: 0 12px;
 	min-height: 0;
-	padding: 18px;
+	padding: 20px 20px 18px;
 	border-radius: 16px;
 	box-shadow: none;
-}
-.app-card-tile {
-	grid-area: tile;
-	display: grid;
-	width: 40px;
-	height: 40px;
-	place-items: center;
-	border-radius: 12px;
-	background: var(--app-accent-soft);
-	color: var(--app-accent-text);
-	font-size: 17px;
-	font-weight: 800;
 }
 .app-card-head {
 	grid-area: head;
@@ -251,7 +239,7 @@
 .app-card-title {
 	margin: 1px 0 0;
 	color: var(--app-text);
-	font-size: 18px;
+	font-size: 19px;
 	font-weight: 700;
 	line-height: 1.3;
 	word-break: keep-all;
@@ -259,6 +247,7 @@
 }
 .app-card-open {
 	grid-area: open;
+	align-self: end;
 	display: inline-flex;
 	align-items: center;
 	gap: 3px;
@@ -305,12 +294,6 @@
 	.apple-product-panel.app-card {
 		padding: 12px 14px;
 		gap: 0 10px;
-	}
-	.app-card-tile {
-		width: 34px;
-		height: 34px;
-		border-radius: 10px;
-		font-size: 15px;
 	}
 	.app-card-title {
 		font-size: 16px;

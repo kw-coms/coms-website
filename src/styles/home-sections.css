@@ -1379,9 +1379,26 @@
 	transform: translateX(3px);
 }
 
+/* A short last row stretches over the empty cells instead of leaving an orphan tile. */
+.coms-tools-grid > li:last-child:nth-child(odd) {
+	grid-column: span 2;
+}
+
 @media (min-width: 768px) {
 	.coms-tools-grid {
 		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.coms-tools-grid > li:last-child:nth-child(odd) {
+		grid-column: auto;
+	}
+
+	.coms-tools-grid > li:last-child:nth-child(3n + 1) {
+		grid-column: span 3;
+	}
+
+	.coms-tools-grid > li:last-child:nth-child(3n + 2) {
+		grid-column: span 2;
 	}
 }
 

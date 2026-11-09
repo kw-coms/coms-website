@@ -104,7 +104,6 @@ export default function AppProjectCard({
       data-testid={testId}
       className={`apple-product-panel app-card group text-left no-underline transition hover:-translate-y-0.5 ${className}`}
     >
-      <span className="app-card-tile" aria-hidden="true">{Array.from(title)[0]?.toUpperCase()}</span>
       <div className="app-card-head">
         {project?.eyebrow && <p className="app-card-eyebrow">{project.eyebrow}</p>}
         <h3 className="app-card-title">{title}</h3>
