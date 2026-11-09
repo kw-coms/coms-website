@@ -2394,6 +2394,18 @@ for (const path of ['/', '/study/arduino']) {
   })
 }
 
+// Like Sponsors or Resources, the Records and Tools toggles draw the accent underline on their own pages (detail routes too).
+test('Records and Tools toggles show the active underline on their pages', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.setViewportSize({ width: 1280, height: 800 })
+  const underline = (name) => page.locator('header nav').first().getByRole('button', { name, exact: true }).locator('span').last()
+  for (const [path, records, tools] of [['/activity-log', 1, 0], ['/meet', 0, 1], ['/meet/1', 0, 1], ['/about', 0, 0]]) {
+    await page.goto(path)
+    await expect(underline('Records'), path).toHaveCSS('opacity', String(records))
+    await expect(underline('Tools'), path).toHaveCSS('opacity', String(tools))
+  }
+})
+
 test('top navigation groups activity log and monthly calendar under Records and Tools', async ({ page }) => {
   await mockAdminApis(page)
   await page.goto('/')

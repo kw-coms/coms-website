@@ -293,6 +293,7 @@ export default function GlobalNavigation() {
                 >
                   {group.navLabel}
                   <ChevronDown size={12} className={`transition ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+                  <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${groupActive ? 'opacity-100' : 'opacity-0'}`} />
                 </button>
                 {open && (
                   <nav
