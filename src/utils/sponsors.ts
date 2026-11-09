@@ -153,10 +153,3 @@ function monthLabel(value?: string | null) {
   const match = raw.match(/^(\d{4})-(\d{2})/)
   return match ? `${match[1]}.${match[2]}` : ''
 }
-
-/** Fallback avatar glyph for a sponsor with no logo. */
-export function sponsorInitial(name?: string | null) {
-  // "60기 박채현" should read 박, not 6: drop a leading 기수 prefix.
-  const raw = text(name).replace(/^\d{1,3}기\s*/, '')
-  return raw ? Array.from(raw)[0] : '?'
-}

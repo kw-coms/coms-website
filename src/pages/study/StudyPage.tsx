@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import NotFoundPage from '../../components/NotFoundPage'
 import { findStudy } from './studies'
 import { loadStudyHtml } from './studyContent'
@@ -59,16 +59,6 @@ function StudyBody({ id }: { id: string }) {
       <div className="study-back">
         <Link to="/study"><ArrowLeft size={14} aria-hidden="true" /> 스터디 목록</Link>
       </div>
-      {id === 'arduino' && (
-        // /lab/ is a separate app, not a router page: a plain link makes the browser load it.
-        <a href="/lab/" className="study-lab-cta">
-          <span className="study-lab-cta-text">
-            <strong>Circuit Lab에서 열기</strong>
-            <span>브라우저에서 아두이노 회로를 만들고 코드를 바로 돌려 보세요</span>
-          </span>
-          <ArrowRight size={18} aria-hidden="true" />
-        </a>
-      )}
       {markup ? (
         // Trusted build-time constant (src/pages/study/content/*.html), not user content. React never re-renders it.
         <div ref={layoutRef} className="study-layout" dangerouslySetInnerHTML={markup} />

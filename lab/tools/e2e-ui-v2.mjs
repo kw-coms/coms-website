@@ -165,17 +165,39 @@ try {
     return { c, p };
   };
   const skipTutorial = () => { try { localStorage.setItem('coms-lab:tutorial-done', '1'); } catch { /* no storage */ } };
-  for (const w of [1440, 1280, 1100, 1024, 1001, 390]) {
+  for (const w of [1600, 1501, 1440, 1280, 1100, 1024, 1001, 1000, 800, 390]) {
     const { c, p } = await fresh(w, 900, skipTutorial);
     const m = await p.evaluate(() => {
       const bar = document.querySelector('.toolbar');
-      const vis = [...bar.querySelectorAll('.tb, .brand strong, .speed select')].filter((e) => e.offsetParent !== null);
+      const vis = [...bar.querySelectorAll('.tb, .brand strong, .brand-home, .speed select')].filter((e) => e.offsetParent !== null);
       return { over: bar.scrollWidth - bar.clientWidth, barH: bar.getBoundingClientRect().height, tall: vis.filter((e) => e.getBoundingClientRect().height > 40).map((e) => e.textContent), n: vis.length, docOver: document.documentElement.scrollWidth - innerWidth, offscreen: vis.filter((e) => e.getBoundingClientRect().right > innerWidth + 1).length };
     });
     check(`toolbar at ${w}px: no wrapped button, no overflow`, m.over <= 1 && m.tall.length === 0 && m.barH < 56 && m.docOver <= 0 && m.offscreen === 0, JSON.stringify(m));
     if (w === 1440 || w === 1280) {
       const t = await p.evaluate(() => { const e = document.querySelector('.run-btn .tb-text'); return { shown: !!e && e.offsetParent !== null, text: e?.textContent?.trim() }; });
       check(`Run button keeps its text label at ${w}px`, t.shown && t.text === '실행', JSON.stringify(t));
+    }
+    if (w === 1440 || w === 390) {
+      const h = await p.evaluate(() => { const a = document.querySelector('.toolbar a.brand-home'); const r = a?.getBoundingClientRect(); return { href: a?.getAttribute('href'), name: a?.getAttribute('aria-label'), shown: !!a && a.offsetParent !== null, left: r?.left, w: r?.width, h: r?.height }; });
+      check(`home link at ${w}px: <a href="/"> with an accessible name, visible at the left edge`, h.href === '/' && /COM's/.test(h.name ?? '') && h.shown && h.left <= 12 && h.w >= 28 && h.h >= 28, JSON.stringify(h));
+    }
+    if (w === 1440) {
+      // full page load to "/": the dev server may not serve it, so fulfil the request and assert it happened
+      const origin = new URL(base).origin;
+      const asked = [];
+      await p.route(`${origin}/`, (r) => { asked.push(r.request().url()); return r.fulfill({ contentType: 'text/html', body: '<title>site</title>' }); });
+      await p.evaluate(() => window.__lab.set({ code: '// unsaved edit before leaving\nvoid setup(){}\nvoid loop(){}' }));
+      const hasEdit = () => p.evaluate(() => Object.keys(localStorage).some((k) => (localStorage.getItem(k) ?? '').includes('unsaved edit before leaving')));
+      check('before the click the edit is still only pending (debounce not fired), so pagehide must do the save', !(await hasEdit()));
+      await Promise.all([p.waitForURL(`${origin}/`), p.locator('a.brand-home').click()]);
+      check('clicking the home link requests the site root (full page load)', asked.length === 1 && asked[0] === `${origin}/`, JSON.stringify(asked));
+      const saved = await p.evaluate(() => Object.keys(localStorage).filter((k) => /lab/.test(k)).map((k) => (localStorage.getItem(k) ?? '').includes('unsaved edit before leaving')).some(Boolean));
+      check('leaving through the link flushed the pending autosave (pagehide)', saved);
+    }
+    if (w === 390 || w === 1000) {
+      await p.getByRole('button', { name: '더보기' }).click();
+      const it = p.locator('.more-pop a.home-item');
+      check(`더보기 at ${w}px has a COM's 홈으로 link to /`, (await it.count()) === 1 && (await it.getAttribute('href')) === '/' && /COM's 홈으로/.test(await it.innerText()));
     }
     await c.close();
   }

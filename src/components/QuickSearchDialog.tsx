@@ -45,8 +45,8 @@ function page(path: string, menuLabel: string, keywords = '', icon?: LucideIcon)
 function buildPages(signedIn: boolean, operations: boolean): PageItem[] {
   const pages: PageItem[] = [
     { id: 'page:/', group: 'page', title: '홈', hint: 'Home', path: '/', keywords: 'main 메인 처음' },
-    // Lab (a tab with its own path) is listed below as Circuit Lab.
-    ...tabs.filter((tab) => !('path' in tab)).map((tab) => page(`/${tab.id}`, tab.label, tab.hint, tab.icon)),
+    // A tab may carry its own path (Lab: a separate app at /lab/); it is the only entry for Circuit Lab.
+    ...tabs.map((tab) => page('path' in tab ? tab.path : `/${tab.id}`, tab.label, tab.id === 'lab' ? `${tab.hint} circuit lab 아두이노` : tab.hint, tab.icon)),
     ...navExtraItems.map((item) => page(item.path, item.label)),
     ...activitySectionNavItems.map((item) => page(item.path, item.label, item.hint, item.icon)),
     page('/apps', 'Apps', '앱 미니앱'),
