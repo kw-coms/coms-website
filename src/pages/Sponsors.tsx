@@ -19,8 +19,8 @@ import ErrorState from '../components/common/ErrorState'
 import { isSafeUrl } from '../utils/sanitizeHtml'
 import '../styles/site-pages.css'
 
-/** Text in an admin-chosen colour is pulled toward the theme's text colour so it keeps AA contrast on either background. */
-const readable = (color: string) => `color-mix(in srgb, ${color} 40%, var(--app-text))`
+/** Text in an admin-chosen colour is pulled 70% toward the theme's text colour so it keeps AA contrast on either background. */
+const readable = (color: string) => `color-mix(in srgb, ${color} 30%, var(--app-text))`
 
 /**
  * 후원자 공개 페이지. Logged-out visitors see exactly what members see: the API
@@ -146,11 +146,11 @@ function TierSection({ group, layout, showTierLabels }: {
   showTierLabels: boolean
 }) {
   const tierColor = group.color || 'var(--sponsor-accent)'
-  // One or two sponsors would sit alone in a wide empty grid: cap the width, centre it, stack them.
+  // One or two sponsors would sit alone in a wide empty grid: keep the admin's layout, but size the
+  // columns to the count and centre them.
   const sparse = layout === 'grid' && group.sponsors.length < 3
-  const cardLayout = sparse ? 'list' : layout
   return (
-    <section className={sparse ? 'mx-auto max-w-2xl' : undefined}>
+    <section>
       {showTierLabels && group.name && (
         <div className={`mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 ${sparse ? 'justify-center text-center' : ''}`}>
           <span
@@ -169,10 +169,13 @@ function TierSection({ group, layout, showTierLabels }: {
           )}
         </div>
       )}
-      <ul className={cardLayout === 'list' ? 'flex flex-col gap-3' : 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3'}>
+      <ul
+        className={layout === 'list' ? 'flex flex-col gap-3' : sparse ? 'grid gap-3 sm:justify-center sm:[grid-template-columns:repeat(var(--n),minmax(0,22rem))]' : 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3'}
+        style={sparse ? ({ '--n': group.sponsors.length } as CSSProperties) : undefined}
+      >
         {group.sponsors.map((sponsor, index) => (
           <li key={sponsor.anonymous ? `anon-${index}` : sponsor.id}>
-            <SponsorCard sponsor={sponsor} tierColor={tierColor} layout={cardLayout} />
+            <SponsorCard sponsor={sponsor} tierColor={tierColor} layout={layout} />
           </li>
         ))}
       </ul>

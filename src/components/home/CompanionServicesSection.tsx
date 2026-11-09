@@ -86,7 +86,7 @@ function CompanionServicesSection() {
         </div>
 
         {loadState === 'error' ? (
-          <p className="mt-8 text-sm font-medium text-[var(--app-danger)]">프로젝트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
+          <p className="mt-8 text-sm font-medium text-[color-mix(in_srgb,var(--app-danger)_65%,var(--app-text))]">프로젝트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
         ) : groups.length === 0 ? (
           <p className="mt-8 text-sm font-medium text-[var(--app-muted)]">등록된 프로젝트가 아직 없습니다.</p>
         ) : (

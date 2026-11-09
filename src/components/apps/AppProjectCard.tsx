@@ -1,5 +1,6 @@
 import { ArrowUpRight, Download, FileText } from 'lucide-react'
 import { buildProjectStatusBadges } from '../../utils/appProjectStatus'
+import '../../styles/site-pages.css'
 import { projectFileHref, safeProjectLinkUrl } from '../../utils/appProjectUrls'
 
 const STATUS_TONE_CLASS = {

@@ -111,6 +111,11 @@
 	backdrop-filter: blur(10px);
 	border-bottom: 1px solid var(--app-hairline);
 }
+/* Lite look: blur is off, so the bar must be solid or the cards show through it. */
+:root[data-perf='lite'] .apps-filter {
+	background: var(--app-bg);
+	backdrop-filter: none;
+}
 .apps-chip {
 	display: inline-flex;
 	align-items: center;
