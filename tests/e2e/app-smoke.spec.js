@@ -2543,7 +2543,9 @@ test('only the nav Lab button and the Arduino code-block buttons lead to /lab/',
   for (const path of ['/', '/study', '/study/arduino']) {
     await page.goto(path)
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
-    await expect(page.locator('a[href^="/lab"]')).toHaveCount(0)
+    // Playground buttons are injected imperatively after render: wait for them before counting.
+    if (path === '/study/arduino') await expect(page.getByRole('button', { name: 'Circuit Lab에서 열기' }).first()).toBeVisible()
+    await expect(page.locator('a[href*="/lab"]')).toHaveCount(0)
     const names = await page.getByRole('button', { name: /Lab/ }).evaluateAll(
       (els) => els.filter((el) => el.getClientRects().length > 0).map((el) => el.textContent.trim()))
     const open = names.filter((name) => name !== 'Lab')
