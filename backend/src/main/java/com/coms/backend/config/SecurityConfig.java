@@ -135,6 +135,9 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.DELETE, "/api/club-events/**").authenticated();
                 // Club projects showcase is public (the /apps route is public); admin CRUD
                 // lives under /api/admin/** and is guarded above.
+                // link-status is for members only — guests do not need it. First match wins, so this
+                // must stay above the permitAll for /api/club-projects/** below.
+                auth.requestMatchers(HttpMethod.GET, "/api/club-projects/link-status").authenticated();
                 auth.requestMatchers(HttpMethod.GET, "/api/club-projects", "/api/club-projects/**").permitAll();
                 // project.write — 컨트롤러의 @perm.has 가 실제 게이트.
                 auth.requestMatchers(HttpMethod.POST, "/api/club-projects", "/api/club-projects/**").authenticated();
