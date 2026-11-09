@@ -117,6 +117,9 @@ public class SponsorService {
         LocalDate today = today();
         Map<Long, List<Sponsor>> byTier = sponsorRepository.findAllByOrderBySortOrderAscNameAscIdAsc().stream()
                 .filter(sponsor -> sponsor.isPubliclyVisible(today))
+                // Guests only see placeholders, so the name order must not leak through the ranking.
+                .sorted(member ? (a, b) -> 0 : java.util.Comparator.comparingInt(Sponsor::getSortOrder)
+                        .thenComparing(Sponsor::getId))
                 .collect(Collectors.groupingBy(
                         sponsor -> sponsor.getTierId() == null ? 0L : sponsor.getTierId(),
                         java.util.LinkedHashMap::new,

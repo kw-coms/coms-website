@@ -128,6 +128,20 @@ class SponsorServiceTest {
     }
 
     @Test
+    void guestOrderFollowsIdWhileMemberOrderFollowsName() {
+        Long tierId = tier("골드");
+        // Lower id has the later name; sinceDate survives masking, so it identifies each placeholder.
+        sponsorService.create(sponsor("나", tierId, b -> b.sinceDate(LocalDate.of(2020, 1, 1))));
+        sponsorService.create(sponsor("가", tierId, b -> b.sinceDate(LocalDate.of(2021, 1, 1))));
+        jdbc.update("UPDATE sponsors SET sort_order = 0");
+
+        assertThat(sponsorService.publicList(true).get(0).sponsors()).extracting("sinceDate")
+                .containsExactly(LocalDate.of(2021, 1, 1), LocalDate.of(2020, 1, 1));
+        assertThat(sponsorService.publicList(false).get(0).sponsors()).extracting("sinceDate")
+                .containsExactly(LocalDate.of(2020, 1, 1), LocalDate.of(2021, 1, 1));
+    }
+
+    @Test
     void sponsorAnonymizedByV106NoLongerExposesItsNamePublicly() throws Exception {
         Long tierId = tier("실버");
         jdbc.update("INSERT INTO sponsors (id, name, tier_id, description, since_date, anonymous, visible, sort_order)"
@@ -348,6 +362,7 @@ class SponsorServiceTest {
         private Long logoImageId;
         private String linkUrl;
         private String amountNote;
+        private LocalDate sinceDate;
         private LocalDate untilDate;
         private Boolean anonymous;
         private Boolean visible;
@@ -355,12 +370,13 @@ class SponsorServiceTest {
         Draft logoImageId(Long value) { this.logoImageId = value; return this; }
         Draft linkUrl(String value) { this.linkUrl = value; return this; }
         Draft amountNote(String value) { this.amountNote = value; return this; }
+        Draft sinceDate(LocalDate value) { this.sinceDate = value; return this; }
         Draft untilDate(LocalDate value) { this.untilDate = value; return this; }
         Draft anonymous(boolean value) { this.anonymous = value; return this; }
         Draft visible(boolean value) { this.visible = value; return this; }
 
         SponsorRequest toRequest(String name, Long tierId) {
-            return new SponsorRequest(name, tierId, logoImageId, linkUrl, null, amountNote, null, untilDate, anonymous, visible, null);
+            return new SponsorRequest(name, tierId, logoImageId, linkUrl, null, amountNote, sinceDate, untilDate, anonymous, visible, null);
         }
     }
 }

@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -97,7 +97,7 @@ class SponsorSecurityIntegrationTest {
         mockMvc.perform(get("/api/sponsors"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "private, no-store"))
-                .andExpect(header().stringValues("Vary", hasItem("Cookie")))
+                .andExpect(header().stringValues("Vary", hasItems("Cookie", "Authorization")))
                 .andExpect(jsonPath("$[0].sponsors[0].name").value("익명 후원자"))
                 .andExpect(jsonPath("$[0].sponsors[1].name").value("익명 후원자"))
                 .andExpect(jsonPath("$[0].sponsors[0].id").value(nullValue()))
@@ -106,10 +106,20 @@ class SponsorSecurityIntegrationTest {
         mockMvc.perform(get("/api/sponsors").cookie(userCookie))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "private, no-store"))
-                .andExpect(header().stringValues("Vary", hasItem("Cookie")))
+                .andExpect(header().stringValues("Vary", hasItems("Cookie", "Authorization")))
                 .andExpect(jsonPath("$[0].sponsors[?(@.name == '실명후원')].id").isNotEmpty())
                 // A sponsor who asked to be anonymous stays a placeholder even for members.
                 .andExpect(content().string(not(containsString("본인익명"))));
+    }
+
+    @Test
+    void invalidTokenCookieIsTreatedAsGuest() throws Exception {
+        sponsorService.create(sponsor("실명후원", null, false, true, null));
+
+        mockMvc.perform(get("/api/sponsors").cookie(new Cookie("token", "bogus.expired.token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].sponsors[0].name").value("익명 후원자"))
+                .andExpect(content().string(not(containsString("실명후원"))));
     }
 
     @Test
@@ -136,7 +146,7 @@ class SponsorSecurityIntegrationTest {
         mockMvc.perform(get("/api/sponsors/images/{id}", expired).cookie(userCookie)).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/sponsors/images/{id}", current).cookie(userCookie))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Cache-Control", "private, max-age=3600"));
+                .andExpect(header().string("Cache-Control", "private, no-cache"));
         mockMvc.perform(get("/api/sponsors/images/{id}", banner))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "public, max-age=86400"));

@@ -41,7 +41,7 @@ public class SponsorController {
         // The body depends on who asks (members see names, guests see placeholders), so no shared cache.
         return ResponseEntity.ok()
                 .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
-                .header(HttpHeaders.VARY, "Cookie")
+                .header(HttpHeaders.VARY, "Cookie", "Authorization")
                 .body(sponsorService.publicList(isMember(authentication)));
     }
 
@@ -64,7 +64,7 @@ public class SponsorController {
                 : meta.getOriginalName();
         return ResponseEntity.ok()
                 .header(HttpHeaders.CACHE_CONTROL,
-                        sponsorService.isBannerImage(id) ? "public, max-age=86400" : "private, max-age=3600")
+                        sponsorService.isBannerImage(id) ? "public, max-age=86400" : "private, no-cache")
                 .header(HttpHeaders.VARY, "Cookie")
                 .contentType(MediaType.parseMediaType(meta.getMime()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
