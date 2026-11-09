@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Check, ChevronUp, Moon, Sun, X } from 'lucide-react'
+import { Check, ChevronUp, Compass, Moon, Sun, X } from 'lucide-react'
 import { accentSwatches, footerLinkGroups } from '../data/homeContent'
 import { DEFAULT_ACCENT, normalizeHex } from '../utils/themeColors'
+import { startSiteTour } from './tour/tourState'
 import { setPerfPreference, usePerfState, type PerfPreference } from '../utils/perfMode'
 
 const PERF_CHOICES: { value: PerfPreference; label: string }[] = [
@@ -159,8 +160,17 @@ export default function AppearanceControl({
               {isDark ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
             </button>
             <button
+              type="button"
+              onClick={startSiteTour}
+              className="appearance-tour-trigger inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 sm:min-h-9 sm:flex-none"
+            >
+              <Compass size={14} aria-hidden="true" />
+              튜토리얼 시작
+            </button>
+            <button
               ref={buttonRef}
               type="button"
+              data-tour="appearance"
               onClick={() => setOpen(!open)}
               aria-expanded={open}
               aria-controls={dialogId}
