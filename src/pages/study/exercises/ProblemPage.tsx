@@ -12,6 +12,7 @@ import { exercisesFor, findExercise } from './problems'
 import { flushSaves, markOpened, markViewed, readProgress, recordAttempt, saveCode, scheduleSaveCode, useProgress } from './progress'
 import { type ExLang, type Exercise, type WebExercise } from './types'
 import WebWorkspace from './WebWorkspace'
+import Dots from './Dots'
 import '../study.css'
 import './exercises.css'
 
@@ -200,7 +201,7 @@ function ProblemBody({ studyId, problem }: { studyId: string; problem: Exercise 
 
   return <main className="study-page ex-page">
     <nav className="ex-back"><Link to={`/study/${studyId}/practice`}>← 실습 문제 목록</Link></nav>
-    <header className="ex-head"><div><p className="ex-eyebrow">실습 문제 · {LEVEL_NAME[problem.level - 1]}</p><h1>{problem.title}</h1><div className="ex-meta"><span aria-label={`난이도 ${problem.level}단계`}>{'●'.repeat(problem.level)}{'○'.repeat(5 - problem.level)}</span>{problem.topics.map((topic) => <span key={topic}>{topic}</span>)}</div></div></header>
+    <header className="ex-head"><div><p className="ex-eyebrow">실습 문제 · {LEVEL_NAME[problem.level - 1]}</p><h1>{problem.title}</h1><div className="ex-meta"><Dots level={problem.level} />{problem.topics.map((topic) => <span key={topic}>{topic}</span>)}</div></div></header>
     <div className="ex-columns">
       <section className="ex-panel ex-statement" aria-label="문제 설명">
         <MiniMarkdown text={problem.statement} />

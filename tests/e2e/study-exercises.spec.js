@@ -94,6 +94,16 @@ test('web checks fail on starter CSS and pass after editing in the real sandbox'
   await expect(page.locator('.ex-web-results')).not.toContainText('실패')
 })
 
+test('typing in a web exercise updates the live preview without waiting for Run, and no placeholder covers it', async ({ page }) => {
+  await mockOptionalApis(page)
+  await page.goto('/study/web/practice/sample-web-heading')
+  await expect(page.locator('iframe.ex-web-preview').contentFrame().getByText('안녕하세요')).toBeVisible()
+  await expect(page.locator('.ex-preview-empty')).toHaveCount(0)
+  await replaceEditor(page, '.ex-web-editor .cm-content', '<h1 id="typed-live">바로 보이는 미리보기</h1>')
+  await expect(page.locator('iframe.ex-web-preview').contentFrame().locator('#typed-live')).toHaveText('바로 보이는 미리보기', { timeout: 1500 })
+  await expect(page.locator('.ex-preview-empty')).toHaveCount(0)
+})
+
 test('shared web code stays idle until Run is clicked', async ({ page }) => {
   await mockOptionalApis(page)
   const files = { html: '<p id="shared-preview-marker">공유 실행 확인</p>', css: '', js: 'window.sharedCodeRan = true' }
@@ -103,7 +113,9 @@ test('shared web code stays idle until Run is clicked', async ({ page }) => {
   await expect(page.locator('.ex-web-status')).toHaveText('공유된 코드는 실행 버튼을 눌러야 미리보기가 돼요')
   await page.waitForTimeout(650)
   await expect(page.locator('iframe.ex-web-preview')).not.toHaveAttribute('src', /study-sandbox/)
+  await expect(page.locator('.ex-preview-empty')).toHaveText('실행하면 결과가 여기에 보여요')
   await page.locator('.ex-web').getByRole('button', { name: '실행', exact: true }).click()
+  await expect(page.locator('.ex-preview-empty')).toHaveCount(0)
   await expect(page.locator('iframe.ex-web-preview').contentFrame().locator('#shared-preview-marker')).toHaveText('공유 실행 확인')
 })
 

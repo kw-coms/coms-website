@@ -11,7 +11,7 @@
 .ex-progress { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px solid var(--app-hairline); border-radius: 16px; background: color-mix(in srgb, var(--app-surface) 86%, transparent); }
 .ex-progress label { font-size: 13px; font-weight: 600; color: var(--app-muted); }
 .ex-progress label b { font-size: 26px; font-weight: 800; color: var(--app-text); font-variant-numeric: tabular-nums; margin-right: 2px; }
-progress.ex-bar, .ex-progress progress { appearance: none; -webkit-appearance: none; display: block; width: 100%; height: 6px; border: 0; border-radius: 99px; overflow: hidden; background: color-mix(in srgb, var(--app-text) 12%, transparent); color: var(--app-accent); }
+.ex-progress progress { appearance: none; -webkit-appearance: none; display: block; width: 100%; height: 6px; border: 0; border-radius: 99px; overflow: hidden; background: color-mix(in srgb, var(--app-text) 12%, transparent); color: var(--app-accent); }
 .ex-progress progress::-webkit-progress-bar { background: transparent; }
 .ex-progress progress::-webkit-progress-value { background: var(--app-accent); border-radius: 99px; transition: width .3s; }
 .ex-progress progress::-moz-progress-bar { background: var(--app-accent); border-radius: 99px; }
@@ -20,7 +20,7 @@ progress.ex-bar, .ex-progress progress { appearance: none; -webkit-appearance: n
 .ex-filters label { flex: 1 1 140px; font-size: 12.5px; font-weight: 600; color: var(--app-muted); }
 .ex-page .ex-filters select { display: block; width: 100%; margin-top: 6px; appearance: none; -webkit-appearance: none; min-height: 40px; padding-right: 34px; border-radius: 99px; border-color: var(--app-hairline); background: var(--app-surface-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%238a8f9c' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E") no-repeat right 14px center; color: var(--app-text); font-size: 14px; font-weight: 600; cursor: pointer; transition: border-color .15s; }
 .ex-page .ex-filters select:hover { border-color: var(--app-accent-border); }
-.ex-page .ex-filters select:not([value=""]):not(:has(option:first-child:checked)) { border-color: var(--app-accent-border); background-color: var(--app-accent-soft); }
+.ex-page .ex-filters select:not(:has(option:first-child:checked)) { border-color: var(--app-accent-border); background-color: var(--app-accent-soft); }
 .ex-page :is(select, textarea, input) { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); padding: 10px 12px; max-width: 100%; }
 .ex-page textarea { display: block; width: 100%; min-height: 88px; resize: vertical; }
 .ex-page :is(button, summary, a, select, textarea):focus-visible, .ex-inline a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -33,7 +33,6 @@ progress.ex-bar, .ex-progress progress { appearance: none; -webkit-appearance: n
 .ex-list-head, .ex-row { display: grid; grid-template-columns: minmax(180px, 2.2fr) 96px minmax(120px, 1.4fr) 84px; align-items: center; gap: 16px; padding: 0 20px; }
 .ex-list-head:has(:nth-child(5)), .ex-row[data-lang] { grid-template-columns: minmax(180px, 2.2fr) 96px minmax(120px, 1.4fr) minmax(110px, .9fr) 84px; }
 .ex-list-head { min-height: 38px; font-size: 12.5px; font-weight: 600; color: var(--app-muted); background: var(--app-surface-soft); }
-.ex-list li + li { border-top: 1px solid var(--line); }
 .ex-row { min-height: 60px; padding-top: 12px; padding-bottom: 12px; color: var(--app-text); text-decoration: none !important; transition: background-color .15s; }
 .ex-row:hover { background: var(--app-surface-soft); }
 .ex-row:focus-visible { outline: 2px solid var(--app-accent); outline-offset: -2px; }
@@ -42,10 +41,11 @@ progress.ex-bar, .ex-progress progress { appearance: none; -webkit-appearance: n
 .ex-row .ex-dots, .ex-dots { display: inline-flex; gap: 4px; align-items: center; }
 .ex-dots i { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, var(--app-text) 16%, transparent); }
 .ex-dots i[data-on] { background: var(--app-accent); }
+.ex-row .ex-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .ex-row .ex-lang { justify-self: start; padding: 2px 9px; border: 1px solid var(--app-hairline); border-radius: 99px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .ex-row .ex-go { justify-self: end; color: var(--app-text); font-weight: 600; }
-.ex-row .ex-state:not(:empty) { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--app-hairline); background: var(--app-surface-soft); color: var(--app-text); font-size: 12px; font-weight: 700; white-space: nowrap; }
-.ex-row .ex-state:not(:empty)::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--app-muted); }
+.ex-row .ex-state:not([data-state='new']) { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--app-hairline); background: var(--app-surface-soft); color: var(--app-text); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.ex-row .ex-state:not([data-state='new'])::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--app-muted); }
 .ex-row .ex-state[data-state='trying']::before { background: var(--app-accent); }
 .ex-row .ex-state[data-state='solved'] { border-color: color-mix(in srgb, #2fa863 45%, var(--app-hairline)); background: color-mix(in srgb, #2fa863 14%, var(--app-surface)); }
 .ex-row .ex-state[data-state='solved']::before { background: #2fa863; }
@@ -88,12 +88,16 @@ progress.ex-bar, .ex-progress progress { appearance: none; -webkit-appearance: n
 .ex-actions, .ex-web-actions { margin: 12px 0; align-items: center; }
 .ex-actions-gap { flex: 1 1 0; }
 .ex-page button.ex-primary { background: var(--app-accent); border-color: var(--app-accent); color: #fff; padding-inline: 20px; }
+@supports (color: oklch(from red l c h)) { .ex-page button.ex-primary { color: oklch(from var(--app-accent) clamp(0, (0.6 - l) * 1000, 1) 0 0); } }
 .ex-page button.ex-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--app-accent) 86%, #000); }
 .ex-page button.ex-quiet { background: transparent; border-color: transparent; color: var(--app-muted); font-weight: 600; }
 .ex-page button.ex-quiet:hover:not(:disabled) { background: var(--app-surface-soft); color: var(--app-text); }
-.ex-preview-wrap { position: relative; }
-.ex-preview-wrap iframe { display: block; }
-.ex-page .ex-preview-empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 16px; text-align: center; border: 1px dashed var(--app-hairline); border-radius: 8px; background: var(--app-surface-soft); color: var(--app-muted); font-size: 14px; pointer-events: none; }
+.ex-preview-wrap { border: 1px solid var(--app-hairline); border-radius: 12px; overflow: hidden; background: var(--app-surface-soft); }
+.ex-preview-bar { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-bottom: 1px solid var(--app-hairline); }
+.ex-preview-bar i { width: 8px; height: 8px; border-radius: 50%; background: color-mix(in srgb, var(--app-text) 18%, transparent); }
+.ex-preview-stage { position: relative; }
+.ex-page .ex-preview-wrap iframe { display: block; border: 0; border-radius: 0; }
+.ex-page .ex-preview-empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 16px; text-align: center; background: var(--app-surface-soft); color: var(--app-muted); font-size: 14px; pointer-events: none; }
 .ex-spec, .ex-example, .ex-case, .ex-shared, .ex-busy { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin: 12px 0; }
 .ex-page pre { max-width: 100%; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 8px; background: var(--surface-2); padding: 12px; font-size: 13px; }
 .ex-page .cm-editor pre { padding: 0; }
