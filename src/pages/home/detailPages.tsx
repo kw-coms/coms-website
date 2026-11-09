@@ -14,6 +14,7 @@ import {
 import CompanionServicesSection from '../../components/home/CompanionServicesSection'
 import ActivityLogSection from '../../features/activityLog/ActivityLogSection'
 import ClubEventSection from '../../features/clubEvent/ClubEventSection'
+import ActivityTimeline from '../../components/activities/ActivityTimeline'
 import ClubCalendarSection from '../../features/clubCalendar/ClubCalendarSection'
 import { useScrollReveal } from '../../hooks/useScrollReveal'
 import HeroField from './HeroField'
@@ -50,6 +51,8 @@ export function DetailStoryPage({
   outputsTitle,
   outputsBody,
   outputs,
+  lead,
+  className = '',
 }: {
   eyebrow?: React.ReactNode
   title?: React.ReactNode
@@ -63,6 +66,9 @@ export function DetailStoryPage({
   outputsTitle?: React.ReactNode
   outputsBody?: string
   outputs: string[]
+  /** Shown straight after the hero, ahead of the cards. */
+  lead?: React.ReactNode
+  className?: string
 }) {
   const navigate = useNavigate()
   const titleRef = useRef<HTMLHeadingElement>(null)
@@ -122,7 +128,7 @@ export function DetailStoryPage({
   }, [title])
 
   return (
-    <div className="apple-detail-page theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
+    <div className={`apple-detail-page ${className} theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]`}>
       <main className="apple-detail-main coms-detail relative overflow-hidden">
         <section className="apple-detail-hero relative grid min-h-[calc(88svh-44px)] items-center gap-12 overflow-hidden bg-[var(--app-surface-soft)] px-5 py-16 lg:grid-cols-[1fr_0.88fr] lg:px-12">
           <div className="home-hero-surface absolute inset-0" />
@@ -141,6 +147,8 @@ export function DetailStoryPage({
             {visual}
           </div>
         </section>
+
+        {lead}
 
         {/* What the track is made of: three cards. Not a sequence, so no numbers. */}
         <section className="coms-sec coms-sec-top">
@@ -228,6 +236,8 @@ export function ActivitiesDetailPage() {
       outputsTitle="활동에서 다루는 주제."
       outputsBody="웹 개발과 프로그래밍 기초부터 임베디드, 협업 도구, 대회 준비까지 다룹니다."
       outputs={activitiesDetailTopics}
+      lead={<ActivityTimeline />}
+      className="activities-page"
     />
   )
 }
