@@ -42,10 +42,11 @@ test.describe('desktop popover', () => {
     await page.goto('/activities')
     await openFromFooter(page)
     // Keyboard navigation: a pointer press on the link would already count as an outside click.
-    const link = page.locator('.apple-global-nav').getByRole('button', { name: 'Notices', exact: true }).first()
+    // A public route: /notices needs a login and redirects to /login, which breaks the goBack() below.
+    const link = page.locator('.apple-global-nav').getByRole('button', { name: 'Projects', exact: true }).first()
     await link.focus()
     await page.keyboard.press('Enter')
-    await expect(page).toHaveURL(/\/notices/)
+    await expect(page).toHaveURL(/\/projects/)
     await expect(dialog(page)).toHaveCount(0)
     // Back to the page it was opened on: it stays closed.
     await page.goBack()
