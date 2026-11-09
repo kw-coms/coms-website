@@ -52,35 +52,11 @@ f = frame(100)
 for (const h of [150, 90, 400, 120, 300, 210]) applyFrameSize(f, msg(size(h, { k: 'a' })), 3)
 assert.equal(f.style.height, '212px')
 
-// the real frame: content = its viewport + 24 (100vh + margins); it reports only when the content changes
-function simulate(f, k, reports = 20) {
-  let last = -1, applied = 0
-  for (let i = 0; i < reports; i++) {
-    const h = f.clientHeight + 24
-    if (h === last) break // the page's hook sends nothing when the height did not change: the loop has ended
-    last = h
-    const before = f.style.height
-    applyFrameSize(f, msg(size(h, { k })), 3)
-    if (f.style.height !== before) { applied++; f.offsetHeight = parseInt(f.style.height); f.clientHeight = f.offsetHeight - 2 }
-  }
-  return applied
-}
-f = frame(100)
-assert.equal(simulate(f, 'doc1'), 1) // grew once; the report that followed grew by the same amount, so it is not applied
-assert.equal(f.style.height, '124px')
-
-// a new document (another k) starts clean: the same frame, a fresh page, normal growth is applied again
-applyFrameSize(f, msg(size(500, { k: 'doc2' })), 3)
-assert.equal(f.style.height, '502px')
-// ...and the old document's feedback state does not carry over: doc2's first report after a growth is not mistaken for feedback
-f.offsetHeight = 502; f.clientHeight = 500
-applyFrameSize(f, msg(size(500 + 378, { k: 'doc3' })), 3) // prev from another doc, grew from another doc
-assert.equal(f.style.height, `${FRAME_MAX}px`)
-
-// growth that is not the frame following itself (different amount) is applied
+// a late growth that equals the previous growth is still applied (an image adding exactly what the frame just grew by)
 f = frame(100)
 applyFrameSize(f, msg(size(200, { k: 'x' })), 3) // grew 102
-applyFrameSize(f, msg(size(450, { k: 'x' })), 3) // content grew 250, not 102
-assert.equal(f.style.height, '452px')
+f.offsetHeight = 202; f.clientHeight = 200
+applyFrameSize(f, msg(size(302, { k: 'x' })), 3) // content grew by the same 102
+assert.equal(f.style.height, '304px')
 
 console.log('studyFrameSize ok')

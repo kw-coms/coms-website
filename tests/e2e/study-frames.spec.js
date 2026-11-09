@@ -73,7 +73,7 @@ test('playground output frames and the practice preview grow with tall content',
   await expect.poll(settled(out), { timeout: 5000 }).toBeNull()
 })
 
-test('content that follows its own frame height (min-height:100vh) settles instead of ramping', async ({ page }) => {
+test('content that follows its own frame height (min-height:100vh) grows to the cap and then stops reporting', async ({ page }) => {
   await mockOptionalApis(page)
   await page.addInitScript(() => {
     window.__sizes = []
@@ -83,21 +83,28 @@ test('content that follows its own frame height (min-height:100vh) settles inste
   const editor = page.locator('.ex-web-editor .cm-content')
   await expect(editor).toBeVisible()
   const preview = await page.locator('iframe.ex-web-preview').elementHandle()
-  const type = async (code) => {
+  // a frame scrolled out of view is not rendered by the browser, so it reports nothing until it is seen
+  await preview.scrollIntoViewIfNeeded()
+  const type = async (code, wait = 1500) => {
     await editor.click()
     await page.keyboard.press('ControlOrMeta+A')
     await page.keyboard.insertText(code)
     await page.evaluate(() => { window.__sizes.length = 0 })
-    await page.waitForTimeout(1500)
+    await page.waitForTimeout(wait)
   }
   // no margin: the content equals the frame, a fixed point, so it takes at most 2 reports and the frame stays put
   await type('<style>html,body,p{margin:0}body{min-height:100vh;background:#eef}</style><p>안녕</p>')
   expect(await page.evaluate(() => window.__sizes.length)).toBeLessThanOrEqual(2)
   expect((await measure(preview)).height).toBeLessThan(300)
-  // the default 12px margin never reaches a fixed point: the frame is grown once, then the echo is recognised and the loop ends
-  await type('<style>body{min-height:100vh}</style><p>안녕</p>')
-  expect(await page.evaluate(() => window.__sizes.length)).toBeLessThanOrEqual(3)
-  expect((await measure(preview)).height).toBeLessThan(CAP)
+  // the default 12px margin never reaches a fixed point: the frame grows to the cap, stops there, and the reports end
+  const t0 = Date.now()
+  await type('<style>body{min-height:100vh}</style><p>안녕</p>', 0)
+  await expect.poll(async () => (await measure(preview)).height, { timeout: 10_000 }).toBe(CAP)
+  console.log(`100vh ramp to the cap: ${Date.now() - t0}ms, ${await page.evaluate(() => window.__sizes.length)} reports`)
+  await page.evaluate(() => { window.__sizes.length = 0 })
+  await page.waitForTimeout(1000)
+  expect(await page.evaluate(() => window.__sizes.length)).toBe(0)
+  expect((await measure(preview)).height).toBe(CAP)
 })
 
 test('quick successive edits leave the frame as tall as the last content', async ({ page }) => {
