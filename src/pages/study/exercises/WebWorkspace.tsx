@@ -3,6 +3,7 @@ import type { PgEditor } from '../playground/editor'
 import { decodeShareHash, encodeShareHash } from '../playground/storage'
 import type { WebExercise, WebFiles } from './types'
 import { flushSaves, readProgress, recordAttempt, saveCode, scheduleSaveCode } from './progress'
+import { applyFrameSize } from '../studyDemos'
 import { gradeWebInFrame, loadWebPreview, type WebCheckResult } from './web'
 
 type Tab = keyof WebFiles
@@ -74,6 +75,13 @@ export default function WebWorkspace({ exercise, onSolved }: { exercise: WebExer
     }, 400)
     return () => window.clearTimeout(timer)
   }, [files, busy, shared])
+
+  // The preview reports its content height (id -1, see buildDoc); keep the frame as tall as the content, up to FRAME_MAX.
+  useEffect(() => {
+    const onSize = (e: MessageEvent) => { if (frameRef.current) applyFrameSize(frameRef.current, e, -1) }
+    window.addEventListener('message', onSize)
+    return () => window.removeEventListener('message', onSize)
+  }, [])
 
   useEffect(() => () => { runId.current++; gradeAbort.current?.abort(); flushSaves() }, [])
 

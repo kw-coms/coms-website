@@ -5,7 +5,7 @@
 // No editor exists until "직접 해보기" is pressed. The returned cleanup undoes everything (StrictMode runs effects twice).
 
 import { dismissToast, showToast } from '../../../components/common/Toast'
-import { buildDoc, buildRawDoc, SANDBOX_URL } from '../studyDemos'
+import { applyFrameSize, buildDoc, buildRawDoc, SANDBOX_URL } from '../studyDemos'
 import { classifyBlock, initialCode, langLabel, type BlockDecision, type PageLang } from './classify'
 import { compareOutput } from './compare'
 import { encodeLabShare, labLink, LAB_URL } from './labShare'
@@ -549,7 +549,9 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     const d = e.data as { __demo?: unknown; type?: string; msg?: unknown } | null
     if (!d || typeof d.__demo !== 'number' || d.__demo < 1000) return
     const b = blocks.find((x) => x.webId === d.__demo && x.frame?.contentWindow === e.source)
-    if (!b || !b.webEntry) return
+    if (!b) return
+    if (b.frame && applyFrameSize(b.frame, e, d.__demo)) return
+    if (!b.webEntry) return
     const line = String(d.msg ?? '')
     if (d.type === 'error') b.webEntry.stderr += (b.webEntry.stderr ? '\n' : '') + line
     else b.webEntry.stdout += (b.webEntry.stdout ? '\n' : '') + (d.type === 'warn' ? `[경고] ${line}` : line)
