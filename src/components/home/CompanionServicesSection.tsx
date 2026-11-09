@@ -70,9 +70,6 @@ function CompanionServicesSection() {
   }, [user])
 
   const groups = groupByCategory(projects, categories)
-  // One author for every project is said once, in the page head, instead of on each card.
-  const authors = new Set(projects.map((project) => (project.madeBy || '').trim()))
-  const soleAuthor = authors.size === 1 ? [...authors][0] : ''
   const shown = filter === 'all' ? groups : groups.filter((group) => group.key === filter)
 
   return (
@@ -89,7 +86,6 @@ function CompanionServicesSection() {
             <dl className="site-stats">
               <div><dt>프로젝트</dt><dd>{projects.length}</dd></div>
               <div><dt>카테고리</dt><dd>{groups.length}</dd></div>
-              {soleAuthor && <div><dt>만든 사람</dt><dd>{soleAuthor}</dd></div>}
             </dl>
           )}
         </div>
@@ -121,7 +117,7 @@ function CompanionServicesSection() {
                   </div>
                   <div className="apps-grid">
                     {group.projects.map((project) => (
-                      <AppProjectCard key={project.id} project={project} showAuthor={!soleAuthor} linkState={linkStateOf(project, user ? linkStatuses : [])} />
+                      <AppProjectCard key={project.id} project={project} linkState={linkStateOf(project, user ? linkStatuses : [])} />
                     ))}
                   </div>
                 </section>

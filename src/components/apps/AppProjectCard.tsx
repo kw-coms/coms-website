@@ -47,7 +47,6 @@ export default function AppProjectCard({
   showStatusBadges = false,
   linkState = null,
   interactive = true,
-  showAuthor = true,
   className = '',
   testId,
 }: {
@@ -56,8 +55,6 @@ export default function AppProjectCard({
   /** What the server's last look at the link found; see linkStateOf. */
   linkState?: 'UP' | 'DOWN' | 'UNKNOWN' | null
   interactive?: boolean
-  /** False where one author is said once for the whole page instead of on every card. */
-  showAuthor?: boolean
   className?: string
   testId?: string
 }) {
@@ -105,31 +102,29 @@ export default function AppProjectCard({
       className={`apple-product-panel app-card group text-left no-underline transition hover:-translate-y-0.5 ${className}`}
     >
       <div className="app-card-head">
-        {project?.eyebrow && <p className="app-card-eyebrow">{project.eyebrow}</p>}
-        <h3 className="app-card-title">{title}</h3>
+        <p className="app-card-eyebrow">{project?.eyebrow}</p>
+        <h3 className="app-card-title" title={title}>{title}</h3>
       </div>
       {open}
-      {project?.description && <p className="app-card-desc">{project.description}</p>}
-      {(host || notAnswering || (showAuthor && project?.madeBy)) && (
-        <div className="app-card-foot">
+      {/* Fixed-size slots: every card is the same size however much text it carries. */}
+      <p className="app-card-desc" title={project?.description || undefined}>{project?.description}</p>
+      <div className="app-card-foot">
           {notAnswering && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-hairline-strong)] px-2.5 py-0.5 text-xs font-bold text-[var(--app-text)]">
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--app-hairline-strong)] px-2.5 py-0.5 text-xs font-bold text-[var(--app-text)]">
               <span className="size-1.5 rounded-full bg-[var(--app-danger)]" aria-hidden="true" />
               지금 응답 없음
             </span>
           )}
           {host && <span className="app-card-host">{host}</span>}
-          {showAuthor && project?.madeBy && <span>만든 사람: {project.madeBy}</span>}
         </div>
-      )}
 
       <div className="app-card-more">
       {badges.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5" aria-label="앱 상태">
+        <div className="flex shrink-0 gap-1.5" aria-label="앱 상태">
           {badges.map((badge) => (
             <span
               key={badge.key}
-              className={`rounded-full px-2.5 py-1 text-xs font-bold ${STATUS_TONE_CLASS[badge.tone] || STATUS_TONE_CLASS.draft}`}
+              className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${STATUS_TONE_CLASS[badge.tone] || STATUS_TONE_CLASS.draft}`}
             >
               {badge.label}
             </span>
@@ -138,7 +133,7 @@ export default function AppProjectCard({
       )}
 
       {files.length > 0 && (
-        <div className="mt-3 grid gap-2" aria-label="배포 파일">
+        <div className="flex min-w-0 gap-2" aria-label="배포 파일">
           {files.map((file) => {
             const size = formatFileSize(file.fileSize)
             const href = projectFileHref(file.url)
@@ -146,7 +141,7 @@ export default function AppProjectCard({
               <a
                 key={file.id || file.originalName || file.url}
                 href={href}
-                className="flex min-w-0 items-center gap-2 rounded-lg border border-[var(--app-hairline-strong)] bg-[var(--app-surface-soft)] px-3 py-2 text-xs font-bold text-[var(--app-text)] no-underline transition hover:border-[var(--app-accent-text)] hover:text-[var(--app-accent-text)]"
+                className="flex min-w-0 shrink items-center gap-2 rounded-lg border border-[var(--app-hairline-strong)] bg-[var(--app-surface-soft)] px-3 py-2 text-xs font-bold text-[var(--app-text)] no-underline transition hover:border-[var(--app-accent-text)] hover:text-[var(--app-accent-text)]"
                 onClick={(event) => {
                   event.stopPropagation()
                   if (href === '#') event.preventDefault()
