@@ -255,6 +255,10 @@ jobs:
             echo "JWT_SECRET=$(openssl rand -hex 48)"
             # Lets the Circuit Lab check below create the first admin (and so a login to compile with).
             echo "BOOTSTRAP_SECRET=$(openssl rand -hex 24)"
+            # The stack is served at http://127.0.0.1:3000 (E2E_STACK_URL). Trust it as the site's own origin, as
+            # production trusts https://coms.kw.ac.kr: otherwise the backend's origin check answers the page's own
+            # POSTs (e.g. /api/auth/refresh) with 403 and the stack behaves unlike production.
+            echo "CORS_ALLOWED_ORIGINS=https://coms.kw.ac.kr,https://localhost,capacitor://localhost,http://127.0.0.1:3000"
           } > .env
           # The deploy creates the backup directory as the deploy user before starting the stack.
           mkdir -p ../coms-backups
