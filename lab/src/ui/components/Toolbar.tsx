@@ -157,7 +157,7 @@ export function Toolbar() {
           <span className="brand-home-text">COM's</span>
         </a>
         <span className="brand-sep" aria-hidden="true">/</span>
-        <strong aria-current="page">Circuit Lab</strong>
+        <strong>Circuit Lab</strong>
       </div>
       <div className="tb-group">
         <div className="pop">

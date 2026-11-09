@@ -165,7 +165,7 @@ try {
     return { c, p };
   };
   const skipTutorial = () => { try { localStorage.setItem('coms-lab:tutorial-done', '1'); } catch { /* no storage */ } };
-  for (const w of [1440, 1280, 1100, 1024, 1001, 1000, 390]) {
+  for (const w of [1600, 1501, 1440, 1280, 1100, 1024, 1001, 1000, 800, 390]) {
     const { c, p } = await fresh(w, 900, skipTutorial);
     const m = await p.evaluate(() => {
       const bar = document.querySelector('.toolbar');
@@ -187,6 +187,8 @@ try {
       const asked = [];
       await p.route(`${origin}/`, (r) => { asked.push(r.request().url()); return r.fulfill({ contentType: 'text/html', body: '<title>site</title>' }); });
       await p.evaluate(() => window.__lab.set({ code: '// unsaved edit before leaving\nvoid setup(){}\nvoid loop(){}' }));
+      const hasEdit = () => p.evaluate(() => Object.keys(localStorage).some((k) => (localStorage.getItem(k) ?? '').includes('unsaved edit before leaving')));
+      check('before the click the edit is still only pending (debounce not fired), so pagehide must do the save', !(await hasEdit()));
       await Promise.all([p.waitForURL(`${origin}/`), p.locator('a.brand-home').click()]);
       check('clicking the home link requests the site root (full page load)', asked.length === 1 && asked[0] === `${origin}/`, JSON.stringify(asked));
       const saved = await p.evaluate(() => Object.keys(localStorage).filter((k) => /lab/.test(k)).map((k) => (localStorage.getItem(k) ?? '').includes('unsaved edit before leaving')).some(Boolean));

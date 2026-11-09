@@ -172,8 +172,9 @@ a.home-item { text-decoration: none; color: inherit; }
 .quality-flat { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
 .quality-choice input, .aa-toggle input { width: 16px; height: 16px; flex: none; accent-color: var(--accent); margin-top: 1px; }
 
-@media (max-width: 1500px) { .tb-secondary .tb-text { display: none; } .toolbar { gap: 6px 8px; } .tb-secondary { gap: 8px; } }
-@media (max-width: 1360px) { .brand-home-text { display: none; } .brand-home { padding: 0 6px; margin-left: -6px; } }
+@media (max-width: 1500px) { .tb-secondary .tb-text { display: none; } }
+@media (max-width: 1600px) { .toolbar { gap: 6px 8px; } .tb-secondary { gap: 8px; } }
+@media (max-width: 1360px) { .brand-home-text { display: none; } .brand-home { padding: 0 6px; margin-left: -4px; } }
 @media (max-width: 1360px) and (min-width: 1001px) {
   .toolbar { gap: 6px; padding: 6px 8px; } .tb-secondary { gap: 6px; } .tb-group { padding-left: 6px; gap: 2px; } .tb { padding: 0 6px; gap: 4px; }
   .quality-btn .q-text { display: none; } .speed select { padding: 0 2px; }
