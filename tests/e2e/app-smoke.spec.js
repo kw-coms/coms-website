@@ -3790,13 +3790,95 @@ test('apps page renders DB-driven club projects grouped by category', async ({ p
 
   const portalCard = page.locator('a.apple-product-panel').filter({ hasText: "COM's 포털" })
   await expect(portalCard).toHaveAttribute('href', 'https://portal.example.com/')
-  await expect(portalCard.getByText('만든 사람: 김개발')).toBeVisible()
+  await expect(portalCard.getByText('만든 사람')).toHaveCount(0)
   await expect(portalCard.getByText('열기')).toBeVisible()
 
   const attendCard = page.locator('.apple-product-panel').filter({ hasText: '출석 체크 앱' })
-  await expect(attendCard.getByText('만든 사람: 이모바일')).toBeVisible()
+  await expect(attendCard.getByText('만든 사람')).toHaveCount(0)
   await expect(attendCard.getByText('attend.apk')).toBeVisible()
   await expect(attendCard.getByRole('link', { name: /다운로드/ })).toBeVisible()
+  await expect(page.locator('.site-stats')).toContainText('프로젝트')
+  await expect(page.locator('.site-stats')).toContainText('카테고리')
+  await expect(page.locator('.site-stats')).not.toContainText('만든 사람')
+})
+
+test('apps page cards keep one size whatever the text length or section count', async ({ page }) => {
+  const long = '아주 긴 제목 '.repeat(20)
+  const longDesc = '아주 긴 설명이 들어가도 카드 크기는 변하지 않아야 합니다. '.repeat(12)
+  const project = (id, category, title, description, extra = {}) => ({
+    id, category, categoryName: category === 'WEBSITE' ? '웹사이트' : '앱',
+    title, description, eyebrow: 'Web', madeBy: '홍길동',
+    linkUrl: 'https://example.com/', displayUrl: 'a-very-long-domain-name.example.com/path', files: [], ...extra,
+  })
+  const longFile = (id, name) => ({ id, url: `/api/club-projects/4/files/${id}`, originalName: name })
+  const fixture = (withFiles) => [
+    project(1, 'WEBSITE', long, longDesc),
+    project(2, 'WEBSITE', '짧은 제목', '짧은 설명', { eyebrow: '' }),
+    project(3, 'WEBSITE', '세 번째', '', { displayUrl: null }),
+    project(4, 'APP', long, longDesc, {
+      linkUrl: null,
+      files: withFiles ? [longFile(9, `${'긴파일이름'.repeat(10)}.apk`), longFile(10, 'second.zip'), longFile(11, 'third.zip')] : [],
+    }),
+    project(5, 'APP', '두 번째 앱', '설명'),
+  ]
+  await page.route('**/api/club-projects/categories', (route) => route.fulfill({
+    status: 200,
+    json: [{ id: 1, key: 'WEBSITE', name: '웹사이트', position: 0 }, { id: 2, key: 'APP', name: '앱', position: 1 }],
+  }))
+  let withFiles = true
+  await page.route('**/api/club-projects', (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    return route.fulfill({ status: 200, json: fixture(withFiles) })
+  })
+
+  const heights = {}
+  for (const files of [true, false]) {
+    withFiles = files
+    for (const viewport of [{ width: 1280, height: 900 }, { width: 800, height: 900 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport)
+      await page.goto('/apps')
+      await expect(page.locator('.app-card')).toHaveCount(5)
+      // One size across the whole page, sections included: the file row is reserved page-wide.
+      const boxes = await page.locator('.app-card').evaluateAll((els) => els.map((el) => {
+        const r = el.getBoundingClientRect()
+        return { w: r.width, h: r.height }
+      }))
+      for (const box of boxes) {
+        expect(Math.abs(box.w - boxes[0].w)).toBeLessThanOrEqual(1)
+        expect(Math.abs(box.h - boxes[0].h)).toBeLessThanOrEqual(1)
+      }
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      expect(overflow).toBeLessThanOrEqual(0)
+      heights[`${files}-${viewport.width}`] = boxes[0].h
+      // Every author is the same here: the old page showed a 만든 사람 stat in this case.
+      await expect(page.locator('.site-stats')).not.toContainText('만든 사람')
+      await expect(page.locator('.app-card').filter({ hasText: '만든 사람' })).toHaveCount(0)
+
+      if (files && viewport.width === 1280) {
+        // The 2px focus ring of a file link must fit inside the clipping slot.
+        const link = page.locator('.app-card-files a').first()
+        await link.focus()
+        const ok = await page.evaluate(() => {
+          const a = document.activeElement
+          const slot = a.closest('.app-card-more').getBoundingClientRect()
+          const scroller = a.closest('.app-card-files').getBoundingClientRect()
+          const r = a.getBoundingClientRect()
+          return [slot, scroller].every((c) => r.top - 2 >= c.top && r.bottom + 2 <= c.bottom && r.left - 2 >= c.left)
+        })
+        expect(ok).toBe(true)
+        await expect(link).toHaveAttribute('title', /긴파일이름/)
+        // The filter keeps the page-wide size: one section alone is as tall as the whole page was.
+        await page.getByRole('button', { name: /^웹사이트/ }).click()
+        await expect(page.locator('.app-card')).toHaveCount(3)
+        const filtered = await page.locator('.app-card').first().evaluate((el) => el.getBoundingClientRect().height)
+        expect(Math.abs(filtered - boxes[0].h)).toBeLessThanOrEqual(1)
+      }
+    }
+  }
+  // No file row reserved when no card has files: the cards are shorter.
+  for (const width of [1280, 800, 390]) {
+    expect(heights[`false-${width}`]).toBeLessThan(heights[`true-${width}`])
+  }
 })
 
 test('admin Apps management shows public-card previews with status badges', async ({ page }) => {

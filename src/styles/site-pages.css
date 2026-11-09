@@ -154,7 +154,7 @@
 	outline-offset: 2px;
 }
 
-/* ---- Apps: grid, no empty seats in the last row ---------------------------------- */
+/* ---- Apps: grid, fixed column count per breakpoint so every card has the same width ---- */
 .apps-group + .apps-group {
 	margin-top: 44px;
 }
@@ -185,24 +185,10 @@
 	.apps-grid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
-	.apps-grid > :last-child:nth-child(odd) {
-		grid-column: 1 / -1;
-	}
 }
-/* Six tracks, each card takes two; a short last row of one or two cards stretches to fill it. */
 @media (min-width: 1024px) {
 	.apps-grid {
-		grid-template-columns: repeat(6, minmax(0, 1fr));
-	}
-	.apps-grid > * {
-		grid-column: span 2;
-	}
-	.apps-grid > :last-child:nth-child(3n + 1) {
-		grid-column: 1 / -1;
-	}
-	.apps-grid > :last-child:nth-child(3n + 2),
-	.apps-grid > :nth-last-child(2):nth-child(3n + 1) {
-		grid-column: span 3;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 }
 
@@ -215,8 +201,9 @@
 		'desc desc'
 		'foot foot'
 		'more more';
+	/* desc takes any leftover height, so the domain line sits at the card bottom */
+	grid-template-rows: auto 1fr auto auto;
 	align-items: start;
-	align-content: start;
 	gap: 0 12px;
 	min-height: 0;
 	padding: 20px 20px 18px;
@@ -235,6 +222,8 @@
 	color: var(--app-muted);
 	font-size: 12.5px;
 	font-weight: 600;
+	line-height: 1.4;
+	height: 1.4em;
 }
 .app-card-title {
 	margin: 1px 0 0;
@@ -242,8 +231,10 @@
 	font-size: 19px;
 	font-weight: 700;
 	line-height: 1.3;
-	word-break: keep-all;
-	overflow-wrap: anywhere;
+	height: 1.3em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 .app-card-open {
 	grid-area: open;
@@ -261,20 +252,23 @@
 	margin: 12px 0 0;
 	display: -webkit-box;
 	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 3;
+	-webkit-line-clamp: 2;
 	overflow: hidden;
 	color: var(--app-muted);
 	font-size: 14px;
 	font-weight: 500;
 	line-height: 1.6;
+	height: 3.2em;
 	word-break: keep-all;
+	overflow-wrap: anywhere;
 }
 .app-card-foot {
 	grid-area: foot;
 	display: flex;
-	flex-wrap: wrap;
 	align-items: center;
-	gap: 4px 12px;
+	gap: 12px;
+	height: 24px;
+	overflow: hidden;
 	margin-top: 12px;
 	min-width: 0;
 	color: var(--app-subtle);
@@ -289,6 +283,32 @@
 }
 .app-card-more {
 	grid-area: more;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	box-sizing: border-box;
+	height: 40px;
+	/* 3px padding / -3px margin keep the 2px focus ring of a file link inside the clip */
+	padding: 3px;
+	margin: 9px -3px -3px;
+	overflow: hidden;
+}
+.app-card-files::-webkit-scrollbar {
+	display: none;
+}
+.app-card-more:not(:has(*)) {
+	display: none;
+}
+.apps-has-files .app-card-more {
+	display: flex;
+}
+.app-card-files {
+	/* sideways scroll without a scrollbar: a classic bar would eat the 40px slot; focus still scrolls into view */
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: none;
+	padding: 3px;
+	margin: -3px;
 }
 @media (max-width: 640px) {
 	.apple-product-panel.app-card {
@@ -299,20 +319,16 @@
 		font-size: 16px;
 	}
 	.app-card-desc {
-		-webkit-line-clamp: 2;
 		margin-top: 8px;
 		font-size: 13.5px;
 		line-height: 1.5;
+		height: 3em;
 	}
 	.app-card-foot {
 		margin-top: 8px;
 	}
-	/* The address is secondary: a phone shows the list, the card is the link. */
-	.app-card-host {
-		display: none;
-	}
-	.app-card-foot:not(:has(> :not(.app-card-host))) {
-		display: none;
+	.app-card-more {
+		margin-top: 5px;
 	}
 	.apps-grid {
 		gap: 8px;
