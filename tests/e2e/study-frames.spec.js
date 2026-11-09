@@ -110,6 +110,8 @@ test('content that fills its frame exactly (min-height:100vh, no margin) takes a
   // a frame scrolled out of view is not rendered by the browser, so it reports nothing until it is seen
   await preview.scrollIntoViewIfNeeded()
   await type('<style>html,body,p{margin:0}body{min-height:100vh;background:#eef}</style><p>안녕</p>')
+  // the new document has rendered once it has reported (type() cleared the log after the edit); without this the checks below could run on the old one
+  await expect.poll(() => page.evaluate(() => window.__sizes.length), { timeout: 5000 }).toBeGreaterThan(0)
   await expect.poll(async () => { const m = await measure(preview); return m?.loaded ? m.height : Infinity }, { timeout: 5000 }).toBeLessThan(300)
   await page.waitForTimeout(1000)
   expect(await page.evaluate(() => window.__sizes.length)).toBeLessThanOrEqual(2)
