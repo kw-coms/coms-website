@@ -3,14 +3,14 @@
    (100) and toasts (120). App tokens only, so every accent and both themes follow. */
 
 .coms-tour {
-	--tour-scrim: rgb(10 12 18 / 0.6);
+	--tour-scrim: rgb(10 12 18 / 0.74);
 	position: fixed;
 	inset: 0;
 	z-index: 130;
 }
 
 :root[data-theme-mode='dark'] .coms-tour {
-	--tour-scrim: rgb(2 3 6 / 0.74);
+	--tour-scrim: rgb(2 3 6 / 0.78);
 }
 
 .coms-tour-shield {

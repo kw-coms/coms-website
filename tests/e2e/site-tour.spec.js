@@ -19,6 +19,18 @@ const asMember = async (page) => {
   await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
 }
 
+// "The tour does not start": wait out more than the auto-start's three 300 ms polls and see that
+// no tour dialog appears. Bounded, and it waits on the dialog itself rather than on a bare timer.
+const neverAppears = async (page, ms = 2500) => {
+  const appeared = await tour(page).waitFor({ state: 'visible', timeout: ms }).then(() => true, () => false)
+  expect(appeared).toBe(false)
+}
+// The home page is "done": the boot intro is gone, the hero's entrance has finished, the footer is there.
+const homeSettled = async (page) => {
+  await expect(page.getByRole('button', { name: '화면 설정', exact: true })).toBeVisible()
+  await page.waitForFunction(() => !document.querySelector('[data-coms-intro]') && !document.documentElement.classList.contains('coms-booted'))
+}
+
 const noHorizontalOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
 
 test.describe('starting', () => {
@@ -35,9 +47,8 @@ test.describe('starting', () => {
 
     // A second visit (the flag is in localStorage) stays quiet.
     await page.reload()
-    await expect(page.getByRole('button', { name: '화면 설정', exact: true })).toBeVisible()
-    await page.waitForTimeout(1800)
-    await expect(tour(page)).toHaveCount(0)
+    await homeSettled(page)
+    await neverAppears(page)
   })
 
   test('never starts by itself on a deep link', async ({ page }) => {
@@ -45,18 +56,71 @@ test.describe('starting', () => {
     await skipIntro(page)
     await forceAuto(page)
     await page.goto('/about')
-    await expect(page.getByRole('button', { name: '화면 설정', exact: true })).toBeVisible()
-    await page.waitForTimeout(1800)
-    await expect(tour(page)).toHaveCount(0)
+    await homeSettled(page)
+    await neverAppears(page)
   })
 
   test('does not start by itself in an automated browser unless asked to', async ({ page }) => {
     await mockOptionalApis(page)
     await skipIntro(page)
     await page.goto('/')
-    await expect(page.getByRole('button', { name: '화면 설정', exact: true })).toBeVisible()
-    await page.waitForTimeout(1800)
-    await expect(tour(page)).toHaveCount(0)
+    await homeSettled(page)
+    await neverAppears(page)
+  })
+
+  test('self-start waits while a dialog is open, then starts', async ({ page }) => {
+    await mockOptionalApis(page)
+    await skipIntro(page)
+    await forceAuto(page)
+    // A modal that is there from the first paint, as an open confirmation would be.
+    await page.addInitScript(() => {
+      document.addEventListener('DOMContentLoaded', () => {
+        const modal = document.createElement('div')
+        modal.id = 'fake-modal'
+        modal.setAttribute('role', 'dialog')
+        modal.setAttribute('aria-modal', 'true')
+        modal.setAttribute('aria-label', '확인')
+        document.body.appendChild(modal)
+      })
+    })
+    await page.goto('/')
+    await homeSettled(page)
+    await neverAppears(page)
+    await page.evaluate(() => document.getElementById('fake-modal')?.remove())
+    await expect(tour(page)).toBeVisible({ timeout: 10_000 })
+  })
+
+  test('a reload does not start it again when localStorage cannot be written', async ({ page }) => {
+    await mockOptionalApis(page)
+    await skipIntro(page)
+    await forceAuto(page)
+    await page.addInitScript(() => {
+      const setItem = Storage.prototype.setItem
+      Storage.prototype.setItem = function (key, value) {
+        if (this === window.localStorage && String(key).startsWith('coms.tour.')) throw new Error('QuotaExceededError')
+        return setItem.call(this, key, value)
+      }
+    })
+    await page.goto('/')
+    await expect(tour(page)).toBeVisible({ timeout: 10_000 })
+    await page.keyboard.press('Escape')
+    await page.reload()
+    await homeSettled(page)
+    await neverAppears(page)
+  })
+
+  test('the app stays usable when the tour chunk cannot be loaded', async ({ page }) => {
+    await mockOptionalApis(page)
+    await skipIntro(page)
+    await page.route(/\/assets\/TourOverlay-.*\.(js|css)/, (route) => route.abort())
+    await page.goto('/about')
+    await footerStart(page).click()
+    await neverAppears(page, 1500)
+    await expect(page.getByText('문제가 발생했습니다.')).toHaveCount(0)
+    await expect(page.locator('#root')).not.toHaveAttribute('inert', '')
+    // The rest of the page still answers.
+    await page.getByRole('button', { name: '빠른 이동 열기' }).click()
+    await expect(page.getByRole('dialog', { name: '빠른 이동' })).toBeVisible()
   })
 
   test('starts from the footer, and Esc gives focus back to the button', async ({ page }) => {
@@ -90,6 +154,19 @@ test.describe('starting', () => {
     await expect(page).toHaveURL(/\/about$/)
   })
 
+  test('a start asked for while auth is still loading opens the member tour', async ({ page }) => {
+    await asMember(page)
+    await skipIntro(page)
+    await page.route('**/api/auth/me', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } })
+    })
+    await page.goto('/about')
+    await footerStart(page).click()
+    await expect(tour(page)).toContainText('공지사항', { timeout: 8000 })
+    await expect(tour(page)).toContainText('1 / 8')
+  })
+
   test('waits while quick jump is open, then starts', async ({ page }) => {
     await mockOptionalApis(page)
     await skipIntro(page)
@@ -98,10 +175,30 @@ test.describe('starting', () => {
     await page.keyboard.press('Control+k')
     await expect(page.getByRole('dialog', { name: '빠른 이동' })).toBeVisible()
     await page.evaluate(() => window.dispatchEvent(new Event('coms:start-tour')))
-    await page.waitForTimeout(700)
-    await expect(tour(page)).toHaveCount(0)
+    await neverAppears(page, 1000)
     await page.keyboard.press('Escape')
     await expect(tour(page)).toBeVisible()
+  })
+})
+
+test.describe('navigation', () => {
+  test('Back closes the tour, lifts the inert page and does not scroll the new page', async ({ page }) => {
+    await asMember(page)
+    await skipIntro(page)
+    await page.goto('/about')
+    await page.locator('[data-tour="nav-projects"]').click()
+    await expect(page).toHaveURL(/\/projects$/)
+    await footerStart(page).click()
+    await expect(tour(page)).toBeVisible()
+    // The footer step scrolls the page down.
+    for (let i = 0; i < 6; i += 1) await page.keyboard.press('ArrowRight')
+    await expect(page.getByRole('button', { name: '화면 설정', exact: true })).toBeInViewport()
+    await page.goBack()
+    await expect(page).toHaveURL(/\/about$/)
+    await expect(tour(page)).toHaveCount(0)
+    await expect(page.locator('#root')).not.toHaveAttribute('inert', '')
+    // The new page is at the top, not at the old page's offset.
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(50)
   })
 })
 
@@ -128,9 +225,9 @@ test.describe('guest tour', () => {
 
     await page.getByRole('button', { name: '다음' }).click()
     await expect(card).toContainText('2 / 6')
-    await expect(page.getByRole('status').filter({ hasText: '2/6단계' })).toHaveCount(1)
+    await expect(page.getByRole('status').filter({ hasText: /^2 \/ 6 · / })).toHaveCount(1)
     await page.keyboard.press('ArrowRight')
-    await expect(card).toContainText('배우고 직접 돌려 봐요')
+    await expect(card).toContainText('읽고, 풀고, 만들어 봐요')
     await page.keyboard.press('ArrowLeft')
     await expect(card).toContainText('2 / 6')
     await page.getByRole('button', { name: '이전' }).click()
@@ -203,8 +300,8 @@ test.describe('member tour', () => {
 
     // Seen as a member now: not again.
     await page.reload()
-    await page.waitForTimeout(1800)
-    await expect(card).toHaveCount(0)
+    await homeSettled(page)
+    await neverAppears(page)
   })
 
   test('the footer step scrolls "화면 설정" into view and lights it', async ({ page }) => {

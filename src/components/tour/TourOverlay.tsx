@@ -75,6 +75,8 @@ export default function TourOverlay({ kind, onClose }: { kind: TourKind; onClose
   const frameRef = useRef(0)
   const indexRef = useRef(0)
   const scrolledRef = useRef(false)
+  const startYRef = useRef(0)
+  const nudgeTimerRef = useRef(0)
   const onCloseRef = useRef(onClose)
   const step = steps[index]
   const last = index === steps.length - 1
@@ -83,6 +85,13 @@ export default function TourOverlay({ kind, onClose }: { kind: TourKind; onClose
     indexRef.current = index
     onCloseRef.current = onClose
   })
+
+  // Skip, 완료 and Esc: the tour scrolled to a target (the footer), so leave the page where the
+  // visitor was. Not done in the unmount cleanup: after a navigation that would scroll the new page.
+  const close = useCallback(() => {
+    if (scrolledRef.current) window.scrollTo({ top: startYRef.current, behavior: 'auto' })
+    onCloseRef.current()
+  }, [])
 
   // `targets` is passed by the step-change effect, which runs before indexRef has caught up.
   const measure = useCallback((targets?: string[]) => {
@@ -135,14 +144,12 @@ export default function TourOverlay({ kind, onClose }: { kind: TourKind; onClose
   // Modal for the time it is open: the page is inert, focus goes into the card and comes back.
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null
-    const startY = window.scrollY
+    startYRef.current = window.scrollY
     const root = document.getElementById('root')
     root?.setAttribute('inert', '')
     cardRef.current?.focus({ preventScroll: true })
     return () => {
       root?.removeAttribute('inert')
-      // The tour scrolled to a target (the footer): leave the page where the visitor was.
-      if (scrolledRef.current) window.scrollTo({ top: startY, behavior: 'auto' })
       if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true })
     }
   }, [])
@@ -160,13 +167,13 @@ export default function TourOverlay({ kind, onClose }: { kind: TourKind; onClose
       if (event.key === 'Escape') {
         event.preventDefault()
         event.stopPropagation()
-        onCloseRef.current()
+        close()
       } else if ((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
         event.preventDefault()
         const delta = event.key === 'ArrowRight' ? 1 : -1
         const next = indexRef.current + delta
         if (next >= 0 && next < steps.length) setIndex(next)
-        else if (next === steps.length) onCloseRef.current()
+        else if (next === steps.length) close()
       } else if (event.key === 'Tab' && card) {
         const focusable = [...card.querySelectorAll<HTMLElement>('button:not([disabled])')]
         if (focusable.length === 0) return
@@ -179,12 +186,14 @@ export default function TourOverlay({ kind, onClose }: { kind: TourKind; onClose
     }
     document.addEventListener('keydown', onKeyDown, true)
     return () => document.removeEventListener('keydown', onKeyDown, true)
-  }, [steps.length])
+  }, [steps.length, close])
 
   const nudge = () => {
     setNudged(true)
-    window.setTimeout(() => setNudged(false), 420)
+    window.clearTimeout(nudgeTimerRef.current)
+    nudgeTimerRef.current = window.setTimeout(() => setNudged(false), 420)
   }
+  useEffect(() => () => window.clearTimeout(nudgeTimerRef.current), [])
 
   const Icon = step.icon
   const spot = layout?.spot ?? null
@@ -218,17 +227,17 @@ export default function TourOverlay({ kind, onClose }: { kind: TourKind; onClose
         </div>
         <p id={bodyId} className="coms-tour-body">{step.body}</p>
         <div className="coms-tour-actions">
-          <button type="button" className="coms-tour-btn coms-tour-btn-ghost" onClick={() => onClose()}>건너뛰기</button>
+          <button type="button" className="coms-tour-btn coms-tour-btn-ghost" onClick={close}>건너뛰기</button>
           <button type="button" className="coms-tour-btn" disabled={index === 0} onClick={() => setIndex(index - 1)}>
             <ChevronLeft size={15} aria-hidden="true" />이전
           </button>
-          <button type="button" className="coms-tour-btn coms-tour-btn-primary" onClick={() => (last ? onClose() : setIndex(index + 1))}>
+          <button type="button" className="coms-tour-btn coms-tour-btn-primary" onClick={() => (last ? close() : setIndex(index + 1))}>
             {last ? <>완료<Check size={15} aria-hidden="true" /></> : <>다음<ChevronRight size={15} aria-hidden="true" /></>}
           </button>
         </div>
         <p className="coms-tour-keys" aria-hidden="true"><kbd>←</kbd><kbd>→</kbd> 이동 <kbd>Esc</kbd> 닫기</p>
       </div>
-      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{`${kind === 'guest' ? '둘러보기' : '멤버 안내'} ${index + 1}/${steps.length}단계. ${step.title}. ${step.body}`}</div>
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{`${index + 1} / ${steps.length} · ${step.title}`}</div>
     </div>,
     document.body,
   )

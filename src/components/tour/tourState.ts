@@ -17,24 +17,36 @@ const SEEN_KEYS: Record<TourKind, string> = {
   member: 'coms.tour.member.seen:v1',
 }
 
-// Browsers that refuse storage (private windows) still get "once per page load".
+// A browser that refuses localStorage (a private window, a full quota) falls back to
+// sessionStorage, so a reload in the same tab does not start the tour again; and past that,
+// to memory, which at least covers navigation inside the app.
 const seenInMemory = new Set<TourKind>()
 
-export function hasSeenTour(kind: TourKind): boolean {
-  if (seenInMemory.has(kind)) return true
+function readFlag(store: () => Storage, key: string): boolean {
   try {
-    return window.localStorage.getItem(SEEN_KEYS[kind]) === '1'
+    return store().getItem(key) === '1'
   } catch {
     return false
   }
+}
+
+export function hasSeenTour(kind: TourKind): boolean {
+  const key = SEEN_KEYS[kind]
+  return seenInMemory.has(kind) || readFlag(() => window.localStorage, key) || readFlag(() => window.sessionStorage, key)
 }
 
 export function markTourSeen(kind: TourKind) {
   seenInMemory.add(kind)
   try {
     window.localStorage.setItem(SEEN_KEYS[kind], '1')
+    return
   } catch {
-    // Storage unavailable: the in-memory flag above is all there is.
+    // Fall through to the tab's storage.
+  }
+  try {
+    window.sessionStorage.setItem(SEEN_KEYS[kind], '1')
+  } catch {
+    // No storage at all: the in-memory flag above is all there is.
   }
 }
 

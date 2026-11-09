@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarClock, Compass, GraduationCap, CornerDownLeft, FolderOpen, Megaphone, MessagesSquare, Search, type LucideIcon } from 'lucide-react'
+import { CalendarClock, Compass, CornerDownLeft, FolderOpen, Megaphone, MessagesSquare, Search, type LucideIcon } from 'lucide-react'
 import { activitySectionNavItems, navExtraItems, tabs } from '../data/homeContent'
 import { routeLabel } from '../routes/pageTitles'
 import { listNotices } from '../services/noticeApi'
@@ -62,7 +62,7 @@ function buildPages(signedIn: boolean, operations: boolean): PageItem[] {
   } else {
     pages.push(page('/login', '', 'login sign in'), page('/signup', '', 'signup join 가입'))
   }
-  pages.push({ id: TOUR_COMMAND_ID, group: 'page', title: '튜토리얼 시작', hint: '사이트 둘러보기', path: '', keywords: 'tutorial tour guide 투어 안내 도움말 처음', icon: GraduationCap })
+  pages.push({ id: TOUR_COMMAND_ID, group: 'page', title: '튜토리얼 시작', hint: '사이트 둘러보기', path: '', keywords: 'tutorial tour guide 투어 안내 도움말 처음' })
   return pages
 }
 

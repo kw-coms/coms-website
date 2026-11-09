@@ -36,8 +36,8 @@ const GUEST_STEPS: TourStep[] = [
   {
     id: 'study-lab',
     icon: BookOpen,
-    title: '배우고 직접 돌려 봐요',
-    body: 'Study에서는 과목과 챕터 목록을 볼 수 있고, 로그인하면 강의 전체와 실습을 볼 수 있어요. Lab에서는 아두이노 회로를 만들어 코드를 바로 돌려 볼 수 있어요.',
+    title: '읽고, 풀고, 만들어 봐요',
+    body: 'Study에서 강의를 읽고 실습 문제를 풀어 볼 수 있어요. 코드 실행은 로그인 후 쓸 수 있어요. Lab에서는 아두이노 회로를 만들어 코드를 바로 돌려 볼 수 있어요.',
     targets: [nav('study'), nav('lab')],
   },
   {
@@ -75,7 +75,7 @@ const MEMBER_STEPS: TourStep[] = [
     id: 'community',
     icon: MessagesSquare,
     title: '커뮤니티',
-    body: '질문, 프로젝트 모집, 활동 후기를 부원들과 나눠요.',
+    body: '부원들과 질문하고 정보를 나누는 곳이에요. 말머리별로 글을 골라 볼 수 있어요.',
     targets: [nav('community')],
   },
   {
@@ -117,7 +117,7 @@ const MEMBER_STEPS: TourStep[] = [
     id: 'account',
     icon: UserRound,
     title: '계정 설정',
-    body: "이름을 누르면 계정 설정이 열려요. 프로필과 비밀번호를 여기서 관리해요. 이 안내는 맨 아래 '튜토리얼 시작'에서 다시 볼 수 있어요.",
+    body: "이름을 누르면 계정 설정이 열려요. 비밀번호와 알림 설정을 바꿀 수 있어요. 이 안내는 맨 아래 '튜토리얼 시작'에서 다시 볼 수 있어요.",
     targets: ['[data-tour="account"]'],
   },
 ]

@@ -1,10 +1,33 @@
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/useAuth'
+import { captureError } from '../../services/observability'
 import { START_TOUR_EVENT, autoStartAllowed, blockingUiOpen, hasSeenTour, homeStillSettling, markTourSeen, type TourKind } from './tourState'
 
 // The overlay, its steps and its stylesheet are fetched the first time a tour starts.
 const TourOverlay = lazy(() => import('./TourOverlay'))
+
+/**
+ * The overlay is a lazy chunk: offline, or with a stale hashed file after a deploy, loading it
+ * fails and React throws. Only the root boundary would catch that and take the app down, so
+ * this one drops the tour instead: the page stays usable and the tour just does not open.
+ */
+class TourBoundary extends Component<{ onFail: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  componentDidCatch(error: Error) {
+    captureError(error, { source: 'site-tour' })
+    this.props.onFail()
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children
+  }
+}
 
 const POLL_MS = 150
 const AUTO_POLL_MS = 300
@@ -38,7 +61,15 @@ export default function SiteTour() {
     return () => window.clearInterval(id)
   }, [loading, pathname, forWho])
 
-  // On request, from anywhere: wait (briefly) for a dialog or the open menu to go away.
+  // Who the tour is for and whether auth is still loading, read when a pending start fires: an
+  // auth change must not cancel the start, and a start must not run before the answer is in.
+  const whoRef = useRef({ forWho, loading })
+  useEffect(() => {
+    whoRef.current = { forWho, loading }
+  })
+
+  // On request, from anywhere: wait (briefly) for auth and for a dialog or the open menu. After
+  // the give-up the next request starts a fresh wait.
   useEffect(() => {
     let id = 0
     const onStart = () => {
@@ -46,14 +77,15 @@ export default function SiteTour() {
       let waited = 0
       id = window.setInterval(() => {
         waited += 1
-        if (blockingUiOpen()) {
+        if (whoRef.current.loading || blockingUiOpen()) {
           // Still covered after a few seconds: give up rather than open over it.
           if (waited >= MANUAL_WAIT_POLLS) window.clearInterval(id)
           return
         }
         window.clearInterval(id)
-        markTourSeen(forWho)
-        setKind((current) => current ?? forWho)
+        const who = whoRef.current.forWho
+        markTourSeen(who)
+        setKind((current) => current ?? who)
       }, POLL_MS)
     }
     window.addEventListener(START_TOUR_EVENT, onStart)
@@ -61,7 +93,7 @@ export default function SiteTour() {
       window.removeEventListener(START_TOUR_EVENT, onStart)
       window.clearInterval(id)
     }
-  }, [forWho])
+  }, [])
 
   // The tour never navigates; if the route changes under it (Back button) it is over.
   // Reset while rendering, as GlobalNavigation does, instead of in a setState effect.
@@ -73,8 +105,10 @@ export default function SiteTour() {
 
   if (!kind) return null
   return (
-    <Suspense fallback={null}>
-      <TourOverlay kind={kind} onClose={() => setKind(null)} />
-    </Suspense>
+    <TourBoundary onFail={() => setKind(null)}>
+      <Suspense fallback={null}>
+        <TourOverlay kind={kind} onClose={() => setKind(null)} />
+      </Suspense>
+    </TourBoundary>
   )
 }
