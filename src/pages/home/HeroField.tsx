@@ -25,8 +25,8 @@ const DOT = 1.6
 const TRAIL = 11 // cells a signal leaves lit behind its head
 const REACH = 210 // px around the pointer that lights up
 const SURGE = 1500 // ms the switch-on flare takes to settle
-const SWEEP_EVERY = 6800 // ms between the bands of light that cross the grid
-const SWEEP_TIME = 2400 // ms one crossing takes
+const SWEEP_EVERY = 14000 // ms between the bands of light that cross the grid
+const SWEEP_TIME = 5200 // ms one crossing takes
 const SWEEP_WIDTH = 150 // px, half the band
 
 type Signal = { path: Int32Array; born: number; speed: number }
@@ -67,7 +67,7 @@ export default function HeroField() {
       ink = /^#[0-9a-f]{6}$/i.test(text) ? text : dark ? '#f5f5f7' : '#1d1d1f'
       lit = dark ? mixHex(accent, '#ffffff', 0.38) : accent
       hot = dark ? '#ffffff' : mixHex(accent, '#000000', 0.12)
-      rest = dark ? 0.2 : 0.15
+      rest = dark ? 0.11 : 0.09
       const { r, g, b } = hexToRgb(lit)
       sprite = document.createElement('canvas')
       sprite.width = 48
