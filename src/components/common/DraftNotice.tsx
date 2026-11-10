@@ -19,7 +19,7 @@ export default function DraftNotice({ onDiscard, className = '' }: { onDiscard: 
   )
 }
 
-/** Shown instead when the item changed on the server after the draft was saved: the member picks. */
+/** A different (or unknown legacy) base revision needs the member's explicit choice. */
 export function DraftConflictNotice({ savedAt, updatedAt, onApply, onKeep, className = '' }: {
   savedAt: number
   updatedAt: string | null | undefined
@@ -32,7 +32,7 @@ export function DraftConflictNotice({ savedAt, updatedAt, onApply, onKeep, class
   return (
     <div ref={ref} tabIndex={-1} role="alert" className={`${boxClass} ${className}`}>
       <span>
-        임시 저장본({formatTime(savedAt)})보다 나중에 이 글이 수정되었어요({formatTime(updatedAt)}). 어느 쪽을 쓸까요?
+        임시 저장본의 기준과 현재 서버 내용이 달라요. 어느 쪽을 쓸까요? (임시 저장: {formatTime(savedAt)}{updatedAt ? `, 서버 수정: ${formatTime(updatedAt)}` : ''})
       </span>
       <span className="flex gap-2">
         <button type="button" onClick={onApply} className="apple-action-secondary inline-flex min-h-9 items-center px-3 text-xs">임시 저장본 불러오기</button>

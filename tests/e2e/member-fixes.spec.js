@@ -711,7 +711,7 @@ test.describe('review fixes', () => {
       savedAt: new Date('2026-06-02T09:00:00').getTime(),
     })))
     await page.getByRole('button', { name: '수정', exact: true }).click()
-    await expect(page.getByRole('alert').filter({ hasText: '나중에 이 글이 수정되었어요' })).toBeFocused()
+    await expect(page.getByRole('alert').filter({ hasText: '임시 저장본의 기준과 현재 서버 내용이 달라요' })).toBeFocused()
     await expect(page.locator('.community-compose-title')).toHaveValue('현재 서버 글')
     await expect(page.locator('.community-compose-title')).toBeDisabled()
     await page.getByRole('button', { name: '임시 저장본 불러오기' }).click()
@@ -737,7 +737,7 @@ test.describe('review fixes', () => {
     await page.goto('/notices/2')
     await page.getByRole('button', { name: '수정', exact: true }).click()
     const input = page.getByPlaceholder('제목', { exact: true })
-    await expect(page.getByRole('alert').filter({ hasText: '나중에 이 글이 수정되었어요' })).toBeFocused()
+    await expect(page.getByRole('alert').filter({ hasText: '임시 저장본의 기준과 현재 서버 내용이 달라요' })).toBeFocused()
     await expect(input).toHaveValue('이번 주 최신 공지')
     await expect(input).toBeDisabled()
     await page.getByRole('button', { name: '임시 저장본 불러오기' }).click()
@@ -785,7 +785,7 @@ test.describe('review fixes', () => {
     await expect(page.locator('tbody tr').first()).toBeVisible()
     await expect(page.locator('[data-notice-new]:visible')).toHaveCount(0)
     await page.getByRole('button', { name: 'Logout' }).click()
-    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((key) => key.includes('2023000002')))).toEqual([])
+    await expect.poll(() => memberKeys(page, '2023000002')).toEqual([])
     expect(await page.evaluate(() => localStorage.getItem('kwcoms-draft:v1:other:post:new'))).not.toBeNull()
   })
 
@@ -905,5 +905,189 @@ test.describe('review fixes', () => {
     await page.getByRole('button', { name: '공지 작성' }).click()
     await expect(inlineDraftNotice(page)).toBeVisible()
     await expect(title).toHaveValue('내 초안')
+  })
+})
+
+test.describe('review regressions', () => {
+  for (const editor of ['post', 'notice']) {
+    test(`review regression: another tab logout stops the ${editor} editor and clears member storage`, async ({ page, context }) => {
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await mockAdminApis(page)
+      await page.route('**/api/notices', (route) => route.fulfill({ json: [] }))
+      await page.route('**/api/community/posts{,?*}', (route) => route.fulfill({ json: [] }))
+      await page.goto('/notices')
+      await expect.poll(() => memberKeys(page, '2020123456')).toContain('kwcoms-notice-read:v1:2020123456')
+      if (editor === 'post') {
+        await page.goto('/community')
+        await page.getByRole('button', { name: '글쓰기' }).click()
+        await page.locator('.community-compose-title').fill('다른 탭 로그아웃 전 글')
+      } else {
+        await page.getByRole('button', { name: '공지 작성' }).click()
+        await page.getByPlaceholder('제목', { exact: true }).fill('다른 탭 로그아웃 전 공지')
+      }
+      const draftKey = `kwcoms-draft:v1:2020123456:${editor}:new`
+      await expect.poll(() => memberKeys(page, '2020123456')).toContain(draftKey)
+      await page.getByRole('button', { name: '홈으로 이동' }).click()
+      await expect(page.locator('.coms-confirm-card')).toBeVisible()
+
+      const otherTab = await context.newPage()
+      await mockAdminApis(otherTab)
+      await otherTab.route('**/api/auth/logout', (route) => route.fulfill({ status: 204 }))
+      await otherTab.goto('/settings')
+      await otherTab.getByRole('button', { name: 'Logout' }).click()
+      await expect(page.getByRole('alert').filter({ hasText: '다른 탭에서 로그인 상태가 변경되었습니다' })).toBeVisible()
+      await expect(page.locator('.coms-confirm-card')).toHaveCount(0)
+      await expect(page.getByPlaceholder('제목', { exact: true })).toBeDisabled()
+      await expect.poll(() => memberKeys(page, '2020123456')).toEqual([])
+      await page.waitForTimeout(3300)
+      await page.evaluate(() => {
+        document.dispatchEvent(new Event('input', { bubbles: true }))
+        window.dispatchEvent(new Event('pagehide'))
+      })
+      expect(await memberKeys(page, '2020123456')).toEqual([])
+      // /me still returns A in this fixture: reloading alone must not re-arm the ended tab.
+      await page.reload()
+      await page.getByRole('button', { name: editor === 'post' ? '글쓰기' : '공지 작성' }).click()
+      await expect(page.getByRole('alert').filter({ hasText: '다른 탭에서 로그인 상태가 변경되었습니다' })).toBeVisible()
+      await page.waitForTimeout(3300)
+      expect(await memberKeys(page, '2020123456')).toEqual([])
+      await otherTab.close()
+    })
+  }
+
+  test('review regression: another member opening a tab fences off the old post editor', async ({ page, context }) => {
+    await mockAdminApis(page)
+    await page.route('**/api/community/posts{,?*}', (route) => route.fulfill({ json: [] }))
+    await page.goto('/community')
+    await page.getByRole('button', { name: '글쓰기' }).click()
+    await page.locator('.community-compose-title').fill('A 회원 초안')
+    await expect.poll(() => memberKeys(page, '2020123456')).toContain('kwcoms-draft:v1:2020123456:post:new')
+    const otherTab = await context.newPage()
+    await mockAdminApis(otherTab)
+    await otherTab.route('**/api/auth/me', (route) => route.fulfill({ json: {
+      id: 2, studentId: '2023000002', name: '다른 회원', role: 'USER', emailVerified: true,
+    } }))
+    await otherTab.goto('/settings')
+    await expect(page.getByRole('alert').filter({ hasText: '다른 탭에서 로그인 상태가 변경되었습니다' })).toBeVisible()
+    await page.waitForTimeout(3300)
+    const before = await page.evaluate(() => localStorage.getItem('kwcoms-draft:v1:2020123456:post:new'))
+    await page.evaluate(() => window.dispatchEvent(new Event('pagehide')))
+    expect(await page.evaluate(() => localStorage.getItem('kwcoms-draft:v1:2020123456:post:new'))).toBe(before)
+    await otherTab.close()
+  })
+
+  test('review regression: post autosave keeps R1 as its base after server R2', async ({ page }) => {
+    await mockAdminApis(page)
+    const post = {
+      id: 8, title: 'R1 서버 글', content: '<p>R1 본문</p>', category: 'GENERAL',
+      authorName: '관리자', authorStudentId: '2020123456', editable: true,
+      createdAt: '2026-11-01T09:00:00', updatedAt: '2026-11-01T09:00:00',
+      viewCount: 0, upvotes: 0, downvotes: 0, myVote: 0, commentCount: 0,
+    }
+    await page.route('**/api/community/posts/8', (route) => route.fulfill({ json: post }))
+    await page.route('**/api/community/posts/8/comments**', (route) => route.fulfill({ json: [] }))
+    await page.clock.setFixedTime(new Date('2026-11-11T12:00:00'))
+    await page.goto('/community/8')
+    await page.getByRole('button', { name: '수정', exact: true }).click()
+    await page.locator('.community-compose-title').fill('R1 기반 초안')
+    const draft = () => page.evaluate(() => JSON.parse(localStorage.getItem('kwcoms-draft:v1:2020123456:post:8') || 'null'))
+    await expect.poll(draft).toMatchObject({ title: 'R1 기반 초안', baseRevision: post.updatedAt })
+    post.title = 'R2 서버 글'
+    post.content = '<p>R2 본문</p>'
+    post.updatedAt = '2026-11-11T10:00:00'
+    await page.waitForTimeout(3300)
+    expect((await draft()).baseRevision).toBe('2026-11-01T09:00:00')
+    expect((await draft()).savedAt).toBeGreaterThan(new Date(post.updatedAt).getTime())
+    await page.reload()
+    await page.getByRole('button', { name: '수정', exact: true }).click()
+    await expect(page.getByRole('button', { name: '임시 저장본 불러오기' })).toBeVisible()
+    await expect(page.locator('.community-compose-title')).toHaveValue('R2 서버 글')
+    await expect(page.locator('.community-compose-title')).toBeDisabled()
+  })
+
+  test('review regression: notice autosave keeps R1 as its base after server R2', async ({ page }) => {
+    await noticesAsMember(page, { studentId: 'staff' })
+    const edited = { ...noticeRows[1], title: 'R1 서버 공지', content: '<p>R1 본문</p>', updatedAt: '2026-11-01T09:00:00' }
+    await page.route('**/api/notices/2', (route) => route.fulfill({ json: edited }))
+    await page.clock.setFixedTime(new Date('2026-11-11T12:00:00'))
+    await page.goto('/notices/2')
+    await page.getByRole('button', { name: '수정', exact: true }).click()
+    await page.getByPlaceholder('제목', { exact: true }).fill('R1 기반 공지 초안')
+    const draft = () => page.evaluate(() => JSON.parse(localStorage.getItem('kwcoms-draft:v1:staff:notice:2') || 'null'))
+    await expect.poll(draft).toMatchObject({ title: 'R1 기반 공지 초안', baseRevision: edited.updatedAt })
+    edited.title = 'R2 서버 공지'
+    edited.content = '<p>R2 본문</p>'
+    edited.updatedAt = '2026-11-11T10:00:00'
+    await page.waitForTimeout(3300)
+    expect((await draft()).baseRevision).toBe('2026-11-01T09:00:00')
+    expect((await draft()).savedAt).toBeGreaterThan(new Date(edited.updatedAt).getTime())
+    await page.reload()
+    await page.getByRole('button', { name: '수정', exact: true }).click()
+    await expect(page.getByRole('button', { name: '임시 저장본 불러오기' })).toBeVisible()
+    await expect(page.getByPlaceholder('제목', { exact: true })).toHaveValue('R2 서버 공지')
+    await expect(page.getByPlaceholder('제목', { exact: true })).toBeDisabled()
+  })
+
+  test('review regression: Back retires a pending post leave confirmation', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await mockAdminApis(page)
+    await page.route('**/api/community/posts{,?*}', (route) => route.fulfill({ json: [] }))
+    await page.goto('/notices')
+    await page.getByRole('button', { name: '멤버', exact: true }).click()
+    await page.getByRole('link', { name: /커뮤니티/ }).or(page.getByRole('button', { name: /커뮤니티/ })).first().click()
+    await page.getByRole('button', { name: '글쓰기' }).click()
+    await page.locator('.community-compose-title').fill('뒤로 가기 전 초안')
+    await page.getByRole('button', { name: '홈으로 이동' }).click()
+    await expect(page.locator('.coms-confirm-card')).toContainText('저장하지 않은 내용이 있습니다')
+    await page.goBack()
+    await expect(page).toHaveURL(/\/notices$/)
+    const dialog = page.locator('.coms-confirm-card')
+    if (await dialog.isVisible()) await dialog.getByRole('button', { name: '떠나기' }).click()
+    await expect(page).toHaveURL(/\/notices$/)
+    await expect(dialog).toHaveCount(0)
+  })
+
+  test('review regression: Forward retires a pending notice leave confirmation', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await mockAdminApis(page)
+    await page.route('**/api/notices', (route) => route.fulfill({ json: [] }))
+    await page.goto('/notices')
+    await page.getByRole('button', { name: '멤버', exact: true }).click()
+    await page.getByRole('link', { name: /커뮤니티/ }).or(page.getByRole('button', { name: /커뮤니티/ })).first().click()
+    await page.goBack()
+    await expect(page).toHaveURL(/\/notices$/)
+    await page.getByRole('button', { name: '공지 작성' }).click()
+    await page.getByPlaceholder('제목', { exact: true }).fill('앞으로 가기 전 공지')
+    await page.getByRole('button', { name: '홈으로 이동' }).click()
+    await expect(page.locator('.coms-confirm-card')).toContainText('저장하지 않은 내용이 있습니다')
+    await page.goForward()
+    await expect(page).toHaveURL(/\/community$/)
+    const dialog = page.locator('.coms-confirm-card')
+    if (await dialog.isVisible()) await dialog.getByRole('button', { name: '떠나기' }).click()
+    await expect(page).toHaveURL(/\/community$/)
+    await expect(dialog).toHaveCount(0)
+  })
+
+  test('review regression: unavailable session storage keeps editing and warns before leaving', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.addInitScript(() => {
+      const original = Storage.prototype.setItem
+      Storage.prototype.setItem = function (key, value) {
+        if (String(key).startsWith('kwcoms-member-')) throw new DOMException('blocked', 'QuotaExceededError')
+        return original.call(this, key, value)
+      }
+    })
+    await mockAdminApis(page)
+    await page.route('**/api/community/posts{,?*}', (route) => route.fulfill({ json: [] }))
+    await page.goto('/community')
+    await page.getByRole('button', { name: '글쓰기' }).click()
+    await page.locator('.community-compose-title').fill('저장소가 막혀도 편집 중')
+    await expect(page.locator('.community-compose-title')).toBeEnabled()
+    await expect(page.getByText('임시 저장하지 못했어요')).toBeVisible()
+    await expect(page.getByRole('alert').filter({ hasText: '다른 탭에서 로그인 상태가 변경되었습니다' })).toHaveCount(0)
+    await page.getByRole('button', { name: '홈으로 이동' }).click()
+    await expect(page.locator('.coms-confirm-card')).toContainText('임시 저장도 하지 못했습니다')
+    await page.locator('.coms-confirm-card').getByRole('button', { name: '계속 작성' }).click()
+    await expect(page).toHaveURL(/\/community$/)
   })
 })

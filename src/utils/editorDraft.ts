@@ -16,7 +16,7 @@ export type DraftFields = {
   /** Serialized body (JSON blocks), or '' when empty. */
   content: string
 }
-export type EditorDraft = DraftFields & { savedAt: number }
+export type EditorDraft = DraftFields & { savedAt: number; baseRevision?: string }
 
 type DraftStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
@@ -83,6 +83,7 @@ export function readDraft(key: string, storage: DraftStorage | null = browserSto
       anonymousName: typeof value.anonymousName === 'string' ? value.anonymousName : '',
       content: value.content,
       savedAt: Number(value.savedAt) || 0,
+      ...(typeof value.baseRevision === 'string' ? { baseRevision: value.baseRevision } : {}),
     }
   } catch {
     return null
@@ -90,11 +91,11 @@ export function readDraft(key: string, storage: DraftStorage | null = browserSto
 }
 
 /** Returns false when the draft was too large or the browser refused it; never throws. */
-export function writeDraft(key: string, fields: DraftFields, storage: DraftStorage | null = browserStorage(), now = Date.now(), epoch?: number): boolean {
+export function writeDraft(key: string, fields: DraftFields, storage: DraftStorage | null = browserStorage(), now = Date.now(), epoch?: number, baseRevision?: string): boolean {
   if (!mayUseKey(key, epoch)) return false
   try {
-    const text = JSON.stringify({ ...fields, savedAt: now })
-    if (!storage || text.length > MAX_DRAFT_CHARS) return false
+    const text = JSON.stringify({ ...fields, savedAt: now, baseRevision })
+    if (!storage || text.length > MAX_DRAFT_CHARS || !mayUseKey(key, epoch)) return false
     storage.setItem(key, text)
     return true
   } catch {
@@ -111,14 +112,19 @@ export function removeDraft(key: string, storage: DraftStorage | null = browserS
   }
 }
 
-/**
- * True when the item was changed on the server after the draft was saved, so applying the draft
- * would silently overwrite newer content. Server times are zone-less local date-times.
- */
-export function draftIsStale(draft: Pick<EditorDraft, 'savedAt'> | null, itemUpdatedAt: string | null | undefined): boolean {
-  if (!draft || !draft.savedAt || !itemUpdatedAt) return false
-  const updated = Date.parse(itemUpdatedAt)
-  return Number.isFinite(updated) && updated > draft.savedAt
+/** The loaded server revision, independent of when an autosave happens. */
+export function draftRevision(item: { updatedAt?: unknown; title?: unknown; content?: unknown }): string {
+  if (typeof item.updatedAt === 'string' && item.updatedAt) return item.updatedAt
+  // FNV-1a 64-bit fingerprint for items whose API has no updatedAt.
+  let hash = 14695981039346656037n
+  const text = JSON.stringify([item.title ?? '', item.content ?? ''])
+  for (let i = 0; i < text.length; i += 1) hash = BigInt.asUintN(64, (hash ^ BigInt(text.charCodeAt(i))) * 1099511628211n)
+  return `content:${hash.toString(16)}`
+}
+
+/** Legacy drafts have no known base, so editing an existing item requires an explicit choice. */
+export function draftIsStale(draft: Pick<EditorDraft, 'savedAt' | 'baseRevision'> | null, currentRevision: string | null | undefined): boolean {
+  return Boolean(draft && currentRevision != null && draft.baseRevision !== currentRevision)
 }
 
 /** Removes every draft of one member (used on logout). */

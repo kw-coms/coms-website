@@ -45,12 +45,19 @@ function settle(value: boolean | string | null) {
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export function confirmDialog(input: BaseRequest | string): Promise<boolean> {
+export function confirmDialog(input: BaseRequest | string, signal?: AbortSignal): Promise<boolean> {
+  if (signal?.aborted) return Promise.resolve(false)
   const req: BaseRequest = typeof input === 'string' ? { message: input } : input
   // If a dialog is already open, cancel it first (one modal at a time).
   if (current) settle(current.kind === 'prompt' ? null : false)
   return new Promise<boolean>((resolve) => {
-    current = { ...req, id: nextId++, kind: 'confirm', resolve: (v) => resolve(v === true) }
+    const id = nextId++
+    const onAbort = () => { if (current?.id === id) settle(false) }
+    current = { ...req, id, kind: 'confirm', resolve: (v) => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve(v === true)
+    } }
+    signal?.addEventListener('abort', onAbort, { once: true })
     emit()
   })
 }

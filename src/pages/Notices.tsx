@@ -40,7 +40,7 @@ import { usePermissions } from '../contexts/usePermissions'
 import Chip from '../components/common/Chip'
 import DraftNotice, { DraftConflictNotice } from '../components/common/DraftNotice'
 import { confirmEditorLeave, useEditorDraft } from '../hooks/useEditorDraft'
-import { draftIsStale, draftStorageKey, readDraft } from '../utils/editorDraft'
+import { draftIsStale, draftRevision, draftStorageKey, readDraft } from '../utils/editorDraft'
 import { isNoticeUnread, loadNoticeReadState, markAllNoticesRead, markNoticeRead, saveNoticeReadState, visitList } from '../utils/noticeReads'
 import { memberSessionEpoch } from '../utils/memberSession'
 
@@ -132,8 +132,8 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
   const { user } = useAuth()
   const storageKey = draftStorageKey(user?.studentId, 'notice', initialNotice?.id)
   const [stored] = useState(() => readDraft(storageKey))
-  // A draft older than the notice's last server change is offered, never applied on its own.
-  const conflict = Boolean(stored) && Boolean(initialNotice) && draftIsStale(stored, typeof initialNotice?.updatedAt === 'string' ? initialNotice.updatedAt : null)
+  const [baseRevision] = useState(() => initialNotice ? draftRevision(initialNotice) : undefined)
+  const conflict = draftIsStale(stored, baseRevision)
   const [restored, setRestored] = useState(conflict ? null : stored)
   const [pendingDraft, setPendingDraft] = useState(conflict ? stored : null)
   const savedCategory = initialNotice?.category || defaultCategory || 'GENERAL'
@@ -153,6 +153,7 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
   const [originalBlocks] = useState(savedBlocks)
   const draft = useEditorDraft({
     storageKey,
+    baseRevision,
     baseline: () => ({ title: initialNotice?.title || '', category: savedCategory, anonymousName: '', content: serializeRichBody(originalBlocks) }),
     current: () => {
       const blocks = editorApiRef.current?.getBlocks()
@@ -207,8 +208,9 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
     <div className="apple-soft-panel space-y-3 p-4 sm:space-y-4 sm:p-5">
       {pendingDraft && <DraftConflictNotice savedAt={pendingDraft.savedAt} updatedAt={typeof initialNotice?.updatedAt === 'string' ? initialNotice.updatedAt : null} onApply={() => applyDraft(pendingDraft)} onKeep={keepCurrent} />}
       {draft.saveFailed && <p role="alert" className="text-xs font-semibold text-red-500">임시 저장하지 못했어요. 저장 공간이 부족하거나 막혀 있습니다. 이 페이지를 떠나면 작성한 내용이 사라질 수 있어요.</p>}
+      {draft.sessionEnded && <p role="alert" className="text-sm font-semibold">다른 탭에서 로그인 상태가 변경되었습니다. 다시 로그인해주세요.</p>}
       {restored && <DraftNotice onDiscard={discardDraft} />}
-      <fieldset disabled={Boolean(pendingDraft)} inert={Boolean(pendingDraft)} className="min-w-0 space-y-3 sm:space-y-4">
+      <fieldset disabled={Boolean(pendingDraft) || draft.sessionEnded} inert={Boolean(pendingDraft) || draft.sessionEnded} className="min-w-0 space-y-3 sm:space-y-4">
       <input
         value={formData.title}
         onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}

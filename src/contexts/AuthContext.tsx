@@ -10,13 +10,13 @@ import { buildAuthLoadError, isLoggedOutAuthError } from './authErrors'
 import { AuthContext } from './useAuth'
 import { clearMemberDrafts } from '../utils/editorDraft'
 import { clearNoticeReadState } from '../utils/noticeReads'
-import { beginMemberLogout, cancelMemberLogout, finishMemberLogout, setMemberSessionOwner } from '../utils/memberSession'
+import { beginMemberLogout, cancelMemberLogout, finishMemberLogout, isMemberSessionCurrent, setMemberSessionOwner } from '../utils/memberSession'
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUserState] = useState(null)
   const userRef = useRef(null)
-  const setUser = useCallback((next) => {
-    setMemberSessionOwner(next?.studentId)
+  const setUser = useCallback((next, freshLogin = false) => {
+    setMemberSessionOwner(next?.studentId, freshLogin)
     userRef.current = next
     setUserState(next)
   }, [])
@@ -125,11 +125,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const login = useCallback(async (data) => {
     setAuthError(null)
     if (data) {
-      setUser(data)
+      setUser(data, true)
     }
     try {
       const currentUser = await getCurrentUser()
-      setUser(currentUser)
+      setUser(currentUser, !data)
     } catch {
       // The login response is already authoritative for the visible session state.
     }
@@ -151,7 +151,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const logout = useCallback(async () => {
     const owner = userRef.current?.studentId
-    if (!beginMemberLogout()) return false
+    if (!isMemberSessionCurrent(owner)) return false
+    if (!beginMemberLogout()) {
+      showToast({ message: '로그아웃 상태를 동기화하지 못했습니다. 잠시 후 다시 시도해주세요.', tone: 'error' })
+      return false
+    }
     try {
       await logoutUser()
     } catch {

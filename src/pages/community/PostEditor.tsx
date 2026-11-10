@@ -32,7 +32,7 @@ import {
 import { usePermissions } from '../../contexts/usePermissions'
 import DraftNotice, { DraftConflictNotice } from '../../components/common/DraftNotice'
 import { confirmEditorLeave, useEditorDraft } from '../../hooks/useEditorDraft'
-import { draftIsStale, draftStorageKey, readDraft } from '../../utils/editorDraft'
+import { draftIsStale, draftRevision, draftStorageKey, readDraft } from '../../utils/editorDraft'
 
 type PostEditorProps = {
   initialPost?: { id?: number; title?: string; category?: string; anonymousName?: string; imageUrl?: string; [key: string]: unknown } | null
@@ -53,8 +53,8 @@ function PostEditorForm({ initialPost, onCancel, onSave, user }: PostEditorProps
   // A draft saved earlier for this same target (new post, or editing post N) is restored once.
   const storageKey = draftStorageKey(typeof user?.studentId === 'string' ? user.studentId : null, 'post', initialPost?.id)
   const [stored] = useState(() => readDraft(storageKey))
-  // A draft older than the post's last server change is offered, never applied on its own.
-  const conflict = Boolean(stored) && isEditing && draftIsStale(stored, typeof initialPost?.updatedAt === 'string' ? initialPost.updatedAt : null)
+  const [baseRevision] = useState(() => isEditing ? draftRevision(initialPost) : undefined)
+  const conflict = draftIsStale(stored, baseRevision)
   const [restored, setRestored] = useState(conflict ? null : stored)
   const [pendingDraft, setPendingDraft] = useState(conflict ? stored : null)
   const [title, setTitle] = useState(restored?.title ?? (initialPost?.title || ''))
@@ -86,6 +86,7 @@ function PostEditorForm({ initialPost, onCancel, onSave, user }: PostEditorProps
 
   const draft = useEditorDraft({
     storageKey,
+    baseRevision,
     baseline: () => ({
       title: initialPost?.title || '',
       category: categoryOptions.some((item) => item.value === (initialPost?.category || 'GENERAL')) ? (initialPost?.category || 'GENERAL') : (categoryOptions[0]?.value || 'GENERAL'),
@@ -237,9 +238,10 @@ function PostEditorForm({ initialPost, onCancel, onSave, user }: PostEditorProps
     <>
       {pendingDraft && <DraftConflictNotice savedAt={pendingDraft.savedAt} updatedAt={typeof initialPost?.updatedAt === 'string' ? initialPost.updatedAt : null} onApply={() => applyDraft(pendingDraft)} onKeep={keepCurrent} className="mx-4 mt-4 sm:mx-5" />}
       {draft.saveFailed && <p role="alert" className="mx-4 mt-4 text-xs font-semibold text-red-500 sm:mx-5">임시 저장하지 못했어요. 저장 공간이 부족하거나 막혀 있습니다. 이 페이지를 떠나면 작성한 내용이 사라질 수 있어요.</p>}
+      {draft.sessionEnded && <p role="alert" className="mx-4 mt-4 text-sm font-semibold">다른 탭에서 로그인 상태가 변경되었습니다. 다시 로그인해주세요.</p>}
       {restored && <DraftNotice onDiscard={discardDraft} className="mx-4 mt-4 sm:mx-5" />}
     <form onSubmit={submit} className="community-compose-form min-w-0">
-      <fieldset className="grid min-w-0 grid-cols-1 gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start" disabled={Boolean(pendingDraft)} inert={Boolean(pendingDraft)}>
+      <fieldset className="grid min-w-0 grid-cols-1 gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start" disabled={Boolean(pendingDraft) || draft.sessionEnded} inert={Boolean(pendingDraft) || draft.sessionEnded}>
       <div className="community-compose-meta order-2 flex flex-wrap gap-2 lg:col-start-2 lg:row-start-1">
         <select value={effectiveCategory} onChange={(e) => setCategory(e.target.value)}
           aria-label="게시판 분류"

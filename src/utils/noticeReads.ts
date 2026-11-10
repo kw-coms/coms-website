@@ -49,7 +49,8 @@ export function loadNoticeReadState(owner: string | number | null | undefined, s
 export function saveNoticeReadState(owner: string | number | null | undefined, state: NoticeReadState, storage: Pick<Storage, 'setItem'> | null = safeStorage(), epoch = memberSessionEpoch()) {
   if (!canWriteMember(owner, epoch)) return
   try {
-    storage?.setItem(noticeReadKey(owner), JSON.stringify(state))
+    const text = JSON.stringify(state)
+    if (canWriteMember(owner, epoch)) storage?.setItem(noticeReadKey(owner), text)
   } catch {
     // Storage full or blocked: the dots just come back next visit.
   }

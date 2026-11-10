@@ -18,7 +18,7 @@ function Probe() {
 }
 async function mount() {
   localStorage.clear()
-  setMemberSessionOwner('member')
+  setMemberSessionOwner('member', true)
   fields = empty
   const container = document.createElement('div')
   document.body.append(container)

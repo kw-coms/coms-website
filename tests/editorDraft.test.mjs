@@ -45,10 +45,10 @@ assert.equal(readDraft('k', old, 1000 + MAX_DRAFT_AGE_MS + 1), null)
 assert.equal(old.getItem('k'), null, 'and removed from storage')
 assert.notEqual(readDraft('k', (writeDraft('k', fields, old, 1000), old), 1000 + MAX_DRAFT_AGE_MS - 1), null)
 
-// A draft older than the server's last change must not be applied silently.
+// A legacy draft has no base revision and must not be applied silently to an existing item.
 const d = { savedAt: new Date('2026-07-01T10:00:00').getTime() }
 assert.equal(draftIsStale(d, '2026-07-01T11:00:00'), true)
-assert.equal(draftIsStale(d, '2026-07-01T09:00:00'), false)
+assert.equal(draftIsStale(d, '2026-07-01T09:00:00'), true)
 assert.equal(draftIsStale(d, null), false)
 assert.equal(draftIsStale(null, '2026-07-01T11:00:00'), false)
 
