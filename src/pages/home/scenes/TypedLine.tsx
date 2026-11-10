@@ -11,30 +11,28 @@ export default function TypedLine() {
   const calm = useCalm()
   const [step, setStep] = useState({ i: 0, n: 0 })
   const box = useRef<HTMLDivElement | null>(null)
-  const visible = useRef(true)
+  const [visible, setVisible] = useState(true)
 
   useEffect(() => {
     const el = box.current
     if (!el || typeof IntersectionObserver === 'undefined') return
     const io = new IntersectionObserver((entries) => {
-      visible.current = entries.some((entry) => entry.isIntersecting)
+      setVisible(entries.some((entry) => entry.isIntersecting))
     })
     io.observe(el)
     return () => io.disconnect()
   }, [])
 
   useEffect(() => {
-    if (calm) return
+    // No timer while calm or off screen; the observer above restarts it.
+    if (calm || !visible) return
     const full = (i: number) => items[i].lead.length + 3 + items[i].detail.length
     const timer = window.setTimeout(
-      () => {
-        if (!visible.current) return setStep((s) => ({ ...s }))
-        setStep((s) => (s.n < full(s.i) ? { i: s.i, n: s.n + 1 } : { i: (s.i + 1) % items.length, n: 0 }))
-      },
-      !visible.current ? 500 : step.n >= full(step.i) ? 2600 : step.n === 0 ? 400 : 38,
+      () => setStep((s) => (s.n < full(s.i) ? { i: s.i, n: s.n + 1 } : { i: (s.i + 1) % items.length, n: 0 })),
+      step.n >= full(step.i) ? 2600 : step.n === 0 ? 400 : 38,
     )
     return () => window.clearTimeout(timer)
-  }, [calm, step])
+  }, [calm, visible, step])
 
   const { lead, detail } = items[calm ? 0 : step.i]
   const n = calm ? Infinity : step.n

@@ -62,7 +62,11 @@ function CountUp({ value }: { value: string }) {
   const ref = useRef<HTMLSpanElement | null>(null)
   useEffect(() => {
     const el = ref.current
-    if (calm || !el || typeof IntersectionObserver === 'undefined') return
+    // Calm (reduced motion or lite, also when it turns on while counting) shows the finished figure.
+    if (calm || !el || typeof IntersectionObserver === 'undefined') {
+      setShown(value)
+      return
+    }
     const target = Number(value)
     let raf = 0
     setShown('0'.repeat(value.length))

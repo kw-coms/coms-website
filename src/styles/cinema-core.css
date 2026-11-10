@@ -126,7 +126,8 @@
 .cine-ready [data-scene]:not(.is-onscreen) *,
 .cine-ready [data-scene]:not(.is-onscreen) *::before,
 .cine-ready [data-scene]:not(.is-onscreen) *::after {
-	animation-play-state: paused;
+	/* important: an `animation:` shorthand elsewhere resets the play state, and must not win. */
+	animation-play-state: paused !important;
 }
 
 /* ---- Media: opened by a clip-path, once ------------------------------------------- */

@@ -8,17 +8,36 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 const REDUCED = '(prefers-reduced-motion: reduce)'
 const SCENE = '[data-scene]'
 
-function measure(el: HTMLElement) {
+// One measurement pass per frame: every rect is read first, then every write is made, so the
+// scroll frame never forces layout more than once. Other fixed pieces (the scene rail) join the
+// same pass through onSceneFrame.
+type Writer = () => void
+type Reader = () => Writer | void
+const readers = new Set<Reader>()
+let kick: () => void = () => {}
+
+/** Registers a reader for the shared per-frame pass. It reads layout and returns what to write. */
+export function onSceneFrame(reader: Reader) {
+  readers.add(reader)
+  kick()
+  return () => {
+    readers.delete(reader)
+  }
+}
+
+function read(el: HTMLElement): Writer {
   const rect = el.getBoundingClientRect()
   const vh = window.innerHeight
   // A pinned track (data-scene-pin) is taller than the screen: progress runs while it is stuck.
   // Any other scene runs from its top edge entering at the bottom to its bottom edge leaving at the top.
   const pinned = el.hasAttribute('data-scene-pin') && rect.height > vh + 1
   const p = pinned ? -rect.top / (rect.height - vh) : (vh - rect.top) / (vh + rect.height)
-  el.style.setProperty('--p', clamp01(p).toFixed(4))
-  // The opening scene also reports how far it has scrolled away.
-  if (el.dataset.scene === 'opening') {
-    el.style.setProperty('--hero-out', clamp01(-rect.top / Math.max(1, rect.height * 0.85)).toFixed(3))
+  const isOpening = el.dataset.scene === 'opening'
+  const out = clamp01(-rect.top / Math.max(1, rect.height * 0.85))
+  return () => {
+    el.style.setProperty('--p', clamp01(p).toFixed(4))
+    // The opening scene also reports how far it has scrolled away.
+    if (isOpening) el.style.setProperty('--hero-out', out.toFixed(3))
   }
 }
 
@@ -39,12 +58,18 @@ export function useSceneProgress() {
     const off = () => reduced.matches || getPerfState().mode === 'lite'
     const run = () => {
       raf = 0
-      if (off()) return
-      near.forEach(measure)
+      const writes: Writer[] = []
+      if (!off()) near.forEach((el) => writes.push(read(el)))
+      readers.forEach((reader) => {
+        const write = reader()
+        if (write) writes.push(write)
+      })
+      writes.forEach((write) => write())
     }
     const schedule = () => {
       if (!raf) raf = requestAnimationFrame(run)
     }
+    kick = schedule
 
     const io = new IntersectionObserver(
       (entries) => {
@@ -62,38 +87,52 @@ export function useSceneProgress() {
       { rootMargin: '100% 0px' },
     )
     // Looping animation runs only while its scene is on the screen (see cinema-core.css).
+    let openingOn = true
     const live = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => entry.target.classList.toggle('is-onscreen', entry.isIntersecting))
+      entries.forEach((entry) => {
+        entry.target.classList.toggle('is-onscreen', entry.isIntersecting)
+        if ((entry.target as HTMLElement).dataset.scene === 'opening') openingOn = entry.isIntersecting
+      })
     })
     root.querySelectorAll<HTMLElement>(SCENE).forEach((el) => {
       io.observe(el)
       live.observe(el)
     })
 
-    // Tickers speed up with the scroll velocity and settle back.
+    // Tickers speed up with the scroll velocity and settle back. Only while the opening is on
+    // screen, one read per frame, and the animation list is looked up once.
     const tickers = Array.from(root.querySelectorAll<HTMLElement>('[data-ticker]'))
+    let anims: Animation[] | null = null
     let lastY = window.scrollY
     let rate = 1
     let rateRaf = 0
+    let velRaf = 0
     const setRate = (value: number) => {
-      tickers.forEach((el) => el.getAnimations({ subtree: true }).forEach((a) => { a.playbackRate = value }))
+      anims ??= tickers.flatMap((el) => el.getAnimations({ subtree: true }))
+      anims.forEach((a) => {
+        a.playbackRate = value
+      })
     }
     const settle = () => {
       rate += (1 - rate) * 0.06
-      if (Math.abs(rate - 1) < 0.02) {
+      if (!openingOn || Math.abs(rate - 1) < 0.02) {
         rate = 1
         rateRaf = 0
       } else rateRaf = requestAnimationFrame(settle)
       setRate(rate)
     }
-    const onVelocity = () => {
+    const velocity = () => {
+      velRaf = 0
       const y = window.scrollY
       const v = Math.min(6, Math.abs(y - lastY) / 16)
       lastY = y
-      if (!tickers.length || off() || v < 0.05) return
+      if (!openingOn || !tickers.length || off() || v < 0.05) return
       rate = Math.max(rate, 1 + v)
       setRate(rate)
       if (!rateRaf) rateRaf = requestAnimationFrame(settle)
+    }
+    const onVelocity = () => {
+      if (!velRaf) velRaf = requestAnimationFrame(velocity)
     }
     window.addEventListener('scroll', onVelocity, { passive: true })
 
@@ -109,6 +148,8 @@ export function useSceneProgress() {
       io.disconnect()
       live.disconnect()
       if (rateRaf) cancelAnimationFrame(rateRaf)
+      if (velRaf) cancelAnimationFrame(velRaf)
+      kick = () => {}
       window.removeEventListener('scroll', onVelocity)
       offPerf()
       reduced.removeEventListener('change', sync)

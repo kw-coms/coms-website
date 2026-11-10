@@ -19,7 +19,6 @@
 	height: 72vmax;
 	border-radius: 50%;
 	background: radial-gradient(closest-side, color-mix(in srgb, var(--c) var(--cine-glow), transparent), transparent);
-	will-change: transform;
 }
 
 .aurora--a {
@@ -96,7 +95,6 @@
 		repeating-linear-gradient(0deg, var(--floor-line) 0 1px, transparent 1px 64px),
 		repeating-linear-gradient(90deg, var(--floor-line) 0 1px, transparent 1px 64px);
 	animation: floor-flow 20s linear infinite;
-	will-change: transform;
 }
 
 @keyframes floor-flow {
@@ -287,7 +285,6 @@
 .scene-recruit__marquee-run {
 	display: inline-block;
 	white-space: nowrap;
-	will-change: transform;
 }
 
 .scene-opening__ticker-run {
@@ -343,7 +340,6 @@
 	aspect-ratio: 1;
 	border-radius: 50%;
 	background: radial-gradient(closest-side, color-mix(in srgb, var(--g) var(--cine-glow), transparent), transparent);
-	will-change: transform;
 }
 
 .scene-bg__glow--a {
@@ -427,7 +423,6 @@
 	-webkit-mask-image: linear-gradient(180deg, #000 25%, transparent 92%);
 	mask-image: linear-gradient(180deg, #000 25%, transparent 92%);
 	transform: translate3d(0, calc((var(--p, 0.5) - 0.5) * -34vh), 0);
-	will-change: transform;
 }
 
 .scene-bg__numeral::before {
@@ -457,7 +452,6 @@
 	font: 800 clamp(4.5rem, 13vw, 12rem) / 1.05 var(--apple-font-family);
 	letter-spacing: -0.04em;
 	transform: translate3d(calc(-18vw + (var(--p, 0.5) - 0.5) * var(--dir) * 70vw), 0, 0);
-	will-change: transform;
 }
 
 .scene-divider__text::before {
@@ -760,4 +754,28 @@
 
 :root[data-perf='lite'] .scene-projects__numerals span {
 	transition: none;
+}
+
+/* ---- Layers are promoted only while their scene is on screen ----------------------------------------- */
+.cine-ready .is-onscreen :is(.aurora, .floor__plane i, .scene-bg__glow, .scene-bg__numeral, .scene-divider__text, .scene-opening__ticker-run, .scene-recruit__marquee-run) {
+	will-change: transform;
+}
+
+/* ---- Reduced motion and lite: no animation anywhere on the home page, and nothing promoted --------------- */
+@media (prefers-reduced-motion: reduce) {
+	.scenes,
+	.scenes *,
+	.scenes *::before,
+	.scenes *::after {
+		animation: none !important;
+		will-change: auto !important;
+	}
+}
+
+:root[data-perf='lite'] .scenes,
+:root[data-perf='lite'] .scenes *,
+:root[data-perf='lite'] .scenes *::before,
+:root[data-perf='lite'] .scenes *::after {
+	animation: none !important;
+	will-change: auto !important;
 }

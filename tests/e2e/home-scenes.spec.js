@@ -118,6 +118,44 @@ test.describe('a visitor on the home page', () => {
     await expect.poll(() => state('.floor__plane i')).toBe('paused')
   })
 
+  test('no running loop belongs to a scene that is off screen, wherever the page is scrolled', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    const strays = () => page.evaluate(() => {
+      const bad = []
+      let loops = 0
+      for (const a of document.getAnimations()) {
+        const target = a.effect?.target
+        if (!(a instanceof CSSAnimation) || !target || !target.closest('.cine-root')) continue
+        if (a.effect.getComputedTiming().iterations !== Infinity || a.playState !== 'running') continue
+        loops += 1
+        const off = target.closest('[data-scene]:not(.is-onscreen)') || !target.closest('[data-scene]')
+        if (off) bad.push(`${a.animationName} on ${target.tagName.toLowerCase()}.${String(target.className).slice(0, 30)}`)
+      }
+      return { bad, loops }
+    })
+    for (const selector of ['#opening', '.scene-about__visual', '#activities', '#projects', '#members', '#recruit']) {
+      await page.locator(selector).first().scrollIntoViewIfNeeded()
+      await page.evaluate(() => window.scrollBy(0, 120))
+      await page.waitForTimeout(400)
+      const { bad } = await strays()
+      expect(bad, `at ${selector}`).toEqual([])
+    }
+    // The check is not vacuous: back at the top the opening's own loops are running.
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.waitForTimeout(400)
+    expect((await strays()).loops).toBeGreaterThan(3)
+  })
+
+  test('a figure that is mid-count when calm turns on at runtime shows its final value', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    const figure = page.locator('#activities .scene-stats dt').first()
+    await expect(figure.locator('[aria-hidden]')).toHaveText('00')
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await expect(figure.locator('[aria-hidden]')).toHaveText('01')
+  })
+
   test('has a divider band between scenes and a backdrop in each later scene', async ({ page }) => {
     await expect(page.locator('.scene-divider')).toHaveCount(5)
     for (const id of ['about', 'activities', 'projects', 'members', 'recruit']) {
@@ -181,6 +219,17 @@ for (const [label, setup] of [
       // Numbers are finished figures, not mid-count.
       await expect(page.locator('#activities .scene-stats dt').first()).toContainText('01')
       expect(await overflow(page)).toBeLessThanOrEqual(0)
+      // Nothing animates anywhere on the page: no running CSS animation, however far it is scrolled.
+      await page.evaluate(async () => {
+        for (let y = 0; y <= document.body.scrollHeight; y += 600) {
+          window.scrollTo(0, y)
+          await new Promise((resolve) => setTimeout(resolve, 30))
+        }
+      })
+      const running = await page.evaluate(() =>
+        document.getAnimations().filter((a) => a instanceof CSSAnimation && a.playState === 'running' && a.effect?.target?.closest('.cine-root')).map((a) => a.animationName),
+      )
+      expect(running).toEqual([])
     })
   })
 }

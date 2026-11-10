@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { onSceneFrame } from '../../../hooks/useSceneProgress'
 
 export type RailItem = { id: string; label: string }
 
@@ -12,13 +13,13 @@ export default function SceneRail({ items }: { items: RailItem[] }) {
     // A scene is current while it holds the middle of the screen: the last scene whose top edge
     // has passed the middle line. Measured on scroll rather than by observing, so a tall (pinned)
     // scene and a fast scroll in either direction both resolve to the scene actually under the line.
-    let raf = 0
-    const measure = () => {
-      raf = 0
+    // It reads in the scene hook's shared per-frame pass and writes after all the reads.
+    const ids = key.split('|')
+    return onSceneFrame(() => {
       const middle = window.innerHeight / 2
-      let current = key.split('|')[0]
+      let current = ids[0]
       let fill = 0
-      for (const id of key.split('|')) {
+      for (const id of ids) {
         const el = document.getElementById(id)
         if (!el) continue
         const r = el.getBoundingClientRect()
@@ -28,20 +29,11 @@ export default function SceneRail({ items }: { items: RailItem[] }) {
           fill = Math.min(1, Math.max(0, (middle - r.top) / Math.max(1, r.height)))
         }
       }
-      nav.current?.style.setProperty('--rail-p', fill.toFixed(3))
-      setActive(current)
-    }
-    const schedule = () => {
-      if (!raf) raf = requestAnimationFrame(measure)
-    }
-    measure()
-    window.addEventListener('scroll', schedule, { passive: true })
-    window.addEventListener('resize', schedule)
-    return () => {
-      window.removeEventListener('scroll', schedule)
-      window.removeEventListener('resize', schedule)
-      if (raf) cancelAnimationFrame(raf)
-    }
+      return () => {
+        nav.current?.style.setProperty('--rail-p', fill.toFixed(3))
+        setActive(current)
+      }
+    })
   }, [key])
 
   const go = (id: string) => {
