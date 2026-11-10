@@ -2693,7 +2693,7 @@ test('community list stays dense but readable on mobile', async ({ page }) => {
   await page.goto('/community')
 
   await expect(page.locator('.community-post-card-mobile').first()).toBeVisible()
-  await expect(page.locator('.community-pagination-pages').first()).toBeVisible()
+  await expect(page.locator('.community-pagination-pages').last()).toBeVisible()
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   const firstCardBox = await page.locator('.community-post-card-mobile').first().boundingBox()
   expect(firstCardBox.width).toBeLessThanOrEqual(360)
