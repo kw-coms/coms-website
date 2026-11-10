@@ -42,7 +42,9 @@ function StudyBody({ id }: { id: string }) {
   // A link from quick search (/study/c#pointer) arrives before the lesson markup exists, so the browser cannot scroll to it.
   useEffect(() => {
     if (!html || !location.hash || /^#(code-\d+|pg=)/.test(location.hash)) return
-    document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView()
+    // A frame later: the route's scroll-to-top effect runs after this one when the lesson is already cached.
+    const frame = requestAnimationFrame(() => document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView())
+    return () => cancelAnimationFrame(frame)
   }, [html, location.hash])
 
   // The playground calls the latest login handler without being re-created when the router state changes.
