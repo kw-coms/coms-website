@@ -259,3 +259,38 @@ test.describe('recruit form (item 5)', () => {
     }
   }
 })
+
+test.describe('next steps on /about and /projects (item 6)', () => {
+  const cases = [
+    ['/about', [['지원하기', '/recruit'], ['스터디 보기', '/study']]],
+    ['/projects', [['부원들이 만든 프로젝트 보기', '/apps'], ['지원하기', '/recruit'], ['스터디 보기', '/study']]],
+  ]
+  for (const [path, links] of cases) {
+    test(`${path} ends with next steps`, async ({ page }) => {
+      await skipIntro(page)
+      await mockOptionalApis(page)
+      await page.goto(path)
+      const steps = page.getByRole('navigation', { name: '다음에 할 일' })
+      await steps.scrollIntoViewIfNeeded()
+      for (const [name, href] of links) await expect(steps.getByRole('link', { name })).toHaveAttribute('href', href)
+      await steps.getByRole('link', { name: links[0][0] }).click()
+      await expect(page).toHaveURL(new RegExp(`${links[0][1]}$`))
+    })
+  }
+
+  for (const theme of ['light', 'dark']) {
+    for (const view of VIEWS) {
+      test(`screenshot next steps ${theme} ${view.name}`, async ({ page }) => {
+        await page.setViewportSize(view.size)
+        await skipIntro(page)
+        await setTheme(page, theme)
+        await mockOptionalApis(page)
+        await page.goto('/projects')
+        const steps = page.getByRole('navigation', { name: '다음에 할 일' })
+        await steps.scrollIntoViewIfNeeded()
+        await page.waitForTimeout(500)
+        await page.screenshot({ path: `${SHOTS}/projects-steps-${theme}-${view.name}.png` })
+      })
+    }
+  }
+})
