@@ -91,7 +91,7 @@ export default defineConfig({
       : []),
     {
       name: 'smoke',
-      testMatch: [/app-smoke\.spec\.js/, /activities-timeline\.spec\.js/, /appearance\.spec\.js/, /community-flows\.spec\.js/, /study-playground\.spec\.js/, /study-exercises\.spec\.js/, /study-exercises-web-answers\.spec\.js/, /study-frames\.spec\.js/, /site-tour\.spec\.js/, /guest-gating\.spec\.js/, /sponsor-viewer\.spec\.js/],
+      testMatch: [/app-smoke\.spec\.js/, /home-scenes\.spec\.js/, /activities-timeline\.spec\.js/, /appearance\.spec\.js/, /community-flows\.spec\.js/, /study-playground\.spec\.js/, /study-exercises\.spec\.js/, /study-exercises-web-answers\.spec\.js/, /study-frames\.spec\.js/, /site-tour\.spec\.js/, /guest-gating\.spec\.js/, /sponsor-viewer\.spec\.js/],
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 900 },

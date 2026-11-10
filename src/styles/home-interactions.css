@@ -28,114 +28,6 @@
 	animation: coms-title-in 1000ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
-/* Floating logo card with depth + tilt */
-.coms-3d-card {
-	box-shadow:
-		inset 0 1px 0 var(--coms-3d-highlight),
-		0 10px 24px var(--coms-3d-depth-soft),
-		0 26px 60px var(--coms-3d-depth);
-	transform: perspective(900px) rotateX(7deg);
-	transition: transform 420ms ease, box-shadow 420ms ease;
-}
-
-.coms-3d-card:hover {
-	transform: perspective(900px) rotateX(0deg) translateY(-3px);
-}
-
-/* 3D press buttons across the home page */
-.theme-home .apple-action-primary {
-	box-shadow:
-		0 3px 0 var(--coms-3d-depth),
-		0 7px 16px var(--coms-3d-depth-soft);
-	transition: background-color 160ms ease, transform 120ms ease, box-shadow 120ms ease;
-}
-
-.theme-home .apple-action-primary:hover {
-	transform: translateY(-1px);
-	box-shadow:
-		0 4px 0 var(--coms-3d-depth),
-		0 10px 20px var(--coms-3d-depth-soft);
-}
-
-.theme-home .apple-action-primary:active {
-	transform: translateY(2px);
-	box-shadow:
-		0 1px 0 var(--coms-3d-depth),
-		0 3px 8px var(--coms-3d-depth-soft);
-}
-
-.theme-home .apple-action-secondary {
-	box-shadow:
-		0 2px 0 var(--coms-3d-depth-soft),
-		0 5px 12px var(--coms-3d-depth-soft);
-	transition: background-color 160ms ease, color 160ms ease, transform 120ms ease, box-shadow 120ms ease;
-}
-
-.theme-home .apple-action-secondary:hover {
-	transform: translateY(-1px);
-}
-
-.theme-home .apple-action-secondary:active {
-	transform: translateY(1px);
-	box-shadow: 0 1px 4px var(--coms-3d-depth-soft);
-}
-
-/* ---- Interactive 3D stage: pointer-driven parallax tilt ---------------- */
-.coms-3d-stage {
-	perspective: 1100px;
-	perspective-origin: center 40%;
-}
-
-.coms-3d-stage-inner {
-	transform: translateY(var(--coms-sy, 0px)) scale(var(--coms-sc, 1))
-		rotateX(var(--coms-rx, 0deg)) rotateY(var(--coms-ry, 0deg));
-	opacity: var(--coms-so, 1);
-	transform-style: preserve-3d;
-	transition: transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1);
-	will-change: transform, opacity;
-}
-
-/* Depth layers — float at different Z so the tilt yields real parallax */
-.coms-depth-sm {
-	transform: translateZ(20px);
-	transform-style: preserve-3d;
-}
-
-.coms-depth-md {
-	transform: translateZ(34px);
-	transform-style: preserve-3d;
-}
-
-.coms-depth-lg {
-	transform: translateZ(64px);
-	transform-style: preserve-3d;
-}
-
-/* Logo: continuous 3D bob + Y-axis wobble. It is held a little in front of its card
-   (translateZ): the two share a 3D context and the card is tilted, so at z 0 the card's
-   lower half sat in front of the logo and greyed out the bottom of it. */
-.coms-logo-3d {
-	transform: translateZ(28px);
-	animation: coms-logo-3d 8s ease-in-out infinite;
-	transform-style: preserve-3d;
-}
-
-@keyframes coms-logo-3d {
-	0%,
-	100% {
-		transform: translate3d(0, 0, 28px) rotateY(0deg) rotateX(0deg);
-	}
-	25% {
-		transform: translate3d(0, -7px, 28px) rotateY(18deg) rotateX(6deg);
-	}
-	50% {
-		transform: translate3d(0, 0, 28px) rotateY(0deg) rotateX(0deg);
-	}
-	75% {
-		transform: translate3d(0, -7px, 28px) rotateY(-18deg) rotateX(6deg);
-	}
-}
-
 @keyframes coms-title-in {
 	0% {
 		opacity: 0;
@@ -146,53 +38,7 @@
 		transform: translateZ(46px) rotateX(9deg);
 	}
 }
-
 /* ---- Home hero --------------------------------------------------------- */
-/* One screen, complete as soon as it is on: logo, wordmark, copy and actions are all there
-   without scrolling. (It used to open on a giant logo and wordmark that only gave way to
-   this after a long pinned scroll.) What moves is the backdrop (HeroField) and, as the page
-   scrolls past, the hero sinking back: JS sets --hero-out on .coms-cinema-track, 0 to 1. */
-.coms-cinema {
-	position: relative;
-}
-
-.coms-cinema-pin {
-	position: relative;
-	display: flex;
-	min-height: calc(100svh - var(--apple-nav-height));
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	overflow: hidden;
-	padding: 1.5rem 1.25rem 3.5rem;
-	text-align: center;
-	/* layered depth: soft top glow, accent wash, bottom vignette — not flat */
-	background:
-		radial-gradient(120% 90% at 50% -12%, color-mix(in srgb, var(--app-accent-soft) 95%, transparent), transparent 58%),
-		radial-gradient(70% 55% at 50% -6%, color-mix(in srgb, var(--app-accent) 18%, transparent), transparent 60%),
-		radial-gradient(95% 75% at 50% 122%, color-mix(in srgb, var(--app-text) 11%, transparent), transparent 62%),
-		linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-soft) 100%);
-}
-
-/* Soft drifting aurora so the hero never feels flat. Sits behind the tint
-   overlay + content, very low contrast. */
-.coms-cinema-pin::before {
-	content: '';
-	position: absolute;
-	inset: -25%;
-	z-index: 0;
-	pointer-events: none;
-	background:
-		radial-gradient(40% 40% at 20% 26%, color-mix(in srgb, var(--app-accent) 42%, transparent), transparent 72%),
-		radial-gradient(36% 36% at 82% 20%, color-mix(in srgb, #6f9dff 38%, transparent), transparent 72%),
-		radial-gradient(34% 34% at 88% 66%, color-mix(in srgb, #a0c4ff 30%, transparent), transparent 72%),
-		radial-gradient(50% 50% at 60% 86%, color-mix(in srgb, var(--app-accent-soft) 92%, transparent), transparent 72%);
-	/* Lite mode (perf-lite.css) drops this filter: blur() over a full-hero layer is what a
-	   CPU-composited page cannot afford. */
-	filter: blur(40px) saturate(118%);
-	animation: coms-aurora 18s ease-in-out infinite alternate;
-	will-change: transform;
-}
 
 /* The pixel grid behind the hero (HeroField). It sinks slower than the copy as the page
    scrolls, which is what gives the hero its depth on the way out. */
@@ -204,20 +50,6 @@
 	pointer-events: none;
 	transform: translateY(calc(var(--hero-out, 0) * 96px));
 	will-change: transform;
-}
-
-/* Dark mode: a near-black stage with one quiet wash of the accent from above. The aurora and
-   the glow under the wordmark stay, but faint: at full strength they turned the whole hero
-   navy and put a blue cloud behind the letters. */
-:root[data-theme-mode='dark'] .coms-cinema-pin {
-	background:
-		radial-gradient(90% 70% at 50% -14%, color-mix(in srgb, var(--app-accent) 11%, transparent), transparent 62%),
-		radial-gradient(100% 90% at 50% 118%, rgba(0, 0, 0, 0.5), transparent 62%),
-		var(--app-bg);
-}
-:root[data-theme-mode='dark'] .coms-cinema-pin::before {
-	opacity: 0.2;
-	filter: blur(52px);
 }
 /* The wordmark itself: white easing to a cool silver at the foot, with a soft shadow for lift
    instead of the stacked extrusion (text-shadow would show through the clipped fill). Every
@@ -263,44 +95,6 @@ html.coms-booted:root[data-theme-mode='dark'] .coms-cinema-title {
 	}
 }
 
-/* The semester badge's dot is a status light: it sends out a slow ring. */
-.coms-live-dot {
-	position: relative;
-}
-
-.coms-live-dot::after {
-	content: '';
-	position: absolute;
-	inset: 0;
-	border-radius: inherit;
-	background: var(--app-accent);
-	animation: coms-live-ping 2.6s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
-}
-
-@keyframes coms-live-ping {
-	0% {
-		opacity: 0.7;
-		transform: scale(1);
-	}
-	70%,
-	100% {
-		opacity: 0;
-		transform: scale(3.1);
-	}
-}
-
-@keyframes coms-aurora {
-	0% {
-		transform: translate3d(-3%, -2%, 0) scale(1);
-	}
-	50% {
-		transform: translate3d(3%, 2%, 0) scale(1.08);
-	}
-	100% {
-		transform: translate3d(-2%, 3%, 0) scale(1.03);
-	}
-}
-
 /* The large floating logo (now only the 404 page uses it). */
 .coms-cinema-intrologo {
 	width: clamp(3.5rem, 9vw, 6.5rem);
@@ -316,15 +110,6 @@ html.coms-booted:root[data-theme-mode='dark'] .coms-cinema-title {
 	filter: invert(1) brightness(1.08) drop-shadow(0 14px 30px rgba(0, 0, 0, 0.4));
 }
 
-/* Theme-aware bottom vignette (was a hard-coded white fade — ugly on dark). */
-.coms-cinema-fade {
-	background-image: linear-gradient(
-		to bottom,
-		transparent,
-		color-mix(in srgb, var(--app-surface-soft) 92%, transparent)
-	);
-}
-
 /* Hero title reuses the 3D text-shadow but not the title-in transform. Light-mode lift:
    subtle layered shadow + faint accent halo so the wordmark reads with depth instead of
    sitting flat (dark mode has its own rule above). */
@@ -335,111 +120,17 @@ html.coms-booted:root[data-theme-mode='dark'] .coms-cinema-title {
 	filter: drop-shadow(0 10px 28px color-mix(in srgb, var(--app-accent) 24%, transparent))
 		drop-shadow(0 2px 5px rgba(0, 0, 0, 0.12));
 }
-
-/* The hero is the first thing on screen now, so on wide screens a short wordmark is set
-   large enough to carry it. (A long custom title keeps the plain size so it cannot overflow.) */
-@media (min-width: 768px) {
-	.coms-cinema-title-lg {
-		font-size: clamp(4.5rem, 8.6vw, 7rem);
-		line-height: 0.96;
-	}
-}
-
-/* The hero body. As the page scrolls past it sinks back: it drops slower than the page,
-   shrinks a touch and dims. The pointer tilts it. */
-.coms-cinema-content {
-	opacity: calc(1 - var(--hero-out, 0) * 0.6);
-	transform:
-		translateY(calc(var(--hero-out, 0) * 58px))
-		scale(calc(1 - var(--hero-out, 0) * 0.035))
-		rotateX(var(--coms-rx, 0deg))
-		rotateY(var(--coms-ry, 0deg));
-	transform-style: preserve-3d;
-	transition: transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
-	will-change: transform, opacity;
-}
-
-/* Boot intro handoff. The intro (ComsIntro) covers the page while the machine "loads", then
-   opens the screen onto a hero that is already complete; the hero only settles a touch, the
-   way a picture does when a display wakes. `scale` is used so the tilt transform above is
-   left alone. The class is not there when the intro does not play (repeat visits in a tab). */
-html.coms-booted .coms-cinema-content {
-	animation: coms-screen-settle 640ms cubic-bezier(0.16, 0.84, 0.3, 1) both;
-}
-@keyframes coms-screen-settle {
-	from {
-		scale: 1.04;
-	}
-	to {
-		scale: 1;
-	}
-}
-
-/* Scroll hint — fades out once the user starts scrolling. */
-.coms-cinema-hint {
-	position: absolute;
-	bottom: 1.1rem;
-	left: 50%;
-	color: var(--app-muted);
-	opacity: calc(1 - var(--hero-out, 0) * 5);
-	transform: translateX(-50%);
-	animation: coms-hint-bob 1.8s ease-in-out infinite;
-}
-
-@keyframes coms-hint-bob {
-	0%,
-	100% {
-		transform: translate(-50%, 0);
-	}
-	50% {
-		transform: translate(-50%, 7px);
-	}
-}
-
 @media (prefers-reduced-motion: reduce) {
-	.coms-cinema-content {
-		opacity: 1;
-		transform: none;
-		transition: none;
-	}
 	.coms-hero-field {
 		transform: none;
-	}
-	.coms-cinema-hint {
-		display: none;
 	}
 }
 
 /* ---- Mobile home ------------------------------------------------------- */
-/* On phones the hero stays put while it scrolls away (no sinking back), and the
-   per-section snap is off so natural scrolling returns. Desktop (>=768px) is untouched. */
+/* On phones the hero stays put while it scrolls away (no sinking back). */
 @media (max-width: 767px) {
-	/* 1. A plain one-screen hero. */
-	.coms-cinema-pin {
-		padding-bottom: 2.5rem;
-	}
-	.coms-cinema-hint {
-		display: none;
-	}
-	.coms-cinema-content {
-		opacity: 1 !important;
-		transform: none !important;
-		transition: none !important;
-	}
 	.coms-hero-field {
 		transform: none;
-	}
-
-	/* 2. Disable scroll-snap so natural scrolling returns (no janky
-	   snapping on multi-screen-tall sections). The base rule at the bottom of
-	   this file (html.home-snap-scroll{scroll-snap-type:y proximity}) has the
-	   same specificity but appears later in source, so bump specificity here
-	   with :root to guarantee this override wins. */
-	html.home-snap-scroll:root {
-		scroll-snap-type: none !important;
-	}
-	html.home-snap-scroll .home-snap-section {
-		scroll-snap-align: none !important;
 	}
 
 	/* 3. Trim the hero wordmark so the stacked hero is not artificially tall on phones. */
@@ -476,43 +167,13 @@ html.coms-booted .coms-cinema-content {
 .reveal-ready [data-reveal-dir='left'].is-revealed {
 	transform: none;
 }
-
-/* ---- Scroll-snap "pause" on the home sections (Kakao-style) ------------ */
-/* proximity (not mandatory) so it gently settles without trapping the user. */
-html.home-snap-scroll {
-	scroll-snap-type: y proximity;
-}
-html.home-snap-scroll .home-snap-section {
-	scroll-snap-align: start;
-	scroll-snap-stop: normal;
-	scroll-margin-top: var(--apple-nav-height);
-}
-
 @media (prefers-reduced-motion: reduce) {
-	html.home-snap-scroll {
-		scroll-snap-type: none;
-	}
-	.coms-3d-title,
-	.coms-3d-card,
-	.coms-3d-card:hover,
-	.coms-3d-stage-inner,
-	.coms-depth-sm,
-	.coms-depth-md,
-	.coms-depth-lg {
-		transform: none;
-	}
-
-	.coms-logo-3d {
-		animation: none;
-	}
-
 	.coms-3d-title {
+		transform: none;
 		animation: none;
 	}
 
-	.coms-cinema-pin::before,
-	.coms-cinema-intrologo,
-	.coms-live-dot::after {
+	.coms-cinema-intrologo {
 		animation: none;
 	}
 
@@ -526,51 +187,6 @@ html.home-snap-scroll .home-snap-section {
 		transition: none;
 	}
 }
-
-/* ---- Mobile swipe carousel (desktop keeps its grid) ------------------- */
-/* Cards stack into a long column on phones; turn them into a peeking,
-   snap-scrolling row instead. At lg the grid takes over again. */
-.coms-hscroll {
-	display: flex;
-	gap: 0.75rem;
-	overflow-x: auto;
-	/* Cross-axis must not become an auto scroll container, and a vertical drag
-	   must fall through to the page — otherwise the card row eats the page's
-	   vertical scroll on touch ("걸림"). pan-x = this element scrolls horizontally
-	   only; vertical pan + pinch-zoom go to the page. */
-	overflow-y: hidden;
-	touch-action: pan-x pinch-zoom;
-	overscroll-behavior-x: contain;
-	padding-bottom: 0.5rem;
-	scroll-snap-type: x mandatory;
-	scroll-padding-left: 1.25rem;
-	-webkit-overflow-scrolling: touch;
-	scrollbar-width: none;
-}
-.coms-hscroll::-webkit-scrollbar {
-	display: none;
-}
-.coms-hslide {
-	flex: 0 0 82%;
-	scroll-snap-align: start;
-}
-@media (min-width: 640px) {
-	.coms-hslide {
-		flex-basis: 47%;
-	}
-}
-@media (min-width: 1024px) {
-	.coms-hscroll {
-		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		overflow: visible;
-		padding-bottom: 0;
-	}
-	.coms-hslide {
-		flex: initial;
-	}
-}
-
 /* ---- Top scroll-progress bar ----------------------------------------- */
 .coms-scroll-progress {
 	position: fixed;
@@ -625,41 +241,9 @@ html.home-snap-scroll .home-snap-section {
 	background: var(--app-surface);
 	transform: translateY(-2px) scale(1.04);
 }
-
 /* ---- Infinite keyword marquee (Kakao-style slide) -------------------- */
-.coms-marquee {
-	overflow: hidden;
-	-webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
-	mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
-}
-.coms-marquee-track {
-	display: inline-flex;
-	align-items: center;
-	gap: 3rem;
-	padding-block: 0.35rem;
-	white-space: nowrap;
-	will-change: transform;
-	animation: coms-marquee 32s linear infinite;
-}
-.coms-marquee-track > span {
-	letter-spacing: 0.02em;
-}
-.coms-marquee:hover .coms-marquee-track {
-	animation-play-state: paused;
-}
-@keyframes coms-marquee {
-	from {
-		transform: translateX(0);
-	}
-	to {
-		transform: translateX(-50%);
-	}
-}
 
 @media (prefers-reduced-motion: reduce) {
-	.coms-marquee-track {
-		animation: none;
-	}
 	.coms-to-top {
 		transition: none;
 	}
@@ -771,4 +355,3 @@ html.home-snap-scroll .home-snap-section {
 		animation: none;
 	}
 }
-

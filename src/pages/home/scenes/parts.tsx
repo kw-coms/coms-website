@@ -1,12 +1,11 @@
-import type { CSSProperties, ElementType } from 'react'
+import type { ElementType } from 'react'
 import { sectionMetrics } from '../../../data/homeContent'
+import { cssVars } from './cssVars'
 
 export type SceneActions = {
   primary: { label: string; onClick: () => void }
   secondary: { label: string; onClick?: () => void; href?: string }
 }
-
-export const cssVars = (vars: Record<string, string | number>) => vars as CSSProperties
 
 /** The slate in the corner of a scene: "SCENE 02 · ABOUT". Text is kept in its own case; CSS sets it in capitals. */
 export function Slate({ index, name }: { index: number; name: string }) {
@@ -23,8 +22,11 @@ export function CineTitle({ text, className = '', as: Tag = 'h2' }: { text: stri
   return (
     <Tag className={`cine-lines scene-title ${className}`}>
       {lines.map((line, i) => (
-        <span key={line} className="cine-m" style={cssVars({ '--i': i })}>
-          <span>{line}</span>
+        <span key={line}>
+          <span className="cine-m" style={cssVars({ '--i': i })}>
+            <span>{line}</span>
+          </span>
+          {i < lines.length - 1 && ' '}
         </span>
       ))}
     </Tag>

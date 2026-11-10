@@ -1,7 +1,8 @@
 import { ArrowUpRight } from 'lucide-react'
 import { projectDetails, sectionStories, visualDetails } from '../../../data/homeContent'
 import { ProjectLabVisual } from '../HomeVisuals'
-import { CineTitle, SceneActionRow, SceneStats, Slate, cssVars, type SceneActions } from './parts'
+import { CineTitle, SceneActionRow, SceneStats, Slate, type SceneActions } from './parts'
+import { cssVars } from './cssVars'
 
 // What each row of projectDetails is, in the same order (the site's own three kinds of work).
 const KINDS = ['Web', 'IoT', 'Web', 'App']

@@ -1,6 +1,7 @@
 import { sectionStories, visualDetails } from '../../../data/homeContent'
 import { JoinFlowVisual } from '../HomeVisuals'
-import { CineTitle, SceneActionRow, SceneStats, Slate, cssVars, type SceneActions } from './parts'
+import { CineTitle, SceneActionRow, SceneStats, Slate, type SceneActions } from './parts'
+import { cssVars } from './cssVars'
 
 // The finale. The title is set very large and drifts a few percent sideways as the scene passes
 // (--p, scroll only), then the copy, the actions, the steps and the join flow.

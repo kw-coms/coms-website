@@ -3,7 +3,7 @@ import { Megaphone } from 'lucide-react'
 import { ghostActionBtnClass, solidActionBtnClass } from '../../../shared/homeUi'
 import { SCREEN_ON_EVENT } from '../../../utils/screenOn'
 import HeroField from '../HeroField'
-import { cssVars } from './parts'
+import { cssVars } from './cssVars'
 
 type Props = {
   title: string

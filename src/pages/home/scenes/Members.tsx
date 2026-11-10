@@ -2,7 +2,8 @@ import { ArrowRight, FolderOpen, Megaphone, MessagesSquare } from 'lucide-react'
 import { activityHubItems, activitySectionNavItems } from '../../../data/homeContent'
 import MemberLock from '../../../components/MemberLock'
 import ClubCalendarSection from '../../../features/clubCalendar/ClubCalendarSection'
-import { CineTitle, Slate, cssVars } from './parts'
+import { CineTitle, Slate } from './parts'
+import { cssVars } from './cssVars'
 
 const HUB_ICONS = [Megaphone, MessagesSquare, FolderOpen]
 
@@ -40,12 +41,16 @@ export default function Members({ index, member, noticeTitle, onGo }: Props) {
             const Icon = HUB_ICONS[i % HUB_ICONS.length]
             return (
               <li key={item.title} data-cine style={cssVars({ '--i': i })}>
-                <button type="button" className="scene-hubcard" onClick={() => onGo(item.route)}>
+                <article className="scene-hubcard">
                   <Icon size={20} aria-hidden="true" />
-                  <span className="scene-hubcard__title">{item.title} <MemberLock /></span>
-                  <span className="scene-hubcard__body">{item.body}</span>
-                  <span className="scene-hubcard__go">{item.cta} <ArrowRight size={15} aria-hidden="true" /></span>
-                </button>
+                  <h3 className="scene-hubcard__title">
+                    <button type="button" className="scene-hubcard__link" onClick={() => onGo(item.route)}>
+                      {item.title} <MemberLock />
+                    </button>
+                  </h3>
+                  <p className="scene-hubcard__body">{item.body}</p>
+                  <span className="scene-hubcard__go" aria-hidden="true">{item.cta} <ArrowRight size={15} /></span>
+                </article>
               </li>
             )
           })}

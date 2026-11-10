@@ -62,11 +62,6 @@
 	margin-top: 2.25rem;
 }
 
-.scenes .apple-action-primary,
-.scenes .apple-action-secondary {
-	box-shadow: none;
-}
-
 .scene-btn {
 	display: inline-flex;
 	min-height: 2.75rem;
@@ -651,6 +646,7 @@
 }
 
 .scene-hubcard {
+	position: relative;
 	display: grid;
 	width: 100%;
 	align-content: start;
@@ -660,7 +656,21 @@
 	padding-top: 1.25rem;
 	color: var(--app-text);
 	text-align: left;
+}
+
+/* The title's button covers the whole card, so the card is one target with one name. */
+.scene-hubcard__link {
+	color: inherit;
+	font: inherit;
+	letter-spacing: inherit;
+	text-align: left;
 	cursor: pointer;
+}
+
+.scene-hubcard__link::after {
+	content: '';
+	position: absolute;
+	inset: 0;
 }
 
 .scene-hubcard svg {
@@ -699,11 +709,15 @@
 	transform: translateX(4px);
 }
 
-.scene-hubcard:focus-visible,
 .scene-chip:focus-visible,
-.scene-notice:focus-visible {
+.scene-notice:focus-visible,
+.scene-hubcard:has(.scene-hubcard__link:focus-visible) {
 	outline: 2px solid var(--app-accent);
 	outline-offset: 4px;
+}
+
+.scene-hubcard__link:focus-visible {
+	outline: none;
 }
 
 .scene-chips {
@@ -886,6 +900,10 @@
 
 .scenes .coms-visual-dots i:last-child {
 	box-shadow: none;
+}
+
+.scenes .coms-mini-pass {
+	background: transparent;
 }
 
 .scenes .coms-mini {

@@ -1,6 +1,7 @@
 import { experiencePills, heroHighlights, sectionStories, visualDetails } from '../../../data/homeContent'
 import { ClubOsVisual } from '../HomeVisuals'
-import { SceneActionRow, SceneStats, Slate, cssVars, type SceneActions } from './parts'
+import { SceneActionRow, SceneStats, Slate, type SceneActions } from './parts'
+import { cssVars } from './cssVars'
 
 // Scene 2, the one pinned moment: the statement sits still for about 80vh of scrolling while its
 // words light up one by one (--p comes from useSceneProgress). Reduced motion and lite drop the

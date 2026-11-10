@@ -1,7 +1,8 @@
 import { ArrowRight } from 'lucide-react'
 import { activityDetails, sectionStories, showcaseItems, visualDetails } from '../../../data/homeContent'
 import { BuildMini, FlowMini, JoinMini, LearningStackVisual } from '../HomeVisuals'
-import { CineTitle, SceneActionRow, SceneStats, Slate, cssVars, type SceneActions } from './parts'
+import { CineTitle, SceneActionRow, SceneStats, Slate, type SceneActions } from './parts'
+import { cssVars } from './cssVars'
 
 const SHOWCASE_ART = [FlowMini, BuildMini, JoinMini]
 

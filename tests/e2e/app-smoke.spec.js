@@ -231,7 +231,7 @@ test.describe('home boot intro', () => {
         await expect(page.locator('h1')).toContainText("COM's")
         await expect(page.locator('h1')).toBeInViewport()
         await expect(page.getByRole('button', { name: '더 알아보기', exact: true })).toBeInViewport()
-        await expect(page.locator('.coms-cinema-content')).toHaveCSS('opacity', '1')
+        await expect(page.locator('.scene-opening__copy')).toHaveCSS('opacity', '1')
         expect(await page.evaluate(() => window.scrollY)).toBe(0)
         // The page under the intro takes clicks again.
         await page.getByRole('button', { name: '지원하기', exact: true }).click()
@@ -270,7 +270,7 @@ test('home tools row lists the Records and Tools menus and opens a tool', async 
   }
   expect(menu.length).toBeGreaterThanOrEqual(4)
   await expect(tiles).toHaveCount(menu.length)
-  const titles = await tiles.evaluateAll(items => items.map(item => item.querySelector('.coms-tool-title').textContent))
+  const titles = await tiles.evaluateAll(items => items.map(item => item.querySelector('.scene-chip__label').textContent))
   expect(titles).toEqual(menu)
 
   await tools.getByRole('button', { name: /일정 조율/ }).click()
@@ -284,10 +284,14 @@ test('home section cards lead where they say', async ({ page }) => {
   })
   await page.goto('/')
 
-  const hub = page.locator('section').filter({ has: page.getByRole('heading', { name: '활동 허브' }) })
+  // A visitor's "멤버가 되면" scene: the three hub entries (still buttons that go to the login
+  // guide), the tool shortcuts as chips, and no calendar or member grid.
+  const members = page.locator('#members')
+  await expect(members.getByRole('heading', { name: '멤버가 되면' })).toBeAttached()
   for (const name of [/공지사항/, /커뮤니티/, /자료실/]) {
-    await expect(hub.getByRole('button', { name })).toBeVisible()
+    await expect(members.getByRole('button', { name })).toBeVisible()
   }
+  await expect(page.getByRole('heading', { name: '동아리 일정 캘린더' })).toHaveCount(0)
   for (const heading of ['광운대에서 컴퓨터를 가장 자연스럽게 시작하는 곳.', '기초부터 실전까지, 매주 이어지는 학습 루틴.', '아이디어를 실제 서비스와 제작물로.', '함께 배울 다음 멤버를 기다립니다.']) {
     await expect(page.getByRole('heading', { name: heading })).toBeAttached()
   }
@@ -480,7 +484,8 @@ test('apps page surfaces companion service links away from the home dashboard', 
   await page.goto('/')
 
   await expect(page.getByRole('heading', { name: "COM's Apps" })).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: '동아리 일정 캘린더' })).toBeVisible()
+  // A guest's home has no calendar (it moves to the signed-in "오늘의 COM's" scene).
+  await expect(page.getByRole('heading', { name: '동아리 일정 캘린더' })).toHaveCount(0)
 
   await page.goto('/apps')
   await expect(page.getByRole('heading', { name: "COM's Apps" })).toBeVisible()
@@ -2502,9 +2507,10 @@ test('top navigation groups activity log and monthly calendar under Records and 
   await expect(page).toHaveURL(/\/apps$/)
   await page.goto('/')
 
-  await expect(page.getByRole('heading', { name: '활동 허브' })).toBeVisible()
-  await expect(page.locator('section').filter({ has: page.getByRole('heading', { name: '활동 허브' }) }).getByRole('button', { name: /Activity log/ })).toHaveCount(0)
-  await expect(page.locator('section').filter({ has: page.getByRole('heading', { name: '활동 허브' }) }).getByRole('button', { name: /Monthly calendar/ })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: "오늘의 COM's" })).toBeVisible()
+  const today = page.locator('#members')
+  await expect(today.getByRole('button', { name: /Activity log/ })).toHaveCount(0)
+  await expect(today.getByRole('button', { name: /Monthly calendar/ })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '실제로 이어지는 활동 기록' })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '동아리 일정 캘린더' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '공지사항' })).toBeVisible()
