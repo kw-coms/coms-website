@@ -9,12 +9,22 @@ const NUMBER_PATTERNS = [
   /^050\d{8,9}$/,
 ]
 
-// Digit groups (or a (group)) joined by at most one hyphen, space or dot; an optional leading +.
-const SHAPE = /^\+?(?:\(\d+\)|\d+)(?:[\s.-]?(?:\(\d+\)|\d+))*$/
+// The backend caps the field at 30 characters.
+const MAX_LENGTH = 30
+
+// Each check below is a single pass over the text: no nested repetition, so a long pasted value cannot stall the page.
+function hasPhoneShape(text: string): boolean {
+  if (text.length === 0 || text.length > MAX_LENGTH) return false
+  if (!/^\+?[\d\s.()-]+$/.test(text)) return false
+  // At most one hyphen, space or dot between groups, and none at either end.
+  if (/[\s.-]{2}/.test(text) || /^\+?[\s.-]/.test(text) || /[\s.-]$/.test(text)) return false
+  // Parentheses only as a whole (group) of digits.
+  return !/[()]/.test(text.replace(/\(\d+\)/g, ''))
+}
 
 export function isValidKoreanPhone(value: string): boolean {
   const text = value.trim()
-  if (!SHAPE.test(text)) return false
+  if (!hasPhoneShape(text)) return false
   let digits = text.replace(/\D/g, '')
   if (text.startsWith('+')) {
     if (!digits.startsWith('82')) return false

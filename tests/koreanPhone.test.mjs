@@ -10,3 +10,12 @@ const bad = ['', '1234', '010-12-5678', '0101234567890', '12345678', '010-abcd-5
 for (const value of good) assert.equal(isValidKoreanPhone(value), true, `should accept ${value}`)
 for (const value of bad) assert.equal(isValidKoreanPhone(value), false, `should reject ${value}`)
 console.log('korean phone ok')
+
+// A long malformed value must be rejected at once: the old pattern backtracked for seconds on this input.
+{
+  const started = performance.now()
+  assert.equal(isValidKoreanPhone('0'.repeat(29) + 'x'), false)
+  assert.equal(isValidKoreanPhone('0'.repeat(5000) + 'x'), false)
+  assert.equal(isValidKoreanPhone('0-'.repeat(3000)), false)
+  assert.ok(performance.now() - started < 50, 'phone validation stays linear on long input')
+}
