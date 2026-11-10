@@ -850,8 +850,8 @@ test('admin exposes a pre-deploy screen check panel', async ({ page }) => {
   await page.goto('/admin')
   await page.getByRole('tab', { name: '화면 점검' }).click()
 
-  await expect(page.getByRole('heading', { name: '배포 전 화면 점검' })).toBeVisible()
-  await expect(page.getByText('Smoke 대상 경로')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '수동 점검 바로가기' })).toBeVisible()
+  await expect(page.getByText('직접 열어볼 화면')).toBeVisible()
   const routePanel = page.getByTestId('screen-check-routes')
   for (const path of ['/', '/activities', '/projects', '/notices', '/login', '/signup', '/recruit']) {
     await expect(routePanel.locator(`a[href="${path}"]`)).toBeVisible()
@@ -2159,19 +2159,19 @@ test('admin tracks recruit applications from overview to status update', async (
   await page.goto('/admin')
 
   await expect(page.getByRole('heading', { name: '운영 요약' })).toBeVisible()
-  await expect(page.getByText('처리 대기 지원')).toBeVisible()
-  await expect(page.getByText('1건')).toBeVisible()
+  await expect(page.getByTestId('admin-todo').getByRole('button', { name: /처리 대기 중인 지원서.*1건/ })).toBeVisible()
 
   await page.getByRole('tab', { name: '모집 관리', exact: true }).click()
   await expect(page.getByRole('heading', { name: '모집 지원 관리' })).toBeVisible()
   await expect(page.getByText('김지원')).toBeVisible()
   await expect(page.getByText('같이 만들고 싶습니다.')).toBeVisible()
 
+  // Saved as soon as the status changes, and the memo when its box loses focus.
   await page.getByLabel('김지원 지원 상태').selectOption('REVIEWING')
+  await expect(page.getByRole('status', { name: '김지원 저장 상태' })).toContainText('저장됨')
   await page.getByLabel('김지원 운영 메모').fill('면담 일정 조율 중')
-  await page.getByRole('button', { name: '김지원 저장' }).click()
-
-  await expect(page.getByText('김지원 지원서를 저장했습니다.')).toBeVisible()
+  await page.getByLabel('김지원 운영 메모').blur()
+  await expect.poll(() => savedNote).toBe('면담 일정 조율 중')
   await expect(page.locator('article').filter({ hasText: '김지원' }).locator('span').filter({ hasText: '검토중' })).toBeVisible()
 })
 
