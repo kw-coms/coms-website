@@ -42,8 +42,15 @@ function StudyBody({ id }: { id: string }) {
   // A link from quick search (/study/c#pointer) arrives before the lesson markup exists, so the browser cannot scroll to it.
   useEffect(() => {
     if (!html || !location.hash || /^#(code-\d+|pg=)/.test(location.hash)) return
+    // A hand-typed hash such as "#%E0%A4%A" is not valid percent-encoding: decodeURIComponent throws. Look the id up as written then.
+    let anchor = location.hash.slice(1)
+    try {
+      anchor = decodeURIComponent(anchor)
+    } catch {
+      // Not decodable.
+    }
     // A frame later: the route's scroll-to-top effect runs after this one when the lesson is already cached.
-    const frame = requestAnimationFrame(() => document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView())
+    const frame = requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView())
     return () => cancelAnimationFrame(frame)
   }, [html, location.hash])
 

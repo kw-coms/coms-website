@@ -145,6 +145,13 @@ test.describe('recruit form (item 5)', () => {
     await expect(page.locator('#email')).toHaveAttribute('aria-describedby', 'email-error')
     await expect(page.locator('#email-error')).toContainText('이메일 형식')
     await expect(page.locator('#consent-error')).toContainText('동의')
+    // The summary lists every invalid field, each a link that focuses it.
+    const summary = page.getByRole('alert').filter({ hasText: '입력을 확인해 주세요' })
+    await expect(summary.getByRole('link')).toHaveCount(3)
+    await summary.getByRole('link', { name: /이메일/ }).click()
+    await expect(page.locator('#email')).toBeFocused()
+    await page.locator('#email').fill('gil@example.com')
+    await expect(summary.getByRole('link')).toHaveCount(2)
   })
 
   test('accepts Korean mobile and landline numbers, rejects others', async ({ page }) => {
@@ -313,4 +320,16 @@ test.describe('no horizontal overflow on a phone, dark', () => {
       expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false)
     })
   }
+})
+
+test('a malformed #hash on a study page does not crash it', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await skipIntro(page)
+  await mockOptionalApis(page)
+  await asMember(page)
+  await page.goto('/study/c#%E0%A4%A')
+  await expect(page.locator('.study-layout')).toBeVisible()
+  await page.waitForTimeout(300)
+  expect(errors).toEqual([])
 })

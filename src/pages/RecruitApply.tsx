@@ -36,6 +36,11 @@ const PRIVACY_NOTICE: [string, string][] = [
   ['보관', '지원서는 합격·불합격이 정해지면 삭제하고, 정해지지 않으면 접수 1년 뒤 삭제합니다. 결정 기록에는 이름·학번·학과가 남고, 합격 기록의 전화번호와 이메일은 1년 뒤 지웁니다. 불합격 기록에는 연락처를 남기지 않습니다.'],
 ]
 
+const FIELD_LABELS: Record<string, string> = {
+  name: '이름', studentId: '학번', department: '학과', otherGrade: '기타 학년', phone: '전화번호', email: '이메일',
+  otherInterest: '기타 관심 분야', motive: '지원 동기', expectation: '기대하는 활동', consent: '개인정보 동의',
+}
+
 type FieldName = 'name' | 'studentId' | 'department' | 'otherGrade' | 'phone' | 'email' | 'otherInterest' | 'motive' | 'expectation' | 'consent'
 type FieldErrors = Partial<Record<FieldName, string>>
 
@@ -392,6 +397,24 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
             </div>
           ) : (
           <form onSubmit={handleSubmit} noValidate className="grid gap-5 bg-[var(--app-surface)] p-6 text-[var(--app-text)] sm:p-8">
+            {Object.keys(fieldErrors).some((name) => fieldErrors[name as FieldName]) && (
+              <div role="alert" data-testid="error-summary" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                <p className="font-semibold">입력을 확인해 주세요.</p>
+                <ul className="mt-1 list-disc pl-5">
+                  {(Object.keys(fieldErrors) as FieldName[]).filter((name) => fieldErrors[name]).map((name) => (
+                    <li key={name}>
+                      <a
+                        href={`#${name}`}
+                        className="underline underline-offset-2"
+                        onClick={(event) => { event.preventDefault(); document.getElementById(name)?.focus() }}
+                      >
+                        {FIELD_LABELS[name]}: {fieldErrors[name]}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <div className="flex size-11 items-center justify-center rounded-lg bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]">
                 <UserRound size={20} />
