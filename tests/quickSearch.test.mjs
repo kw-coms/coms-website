@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { QUICK_GROUPS, initialsOf, moveQuickIndex, quickDate, quickScore, searchQuickItems } from '../src/utils/quickSearch.ts'
 
 const item = (id, group, title, extra = {}) => ({ id, group, title, path: `/${id}`, ...extra })
@@ -84,5 +85,20 @@ assert.equal(moveQuickIndex(5, -1, 0), 0)
 assert.equal(quickDate('2026-10-03T12:00:00'), '10월 3일')
 assert.equal(quickDate('nope'), '')
 assert.equal(quickDate(null), '')
+
+// The page list comes from navGroups, the same data as the header menu, so no menu entry can be missing here.
+const dialog = readFileSync(new URL('../src/components/QuickSearchDialog.tsx', import.meta.url), 'utf8')
+const homeContent = readFileSync(new URL('../src/data/homeContent.ts', import.meta.url), 'utf8')
+assert.match(dialog, /navGroups\.flatMap\(\(group\) => group\.items\)/, 'quick jump builds its pages from navGroups')
+assert.match(dialog, /\.\.\.navItems\.map\(\(item\) => page\(item\.path/, 'every navGroups item becomes a page')
+assert.match(dialog, /navItems\.filter\(\(item\) => item\.auth\)/, 'member-only items carry the lock')
+const navGroupsSource = homeContent.slice(homeContent.indexOf('export const navGroups'))
+// Every route of the old 13-item bar, and every item of the old Records and Tools menus, is still in the menu.
+for (const path of ['/about', '/activities', '/study', '/lab/', '/projects', '/recruit', '/notices', '/sponsors', '/resources', '/community', '/apps']) {
+  assert.ok(navGroupsSource.includes(`path: '${path}'`), `navGroups lists ${path}`)
+}
+for (const id of ['activity-log', 'monthly-calendar', 'activity-events', 'gatherings', 'meet', 'attendance', 'draw']) {
+  assert.ok(navGroupsSource.includes(`fromActivityItem('${id}')`), `navGroups lists ${id}`)
+}
 
 console.log('quick search contract passed')
