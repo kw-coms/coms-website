@@ -27,7 +27,8 @@
 :root[data-perf='lite'] .coms-toast {
 	background: var(--app-surface);
 }
-:root[data-perf='lite'] .apple-mobile-menu-panel,
+:root[data-perf='lite'] .nav-panel,
+:root[data-perf='lite'] .nav-m-overlay,
 :root[data-perf='lite'] .activity-detail-header,
 :root[data-perf='lite'] .apple-product-panel {
 	background: var(--app-surface);
@@ -52,7 +53,7 @@
 :root[data-perf='lite'] .coms-card:hover,
 :root[data-perf='lite'] .coms-toast,
 :root[data-perf='lite'] .coms-to-top,
-:root[data-perf='lite'] .apple-mobile-menu-panel,
+:root[data-perf='lite'] .nav-panel,
 :root[data-perf='lite'] .coms-confirm-card {
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }

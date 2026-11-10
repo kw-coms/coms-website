@@ -83,15 +83,15 @@ test('home page has no serious or critical accessibility violations', async ({ p
   await assertNoSeriousViolations(page)
 })
 
-for (const [button, menu] of [['Records', '기록·일정 메뉴'], ['Tools', '참여 도구 메뉴']]) {
-  test(`desktop ${button} disclosure uses navigation semantics and closes with Escape`, async ({ page }) => {
+for (const button of ['동아리', '배움', '멤버', '도구']) {
+  test(`desktop ${button} group opens the sitemap panel with navigation semantics and closes with Escape`, async ({ page }) => {
     await mockAdminApis(page)
     await page.goto('/')
     const toggle = page.getByRole('button', { name: button, exact: true })
     await expect(toggle).toHaveAttribute('aria-expanded', 'false')
     await toggle.click()
     await expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    const navigation = page.getByRole('navigation', { name: menu })
+    const navigation = page.getByRole('navigation', { name: '전체 메뉴' })
     await expect(navigation).toBeVisible()
     await assertNoSeriousViolations(page)
     await page.keyboard.press('Escape')

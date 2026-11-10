@@ -13,24 +13,24 @@ test.describe('lock icons', () => {
     await skipIntro(page)
     await mockOptionalApis(page)
     await page.goto('/about')
-    const bar = nav(page).locator('nav').first()
-    for (const label of ['Notices', 'Resources', 'Community']) {
-      await expect(bar.getByRole('button', { name: label, exact: false }).filter({ hasText: label }).locator(LOCK)).toHaveCount(1)
+    // The bar itself shows four group names, no lock: the locks are on the entries in the panel.
+    await expect(nav(page).locator(LOCK)).toHaveCount(0)
+    await nav(page).getByRole('button', { name: '멤버', exact: true }).click()
+    const panel = page.locator('#nav-panel')
+    const column = (name) => panel.getByRole('region', { name })
+    for (const label of ['공지', '커뮤니티', '자료실', '활동 기록', '월별 일정', '회지·인기투표']) {
+      await expect(column('멤버').getByRole('button', { name: new RegExp(`^${label}`) }).locator(LOCK), label).toHaveCount(1)
     }
-    await expect(bar.getByRole('button', { name: 'Notices (회원 전용)' })).toBeVisible()
+    await expect(column('멤버').getByRole('button')).toHaveCount(6)
+    await expect(column('멤버').locator(LOCK)).toHaveCount(6)
+    await expect(panel.getByRole('button', { name: '공지 (회원 전용)' })).toBeVisible()
     // Public entries have none.
-    for (const label of ['About', 'Study', 'Projects', 'Apps']) {
-      await expect(bar.getByRole('button', { name: label, exact: true }).locator(LOCK)).toHaveCount(0)
-    }
-    await bar.getByRole('button', { name: 'Records' }).click()
-    const records = page.locator('#records-nav-panel')
-    await expect(records.getByRole('button')).toHaveCount(3)
-    await expect(records.locator(LOCK)).toHaveCount(3)
-    await page.keyboard.press('Escape')
-    await bar.getByRole('button', { name: 'Tools' }).click()
-    const tools = page.locator('#tools-nav-panel')
-    for (const label of ['Gather', 'Meet', 'Attendance']) await expect(tools.getByRole('button', { name: new RegExp(label) }).locator(LOCK)).toHaveCount(1)
-    await expect(tools.getByRole('button', { name: /Draw/ }).locator(LOCK)).toHaveCount(0)
+    for (const name of ['동아리', '배움']) await expect(column(name).locator(LOCK), name).toHaveCount(0)
+    const tools = column('도구')
+    for (const label of ['모임 신청', '일정 조율', '출석 체크']) await expect(tools.getByRole('button', { name: new RegExp(`^${label}`) }).locator(LOCK)).toHaveCount(1)
+    await expect(tools.getByRole('button', { name: /^조 편성/ }).locator(LOCK)).toHaveCount(0)
+    await expect(tools.getByRole('button', { name: /^앱/ }).locator(LOCK)).toHaveCount(0)
+    await expect(tools.locator(LOCK)).toHaveCount(3)
   })
 
   test('mobile menu: locks on member-only entries', async ({ page }) => {
@@ -40,16 +40,17 @@ test.describe('lock icons', () => {
     await page.goto('/about')
     await page.getByRole('button', { name: '메뉴 열기' }).click()
     const menu = page.locator('#mobile-menu')
-    for (const label of ['Notices', 'Resources', 'Community']) {
-      await expect(menu.getByRole('button', { name: new RegExp(`^${label}`) }).locator(LOCK)).toHaveCount(1)
+    const section = (name) => menu.getByRole('region', { name })
+    for (const label of ['공지', '커뮤니티', '자료실']) {
+      await expect(menu.getByRole('button', { name: new RegExp(`^${label}`) }).locator(LOCK), label).toHaveCount(1)
     }
-    await expect(menu.getByRole('button', { name: /^Sponsors/ }).locator(LOCK)).toHaveCount(0)
-    await menu.getByRole('button', { name: /^Records/ }).click()
-    await menu.getByRole('button', { name: /^Tools/ }).click()
-    await expect(page.locator('#mobile-records-panel').locator(LOCK)).toHaveCount(3)
-    const tools = page.locator('#mobile-tools-panel')
+    await expect(menu.getByRole('button', { name: /^후원/ }).locator(LOCK)).toHaveCount(0)
+    await expect(section('멤버').locator(LOCK)).toHaveCount(6)
+    const tools = section('도구')
     await expect(tools.locator(LOCK)).toHaveCount(3)
-    await expect(tools.getByRole('button', { name: /Draw/ }).locator(LOCK)).toHaveCount(0)
+    await expect(tools.getByRole('button', { name: /^조 편성/ }).locator(LOCK)).toHaveCount(0)
+    await expect(section('동아리').locator(LOCK)).toHaveCount(0)
+    await expect(section('배움').locator(LOCK)).toHaveCount(0)
   })
 
   test('quick jump: member pages carry the lock for a guest', async ({ page }) => {
@@ -71,8 +72,8 @@ test.describe('lock icons', () => {
     await page.goto('/about')
     await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible()
     await expect(nav(page).locator(LOCK)).toHaveCount(0)
-    await nav(page).getByRole('button', { name: 'Records' }).click()
-    await expect(page.locator('#records-nav-panel').locator(LOCK)).toHaveCount(0)
+    await nav(page).getByRole('button', { name: '멤버', exact: true }).click()
+    await expect(page.locator('#nav-panel').locator(LOCK)).toHaveCount(0)
     await expect(page.getByText('(회원 전용)')).toHaveCount(0)
   })
 
@@ -81,7 +82,8 @@ test.describe('lock icons', () => {
     await skipIntro(page)
     await mockOptionalApis(page)
     await page.goto('/about')
-    await nav(page).getByRole('button', { name: /Notices/ }).click()
+    await nav(page).getByRole('button', { name: '멤버', exact: true }).click()
+    await page.locator('#nav-panel').getByRole('button', { name: /^공지/ }).click()
     await expectMembersGate(page, '/notices')
   })
 })

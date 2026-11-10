@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarClock, Compass, CornerDownLeft, FolderOpen, Megaphone, MessagesSquare, Search, type LucideIcon } from 'lucide-react'
-import { activitySectionNavItems, navExtraItems, tabs } from '../data/homeContent'
+import { navGroups } from '../data/homeContent'
 import { routeLabel } from '../routes/pageTitles'
 import { listNotices } from '../services/noticeApi'
 import { listCommunityPosts } from '../services/communityApi'
@@ -27,7 +27,8 @@ import MemberLock from './MemberLock'
 type PageItem = QuickItem & { icon?: LucideIcon }
 
 /** Page ids whose route needs a login: they get the lock mark for a guest. */
-const memberPaths = new Set([...navExtraItems, ...activitySectionNavItems].filter((item) => 'auth' in item && item.auth).map((item) => `page:${item.path}`))
+const navItems = navGroups.flatMap((group) => group.items)
+const memberPaths = new Set(navItems.filter((item) => item.auth).map((item) => `page:${item.path}`))
 
 /** A command, not a page: it has no path and starts the site tour. */
 const TOUR_COMMAND_ID = 'command:tour'
@@ -49,15 +50,12 @@ function page(path: string, menuLabel: string, keywords = '', icon?: LucideIcon)
   return { id: `page:${path}`, group: 'page', title, hint: menuLabel === title ? '' : menuLabel, path, keywords, icon }
 }
 
-/** Every place the menus lead to, in their order, then the few that only have a button somewhere. */
+/** Every place the menu leads to (navGroups), in its order, then the few that only have a button somewhere. */
 function buildPages(signedIn: boolean, operations: boolean): PageItem[] {
   const pages: PageItem[] = [
     { id: 'page:/', group: 'page', title: '홈', hint: 'Home', path: '/', keywords: 'main 메인 처음' },
-    // A tab may carry its own path (Lab: a separate app at /lab/); it is the only entry for Circuit Lab.
-    ...tabs.map((tab) => page('path' in tab ? tab.path : `/${tab.id}`, tab.label, tab.id === 'lab' ? `${tab.hint} circuit lab 아두이노` : tab.hint, tab.icon)),
-    ...navExtraItems.map((item) => page(item.path, item.label)),
-    ...activitySectionNavItems.map((item) => page(item.path, item.label, item.hint, item.icon)),
-    page('/apps', 'Apps', '앱 미니앱'),
+    // Lab carries its own path (a separate app at /lab/); it is the only entry for Circuit Lab.
+    ...navItems.map((item) => page(item.path, item.sub, `${item.label} ${item.keywords ?? ''}`, item.icon)),
     page('/recruit-notice', '', 'recruit notice 모집 안내'),
   ]
   if (signedIn) {
