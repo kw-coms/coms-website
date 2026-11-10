@@ -139,6 +139,8 @@ test.describe('a visitor on the home page', () => {
       await page.waitForTimeout(150)
     }
     await at(0.05)
+    // The web font can arrive after first paint and change the line height by a pixel: wait for it.
+    await page.evaluate(() => document.fonts.ready)
     // The title rises into place when it first appears: measure once that entrance has finished.
     await title.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished.catch(() => {}))))
     const y1 = (await title.boundingBox()).y
