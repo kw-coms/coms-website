@@ -1,3 +1,4 @@
+import PageHeading from '../../../components/PageHeading'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../../contexts/useAuth'
@@ -203,7 +204,7 @@ function ProblemBody({ studyId, problem }: { studyId: string; problem: Exercise 
 
   return <main className="study-page ex-page">
     <nav className="ex-back"><Link to={`/study/${studyId}/practice`}>← 실습 문제 목록</Link></nav>
-    <header className="ex-head"><div><p className="ex-eyebrow">실습 문제 · {LEVEL_NAME[problem.level - 1]}</p><h1>{problem.title}</h1><div className="ex-meta"><Dots level={problem.level} />{problem.topics.map((topic) => <span key={topic}>{topic}</span>)}</div></div></header>
+    <header className="ex-head"><div><p className="ex-eyebrow">실습 문제 · {LEVEL_NAME[problem.level - 1]}</p><PageHeading>{problem.title}</PageHeading><div className="ex-meta"><Dots level={problem.level} />{problem.topics.map((topic) => <span key={topic}>{topic}</span>)}</div></div></header>
     <div className="ex-columns">
       <section className="ex-panel ex-statement" aria-label="문제 설명">
         <MiniMarkdown text={problem.statement} />
@@ -242,7 +243,7 @@ export default function ProblemPage() {
   if (!user && authError) return <main className="study-page ex-page"><AuthCheckFailed /></main>
   if (!user) return <main className="study-page ex-page">
     <nav className="ex-back"><Link to={`/study/${id}/practice`}>← 실습 문제 목록</Link></nav>
-    <header className="ex-head"><div><h1>{problem.title}</h1></div></header>
+    <header className="ex-head"><div><PageHeading>{problem.title}</PageHeading></div></header>
     <MembersGate heading="h2" title="문제 풀이는 동아리원만 할 수 있어요">문제 설명과 코드 편집기는 로그인한 동아리원에게만 열려요.</MembersGate>
   </main>
   return <ProblemBody key={problem.id} studyId={id} problem={problem} />

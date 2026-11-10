@@ -151,8 +151,8 @@ function applyPreference(preference: PerfPreference) {
 }
 
 // ---- Frame-rate watchdog ---------------------------------------------------------------------
-// Only while the mode is "auto" and still full. The boot intro is a full-screen canvas, so its
-// own cost must not count: when it is going to play, sample only after it hands over
+// Only while the mode is "auto" and still full. When the title card is going to play,
+// sample the usable home page only after it hands over
 // (SCREEN_ON_EVENT); otherwise sample once the page has loaded. A slow window switches to lite
 // for good (no flapping). Handlers live at module scope so a repeated "auto" never stacks them.
 let watchTimer = 0

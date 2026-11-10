@@ -332,18 +332,18 @@ html.coms-booted:root[data-theme-mode='dark'] .coms-cinema-title {
 }
 
 /* ---- Page enter transition ------------------------------------------- */
-/* Opacity-only: a `transform` (even translateY(0)) lingers after the animation
-   and would become the containing block for any `position: sticky` or `fixed`
-   element inside the page, breaking it. Fading avoids creating that containing block. */
+/* End at none so fixed descendants keep the viewport as their containing block. */
 .coms-page-enter {
-	animation: coms-page-in 360ms ease both;
+	animation: coms-page-in 450ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 @keyframes coms-page-in {
 	0% {
 		opacity: 0;
+		transform: translateY(12px);
 	}
 	100% {
 		opacity: 1;
+		transform: none;
 	}
 }
 

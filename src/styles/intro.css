@@ -1,0 +1,67 @@
+/* One short film leader, then the opening scene takes over. */
+.coms-intro {
+	position: fixed;
+	inset: 0;
+	z-index: 9999;
+	display: grid;
+	place-items: center;
+	background: var(--app-bg);
+	color: var(--app-text);
+	animation: coms-leader-out 1600ms var(--cine-ease) both;
+}
+.coms-intro-frame {
+	width: min(88vw, 54rem);
+	padding: 1.5rem 0;
+	border-block: 1px solid var(--app-hairline-strong);
+	text-align: center;
+}
+.coms-intro-leader {
+	position: relative;
+	display: grid;
+	min-height: min(56vh, 25rem);
+	place-items: center;
+	margin-block: 1.5rem;
+	background:
+		linear-gradient(var(--app-hairline), var(--app-hairline)) center / 1px 100% no-repeat,
+		linear-gradient(var(--app-hairline), var(--app-hairline)) center / 100% 1px no-repeat;
+}
+.coms-intro-ring {
+	position: absolute;
+	width: min(50vw, 21rem);
+	aspect-ratio: 1;
+	border: 1px solid var(--app-hairline-strong);
+	border-radius: 50%;
+	/* Decoration only: a tap on the title must reach the title. */
+	pointer-events: none;
+}
+.coms-intro-title {
+	font-size: clamp(4rem, 18vw, 11rem);
+	font-weight: 800;
+	line-height: 1;
+	letter-spacing: -0.05em;
+}
+.coms-intro-skip {
+	position: absolute;
+	right: 1.25rem;
+	bottom: max(1rem, env(safe-area-inset-bottom));
+	min-height: 44px;
+	padding: 0 1rem;
+	border: 1px solid var(--app-hairline-strong);
+	border-radius: 999px;
+	background: var(--app-bg);
+	color: var(--app-text);
+	font: 500 12px var(--cine-mono);
+	cursor: pointer;
+}
+.coms-intro-skip:focus-visible {
+	outline: 2px solid var(--app-text);
+	outline-offset: 4px;
+}
+@keyframes coms-leader-out {
+	0%, 72% { opacity: 1; }
+	100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.coms-intro { display: none; animation: none; }
+}
+:root[data-perf='lite'] .coms-intro { display: none; animation: none; }

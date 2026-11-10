@@ -1,3 +1,4 @@
+import PageHeading from '../components/PageHeading'
 import type { CSSProperties } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, HeartHandshake, Mail } from 'lucide-react'
@@ -130,7 +131,7 @@ function SponsorHero({ title, subtitle, bannerUrl, counts }: {
     <header>
       <div className="site-head">
         <div>
-          <h1>{title}</h1>
+          <PageHeading>{title}</PageHeading>
           <p className="site-head-lead">{subtitle}</p>
         </div>
         {counts && (

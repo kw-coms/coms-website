@@ -404,6 +404,10 @@
 	text-align: left;
 }
 
+.scene-activities__head .scene-frame--lead {
+	margin-top: clamp(2.5rem, 6vw, 4rem);
+}
+
 .scene-frame__media {
 	display: block;
 	margin: 1.25rem 0 1.5rem;
@@ -478,25 +482,24 @@
 }
 
 @media (min-width: 900px) {
-	.scene-frames {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
-	.scene-frame--wide,
-	.scene-frame--span {
-		grid-column: 1 / -1;
-	}
-	/* An odd item out takes a whole row: its picture beside its words. */
-	.scene-frame--span {
+	.scene-activities__head {
 		display: grid;
-		grid-template-columns: subgrid;
-		align-items: center;
+		grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+		gap: clamp(2rem, 5vw, 5rem);
+		align-items: end;
 	}
-	.scene-frame--span > .scene-frame__media {
-		grid-row: 1 / span 5;
-		margin: 1.25rem 0 0;
+	.scene-frame--lead .scene-frame__media {
+		margin-bottom: 0;
 	}
-	.scene-frame--span > :not(.scene-frame__media) {
-		grid-column: 2;
+	/* Six tracks: three pictures to a row, the text frames two to a row. */
+	.scene-frames {
+		grid-template-columns: repeat(6, minmax(0, 1fr));
+	}
+	.scene-frame--third {
+		grid-column: span 2;
+	}
+	.scene-frame--text {
+		grid-column: span 3;
 	}
 }
 

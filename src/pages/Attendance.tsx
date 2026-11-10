@@ -1,3 +1,4 @@
+import PageHeading from '../components/PageHeading'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -69,8 +70,7 @@ export default function Attendance() {
       <section className="apple-board-shell">
         <div className="apple-board-hero px-5 py-6 sm:px-8 sm:py-8">
           <span className="coms-icon coms-board-icon" aria-hidden="true"><ClipboardCheck size={22} strokeWidth={2} /></span>
-          <p className="apple-eyebrow">Attendance</p>
-          <h1 className="apple-display mt-2 text-4xl sm:text-5xl">출석 체크</h1>
+          <PageHeading className="apple-display mt-2 text-4xl sm:text-5xl">출석 체크</PageHeading>
           <p className="apple-copy mt-3 max-w-2xl text-base sm:text-lg">세미나와 모임에서 화면에 뜬 네 자리 코드를 입력하면 출석이 기록됩니다.</p>
         </div>
 

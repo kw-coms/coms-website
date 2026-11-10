@@ -1,3 +1,4 @@
+import PageHeading from '../components/PageHeading'
 import { useMemo, useState } from 'react'
 import { CheckCircle2, Mail, Search, Send, UserRound } from 'lucide-react'
 import { lookupRecruitStatus, submitRecruitApplication } from '../services/recruitApi'
@@ -304,8 +305,7 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
 
       <section className="apple-board-shell">
         <div className="apple-board-hero px-6 py-8 sm:px-8 sm:py-10">
-          <p className="apple-eyebrow">Recruit</p>
-          <h1 className="apple-display mt-3 text-4xl sm:text-6xl">COM&apos;s 지원하기</h1>
+          <PageHeading className="apple-display mt-3 text-4xl sm:text-6xl">COM&apos;s 지원하기</PageHeading>
           <p className="apple-copy mt-5 max-w-3xl text-base sm:text-lg">
             로그인 없이 지원서를 작성할 수 있습니다. 작성한 내용은 웹페이지에서 바로 COM&apos;s 공식 메일로 제출됩니다.
           </p>

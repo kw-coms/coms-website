@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Check, ChevronUp, Compass, Moon, Sun, X } from 'lucide-react'
-import { accentSwatches, footerLinkGroups } from '../data/homeContent'
-import { DEFAULT_ACCENT, normalizeHex } from '../utils/themeColors'
+import { accentSwatches, navGroups } from '../data/homeContent'
+import { DEFAULT_ACCENT, normalizeHex, scrollToTopInstant } from '../utils/themeColors'
+import { isFullPageLink } from '../utils/fullPageLink'
+import { useAuth } from '../contexts/useAuth'
+import MemberLock from './MemberLock'
 import { startSiteTour } from './tour/tourState'
 import { setPerfPreference, usePerfState, type PerfPreference } from '../utils/perfMode'
 
@@ -47,6 +50,7 @@ export default function AppearanceControl({
   const isDark = themeMode === 'dark'
   const fontSelectValue = selectedFontId ? String(selectedFontId) : ''
   const perf = usePerfState()
+  const { loading: authLoading } = useAuth()
   const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined)
   const dialogId = useId()
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -346,34 +350,41 @@ export default function AppearanceControl({
           </div>
         </div>
 
-        <div className="apple-footer-directory grid grid-cols-3 gap-x-4 gap-y-4 border-b border-[var(--app-hairline)] py-4 text-xs sm:gap-x-10">
-          {footerLinkGroups.map((group) => (
-            <div key={group.title}>
-              <h3 className="font-semibold text-[var(--app-text)]">{group.title}</h3>
+        <nav aria-label="사이트맵" className="apple-footer-directory grid grid-cols-2 gap-x-4 gap-y-8 border-b border-[var(--app-hairline)] py-8 text-sm sm:grid-cols-4 sm:gap-x-10">
+          {navGroups.map((group) => (
+            <div key={group.id}>
+              <h3 className="font-semibold text-[var(--app-text)]">{group.label}</h3>
               <ul className="mt-1">
-                {group.links.map((link) => (
-                  <li key={link.label}>
-                    <a
-                      href={link.href}
-                      target={link.external ? '_blank' : undefined}
-                      rel={link.external ? 'noreferrer' : undefined}
-                      className="coms-footer-link text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                {/* The Lab is a separate app with one entry point, the header menu: it is not repeated here. */}
+                {group.items.filter((item) => !isFullPageLink(item.path)).map((item) => (
+                  <li key={item.id}>
+                    <Link
+                      to={item.path}
+                      aria-disabled={item.auth && authLoading || undefined}
+                      onClick={(event) => {
+                        if (item.auth && authLoading) { event.preventDefault(); return }
+                        scrollToTopInstant()
+                      }}
+                      className="coms-footer-link gap-1.5 rounded-sm text-[var(--app-muted)] hover:text-[var(--app-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-accent)]"
                     >
-                      {link.label}
-                    </a>
+                      {item.label}{item.auth && <MemberLock />}
+                    </Link>
                   </li>
                 ))}
               </ul>
             </div>
           ))}
-        </div>
+        </nav>
+
+        <p className="coms-footer-wordmark" aria-hidden="true">COM's</p>
 
         <div className="apple-footer-bottom flex flex-col gap-1 pt-3 text-xs sm:flex-row sm:items-center sm:justify-between">
           <p>Copyright © {new Date().getFullYear()} KW COM&apos;s. All rights reserved.</p>
           <div className="flex flex-wrap gap-x-4">
-            <a href="/notices" className="coms-footer-link hover:text-[var(--app-text)]">Notices</a>
-            <a href="/community" className="coms-footer-link hover:text-[var(--app-text)]">Community</a>
-            <a href="mailto:kwcoms69@gmail.com" className="coms-footer-link hover:text-[var(--app-text)]">Contact</a>
+            <a href="https://www.instagram.com/kw_coms" target="_blank" rel="noreferrer" className="coms-footer-link hover:text-[var(--app-text)]">Instagram</a>
+            <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className="coms-footer-link hover:text-[var(--app-text)]">GitHub</a>
+            <a href="https://www.youtube.com/@kw_coms" target="_blank" rel="noreferrer" className="coms-footer-link hover:text-[var(--app-text)]">YouTube</a>
+            <a href="mailto:kwcoms69@gmail.com" className="coms-footer-link hover:text-[var(--app-text)]">메일</a>
           </div>
         </div>
       </div>

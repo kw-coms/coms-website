@@ -3,6 +3,61 @@
    public pages read as one site. Only --app-* tokens: light, dark and every accent work. */
 
 /* ---- Story pages (About, Activities, Projects) -------------------------------- */
+.page-heading {
+	min-width: 0;
+}
+.page-crumb {
+	margin: 0 0 1rem;
+}
+.page-heading > h1.page-title,
+.study-page .hero h1.page-title {
+	margin-top: 0;
+	font-size: clamp(2.25rem, 4.6vw, 4rem);
+	font-weight: 700;
+	line-height: 1.15;
+	letter-spacing: -0.03em;
+	color: var(--app-text);
+	overflow-wrap: anywhere;
+	text-wrap: pretty;
+}
+.page-heading > h1.apple-detail-title {
+	font-size: calc(clamp(2.25rem, 4.6vw, 4rem) * var(--apple-title-fit, 1));
+}
+.page-heading > h1.flex .cine-m > span {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+.page-heading + p,
+.page-heading + .apple-copy {
+	color: var(--app-muted);
+	line-height: 1.6;
+}
+
+/* One surface per inner card, including hover and the lite overrides. */
+.coms-inner-page :is(.coms-card, .coms-timeline-card, .apple-product-panel, .apple-soft-panel, .apple-board-shell, .study-card, .site-stats) {
+	border: 0 !important;
+	background: var(--app-surface-soft) !important;
+	box-shadow: none !important;
+	backdrop-filter: none;
+	transition-property: transform, opacity;
+}
+.coms-inner-page :is(.coms-card, .apple-product-panel, .apple-soft-panel, .study-card):hover {
+	box-shadow: none !important;
+}
+.coms-inner-page :is(.coms-card, .coms-timeline-card, .apple-product-panel, .apple-soft-panel, .study-card):focus-visible {
+	outline: 2px solid var(--app-text);
+	outline-offset: -2px;
+}
+.coms-inner-page :is(.coms-visual, .coms-mini) *,
+.coms-inner-page :is(.coms-visual, .coms-mini) *::before,
+.coms-inner-page :is(.coms-visual, .coms-mini) *::after {
+	animation: none;
+}
+:root .coms-inner-page :is(.coms-cinema-intrologo, .coms-cinema-title) {
+	animation: none;
+}
+
 .coms-detail .detail-head {
 	max-width: 42rem;
 }

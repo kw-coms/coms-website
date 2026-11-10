@@ -1,3 +1,4 @@
+import PageHeading from '../../components/PageHeading'
 import { useNavigate, useParams } from 'react-router-dom'
 import { displayStudentId } from '../../utils/roleAccess'
 import { useQuery } from '@tanstack/react-query'
@@ -68,9 +69,8 @@ export default function CommunityMemberProfile({ onBack }: { onBack: () => void 
         </BoardComposeBar>
 
         <div className="apple-board-hero px-4 py-6 sm:px-8 sm:py-8">
-          <p className="apple-eyebrow">Member</p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <h1 className="apple-display break-words text-3xl sm:text-4xl">{memberName}</h1>
+            <PageHeading className="apple-display break-words text-3xl sm:text-4xl">{memberName}</PageHeading>
             {reputation && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] px-3 py-1.5 text-sm font-black text-[var(--app-accent-text)]">
                 <Award size={15} />

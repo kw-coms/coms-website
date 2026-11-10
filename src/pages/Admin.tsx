@@ -1,3 +1,4 @@
+import PageHeading from '../components/PageHeading'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { listRecruitApplications } from '../services/adminApi'
@@ -151,7 +152,7 @@ export default function Admin({ onBack }: { onBack: () => void }) {
           <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[var(--theme-body-muted)]/80">
             {ROLE_LABELS[user?.role] || 'Officer'}
           </p>
-          <h1 className="mt-2 mb-6 text-2xl font-bold sm:text-3xl">운영 패널</h1>
+          <PageHeading className="mt-2 mb-6 text-2xl font-bold sm:text-3xl">운영 패널</PageHeading>
 
           <div className="-mx-1 mb-6 overflow-x-auto touch-pan-x pb-1">
             <div className="flex min-w-max gap-2 px-1" role="tablist" aria-label="관리자 패널 섹션">

@@ -6,7 +6,7 @@ import { asMember, mockAdminApis, mockOptionalApis } from './visualSupport.js'
 // issues that we surface in the attachment but do not gate on yet.
 const BLOCKING_IMPACTS = ['serious', 'critical']
 
-// The route-enter fade (.coms-page-enter) animates opacity for 360ms; if axe
+// The route entrance (.coms-page-enter) animates opacity for 450ms; if axe
 // scans mid-fade it measures semi-transparent text against the backdrop and
 // reports bogus color-contrast violations. The app disables the fade under
 // prefers-reduced-motion, so run the scans in that mode for determinism.
@@ -17,7 +17,7 @@ test.describe('first-visit intro', () => {
 
   test('visible skip control is available to assistive technology', async ({ page }) => {
     await mockAdminApis(page)
-    await page.goto('/')
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
     const skip = page.getByRole('button', { name: /skip/i })
     await expect(skip).toBeVisible()
     await skip.click()

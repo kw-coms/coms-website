@@ -1,3 +1,4 @@
+import PageHeading from '../../components/PageHeading'
 import { useState } from 'react'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { useNavigate } from 'react-router-dom'
@@ -63,7 +64,7 @@ function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
   const isAdmin = canManageContent(permissions)
   // On its own page (/monthly-calendar) this is the only page-level heading, so it is the
   // <h1>; embedded in the home page (compact), which has its own <h1>, it stays an <h2>.
-  const Heading = compact ? 'h2' : 'h1'
+  const Heading = compact ? 'h2' : PageHeading
   const selectedDayEvents = selectedDay ? eventsByDay[selectedDay] || [] : []
   const activeSelectedEventId = selectedDayEvents.some((event) => event.id === selectedEventId) ? selectedEventId : null
   const monthSummary = buildMonthEventSummary({
@@ -255,7 +256,7 @@ function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <span className="coms-icon coms-board-icon" aria-hidden="true"><CalendarDays size={22} strokeWidth={2} /></span>
-            <p className="apple-eyebrow">Monthly calendar</p>
+            {compact && <p className="apple-eyebrow">Monthly calendar</p>}
             <Heading className="apple-display mt-3 text-4xl sm:text-5xl">동아리 일정 캘린더</Heading>
             <p className="apple-copy mt-4 max-w-2xl text-lg">
               공지사항 목록만으로 놓치기 쉬운 정기 회의, 세미나, 스터디, 발표, 모집 마감, MT/행사를 월별 흐름으로 확인합니다.

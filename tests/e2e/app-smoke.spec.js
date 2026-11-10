@@ -211,8 +211,7 @@ test.describe('public route smoke', () => {
   }
 })
 
-// The boot intro covers the home page for about two seconds. A visitor whose system asks for
-// reduced motion gets it too, in its calm form, and in both cases it must let go of the page.
+// The film leader lasts at most 1.8s; reduced motion bypasses it entirely.
 // What it lets go of is the finished home screen: the wordmark and the actions are there
 // without any scrolling (the hero used to open on a giant logo that had to be scrolled away).
 test.describe('home boot intro', () => {
@@ -222,11 +221,16 @@ test.describe('home boot intro', () => {
 
       test('plays once and hands over the finished home screen', async ({ page }) => {
         await mockOptionalApis(page)
-        await page.goto('/')
+        await page.goto('/', { waitUntil: 'domcontentloaded' })
 
         const skip = page.getByRole('button', { name: 'skip ›' })
-        await expect(skip).toBeVisible()
-        await expect(skip).toBeHidden({ timeout: 8000 })
+        if (reducedMotion === 'reduce') await expect(skip).toHaveCount(0)
+        else {
+          await expect(skip).toBeVisible()
+          await expect(page.locator('[data-coms-intro]')).toContainText("COM's")
+          await expect(skip).toBeHidden({ timeout: 1800 })
+          expect(await page.evaluate(() => sessionStorage.getItem('coms.intro.played:v1'))).toBe('1')
+        }
         await expect(page.locator('html')).not.toHaveClass(/coms-boot/)
         await expect(page.locator('h1')).toContainText("COM's")
         await expect(page.locator('h1')).toBeInViewport()
@@ -244,6 +248,29 @@ test.describe('home boot intro', () => {
         await expect(page.locator('h1')).toContainText("COM's")
         await expect(skip).toHaveCount(0)
       })
+    })
+  }
+
+  test('lite mode never covers the home page on a fresh tab', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('kwcoms-perf-mode:v1', 'lite'))
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('[data-coms-intro]')).toHaveCount(0)
+    await expect(page.locator('h1')).toHaveText("COM's")
+    await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
+  })
+
+  for (const input of ['button', 'keyboard', 'wheel', 'touch', 'card']) {
+    test(`${input} skips the title card and restores scrolling`, async ({ page }) => {
+      await page.goto('/', { waitUntil: 'domcontentloaded' })
+      const intro = page.locator('[data-coms-intro]')
+      await expect(intro).toBeVisible()
+      if (input === 'button') await intro.getByRole('button', { name: 'skip ›', exact: true }).click()
+      else if (input === 'keyboard') await page.keyboard.press('Escape')
+      else if (input === 'wheel') await page.mouse.wheel(0, 1)
+      else if (input === 'touch') await intro.dispatchEvent('touchstart')
+      else await intro.locator('.coms-intro-title').click()
+      await expect(intro).toHaveCount(0)
+      await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
     })
   }
 })

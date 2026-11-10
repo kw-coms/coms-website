@@ -8,31 +8,35 @@ const SHOWCASE_ART = [FlowMini, BuildMini, JoinMini]
 
 const code = (n: number) => `A-${String(n).padStart(2, '0')}`
 
-// Scene 3. The routine as a vertical run of wide frames, two to a row on a wide screen.
+// Scene 3. The routine as rows of frames: three pictures to a row, then the details two to a row.
 export default function Activities({ index, actions, onOpen }: { index: number; actions: SceneActions; onOpen: (id: string) => void }) {
   const story = sectionStories.activities
 
   return (
     <section id="activities" className="scene scene-activities">
       <div className="scene-inner">
-        <Slate index={index} name="Activities" />
-        <CineTitle text={story.title} />
-        <p className="scene-lede" data-cine style={cssVars({ '--i': 2 })}>{story.body}</p>
-        <SceneActionRow actions={actions} />
-        <SceneStats id="activities" />
-
-        <div className="scene-frames">
-          <article className="scene-frame scene-frame--wide">
+        <div className="scene-activities__head">
+          <div>
+            <Slate index={index} name="Activities" />
+            <CineTitle text={story.title} />
+            <p className="scene-lede" data-cine style={cssVars({ '--i': 2 })}>{story.body}</p>
+            <SceneActionRow actions={actions} />
+          </div>
+          {/* The first frame sits beside the words it illustrates. */}
+          <article className="scene-frame scene-frame--lead">
             <p className="cine-hud scene-frame__code" data-cine>{code(1)} · {visualDetails.activities.title}</p>
             <div className="scene-frame__media cine-wipe">
               <LearningStackVisual {...visualDetails.activities} />
             </div>
           </article>
+        </div>
+        <SceneStats id="activities" />
 
+        <div className="scene-frames">
           {showcaseItems.map((item, i) => {
             const Art = SHOWCASE_ART[i % SHOWCASE_ART.length]
             return (
-              <article key={item.title} className={`scene-frame scene-frame--link ${i === showcaseItems.length - 1 && i % 2 === 0 ? 'scene-frame--span' : ''}`}>
+              <article key={item.title} className="scene-frame scene-frame--link scene-frame--third">
                 <div className="scene-frame__media cine-wipe">
                   <Art />
                 </div>

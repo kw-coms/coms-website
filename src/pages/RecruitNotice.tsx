@@ -1,3 +1,4 @@
+import PageHeading from '../components/PageHeading'
 import { ArrowLeft, CalendarDays, CheckCircle2, Mail, PenLine, Rocket, Users, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { getPublicSiteSettings } from '../services/siteSettingsApi'
@@ -48,8 +49,7 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
       <section className="apple-board-shell">
         <div className="apple-board-hero flex items-start justify-between gap-4 px-6 py-8 sm:px-8 sm:py-10">
           <div>
-            <p className="apple-eyebrow">Recruit Notice</p>
-            <h1 className="apple-display mt-4 text-4xl sm:text-6xl">COM&apos;s 신입 부원 모집 공지</h1>
+            <PageHeading className="apple-display mt-4 text-4xl sm:text-6xl">COM&apos;s 신입 부원 모집 공지</PageHeading>
             <p className="apple-copy mt-5 max-w-3xl text-base sm:text-lg">
               {siteSettings?.recruitmentStatus || '광운대학교 중앙 컴퓨터 학술동아리에서 함께 배울 새 멤버를 기다립니다.'}
             </p>

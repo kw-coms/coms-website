@@ -215,16 +215,24 @@
 }
 
 /* ---- Footer ---------------------------------------------------------------- */
-/* A compact footer: note, one "화면 설정" control, link directory. The settings open in a popover
-   (desktop) or a bottom sheet (phones) instead of sitting in the page; the dot grid stays.
+/* The settings open in a popover (desktop) or a bottom sheet (phones).
    The footer must stay an ordinary block: no position, mask, opacity or transform on it. It comes
    after the page in the document, so anything that put it on its own layer would paint it over the
    page's dialogs (and take their clicks) wherever they overlap. Only the open popover is positioned. */
 .apple-footer-surface {
-	background-image:
-		linear-gradient(180deg, var(--app-surface-soft) 30%, transparent 100%),
-		radial-gradient(circle, color-mix(in srgb, var(--app-text) 14%, transparent) 1px, transparent 1.4px);
-	background-size: auto, 23px 23px;
+	background-image: none;
+}
+
+.coms-footer-wordmark {
+	margin: 1.5rem 0 0;
+	font-size: clamp(5rem, 19vw, 15rem);
+	font-weight: 800;
+	line-height: 1.05;
+	letter-spacing: -0.05em;
+	text-align: center;
+	color: transparent;
+	-webkit-text-stroke: 1px var(--app-muted);
+	user-select: none;
 }
 
 .coms-footer-link {

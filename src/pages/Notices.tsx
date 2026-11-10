@@ -1,3 +1,4 @@
+import PageHeading from '../components/PageHeading'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify'
@@ -383,8 +384,7 @@ export default function Notices() {
           <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
             <div className="min-w-0">
               <span className="coms-icon coms-board-icon" aria-hidden="true"><Megaphone size={22} strokeWidth={2} /></span>
-              <p className="apple-eyebrow">Notices</p>
-              <h1 className="apple-display mt-2 text-4xl sm:text-5xl">{headerTitle}</h1>
+              <PageHeading className="apple-display mt-2 text-4xl sm:text-5xl">{headerTitle}</PageHeading>
               <p className="apple-copy mt-3 max-w-xl text-base sm:text-lg">공지, 홍보, 소모임, 취업공고를 한 화면에서 빠르게 확인하고 검색합니다.</p>
             </div>
             {(!urlId && visibleMode === 'list') ? (

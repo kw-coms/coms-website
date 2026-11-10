@@ -1,3 +1,4 @@
+import PageHeading from '../components/PageHeading'
 import { useState } from 'react'
 import { CheckCircle2, Mail, Send, UserRound } from 'lucide-react'
 import { signupUser } from '../services/authApi'
@@ -306,8 +307,7 @@ export default function Signup({ onBack }: { onBack: () => void }) {
 
       <section className="apple-board-shell">
         <div className="apple-board-hero px-6 py-8 sm:px-8 sm:py-10" data-reveal style={{ '--reveal-delay': '80ms' } as React.CSSProperties}>
-          <p className="apple-eyebrow">Signup</p>
-          <h1 className="apple-display mt-3 text-4xl sm:text-6xl">COM&apos;s 회원가입</h1>
+          <PageHeading className="apple-display mt-3 text-4xl sm:text-6xl">COM&apos;s 회원가입</PageHeading>
           <p className="apple-copy mt-5 max-w-3xl text-base sm:text-lg">
             지원하기와 같은 흐름으로 가입 정보를 작성합니다. 재학생은 명부 확인과 관심 분야를 함께 등록하고, 졸업생은 명부 인증 정보를 확인한 뒤 이메일 인증으로 계정을 생성합니다.
           </p>

@@ -1,3 +1,4 @@
+import PageHeading from '../../../components/PageHeading'
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import NotFoundPage from '../../../components/NotFoundPage'
@@ -50,7 +51,7 @@ export default function PracticeListPage() {
   const visible = problems.filter((p) => (!chapter || chapterOf(p, id) === chapter) && (!topic || p.topics.includes(topic)) && (!level || p.level === Number(level)) && (!status || stateOf(progress[p.id]).key === status))
   return <div className="study-page ex-page"><div className="ex-container">
     <Link to={`/study/${id}`}>← {study.title} 자료</Link>
-    <header className="ex-head"><div className="ex-head-copy"><h1>{study.title} 실습 문제</h1>
+    <header className="ex-head"><div className="ex-head-copy"><PageHeading>{study.title} 실습 문제</PageHeading>
       <p>{id === 'arduino' ? 'Circuit Lab에서 회로를 만들고 미션에 도전해 보세요.' : '직접 코드를 작성하고, 테스트를 통과하며 한 걸음씩 익혀 보세요.'}</p></div>
       {id !== 'arduino' && <div className="ex-progress"><label htmlFor="exercise-progress"><b>{solved}</b> / {problems.length} 해결</label><progress id="exercise-progress" value={solved} max={problems.length || 1} /></div>}
     </header>

@@ -1,3 +1,4 @@
+import PageHeading from '../components/PageHeading'
 import { useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -49,8 +50,7 @@ function PageHead({ title, copy, children }: { title: string; copy?: string | nu
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div className="min-w-0">
           <span className="coms-icon coms-board-icon" aria-hidden="true"><UserPlus size={22} strokeWidth={2} /></span>
-          <p className="apple-eyebrow">Gather</p>
-          <h1 className="apple-display mt-2 break-words text-4xl sm:text-5xl">{title}</h1>
+          <PageHeading className="apple-display mt-2 break-words text-4xl sm:text-5xl">{title}</PageHeading>
           {copy && <p className="apple-copy mt-3 max-w-2xl whitespace-pre-line text-base sm:text-lg">{copy}</p>}
         </div>
         {children}

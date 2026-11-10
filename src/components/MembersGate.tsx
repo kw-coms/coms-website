@@ -1,3 +1,4 @@
+import PageHeading from './PageHeading'
 import { Lock } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
@@ -20,7 +21,8 @@ const FALLBACK_LINE = '이 페이지는 로그인한 동아리원에게만 열�
  * Guide card for a guest on a members-only page: what it is, and the two ways forward.
  * `title` and `children` override the per-section copy (the study pages use their own). `heading` is h1 unless the page already has its own h1.
  */
-export default function MembersGate({ title = '동아리원 전용 공간이에요', heading: Heading = 'h1', children }: { title?: string; heading?: 'h1' | 'h2'; children?: React.ReactNode }) {
+export default function MembersGate({ title = '동아리원 전용 공간이에요', heading = 'h1', children }: { title?: string; heading?: 'h1' | 'h2'; children?: React.ReactNode }) {
+  const Heading = heading === 'h1' ? PageHeading : 'h2'
   const location = useLocation()
   const line = SECTION_LINES.find(([pattern]) => pattern.test(location.pathname))?.[1] ?? FALLBACK_LINE
   return (
@@ -42,7 +44,7 @@ export function AuthCheckFailed() {
   const { retryAuth } = useAuth()
   return (
     <div role="alert" className="mx-auto my-10 flex max-w-xl flex-col items-center gap-3 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] p-8 text-center">
-      <h1 className="text-base font-bold text-[var(--app-text)]">로그인 상태를 확인하지 못했어요</h1>
+      <PageHeading className="text-base font-bold text-[var(--app-text)]">로그인 상태를 확인하지 못했어요</PageHeading>
       <button type="button" onClick={() => void retryAuth()} className="apple-action-secondary inline-flex min-h-10 items-center justify-center px-5 py-2 text-sm">다시 시도</button>
     </div>
   )

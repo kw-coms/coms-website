@@ -397,36 +397,6 @@ export const accentSwatches = [
   { name: 'Violet', value: '#8e5cf7' },
 ]
 
-export const footerLinkGroups = [
-  {
-    title: "COM's",
-    links: [
-      { label: 'About', href: '/about' },
-      { label: 'Activities', href: '/activities' },
-      { label: 'Projects', href: '/projects' },
-      { label: 'Recruit', href: '/recruit' },
-    ],
-  },
-  {
-    title: 'Explore',
-    links: [
-      { label: 'Notices', href: '/notices' },
-      { label: 'Community', href: '/community' },
-      { label: 'Archive', href: '/resources' },
-      { label: 'Admin', href: '/admin' },
-    ],
-  },
-  {
-    title: 'Connect',
-    links: [
-      { label: 'Instagram', href: 'https://www.instagram.com/kw_coms', external: true },
-      { label: 'GitHub', href: 'https://github.com/kw-coms', external: true },
-      { label: 'YouTube', href: 'https://www.youtube.com/@kw_coms', external: true },
-      { label: 'Mail', href: 'mailto:kwcoms69@gmail.com' },
-    ],
-  },
-]
-
 // The home tools row lists these same items; keep them ordered group by group ('records' then
 // 'tools') so the row reads in the order of the menu. navGroups below builds the menu from them.
 export const activitySectionNavItems = [

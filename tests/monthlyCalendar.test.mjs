@@ -185,7 +185,7 @@ assert.match(
 )
 assert.match(
   calendarSection,
-  /const Heading = compact \? 'h2' : 'h1'[\s\S]*?<Heading [^>]*>동아리 일정 캘린더<\/Heading>/,
+  /const Heading = compact \? 'h2' : PageHeading[\s\S]*?<Heading [^>]*>동아리 일정 캘린더<\/Heading>/,
   '/monthly-calendar needs an <h1>; the compact block on the home page stays an <h2>',
 )
 

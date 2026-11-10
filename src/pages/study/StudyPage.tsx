@@ -1,3 +1,4 @@
+import PageHeading from '../../components/PageHeading'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
@@ -5,6 +6,8 @@ import NotFoundPage from '../../components/NotFoundPage'
 import { findStudy } from './studies'
 import { loadStudyChapters, loadStudyHtml } from './studyContent'
 import { useAuth } from '../../contexts/useAuth'
+import { useCineReveal } from '../../hooks/useSceneProgress'
+import { routeLabel } from '../../routes/pageTitles'
 import MembersGate, { AuthCheckFailed } from '../../components/MembersGate'
 import { initStudyPage } from './studyDemos'
 import { initPlayground } from './playground'
@@ -22,6 +25,7 @@ function StudyBody({ id }: { id: string }) {
   const navigate = useNavigate()
   const location = useLocation()
   const html = loaded?.id === id ? loaded.html : null
+  useCineReveal(html)
   // A fresh { __html } object on every render makes React 19 assign innerHTML again, which would wipe what initStudyPage added (demos, circuits).
   const markup = useMemo(() => (html ? { __html: html } : null), [html])
 
@@ -35,6 +39,11 @@ function StudyBody({ id }: { id: string }) {
   }, [id])
 
   useEffect(() => (html && layoutRef.current ? initStudyPage(layoutRef.current, study.progressKey) : undefined), [html, study.progressKey])
+
+  useEffect(() => {
+    const crumb = layoutRef.current?.querySelector('.page-crumb')
+    if (crumb) crumb.textContent = `COM'S / ${routeLabel(location.pathname)}`
+  }, [html, location.pathname])
 
   // The playground calls the latest login handler without being re-created when the router state changes.
   const goLogin = useRef<(hash: string) => void>(() => {})
@@ -57,7 +66,7 @@ function StudyBody({ id }: { id: string }) {
   }, [html, id, navigate])
 
   return (
-    <div className="study-page">
+    <div className="study-page cine-root">
       <div className="study-back">
         <Link to="/study"><ArrowLeft size={14} aria-hidden="true" /> 스터디 목록</Link>
       </div>
@@ -86,7 +95,7 @@ function StudyGuest({ id }: { id: string }) {
         <Link to="/study"><ArrowLeft size={14} aria-hidden="true" /> 스터디 목록</Link>
       </div>
       <div className="mx-auto max-w-2xl px-4 py-6">
-        <h1 className="text-3xl font-bold text-[var(--app-text)]">{study.title}</h1>
+        <PageHeading className="text-3xl font-bold text-[var(--app-text)]">{study.title}</PageHeading>
         <p className="mt-1 text-sm text-[var(--app-muted)]">{study.subtitle}</p>
         {chapters && chapters.length > 0 && (
           <ol aria-label="목차" className="mt-6 list-none space-y-1.5 p-0">

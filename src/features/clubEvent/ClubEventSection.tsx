@@ -1,3 +1,4 @@
+import PageHeading from '../../components/PageHeading'
 import { useState } from 'react'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { useNavigate } from 'react-router-dom'
@@ -217,8 +218,7 @@ function ClubEventSection() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                   <div className="min-w-0">
                     <span className="coms-icon coms-board-icon" aria-hidden="true"><Trophy size={22} strokeWidth={2} /></span>
-                    <p className="apple-eyebrow">Event</p>
-                    <h1 className="apple-display mt-3 break-words text-4xl sm:text-6xl">이벤트</h1>
+                    <PageHeading className="apple-display mt-3 break-words text-4xl sm:text-6xl">이벤트</PageHeading>
                     <p className="apple-copy mt-4 max-w-2xl text-base sm:text-lg">회지, 작품, 활동 결과물을 모아 투표하고 랭킹으로 확인합니다. 등록된 실제 이벤트만 보여줍니다.</p>
                   </div>
                   {isAdmin && !isLocked && (
@@ -284,7 +284,7 @@ function ClubEventSection() {
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-[var(--app-muted)]">
                     <span className="text-[var(--app-accent-text)]">Event</span>
                     <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
-                    <h1 className="text-xs font-semibold text-[var(--app-muted)]">이벤트 열기</h1>
+                    <PageHeading className="text-xs font-semibold text-[var(--app-muted)]">이벤트 열기</PageHeading>
                   </div>
                   <button type="button" onClick={() => setMode('list')} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
                     <ArrowLeft size={14} />

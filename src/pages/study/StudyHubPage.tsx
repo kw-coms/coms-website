@@ -1,3 +1,4 @@
+import PageHeading from '../../components/PageHeading'
 import { lazy, Suspense, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CircuitBoard, Coffee } from 'lucide-react'
@@ -49,7 +50,7 @@ export default function StudyHubPage() {
       <div className="study-hub-inner">
         <div className="study-hub-head">
           <div className="study-hub-title">
-            <h1>스터디 자료</h1>
+            <PageHeading>스터디 자료</PageHeading>
             <p className="study-hub-lead">관심 있는 주제를 골라 순서대로 따라와 보세요. 진도는 이 브라우저에 저장됩니다.</p>
           </div>
           <Suspense fallback={<div className="study-overview" data-reserve={hasProgress || undefined} aria-hidden="true" />}><StudyHubOverview reserveResume={hasProgress} /></Suspense>
