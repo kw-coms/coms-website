@@ -4,18 +4,8 @@ import { asMember, mockOptionalApis, trackRequests } from './visualSupport.js'
 // Fixes from the public-pages audit: recruit facts, activities for guests, 404, recruit form, next steps,
 // quick search over study content, study hub weight.
 
-const SHOTS = '/private/tmp/claude-501/-Users-choi-Documents-project/e43260bf-49ca-468b-9a62-7fea75ac4e6a/scratchpad/fix-public'
 const skipIntro = (page) => page.addInitScript(() => window.sessionStorage.setItem('coms.intro.played:v1', '1'))
 const setTheme = (page, theme) => page.addInitScript((mode) => { try { localStorage.setItem('kwcoms-theme-mode:v2', mode) } catch { /* storage blocked */ } }, theme)
-
-async function shot(page, name) {
-  if (process.env.PUBLIC_SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true })
-}
-
-const VIEWS = [
-  { name: '1440', size: { width: 1440, height: 900 } },
-  { name: '390', size: { width: 390, height: 844 } },
-]
 
 test.describe('recruit facts (item 1)', () => {
   for (const path of ['/recruit', '/recruit-notice']) {
@@ -102,24 +92,6 @@ test.describe('/activities for guests (items 2, 3)', () => {
     expect(photoRequests).toEqual([])
   })
 
-  for (const theme of ['light', 'dark']) {
-    for (const view of VIEWS) {
-      test(`screenshot ${theme} ${view.name}`, async ({ page }) => {
-        await page.setViewportSize(view.size)
-        await setTheme(page, theme)
-        await mockOptionalApis(page)
-        await page.goto('/activities')
-        await expect(page.getByTestId('act-photo-notice')).toBeVisible()
-        await shot(page, `activities-${theme}-${view.name}`)
-        await page.goto('/recruit')
-        await expect(page.getByTestId('recruit-facts')).toBeVisible()
-        await shot(page, `recruit-${theme}-${view.name}`)
-        await page.goto('/recruit-notice')
-        await expect(page.getByTestId('recruit-facts')).toBeVisible()
-        await shot(page, `recruit-notice-${theme}-${view.name}`)
-      })
-    }
-  }
 })
 
 test.describe('404 page (item 4)', () => {
@@ -140,19 +112,6 @@ test.describe('404 page (item 4)', () => {
     await expect(page.locator('meta[name="robots"]')).toHaveCount(0)
   })
 
-  for (const theme of ['light', 'dark']) {
-    for (const view of VIEWS) {
-      test(`screenshot 404 ${theme} ${view.name}`, async ({ page }) => {
-        await page.setViewportSize(view.size)
-        await skipIntro(page)
-        await setTheme(page, theme)
-        await mockOptionalApis(page)
-        await page.goto('/no-such-page')
-        await expect(page.getByRole('navigation', { name: '이런 페이지는 어때요' })).toBeVisible()
-        await shot(page, `404-${theme}-${view.name}`)
-      })
-    }
-  }
 })
 
 test.describe('recruit form (item 5)', () => {
@@ -198,7 +157,7 @@ test.describe('recruit form (item 5)', () => {
       await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
       await expect(page.locator('#phone-error'), bad).toBeVisible()
     }
-    for (const good of ['01012345678', '010-1234-5678', '011-123-4567', '02-123-4567', '02-1234-5678', '031-123-4567']) {
+    for (const good of ['01012345678', '010-1234-5678', '011-123-4567', '02-123-4567', '02-1234-5678', '031-123-4567', '+82-10-1234-5678', '(02) 123-4567', '070-1234-5678', '0505-123-4567']) {
       await page.locator('#phone').fill(good)
       await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
       await expect(page.locator('#phone-error'), good).toHaveCount(0)
@@ -211,7 +170,8 @@ test.describe('recruit form (item 5)', () => {
     await open(page)
     const notice = page.getByText('개인정보 수집·이용 안내').locator('..')
     for (const item of ['이름', '학번', '전화번호', '이메일', '지원 동기']) await expect(notice).toContainText(item)
-    await expect(notice).toContainText('삭제')
+    for (const line of ['접속 IP', '동아리 명부', '운영진만', '동아리 공식 메일', '1년 뒤 삭제', '불합격 기록에는 연락처를 남기지 않습니다']) await expect(notice).toContainText(line)
+    await expect(notice.locator('dt')).toHaveText(['수집 항목', '이용 목적', '열람', '보관'])
     await fillValid(page)
     await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
     await expect(page.locator('#consent')).toBeFocused()
@@ -227,7 +187,9 @@ test.describe('recruit form (item 5)', () => {
     await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
     const done = page.getByRole('status').filter({ hasText: '지원서를 접수했어요' })
     await expect(done).toContainText('gil@example.com')
-    await expect(done).toContainText('확인 메일')
+    await expect(done).toContainText('확인 메일이 갈 수 있어요')
+    await expect(done).not.toContainText('보냈')
+    await expect(done).toContainText('지원 현황 확인')
     await expect(page.getByRole('button', { name: '지원서 제출하기' })).toHaveCount(0)
     expect(bodies).toHaveLength(1)
     await done.getByRole('button', { name: '다른 지원서 작성' }).click()
@@ -236,28 +198,6 @@ test.describe('recruit form (item 5)', () => {
     await expect(page.getByRole('button', { name: '지원서 제출하기' })).toBeVisible()
   })
 
-  for (const theme of ['light', 'dark']) {
-    for (const view of VIEWS) {
-      test(`screenshot errors and confirmation ${theme} ${view.name}`, async ({ page }) => {
-        await page.setViewportSize(view.size)
-        await setTheme(page, theme)
-        await page.route('**/api/recruit/apply', (route) => route.fulfill({ status: 201, json: {} }))
-        await open(page)
-        await fillValid(page)
-        await page.locator('#phone').fill('12')
-        await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
-        await expect(page.locator('#phone-error')).toBeVisible()
-        await shot(page, `recruit-form-errors-${theme}-${view.name}`)
-        await page.locator('#phone').fill('010-1234-5678')
-        await page.locator('#consent').check()
-        await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
-        await expect(page.getByText('지원서를 접수했어요')).toBeVisible()
-        await shot(page, `recruit-form-done-${theme}-${view.name}`)
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
-        expect(overflow).toBe(false)
-      })
-    }
-  }
 })
 
 test.describe('next steps on /about and /projects (item 6)', () => {
@@ -278,21 +218,6 @@ test.describe('next steps on /about and /projects (item 6)', () => {
     })
   }
 
-  for (const theme of ['light', 'dark']) {
-    for (const view of VIEWS) {
-      test(`screenshot next steps ${theme} ${view.name}`, async ({ page }) => {
-        await page.setViewportSize(view.size)
-        await skipIntro(page)
-        await setTheme(page, theme)
-        await mockOptionalApis(page)
-        await page.goto('/projects')
-        const steps = page.getByRole('navigation', { name: '다음에 할 일' })
-        await steps.scrollIntoViewIfNeeded()
-        await page.waitForTimeout(500)
-        await page.screenshot({ path: `${SHOTS}/projects-steps-${theme}-${view.name}.png` })
-      })
-    }
-  }
 })
 
 test.describe('study hub weight (item 8)', () => {
@@ -374,16 +299,18 @@ test.describe('quick search finds study content (item 7)', () => {
     await expect(page).toHaveURL(/\/study\/python$/)
   })
 
-  for (const theme of ['light', 'dark']) {
-    for (const view of VIEWS) {
-      test(`screenshot quick search ${theme} ${view.name}`, async ({ page }) => {
-        await page.setViewportSize(view.size)
-        await setTheme(page, theme)
-        const dialog = await openSearch(page)
-        await dialog.getByRole('combobox').fill('회로')
-        await expect(dialog.getByRole('option').first()).toBeVisible()
-        await page.screenshot({ path: `${SHOTS}/quicksearch-${theme}-${view.name}.png` })
-      })
-    }
+})
+
+test.describe('no horizontal overflow on a phone, dark', () => {
+  for (const path of ['/activities', '/recruit', '/recruit-notice', '/about', '/no-such-page']) {
+    test(`${path} fits 390px`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await skipIntro(page)
+      await setTheme(page, 'dark')
+      await mockOptionalApis(page)
+      await page.goto(path)
+      await expect(page.locator('main, h1').first()).toBeVisible()
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false)
+    })
   }
 })
