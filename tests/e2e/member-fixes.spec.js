@@ -296,3 +296,41 @@ test.describe('editor drafts', () => {
     await expect(page.getByPlaceholder('제목', { exact: true })).toHaveValue('공지 초안')
   })
 })
+
+test.describe('account settings', () => {
+  const SECTIONS = ['settings-profile', 'settings-notifications', 'settings-email', 'settings-password', 'settings-miniapps']
+
+  test('desktop: sections are open, no developer wording, a closed section stays closed after reload', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await mockAdminApis(page)
+    await page.goto('/settings')
+    for (const id of SECTIONS) await expect(page.locator(`details#${id}`)).toHaveAttribute('open', '')
+    await expect(page.getByText('입력 영역을 분리했습니다')).toHaveCount(0)
+    await expect(page.getByText('따로 관리합니다')).toHaveCount(0)
+    await page.screenshot({ path: `${SHOTS}/settings-1440-${test.info().project.name}.png`, fullPage: true })
+    await page.locator('details#settings-email > summary').click()
+    await expect(page.locator('details#settings-email')).not.toHaveAttribute('open', '')
+    await page.reload()
+    await expect(page.locator('details#settings-email')).not.toHaveAttribute('open', '')
+    await expect(page.locator('details#settings-password')).toHaveAttribute('open', '')
+  })
+
+  test('phone: sections start collapsed, open by keyboard, and an anchor opens its section', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await mockAdminApis(page)
+    await page.goto('/settings')
+    await expect(page.locator('details#settings-password > summary')).toBeVisible()
+    for (const id of SECTIONS) await expect(page.locator(`details#${id}`)).not.toHaveAttribute('open', '')
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(2200)
+    await page.screenshot({ path: `${SHOTS}/settings-390-collapsed-${test.info().project.name}.png`, fullPage: true })
+
+    await page.locator('details#settings-password > summary').focus()
+    await page.keyboard.press('Enter')
+    await expect(page.locator('details#settings-password')).toHaveAttribute('open', '')
+    await expect(page.getByPlaceholder('현재 비밀번호를 입력하세요')).toBeVisible()
+
+    await page.goto('/settings#settings-email')
+    await expect(page.locator('details#settings-email')).toHaveAttribute('open', '')
+    await page.screenshot({ path: `${SHOTS}/settings-390-anchor-${test.info().project.name}.png` })
+  })
+})
