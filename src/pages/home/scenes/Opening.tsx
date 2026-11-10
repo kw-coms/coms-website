@@ -1,9 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { Megaphone } from 'lucide-react'
+import { experiencePills } from '../../../data/homeContent'
 import { ghostActionBtnClass, solidActionBtnClass } from '../../../shared/homeUi'
 import { SCREEN_ON_EVENT } from '../../../utils/screenOn'
 import HeroField from '../HeroField'
 import { cssVars } from './cssVars'
+import TypedLine from './TypedLine'
+
+const TICKER = Array.from({ length: 2 }, () => experiencePills.join('   ·   ') + '   ·   ').join('')
 
 type Props = {
   title: string
@@ -47,7 +51,25 @@ export default function Opening({ title, copy, semester, total, noticeTitle, onM
   return (
     <section id="opening" data-scene="opening" className="scene scene-opening" aria-label="COM's">
       <div className="scene-opening__bg" aria-hidden="true">
+        <div className="scene-opening__aurora">
+          <span className="aurora aurora--a" />
+          <span className="aurora aurora--b" />
+          <span className="aurora aurora--c" />
+        </div>
+        <div className="scene-opening__floor">
+          <div className="floor__plane"><i /></div>
+        </div>
         <HeroField />
+        <div className="scene-opening__cube">
+          <div className="cube-rig">
+            <div className="cube">
+              <i /><i /><i /><i /><i /><i />
+            </div>
+            <div className="cube cube--inner">
+              <i /><i /><i /><i /><i /><i />
+            </div>
+          </div>
+        </div>
         <div className="scene-opening__vignette" />
       </div>
       <span className="scene-opening__bar scene-opening__bar--top" aria-hidden="true" />
@@ -62,10 +84,10 @@ export default function Opening({ title, copy, semester, total, noticeTitle, onM
           data-cine-hold
           aria-label={title}
           className="cine-lines scene-wordmark"
-          style={cssVars({ '--fit': fit })}
+          style={cssVars({ '--fit': fit, '--len': letters.length })}
         >
           {letters.map((ch, i) => (
-            <span key={i} className="cine-m" aria-hidden="true" style={cssVars({ '--i': i * 0.6 })}>
+            <span key={i} className="cine-m" aria-hidden="true" style={cssVars({ '--i': i * 0.6, '--k': i })}>
               <span>{ch}</span>
             </span>
           ))}
@@ -74,6 +96,7 @@ export default function Opening({ title, copy, semester, total, noticeTitle, onM
 
       <div className="scene-opening__copy">
         <p className="scene-opening__lede">{copy}</p>
+        <TypedLine />
         <div className="scene-actions">
           <button type="button" onClick={onMore} className={solidActionBtnClass}>더 알아보기</button>
           <button type="button" onClick={onApply} className={ghostActionBtnClass}>지원하기</button>
@@ -89,6 +112,9 @@ export default function Opening({ title, copy, semester, total, noticeTitle, onM
 
       <p className="cine-hud scene-opening__bl">{semester}</p>
       <p className="cine-hud scene-opening__br" aria-hidden="true">Scroll<i /></p>
+      <div className="scene-opening__ticker" data-ticker aria-hidden="true">
+        <span className="scene-opening__ticker-run" data-t={TICKER} />
+      </div>
     </section>
   )
 }

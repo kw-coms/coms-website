@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { useNavigate, useLocation, type NavigateOptions, type To } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listNotices } from '../../services/noticeApi'
@@ -6,13 +6,15 @@ import { getPublicSiteSettings } from '../../services/siteSettingsApi'
 import { scrollToTopInstant } from '../../utils/themeColors'
 import { isFullPageLink } from '../../utils/fullPageLink'
 import { useAuth } from '../../contexts/useAuth'
-import { useCineReveal, useSceneProgress } from '../../hooks/useSceneProgress'
+import { useCineReveal, usePointerFx, useSceneProgress } from '../../hooks/useSceneProgress'
 import Opening from './scenes/Opening'
 import Manifesto from './scenes/Manifesto'
 import Activities from './scenes/Activities'
 import Projects from './scenes/Projects'
 import Members from './scenes/Members'
 import Recruit from './scenes/Recruit'
+import Backdrop from './scenes/Backdrop'
+import Divider from './scenes/Divider'
 import SceneRail, { type RailItem } from './scenes/SceneRail'
 import type { SceneActions } from './scenes/parts'
 import { sectionStories } from '../../data/homeContent'
@@ -45,6 +47,7 @@ export default function HomeView() {
   const siteSettings = siteSettingsQuery.data
 
   useSceneProgress()
+  usePointerFx()
   useCineReveal(member)
 
   const openPanel = (id: string) => {
@@ -102,6 +105,11 @@ export default function HomeView() {
   }
   const railItems: RailItem[] = order.map((key) => ({ id: key, label: names[key] }))
   const number = (key: SceneKey) => order.indexOf(key) + 1
+  const backdrop = (key: Exclude<SceneKey, 'opening'>) => {
+    const at = order.indexOf(key)
+    return <Backdrop numeral={at + 1} variant={key} prev={order[at - 1]} next={order[at + 1]} />
+  }
+  const dividerNames: Record<SceneKey, string> = { opening: 'COM\'s', members: member ? 'Today' : 'Members', about: 'About', activities: 'Activities', projects: 'Projects', recruit: 'Recruit' }
 
   const scenes: Record<SceneKey, ReactNode> = {
     opening: (
@@ -117,17 +125,23 @@ export default function HomeView() {
         onNotice={() => goPageTop('/notices')}
       />
     ),
-    members: <Members key="members" index={number('members')} member={member} noticeTitle={latestNotice?.title ?? null} onGo={(path) => goPageTop(path)} />,
-    about: <Manifesto key="about" index={number('about')} actions={actions.about} />,
-    activities: <Activities key="activities" index={number('activities')} actions={actions.activities} onOpen={openPanel} />,
-    projects: <Projects key="projects" index={number('projects')} actions={actions.projects} onOpen={() => goPageTop('/projects')} />,
-    recruit: <Recruit key="recruit" index={number('recruit')} actions={actions.recruit} />,
+    members: <Members key="members" index={number('members')} member={member} noticeTitle={latestNotice?.title ?? null} onGo={(path) => goPageTop(path)} backdrop={backdrop('members')} />,
+    about: <Manifesto key="about" index={number('about')} actions={actions.about} backdrop={backdrop('about')} />,
+    activities: <Activities key="activities" index={number('activities')} actions={actions.activities} onOpen={openPanel} backdrop={backdrop('activities')} />,
+    projects: <Projects key="projects" index={number('projects')} actions={actions.projects} onOpen={() => goPageTop('/projects')} backdrop={backdrop('projects')} />,
+    recruit: <Recruit key="recruit" index={number('recruit')} actions={actions.recruit} backdrop={backdrop('recruit')} />,
   }
 
   return (
     <div className="theme-home cine-root scenes relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
       <div className="cine-grain" aria-hidden="true" />
-      <main className="apple-home-main scenes-main relative overflow-x-clip">{order.map((key) => scenes[key])}</main>
+      <main className="apple-home-main scenes-main relative overflow-x-clip">{order.map((key, i) => (
+          <Fragment key={key}>
+            {i > 0 && <Divider name={dividerNames[key]} dir={i % 2 ? 1 : -1} />}
+            {scenes[key]}
+          </Fragment>
+        ))}
+      </main>
       <SceneRail items={railItems} />
     </div>
   )
