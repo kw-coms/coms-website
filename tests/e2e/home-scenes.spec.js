@@ -178,32 +178,42 @@ test.describe('a visitor on the home page', () => {
     }
   })
 
-  test('the wordmark sheen peak stays at 3:1 or better on the paper theme for any accent', async ({ page }) => {
+  test('the wordmark sheen peak and bottom tone stay at 3:1 or better in both themes for any accent', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
-    for (const accent of ['#0071e3', '#3c3c43', '#d70015', '#ff9f0a', '#8e5cf7', '#ffd60a', '#ffffff', '#f5f5f0']) {
-      await page.addInitScript((value) => {
-        localStorage.setItem('kwcoms-theme-mode:v2', 'light')
-        localStorage.setItem('kwcoms-accent-color', value)
-      }, accent)
-      await page.goto('/')
-      await expect(page.locator('.scene-wordmark')).toBeAttached()
-      const ratio = await page.evaluate(() => {
-        const probe = document.createElement('i')
-        probe.style.color = 'var(--sheen-hi)'
-        document.querySelector('.scene-wordmark').append(probe)
-        const rgb = (css) => {
-          const ctx = document.createElement('canvas').getContext('2d')
-          ctx.fillStyle = css
-          ctx.fillRect(0, 0, 1, 1)
-          return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3))
-        }
-        const lum = ([r, g, b]) => [r, g, b].map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4 }).reduce((s, c, i) => s + c * [0.2126, 0.7152, 0.0722][i], 0)
-        const fg = lum(rgb(getComputedStyle(probe).color))
-        const bg = lum(rgb(getComputedStyle(document.querySelector('.scenes')).backgroundColor))
-        probe.remove()
-        return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05)
-      })
-      expect(ratio, accent).toBeGreaterThanOrEqual(3)
+    for (const theme of ['light', 'dark']) {
+      for (const accent of ['#0071e3', '#3c3c43', '#d70015', '#ff9f0a', '#8e5cf7', '#ffd60a', '#ffffff', '#f5f5f0', '#000000']) {
+        const page2 = await page.context().newPage()
+        await page2.addInitScript(([t, value]) => {
+          localStorage.setItem('kwcoms-theme-mode:v2', t)
+          localStorage.setItem('kwcoms-accent-color', value)
+          sessionStorage.setItem('coms.intro.played:v1', '1')
+        }, [theme, accent])
+        await mockOptionalApis(page2)
+        await page2.goto('/')
+        await expect(page2.locator('.scene-wordmark')).toBeAttached()
+        const ratios = await page2.evaluate(() => {
+          const rgb = (css) => {
+            const ctx = document.createElement('canvas').getContext('2d')
+            ctx.fillStyle = css
+            ctx.fillRect(0, 0, 1, 1)
+            return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3))
+          }
+          const lum = ([r, g, b]) => [r, g, b].map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4 }).reduce((s, c, i) => s + c * [0.2126, 0.7152, 0.0722][i], 0)
+          const bg = lum(rgb(getComputedStyle(document.querySelector('.scenes')).backgroundColor))
+          const ratio = (css) => {
+            const probe = document.createElement('i')
+            probe.style.color = css
+            document.querySelector('.scene-wordmark').append(probe)
+            const fg = lum(rgb(getComputedStyle(probe).color))
+            probe.remove()
+            return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05)
+          }
+          return { peak: ratio('var(--sheen-hi)'), tone: ratio('color-mix(in srgb, var(--app-text) 70%, var(--app-accent))') }
+        })
+        await page2.close()
+        expect(ratios.peak, `${theme} ${accent} peak`).toBeGreaterThanOrEqual(3)
+        expect(ratios.tone, `${theme} ${accent} tone`).toBeGreaterThanOrEqual(3)
+      }
     }
   })
 

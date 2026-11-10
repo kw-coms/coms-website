@@ -1009,10 +1009,3 @@
 :root[data-perf='lite'] .scene-recruit__drift {
 	transform: none;
 }
-
-/* Browsers without overflow: clip (Safari below 16) need the page's side overflow cut off too. */
-@supports not (overflow: clip) {
-	.scenes-main {
-		overflow-x: hidden;
-	}
-}
