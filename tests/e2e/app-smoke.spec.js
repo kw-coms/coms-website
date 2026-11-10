@@ -249,8 +249,8 @@ test.describe('home boot intro', () => {
 })
 
 // The home sections under the hero: every card is a real control that goes where it says.
-// The tools row on the home lists what the Records and Tools menus hold and takes a member there.
-test('home tools row lists the Records and Tools menus and opens a tool', async ({ page }) => {
+// The tools row on the home lists menu entries (activity records and the tools) and takes a member there.
+test('home tools row lists entries of the header menu and opens a tool', async ({ page }) => {
   await page.addInitScript(() => {
     try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
   })
@@ -261,17 +261,13 @@ test('home tools row lists the Records and Tools menus and opens a tool', async 
   const tools = page.getByRole('list', { name: '활동 도구 바로가기' })
   await tools.scrollIntoViewIfNeeded()
   const tiles = tools.getByRole('button')
-  // The same entries, in the same order, as the menu in the header.
-  const menu = []
-  for (const [button, label] of [['Records', '기록·일정 메뉴'], ['Tools', '참여 도구 메뉴']]) {
-    await page.getByRole('button', { name: button, exact: true }).click()
-    menu.push(...await page.getByRole('navigation', { name: label }).getByRole('button').evaluateAll(items => items.map(item => item.querySelector('span span:last-child').textContent)))
-    await page.keyboard.press('Escape')
-  }
-  expect(menu.length).toBeGreaterThanOrEqual(4)
-  await expect(tiles).toHaveCount(menu.length)
   const titles = await tiles.evaluateAll(items => items.map(item => item.querySelector('.coms-tool-title').textContent))
-  expect(titles).toEqual(menu)
+  expect(titles.length).toBeGreaterThanOrEqual(4)
+  // Every tile is an entry of the header's panel, and they come in the panel's order.
+  await page.getByRole('button', { name: '멤버', exact: true }).click()
+  const labels = await page.locator('#nav-panel .nav-item-label').allTextContents()
+  await page.keyboard.press('Escape')
+  expect(labels.filter(label => titles.includes(label))).toEqual(titles)
 
   await tools.getByRole('button', { name: /일정 조율/ }).click()
   await expect(page).toHaveURL(/\/meet$/)
@@ -2176,7 +2172,7 @@ test('quick jump opens with Ctrl+K, finds pages and member content, and goes the
   await expect(box).toBeFocused()
   // With nothing typed it is a menu of the pages, the first one highlighted.
   await expect(options.first()).toContainText('홈')
-  // Circuit Lab is found once: its only page entry is the Lab tab (there is no Tools item for it any more).
+  // Circuit Lab is found once: its only page entry is the Lab item of the 배움 group.
   await box.fill('circuit lab')
   await expect(options).toHaveCount(1)
   await expect(options.first()).toContainText('Lab')
@@ -2394,111 +2390,91 @@ for (const path of ['/', '/study/arduino']) {
   })
 }
 
-// Like Sponsors or Resources, the Records and Tools toggles draw the accent underline on their own pages (detail routes too).
-test('Records and Tools toggles show the active underline on their pages', async ({ page }) => {
+// The four group buttons draw the accent underline on the pages of their group (detail routes too).
+test('group buttons show the active underline on their pages', async ({ page }) => {
   await mockAdminApis(page)
   await page.route(/pretendard/i, (route) => route.abort()) // one face for every page, so widths are comparable
   await page.setViewportSize({ width: 1280, height: 800 })
-  const nav = page.locator('header nav').first()
-  const toggle = (name) => nav.getByRole('button', { name, exact: true })
-  const underline = (name) => toggle(name).locator('span').last()
+  const bar = page.locator('header nav.nav-groups')
+  const toggle = (name) => bar.getByRole('button', { name, exact: true })
+  const underline = (name) => toggle(name).evaluate((button) => Number(getComputedStyle(button.querySelector('[data-nav-label]'), '::after').opacity))
+  const groups = { club: '동아리', learn: '배움', members: '멤버', tools: '도구' }
   const widths = {}
-  for (const [path, records, tools] of [
-    ['/about', 0, 0], ['/activity-log', 1, 0], ['/monthly-calendar', 1, 0], ['/activity-events', 1, 0],
-    ['/meet', 0, 1], ['/meet/1', 0, 1], ['/gatherings/1', 0, 1], ['/attendance', 0, 1], ['/draw', 0, 1],
+  for (const [path, active] of [
+    ['/about', 'club'], ['/sponsors', 'club'], ['/study', 'learn'],
+    ['/activity-log', 'members'], ['/monthly-calendar', 'members'], ['/activity-events', 'members'],
+    ['/meet', 'tools'], ['/meet/1', 'tools'], ['/gatherings/1', 'tools'], ['/attendance', 'tools'], ['/draw', 'tools'], ['/apps', 'tools'],
   ]) {
     await page.goto(path)
-    await expect(underline('Records'), path).toHaveCSS('opacity', String(records))
-    await expect(underline('Tools'), path).toHaveCSS('opacity', String(tools))
+    await expect(toggle(groups[active]), path).toHaveAttribute('data-active', 'true')
+    await expect(toggle(groups[active]), path).toHaveAttribute('aria-current', 'true')
     await page.evaluate(() => document.fonts.ready)
-    const w = [(await toggle('Records').boundingBox()).width, (await toggle('Tools').boundingBox()).width]
-    widths.about ??= w
-    expect(Math.abs(w[0] - widths.about[0]), `Records width on ${path}`).toBeLessThanOrEqual(0.5)
-    expect(Math.abs(w[1] - widths.about[1]), `Tools width on ${path}`).toBeLessThanOrEqual(0.5)
+    for (const [id, name] of Object.entries(groups)) {
+      // The underline fades in (transition), so poll until it settles.
+      await expect.poll(() => underline(name), { message: `${path}: ${name} underline` }).toBe(id === active ? 1 : 0)
+      if (id !== active) await expect(toggle(name)).not.toHaveAttribute('data-active', 'true')
+      const width = (await toggle(name).boundingBox()).width
+      widths[id] ??= width
+      expect(Math.abs(width - widths[id]), `${name} width on ${path}`).toBeLessThanOrEqual(0.5)
+    }
   }
-  // The underline is centred on the label text, like the other items' (offset between the two centres must match).
-  await page.goto('/activity-log')
-  // boundingBox() does not wait for layout: wait until the header is drawn and Records is active first,
-  // and for the web font, so the label width cannot change between the two measurements.
-  await expect(toggle('Records').locator('[data-nav-label]')).toBeVisible()
-  await expect(underline('Records')).toHaveCSS('opacity', '1')
-  await page.evaluate(() => document.fonts.ready)
-  const offset = async (btn, line, label) => {
-    // (an opacity-0 underline still counts as visible: it has a box)
-    await expect(label).toBeVisible()
-    await expect(line).toBeVisible()
-    const [l, u] = [await label.boundingBox(), await line.boundingBox()]
-    return (u.x + u.width / 2) - (l.x + l.width / 2)
-  }
-  const recordsOffset = await offset(toggle('Records'), underline('Records'), toggle('Records').locator('[data-nav-label]'))
-  const sponsors = nav.getByRole('button', { name: 'Sponsors', exact: true })
-  const sponsorsOffset = await offset(sponsors, sponsors.locator('span').last(), sponsors)
-  expect(Math.abs(recordsOffset)).toBeLessThanOrEqual(1)
-  expect(Math.abs(recordsOffset - sponsorsOffset)).toBeLessThanOrEqual(1)
-  // ...and at the same height as Sponsors' underline (it now hangs from the label span, not the button).
-  await expect(sponsors.locator('span').last()).toBeVisible()
-  const [recordsLine, sponsorsLine] = [await underline('Records').boundingBox(), await sponsors.locator('span').last().boundingBox()]
-  expect(Math.abs(recordsLine.y - sponsorsLine.y)).toBeLessThanOrEqual(1)
+  // No group is active on the home page.
+  await page.goto('/')
+  for (const name of Object.values(groups)) await expect(toggle(name)).not.toHaveAttribute('data-active', 'true')
 })
 
-test('top navigation groups activity log and monthly calendar under Records and Tools', async ({ page }) => {
+test('top navigation shows four groups and one panel with the whole sitemap', async ({ page }) => {
   await mockAdminApis(page)
   await page.goto('/')
 
-  const desktopNav = page.locator('header nav').first()
-  await expect(desktopNav.getByRole('button', { name: 'Notices' })).toBeVisible()
-  await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).toBeVisible()
-  await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).toBeVisible()
-  await expect(desktopNav.getByRole('button', { name: 'Activity', exact: true })).toHaveCount(0)
-  await expect(desktopNav.getByRole('button', { name: 'Activity log' })).toHaveCount(0)
-  await expect(desktopNav.getByRole('button', { name: 'Monthly calendar' })).toHaveCount(0)
-
+  const bar = page.locator('header nav.nav-groups')
+  const group = (name) => bar.getByRole('button', { name, exact: true })
+  for (const name of ['동아리', '배움', '멤버', '도구']) await expect(group(name)).toBeVisible()
+  await expect(bar.getByRole('button')).toHaveCount(4)
+  // Closed: no single page is listed in the bar.
+  await expect(page.locator('#nav-panel')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /활동 기록/ })).toHaveCount(0)
   // No group is active on the home page.
-  await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).not.toHaveAttribute('data-active', 'true')
-  await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).not.toHaveAttribute('data-active', 'true')
+  for (const name of ['동아리', '배움', '멤버', '도구']) await expect(group(name)).not.toHaveAttribute('data-active', 'true')
 
-  await desktopNav.getByRole('button', { name: 'Records', exact: true }).click()
-  const activityMenu = page.getByRole('navigation', { name: '기록·일정 메뉴' })
-  await expect(activityMenu.getByRole('button', { name: /Activity log/ })).toBeVisible()
-  await expect(activityMenu.getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
-  // Each row fills its panel, so the whole row is the hit target, and the Tools entries are
-  // not in the Records panel.
-  const activityLogButton = activityMenu.getByRole('button', { name: /Activity log/ })
-  const activityLogColumnWidth = await activityLogButton.evaluate((el) => el.closest('ul').getBoundingClientRect().width)
-  const activityLogBox = await activityLogButton.boundingBox()
-  expect(activityLogBox.width).toBeGreaterThanOrEqual(activityLogColumnWidth - 2)
-  await expect(activityMenu.getByRole('button', { name: /Gather/ })).toHaveCount(0)
-  await expect(activityMenu.getByRole('button', { name: /Circuit Lab/ })).toHaveCount(0)
-  // Only one dropdown is open at a time: opening Tools closes Records.
-  await desktopNav.getByRole('button', { name: 'Tools', exact: true }).click()
-  await expect(activityMenu).toBeHidden()
-  const toolsMenu = page.getByRole('navigation', { name: '참여 도구 메뉴' })
-  await expect(toolsMenu.getByRole('button', { name: /Gather/ })).toBeVisible()
-  await expect(toolsMenu.getByRole('button', { name: /Activity log/ })).toHaveCount(0)
-  // Circuit Lab is reached from the top-nav Lab item and the study hub only, not from Tools.
-  await expect(toolsMenu.getByRole('button', { name: /Circuit Lab/ })).toHaveCount(0)
-  await desktopNav.getByRole('button', { name: 'Records', exact: true }).click()
-  await expect(toolsMenu).toBeHidden()
-  await expect(activityMenu).toBeVisible()
-  await activityMenu.getByRole('button', { name: /Activity log/ }).click()
+  await group('멤버').click()
+  const panel = page.getByRole('navigation', { name: '전체 메뉴' })
+  await expect(panel).toBeVisible()
+  // All four groups are in the panel at once, whichever one was opened.
+  for (const name of ['동아리', '배움', '멤버', '도구']) await expect(panel.getByRole('region', { name })).toBeVisible()
+  await expect(panel.getByRole('region', { name: '멤버' }).getByRole('button', { name: /활동 기록/ })).toBeVisible()
+  await expect(panel.getByRole('region', { name: '멤버' }).getByRole('button', { name: /월별 일정/ })).toBeVisible()
+  await expect(panel.getByRole('region', { name: '도구' }).getByRole('button', { name: /모임 신청/ })).toBeVisible()
+  await expect(panel.getByRole('region', { name: '멤버' }).getByRole('button', { name: /모임 신청/ })).toHaveCount(0)
+  // Only the opened group is emphasised, and it follows the button that is pressed.
+  await expect(panel.locator('[data-open="true"]')).toHaveCount(1)
+  await expect(panel.getByRole('region', { name: '멤버' })).toHaveAttribute('data-open', 'true')
+  await group('도구').click()
+  await expect(panel.getByRole('region', { name: '도구' })).toHaveAttribute('data-open', 'true')
+  await expect(panel.getByRole('region', { name: '멤버' })).not.toHaveAttribute('data-open', 'true')
+  // Each row fills its column, so the whole row is the hit target.
+  const logRow = panel.getByRole('button', { name: /활동 기록/ })
+  const [rowBox, columnBox] = await Promise.all([logRow.boundingBox(), logRow.evaluate((el) => el.closest('ul').getBoundingClientRect().toJSON())])
+  expect(rowBox.width).toBeGreaterThanOrEqual(columnBox.width - 2)
+  await logRow.click()
   await expect(page).toHaveURL(/\/activity-log$/)
-  // The toggle of the group that holds the current page is the active one, and only that one.
-  await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).toHaveAttribute('data-active', 'true')
-  await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).not.toHaveAttribute('data-active', 'true')
-  await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).toHaveAttribute('aria-current', 'true')
-  await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).not.toHaveAttribute('aria-current')
+  await expect(panel).toHaveCount(0)
+  // The button of the group that holds the current page is the active one, and only that one.
+  await expect(group('멤버')).toHaveAttribute('data-active', 'true')
+  await expect(group('멤버')).toHaveAttribute('aria-current', 'true')
+  await expect(group('도구')).not.toHaveAttribute('data-active', 'true')
+  await expect(group('도구')).not.toHaveAttribute('aria-current')
   await page.goto('/draw')
-  await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).toHaveAttribute('data-active', 'true')
-  await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).not.toHaveAttribute('data-active', 'true')
-  await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).toHaveAttribute('aria-current', 'true')
-  await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).not.toHaveAttribute('aria-current')
+  await expect(group('도구')).toHaveAttribute('data-active', 'true')
+  await expect(group('멤버')).not.toHaveAttribute('data-active', 'true')
   await page.goto('/')
 
-  await desktopNav.getByRole('button', { name: 'Records', exact: true }).click()
-  await page.getByRole('navigation', { name: '기록·일정 메뉴' }).getByRole('button', { name: /Monthly calendar/ }).click()
+  await group('멤버').click()
+  await panel.getByRole('button', { name: /월별 일정/ }).click()
   await expect(page).toHaveURL(/\/monthly-calendar$/)
   await page.goto('/')
-  await desktopNav.getByRole('button', { name: 'Apps' }).click()
+  await group('도구').click()
+  await panel.getByRole('button', { name: /^앱/ }).click()
   await expect(page).toHaveURL(/\/apps$/)
   await page.goto('/')
 
@@ -2514,68 +2490,62 @@ test('top navigation groups activity log and monthly calendar under Records and 
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByLabel('메뉴 열기').click()
   const mobileMenu = page.getByRole('navigation', { name: '모바일 메뉴' })
-  await expect(mobileMenu.getByRole('button', { name: /^Notices/ })).toBeVisible()
-  await expect(mobileMenu.getByRole('button', { name: /^Records/ })).toBeVisible()
-  await expect(mobileMenu.getByRole('button', { name: /^Tools/ })).toBeVisible()
-  await expect(mobileMenu.getByRole('button', { name: /Activity log/ })).toHaveCount(0)
-  await expect(mobileMenu.getByRole('button', { name: /Gather/ })).toHaveCount(0)
-  await mobileMenu.getByRole('button', { name: /^Records/ }).click()
-  await mobileMenu.getByRole('button', { name: /^Tools/ }).click()
-  await expect(mobileMenu.getByRole('button', { name: /Gather/ })).toBeVisible()
-  await expect(mobileMenu.getByRole('button', { name: /Activity log/ })).toBeVisible()
+  // Every group is open at once: nothing hides behind a second tap.
+  for (const name of [/^공지/, /^활동 기록/, /^월별 일정/, /^모임 신청/, /^출석 체크/, /^회로 Lab/, /^소개/]) await expect(mobileMenu.getByRole('button', { name })).toBeVisible()
   await expect(mobileMenu.getByRole('button', { name: /Circuit Lab/ })).toHaveCount(0)
-  await expect(mobileMenu.getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
-  // The two collapsibles are independent: closing Records leaves Tools open.
-  await mobileMenu.getByRole('button', { name: /^Records/ }).click()
-  await expect(mobileMenu.getByRole('button', { name: /Activity log/ })).toHaveCount(0)
-  await expect(mobileMenu.getByRole('button', { name: /Gather/ })).toBeVisible()
-  await mobileMenu.getByRole('button', { name: /^Records/ }).click()
-  await expect(mobileMenu.getByRole('button', { name: /Activity log/ })).toBeVisible()
-  const mobileSubitemBox = await mobileMenu.getByRole('button', { name: /Activity log/ }).boundingBox()
-  expect(mobileSubitemBox.height).toBeGreaterThanOrEqual(44)
+  for (const name of ['동아리', '배움', '멤버', '도구']) await expect(mobileMenu.getByRole('region', { name })).toBeVisible()
+  const mobileRowBox = await mobileMenu.getByRole('button', { name: /^활동 기록/ }).boundingBox()
+  expect(mobileRowBox.height).toBeGreaterThanOrEqual(44)
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
 })
 
-// Lab is a top-level item next to Study (not only inside Tools). At every desktop width the nav must fit:
-// brand, nav items and the account cluster do not overlap, nothing is clipped and nothing wraps.
+// Lab sits next to Study in the 배움 column. At every desktop width the bar must fit:
+// brand, the four groups and the account cluster do not overlap, nothing is clipped and nothing wraps.
 for (const width of [1024, 1100, 1280, 1440]) {
-  test(`header shows Lab next to Study and the nav fits at ${width}px`, async ({ page }) => {
+  test(`header shows four groups, Lab sits next to Study in the panel, and the bar fits at ${width}px`, async ({ page }) => {
     await mockAdminApis(page)
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/')
     const bar = page.locator('header > div').first()
-    const nav = page.locator('header nav').first()
-    const lab = nav.getByRole('button', { name: 'Lab', exact: true })
-    await expect(lab).toBeVisible()
+    const nav = page.locator('header nav.nav-groups')
     const boxes = await Promise.all([
       bar.locator('> button').first().boundingBox(),
       nav.boundingBox(),
       bar.locator(':scope > div.lg\\:justify-self-end').boundingBox(),
-      nav.getByRole('button', { name: 'Study', exact: true }).boundingBox(),
-      lab.boundingBox(),
     ])
-    const [brand, navBox, cluster, study, labBox] = boxes
-    const items = await nav.locator(':scope > button, :scope > div').evaluateAll((els) => els.map((el) => {
+    const [brand, navBox, cluster] = boxes
+    const items = await nav.locator(':scope > button').evaluateAll((els) => els.map((el) => {
       const r = el.getBoundingClientRect()
       return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, mid: (r.top + r.bottom) / 2, clipped: el.scrollWidth > el.clientWidth + 1 }
     }))
+    expect(items).toHaveLength(4)
     const first = items[0]
     const last = items[items.length - 1]
-    expect(brand.x + brand.width, 'brand ends before the first nav item').toBeLessThanOrEqual(first.left)
-    expect(last.right, 'last nav item ends before the account cluster').toBeLessThanOrEqual(cluster.x)
+    expect(brand.x + brand.width, 'brand ends before the first group').toBeLessThanOrEqual(first.left)
+    expect(last.right, 'last group ends before the account cluster').toBeLessThanOrEqual(cluster.x)
     for (const item of items) {
       expect(item.left).toBeGreaterThanOrEqual(0)
       expect(item.right).toBeLessThanOrEqual(width)
       expect(item.clipped).toBe(false)
       // one line: every item sits on the same row as the first one
       expect(Math.abs(item.mid - first.mid)).toBeLessThan(4)
-      expect(item.bottom - item.top).toBeLessThan(48)
+      expect(item.bottom - item.top).toBeLessThanOrEqual(48)
     }
-    expect(Math.abs(study.y - labBox.y)).toBeLessThan(4)
-    expect(labBox.x).toBeGreaterThan(study.x)
     expect(cluster.x + cluster.width).toBeLessThanOrEqual(width)
-    expect(navBox.height).toBeLessThan(48)
+    expect(navBox.height).toBeLessThanOrEqual(48)
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+
+    await nav.getByRole('button', { name: '배움', exact: true }).click()
+    const panel = page.getByRole('navigation', { name: '전체 메뉴' })
+    const study = await panel.getByRole('button', { name: /^스터디 자료/ }).boundingBox()
+    const lab = panel.getByRole('button', { name: /^회로 Lab/ })
+    const labBox = await lab.boundingBox()
+    expect(Math.abs(study.x - labBox.x), 'same column').toBeLessThan(2)
+    expect(labBox.y).toBeGreaterThan(study.y)
+    // The panel fits the viewport and runs under the bar.
+    const panelBox = await panel.boundingBox()
+    expect(panelBox.x).toBeGreaterThanOrEqual(0)
+    expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(width)
     const labRequest = page.waitForRequest((request) => request.isNavigationRequest() && new URL(request.url()).pathname === '/lab/')
     await lab.click()
     await labRequest
@@ -2588,15 +2558,15 @@ test('mobile menu lists Lab at 375px without horizontal overflow and opens it wi
   await page.goto('/')
   await page.getByLabel('메뉴 열기').click()
   const mobileMenu = page.getByRole('navigation', { name: '모바일 메뉴' })
-  await expect(mobileMenu.getByRole('button', { name: /^Lab/ })).toBeVisible()
-  const [panelBox, labItemBox] = await Promise.all([mobileMenu.boundingBox(), mobileMenu.getByRole('button', { name: /^Lab/ }).boundingBox()])
+  await expect(mobileMenu.getByRole('button', { name: /^회로 Lab/ })).toBeVisible()
+  const [panelBox, labItemBox] = await Promise.all([mobileMenu.boundingBox(), mobileMenu.getByRole('button', { name: /^회로 Lab/ }).boundingBox()])
   expect(labItemBox.x).toBeGreaterThanOrEqual(panelBox.x)
   expect(labItemBox.x + labItemBox.width).toBeLessThanOrEqual(panelBox.x + panelBox.width + 1)
   expect(labItemBox.y).toBeGreaterThanOrEqual(panelBox.y)
   expect(labItemBox.y + labItemBox.height).toBeLessThanOrEqual(panelBox.y + panelBox.height + 1)
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   const labRequest = page.waitForRequest((request) => request.isNavigationRequest() && new URL(request.url()).pathname === '/lab/')
-  await mobileMenu.getByRole('button', { name: /^Lab/ }).click()
+  await mobileMenu.getByRole('button', { name: /^회로 Lab/ }).click()
   await labRequest
 })
 
@@ -2624,10 +2594,13 @@ test('only the nav Lab button and the Arduino code-block buttons lead to /lab/',
     // Playground buttons are injected imperatively after render: wait for them before counting.
     if (path === '/study/arduino') await expect(page.getByRole('button', { name: 'Circuit Lab에서 열기' }).first()).toBeVisible()
     await expect(page.locator('a[href*="/lab"]')).toHaveCount(0)
+    // The nav entry lives in the panel: open it.
+    await page.getByRole('button', { name: '배움', exact: true }).click()
+    await expect(page.locator('#nav-panel')).toBeVisible()
     const names = await page.getByRole('button', { name: /Lab/ }).evaluateAll(
-      (els) => els.filter((el) => el.getClientRects().length > 0).map((el) => el.textContent.trim()))
-    const open = names.filter((name) => name !== 'Lab')
-    expect(names.filter((name) => name === 'Lab'), `${path}: nav Lab button`).toHaveLength(1)
+      (els) => els.filter((el) => el.getClientRects().length > 0).map((el) => (el.querySelector('.nav-item-label') ?? el).textContent.trim()))
+    const open = names.filter((name) => name !== '회로 Lab')
+    expect(names.filter((name) => name === '회로 Lab'), `${path}: nav Lab button`).toHaveLength(1)
     if (path === '/study/arduino') {
       expect(open.length, `${path}: playground buttons`).toBeGreaterThan(0)
       expect(open.every((name) => name.includes('Circuit Lab에서 열기'))).toBe(true)
@@ -2689,9 +2662,9 @@ test.describe('draw page', () => {
     await mockOptionalApis(page)
     await page.goto('/draw')
     await expect(page.getByRole('heading', { level: 1, name: '뽑기' })).toBeVisible()
-    // It is in the Tools menu, and a guest may use it.
-    await page.getByRole('button', { name: 'Tools', exact: true }).click()
-    await expect(page.getByRole('navigation', { name: '참여 도구 메뉴' }).getByRole('button', { name: /Draw/ })).toBeVisible()
+    // It is in the 도구 column of the menu, and a guest may use it.
+    await page.getByRole('button', { name: '도구', exact: true }).click()
+    await expect(page.getByRole('navigation', { name: '전체 메뉴' }).getByRole('region', { name: '도구' }).getByRole('button', { name: /^조 편성/ })).toBeVisible()
     await page.keyboard.press('Escape')
 
     const names = page.getByRole('textbox', { name: /^이름/ })

@@ -43,7 +43,10 @@ test.describe('desktop popover', () => {
     await openFromFooter(page)
     // Keyboard navigation: a pointer press on the link would already count as an outside click.
     // A public route: /notices needs a login and redirects to /login, which breaks the goBack() below.
-    const link = page.locator('.apple-global-nav').getByRole('button', { name: 'Projects', exact: true }).first()
+    // The keyboard opens the 동아리 group and moves into it; 프로젝트 is a public entry there.
+    await page.locator('.apple-global-nav').getByRole('button', { name: '동아리', exact: true }).focus()
+    await page.keyboard.press('Enter')
+    const link = page.locator('#nav-panel').getByRole('button', { name: /^프로젝트/ })
     await link.focus()
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL(/\/projects/)

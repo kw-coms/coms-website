@@ -29,6 +29,9 @@ const HOVER_CLOSE_MS = 220
 
 const SHORTCUT_LABEL = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform) ? '⌘K' : 'Ctrl K'
 
+// Module level, not a ref: the header can mount again (when the login check finishes) and must not count the same page twice.
+let lastCountedKey = ''
+
 function frequentItems(): NavItem[] {
   return frequentNavPaths(readNavVisits(), ITEM_PATHS).flatMap((path) => ITEMS.filter((item) => item.path === path))
 }
@@ -62,7 +65,6 @@ export default function GlobalNavigation() {
   const openedByHover = useRef(false)
   // Set when the keyboard opened a group: focus moves into its column once it is drawn.
   const focusColumn = useRef<string | null>(null)
-  const countedKey = useRef('')
   // Every navigation closes the menus, not only their own links: the brand link, a
   // notification row and the browser's Back button change the route without our handlers.
   // location.key (not pathname) so /admin -> /admin?tab=… from a notification counts too.
@@ -79,8 +81,8 @@ export default function GlobalNavigation() {
 
   // Count the visit to a menu page for "자주 가는 곳".
   useEffect(() => {
-    if (countedKey.current === location.key || !activePath) return
-    countedKey.current = location.key
+    if (lastCountedKey === location.key || !activePath) return
+    lastCountedKey = location.key
     countNavVisit(activePath)
   }, [location.key, activePath])
 
