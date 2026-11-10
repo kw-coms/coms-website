@@ -154,3 +154,108 @@ test.describe('404 page (item 4)', () => {
     }
   }
 })
+
+test.describe('recruit form (item 5)', () => {
+  async function open(page) {
+    await skipIntro(page)
+    await mockOptionalApis(page)
+    await page.goto('/recruit')
+    await expect(page.getByLabel('이름', { exact: true }).first()).toBeVisible()
+  }
+  const form = (page) => page.locator('form').filter({ has: page.locator('#motive') })
+  async function fillValid(page) {
+    await page.locator('#name').fill('홍길동')
+    await page.locator('#studentId').fill('2026123456')
+    await page.locator('#department').fill('컴퓨터정보공학부')
+    await page.locator('#phone').fill('010-1234-5678')
+    await page.locator('#email').fill('gil@example.com')
+    await page.locator('#motive').fill('함께 배우고 싶어요')
+    await page.locator('#expectation').fill('스터디')
+  }
+
+  test('bad phone and e-mail get messages tied to their fields, and focus goes to the first', async ({ page }) => {
+    await open(page)
+    await fillValid(page)
+    await page.locator('#phone').fill('1234')
+    await page.locator('#email').fill('not-an-email')
+    await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
+    await expect(page.locator('#phone')).toBeFocused()
+    await expect(page.locator('#phone')).toHaveAttribute('aria-invalid', 'true')
+    await expect(page.locator('#phone')).toHaveAttribute('aria-describedby', 'phone-error')
+    await expect(page.locator('#phone-error')).toContainText('전화번호 형식')
+    await expect(page.locator('#email')).toHaveAttribute('aria-describedby', 'email-error')
+    await expect(page.locator('#email-error')).toContainText('이메일 형식')
+    await expect(page.locator('#consent-error')).toContainText('동의')
+  })
+
+  test('accepts Korean mobile and landline numbers, rejects others', async ({ page }) => {
+    await open(page)
+    await fillValid(page)
+    await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
+    await expect(page.locator('#phone-error')).toHaveCount(0)
+    for (const bad of ['010-12-5678', '0101234567890', '12345678', '010-abcd-5678', '010--1234-5678']) {
+      await page.locator('#phone').fill(bad)
+      await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
+      await expect(page.locator('#phone-error'), bad).toBeVisible()
+    }
+    for (const good of ['01012345678', '010-1234-5678', '011-123-4567', '02-123-4567', '02-1234-5678', '031-123-4567']) {
+      await page.locator('#phone').fill(good)
+      await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
+      await expect(page.locator('#phone-error'), good).toHaveCount(0)
+    }
+  })
+
+  test('the personal-data notice lists the items, and consent is required', async ({ page }) => {
+    let posts = 0
+    await page.route('**/api/recruit/apply', (route) => { posts += 1; return route.fulfill({ status: 201, json: {} }) })
+    await open(page)
+    const notice = page.getByText('개인정보 수집·이용 안내').locator('..')
+    for (const item of ['이름', '학번', '전화번호', '이메일', '지원 동기']) await expect(notice).toContainText(item)
+    await expect(notice).toContainText('삭제')
+    await fillValid(page)
+    await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
+    await expect(page.locator('#consent')).toBeFocused()
+    expect(posts).toBe(0)
+  })
+
+  test('after submit the form is replaced by a confirmation, and 다른 지원서 작성 resets it', async ({ page }) => {
+    const bodies = []
+    await page.route('**/api/recruit/apply', (route) => { bodies.push(route.request().postDataJSON()); return route.fulfill({ status: 201, json: {} }) })
+    await open(page)
+    await fillValid(page)
+    await page.locator('#consent').check()
+    await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
+    const done = page.getByRole('status').filter({ hasText: '지원서를 접수했어요' })
+    await expect(done).toContainText('gil@example.com')
+    await expect(done).toContainText('확인 메일')
+    await expect(page.getByRole('button', { name: '지원서 제출하기' })).toHaveCount(0)
+    expect(bodies).toHaveLength(1)
+    await done.getByRole('button', { name: '다른 지원서 작성' }).click()
+    await expect(page.locator('#name')).toHaveValue('')
+    await expect(page.locator('#consent')).not.toBeChecked()
+    await expect(page.getByRole('button', { name: '지원서 제출하기' })).toBeVisible()
+  })
+
+  for (const theme of ['light', 'dark']) {
+    for (const view of VIEWS) {
+      test(`screenshot errors and confirmation ${theme} ${view.name}`, async ({ page }) => {
+        await page.setViewportSize(view.size)
+        await setTheme(page, theme)
+        await page.route('**/api/recruit/apply', (route) => route.fulfill({ status: 201, json: {} }))
+        await open(page)
+        await fillValid(page)
+        await page.locator('#phone').fill('12')
+        await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
+        await expect(page.locator('#phone-error')).toBeVisible()
+        await shot(page, `recruit-form-errors-${theme}-${view.name}`)
+        await page.locator('#phone').fill('010-1234-5678')
+        await page.locator('#consent').check()
+        await form(page).getByRole('button', { name: '지원서 제출하기' }).click()
+        await expect(page.getByText('지원서를 접수했어요')).toBeVisible()
+        await shot(page, `recruit-form-done-${theme}-${view.name}`)
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
+        expect(overflow).toBe(false)
+      })
+    }
+  }
+})

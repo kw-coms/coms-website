@@ -1,5 +1,5 @@
 import PageHeading from '../components/PageHeading'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, Mail, Search, Send, UserRound } from 'lucide-react'
 import { lookupRecruitStatus, submitRecruitApplication } from '../services/recruitApi'
 import { showToast } from '../components/common/Toast'
@@ -24,6 +24,18 @@ const initialForm = {
 const inputClass =
   'w-full rounded-lg border border-black/10 bg-[var(--app-surface)] px-4 py-3 text-[15px] text-[var(--app-text)] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[var(--app-accent)]/24'
 const labelClass = 'mb-2 block text-sm font-semibold text-[var(--app-text)]'
+
+// Korean mobile (010-1234-5678) and landline (02-123-4567, 031-123-4567) numbers; hyphens optional.
+const PHONE_PATTERN = /^(01[016789]|02|0[3-6]\d)-?\d{3,4}-?\d{4}$/
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+
+type FieldName = 'name' | 'studentId' | 'department' | 'otherGrade' | 'phone' | 'email' | 'otherInterest' | 'motive' | 'expectation' | 'consent'
+type FieldErrors = Partial<Record<FieldName, string>>
+
+function FieldError({ name, errors }: { name: FieldName; errors: FieldErrors }) {
+  if (!errors[name]) return null
+  return <p id={`${name}-error`} className="mt-2 text-sm font-semibold text-red-700">{errors[name]}</p>
+}
 
 // Ordered review pipeline. ACCEPTED / REJECTED are terminal outcomes shown after 면접.
 const STATUS_STAGES = [
@@ -221,7 +233,11 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
   const [otherInterest, setOtherInterest] = useState('')
   const [otherGrade, setOtherGrade] = useState('')
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [consent, setConsent] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [sentTo, setSentTo] = useState('')
+  const doneRef = useRef<HTMLHeadingElement>(null)
   const [loading, setLoading] = useState(false)
   const settings = useQuery({ queryKey: ['site-settings', 'public'], queryFn: getPublicSiteSettings }).data
   const settingRows = [
@@ -243,6 +259,7 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
   const handleChange = (event) => {
     const { name, value } = event.target
     setForm((prev) => ({ ...prev, [name]: value }))
+    setFieldErrors((prev) => (prev[name] ? { ...prev, [name]: undefined } : prev))
   }
 
   const toggleInterest = (option) => {
@@ -253,29 +270,56 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
     ))
   }
 
-  const validateForm = () => {
-    if (!form.name.trim()) return '이름을 입력해주세요.'
-    if (!form.studentId.trim()) return '학번을 입력해주세요.'
-    if (!/^\d{10}$/.test(form.studentId.trim())) return '학번은 숫자 10자리로 입력해주세요.'
-    if (!form.department.trim()) return '학과를 입력해주세요.'
-    if (form.grade === '기타' && !otherGrade.trim()) return '기타 학년 정보를 입력해주세요.'
-    if (!form.phone.trim()) return '전화번호를 입력해주세요.'
-    if (!form.email.trim()) return '이메일을 입력해주세요.'
-    if (!form.email.includes('@')) return '올바른 이메일 형식이 아닙니다.'
-    if (interests.includes('기타') && !otherInterest.trim()) return '기타 관심 분야를 입력해주세요.'
-    if (!form.motive.trim()) return '지원 동기를 입력해주세요.'
-    if (!form.expectation.trim()) return '기대하는 활동을 입력해주세요.'
-    return ''
+  const validateForm = (): FieldErrors => {
+    const errors: FieldErrors = {}
+    if (!form.name.trim()) errors.name = '이름을 입력해주세요.'
+    if (!form.studentId.trim()) errors.studentId = '학번을 입력해주세요.'
+    else if (!/^\d{10}$/.test(form.studentId.trim())) errors.studentId = '학번은 숫자 10자리로 입력해주세요.'
+    if (!form.department.trim()) errors.department = '학과를 입력해주세요.'
+    if (form.grade === '기타' && !otherGrade.trim()) errors.otherGrade = '기타 학년 정보를 입력해주세요.'
+    if (!form.phone.trim()) errors.phone = '전화번호를 입력해주세요.'
+    else if (!PHONE_PATTERN.test(form.phone.trim())) errors.phone = '전화번호 형식이 올바르지 않아요. 예: 010-1234-5678, 02-123-4567'
+    if (!form.email.trim()) errors.email = '이메일을 입력해주세요.'
+    else if (!EMAIL_PATTERN.test(form.email.trim())) errors.email = '이메일 형식이 올바르지 않아요. 예: name@example.com'
+    if (interests.includes('기타') && !otherInterest.trim()) errors.otherInterest = '기타 관심 분야를 입력해주세요.'
+    if (!form.motive.trim()) errors.motive = '지원 동기를 입력해주세요.'
+    if (!form.expectation.trim()) errors.expectation = '기대하는 활동을 입력해주세요.'
+    if (!consent) errors.consent = '개인정보 수집·이용에 동의해야 제출할 수 있어요.'
+    return errors
   }
+
+  const resetForm = () => {
+    setForm(initialForm)
+    setInterests([])
+    setOtherInterest('')
+    setOtherGrade('')
+    setConsent(false)
+    setFieldErrors({})
+    setError('')
+    setSubmitted(false)
+    setSentTo('')
+  }
+
+  useEffect(() => {
+    if (submitted) doneRef.current?.focus()
+  }, [submitted])
+
+  // Props that tie an input to its message.
+  const fieldProps = (name: FieldName) => ({
+    'aria-invalid': fieldErrors[name] ? true : undefined,
+    'aria-describedby': fieldErrors[name] ? `${name}-error` : undefined,
+  })
 
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
     setSubmitted(false)
 
-    const validationMessage = validateForm()
-    if (validationMessage) {
-      setError(validationMessage)
+    const errors = validateForm()
+    setFieldErrors(errors)
+    const firstInvalid = (Object.keys(errors) as FieldName[])[0]
+    if (firstInvalid) {
+      document.getElementById(firstInvalid)?.focus()
       return
     }
 
@@ -293,6 +337,7 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
         experience: form.experience.trim(),
         expectation: form.expectation.trim(),
       })
+      setSentTo(form.email.trim())
       setSubmitted(true)
     } catch (err) {
       setError(err.message || '지원서 제출 중 오류가 발생했습니다.')
@@ -324,7 +369,22 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
         </div>
 
         <div className="grid gap-0 lg:grid-cols-[1fr_320px]">
-          <form onSubmit={handleSubmit} className="grid gap-5 bg-[var(--app-surface)] p-6 text-[var(--app-text)] sm:p-8">
+          {submitted ? (
+            <div role="status" className="grid content-start gap-4 bg-[var(--app-surface)] p-6 text-[var(--app-text)] sm:p-8">
+              <div className="flex size-11 items-center justify-center rounded-lg bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]">
+                <CheckCircle2 size={22} />
+              </div>
+              <h2 ref={doneRef} tabIndex={-1} className="text-xl font-bold outline-none">지원서를 접수했어요</h2>
+              <p className="break-all text-sm leading-6 text-[var(--app-muted)]">
+                <strong className="text-[var(--app-text)]">{sentTo}</strong>로 확인 메일을 보냈어요. 몇 분이 지나도 오지 않으면 스팸함을 확인해 주세요.
+              </p>
+              <p className="text-sm leading-6 text-[var(--app-muted)]">
+                운영진이 내용을 확인한 뒤 지원서에 적은 연락처로 연락드려요. 진행 상황은 아래 &lsquo;지원 현황 확인&rsquo;에서 학번과 이름으로 볼 수 있어요.
+              </p>
+              <button type="button" onClick={resetForm} className="apple-action-secondary w-fit px-4 py-2 text-sm">다른 지원서 작성</button>
+            </div>
+          ) : (
+          <form onSubmit={handleSubmit} noValidate className="grid gap-5 bg-[var(--app-surface)] p-6 text-[var(--app-text)] sm:p-8">
             <div className="flex items-center gap-3">
               <div className="flex size-11 items-center justify-center rounded-lg bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]">
                 <UserRound size={20} />
@@ -338,18 +398,21 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className={labelClass} htmlFor="name">이름</label>
-                <input id="name" name="name" value={form.name} onChange={handleChange} className={inputClass} placeholder="이름을 입력하세요" autoComplete="name" />
+                <input id="name" name="name" value={form.name} onChange={handleChange} className={inputClass} placeholder="이름을 입력하세요" autoComplete="name" {...fieldProps('name')} />
+                <FieldError name="name" errors={fieldErrors} />
               </div>
               <div>
                 <label className={labelClass} htmlFor="studentId">학번</label>
-                <input id="studentId" name="studentId" value={form.studentId} onChange={handleChange} className={inputClass} placeholder="10자리 학번" inputMode="numeric" autoComplete="username" />
+                <input id="studentId" name="studentId" value={form.studentId} onChange={handleChange} className={inputClass} placeholder="10자리 학번" inputMode="numeric" autoComplete="username" {...fieldProps('studentId')} />
+                <FieldError name="studentId" errors={fieldErrors} />
               </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className={labelClass} htmlFor="department">학과</label>
-                <input id="department" name="department" value={form.department} onChange={handleChange} className={inputClass} placeholder="학과를 입력하세요" />
+                <input id="department" name="department" value={form.department} onChange={handleChange} className={inputClass} placeholder="학과를 입력하세요" {...fieldProps('department')} />
+                <FieldError name="department" errors={fieldErrors} />
               </div>
               <div>
                 <label className={labelClass} htmlFor="grade">학년</label>
@@ -363,25 +426,30 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
                 </select>
                 {form.grade === '기타' && (
                   <input
+                    id="otherGrade"
                     aria-label="기타 학년 정보"
+                    {...fieldProps('otherGrade')}
                     value={otherGrade}
-                    onChange={(event) => setOtherGrade(event.target.value)}
+                    onChange={(event) => { setOtherGrade(event.target.value); setFieldErrors((prev) => ({ ...prev, otherGrade: undefined })) }}
                     maxLength={50}
                     placeholder="학년 정보를 입력하세요"
                     className={`${inputClass} mt-3`}
                   />
                 )}
+                <FieldError name="otherGrade" errors={fieldErrors} />
               </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className={labelClass} htmlFor="phone">전화번호</label>
-                <input id="phone" name="phone" value={form.phone} onChange={handleChange} className={inputClass} placeholder="01012345678" inputMode="tel" autoComplete="tel" />
+                <input id="phone" name="phone" value={form.phone} onChange={handleChange} className={inputClass} placeholder="010-1234-5678" inputMode="tel" autoComplete="tel" {...fieldProps('phone')} />
+                <FieldError name="phone" errors={fieldErrors} />
               </div>
               <div>
                 <label className={labelClass} htmlFor="email">이메일</label>
-                <input id="email" name="email" type="email" value={form.email} onChange={handleChange} className={inputClass} placeholder="이메일을 입력하세요" autoComplete="email" />
+                <input id="email" name="email" type="email" value={form.email} onChange={handleChange} className={inputClass} placeholder="이메일을 입력하세요" autoComplete="email" {...fieldProps('email')} />
+                <FieldError name="email" errors={fieldErrors} />
               </div>
             </div>
 
@@ -405,19 +473,23 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
               </div>
               {interests.includes('기타') && (
                 <input
+                  id="otherInterest"
                   aria-label="기타 관심 분야"
+                  {...fieldProps('otherInterest')}
                   value={otherInterest}
-                  onChange={(event) => setOtherInterest(event.target.value)}
+                  onChange={(event) => { setOtherInterest(event.target.value); setFieldErrors((prev) => ({ ...prev, otherInterest: undefined })) }}
                   maxLength={100}
                   placeholder="기타 관심 분야를 입력하세요"
                   className={`${inputClass} mt-3`}
                 />
               )}
+              <FieldError name="otherInterest" errors={fieldErrors} />
             </div>
 
             <div>
               <label className={labelClass} htmlFor="motive">지원 동기</label>
-              <textarea id="motive" name="motive" value={form.motive} onChange={handleChange} rows={4} maxLength={700} placeholder="COM's에 지원하게 된 이유를 적어주세요." className={`${inputClass} resize-none`} />
+              <textarea id="motive" name="motive" value={form.motive} onChange={handleChange} rows={4} maxLength={700} placeholder="COM's에 지원하게 된 이유를 적어주세요." className={`${inputClass} resize-none`} {...fieldProps('motive')} />
+              <FieldError name="motive" errors={fieldErrors} />
             </div>
 
             <div>
@@ -429,18 +501,34 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
 
             <div>
               <label className={labelClass} htmlFor="expectation">기대하는 활동</label>
-              <textarea id="expectation" name="expectation" value={form.expectation} onChange={handleChange} rows={3} maxLength={700} placeholder="동아리에서 배우고 싶은 것, 해보고 싶은 활동을 적어주세요." className={`${inputClass} resize-none`} />
+              <textarea id="expectation" name="expectation" value={form.expectation} onChange={handleChange} rows={3} maxLength={700} placeholder="동아리에서 배우고 싶은 것, 해보고 싶은 활동을 적어주세요." className={`${inputClass} resize-none`} {...fieldProps('expectation')} />
+              <FieldError name="expectation" errors={fieldErrors} />
+            </div>
+
+            <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-4 text-sm leading-6 text-[var(--app-muted)]">
+              <p className="font-semibold text-[var(--app-text)]">개인정보 수집·이용 안내</p>
+              <p className="mt-1">
+                수집 항목: 이름, 학번, 학과, 학년, 전화번호, 이메일, 관심 분야, 지원 동기, 관련 경험, 기대하는 활동.
+                지원서 접수와 연락, 합격 여부 판단에만 사용합니다.
+                합격 또는 불합격이 정해지면 지원서를 삭제하고, 결정되지 않은 지원서도 접수 1년 뒤 삭제합니다.
+                결정 기록에 남는 연락처와 이메일도 1년 뒤 지웁니다.
+              </p>
+              <label className="mt-3 flex items-start gap-2 font-semibold text-[var(--app-text)]" htmlFor="consent">
+                <input
+                  id="consent"
+                  type="checkbox"
+                  checked={consent}
+                  onChange={(event) => { setConsent(event.target.checked); setFieldErrors((prev) => ({ ...prev, consent: undefined })) }}
+                  {...fieldProps('consent')}
+                  className="mt-1 size-4 shrink-0"
+                />
+                <span>개인정보 수집·이용에 동의합니다 (필수)</span>
+              </label>
+              <FieldError name="consent" errors={fieldErrors} />
             </div>
 
             {error && (
               <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>
-            )}
-
-            {submitted && (
-              <p className="flex items-center gap-2 rounded-lg bg-[var(--app-accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-accent-text)]">
-                <CheckCircle2 size={16} />
-                지원서가 제출되었습니다. 확인 후 개별 연락드리겠습니다.
-              </p>
             )}
 
             <button
@@ -452,6 +540,7 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
               {loading ? '제출 중...' : '지원서 제출하기'}
             </button>
           </form>
+          )}
 
           <aside className="flex flex-col justify-between gap-8 bg-[var(--app-surface-soft)] p-6 sm:p-8">
             <div className="space-y-6">
