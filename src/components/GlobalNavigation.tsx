@@ -63,6 +63,8 @@ export default function GlobalNavigation() {
   const hoverTimer = useRef(0)
   // True while the panel was opened by hovering: a click on that group then keeps it open.
   const openedByHover = useRef(false)
+  // The group the panel was last opened on by a click or the keyboard; null when it only followed the pointer.
+  const clickedGroup = useRef<string | null>(null)
   // Set when the keyboard opened a group: focus moves into its column once it is drawn.
   const focusColumn = useRef<string | null>(null)
   // Every navigation closes the menus, not only their own links: the brand link, a
@@ -210,11 +212,15 @@ export default function GlobalNavigation() {
   }
 
   const onGroupClick = (event: React.MouseEvent, groupId: string) => {
-    if (openGroup === groupId && !openedByHover.current) {
+    // A second click on the group that was itself clicked closes the panel. A group the pointer only
+    // moved on to (the panel follows the pointer at once) is being chosen now, so it stays open.
+    if (openGroup === groupId && clickedGroup.current === groupId) {
       window.clearTimeout(hoverTimer.current)
+      clickedGroup.current = null
       setOpenGroup(null)
       return
     }
+    clickedGroup.current = groupId
     // detail is 0 for Enter and Space: a keyboard user continues inside the panel.
     if (event.detail === 0) focusColumn.current = groupId
     showPanel(groupId, false)
