@@ -17,6 +17,8 @@ import {
   countsPerSlot,
   formatMinute,
   formatPollDate,
+  isPollPast,
+  sortPollsForList,
   monthCells,
   namesAt,
   normalizeSlots,
@@ -42,6 +44,7 @@ import { canManageContent } from '../utils/roleAccess'
 import { useAuth } from '../contexts/useAuth'
 import { showToast } from '../components/common/Toast'
 import { confirmDialog } from '../components/common/ConfirmDialog'
+import ToolFlow from '../components/ToolFlow'
 import ErrorState from '../components/common/ErrorState'
 import { Skeleton, SkeletonGroup } from '../components/common/Skeleton'
 
@@ -82,7 +85,8 @@ function PollList() {
   const navigate = useNavigate()
   const [creating, setCreating] = useState(false)
   const pollsQuery = useQuery({ queryKey: POLLS_KEY, queryFn: listMeetingPolls })
-  const polls = pollsQuery.data ?? []
+  const today = toIsoDate(new Date())
+  const polls = useMemo(() => sortPollsForList(pollsQuery.data ?? [], today), [pollsQuery.data, today])
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-5xl space-y-4">
@@ -101,6 +105,7 @@ function PollList() {
             새 일정 조율
           </button>
         </PageHead>
+        <ToolFlow current="meet" />
 
         {creating && (
           <div className="border-b border-[var(--app-hairline)] p-4 sm:p-6">
@@ -137,6 +142,12 @@ function PollList() {
                   <button type="button" onClick={() => navigate(`/meet/${poll.id}`)} className="coms-card w-full">
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="coms-card-eyebrow">{poll.creatorName}</span>
+                      {!poll.answered && !isPollPast(poll, today) && (
+                        <span className="inline-flex items-center rounded-full bg-amber-500/20 px-2 py-0.5 text-[11px] font-bold text-amber-800 dark:text-amber-200">응답 필요</span>
+                      )}
+                      {isPollPast(poll, today) && (
+                        <span className="inline-flex items-center rounded-full bg-black/10 px-2 py-0.5 text-[11px] font-bold text-[var(--app-muted)]">날짜 지남</span>
+                      )}
                       {poll.answered && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-[var(--app-accent-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--app-accent-text)]">
                           <Check size={11} strokeWidth={3} aria-hidden="true" />

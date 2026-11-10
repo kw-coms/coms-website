@@ -19,6 +19,7 @@ import {
   cleanAttendanceCode,
   formatAttendanceDay,
   formatAttendanceTime,
+  recentTitles,
   remainingLabel,
   secondsLeft,
 } from '../utils/attendance'
@@ -28,6 +29,7 @@ import { usePermissions } from '../contexts/usePermissions'
 import { canManageContent } from '../utils/roleAccess'
 import { showToast } from '../components/common/Toast'
 import { confirmDialog } from '../components/common/ConfirmDialog'
+import ToolFlow from '../components/ToolFlow'
 import ErrorState from '../components/common/ErrorState'
 import { Skeleton, SkeletonGroup } from '../components/common/Skeleton'
 
@@ -73,6 +75,7 @@ export default function Attendance() {
           <PageHeading className="apple-display mt-2 text-4xl sm:text-5xl">출석 체크</PageHeading>
           <p className="apple-copy mt-3 max-w-2xl text-base sm:text-lg">세미나와 모임에서 화면에 뜬 네 자리 코드를 입력하면 출석이 기록됩니다.</p>
         </div>
+        <ToolFlow current="attendance" />
 
         <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-2">
           <CheckInPanel openSessions={openSessions} loaded={sessionsQuery.isSuccess} onChecked={refresh} />
@@ -197,6 +200,7 @@ function ManagerPanel({ sessions, openSessions, receivedAt, onChanged }: {
   const [summaryOpen, setSummaryOpen] = useState(false)
   const now = useNow(openSessions.length > 0)
   const pastSessions = sessions.filter((session) => !session.open)
+  const titleSuggestions = recentTitles(sessions)
 
   const openMutation = useMutation({
     mutationFn: openAttendanceSession,
@@ -239,6 +243,13 @@ function ManagerPanel({ sessions, openSessions, receivedAt, onChanged }: {
         <div className="min-w-0 flex-1 basis-56">
           <label htmlFor="attendanceTitle" className="mb-1 block text-xs font-bold text-[var(--app-text)]">출석 이름</label>
           <input id="attendanceTitle" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={100} placeholder="예: 웹 세미나 3주차" className={`${inputClass} w-full`} />
+          {titleSuggestions.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="최근에 쓴 이름">
+              {titleSuggestions.map((suggestion) => (
+                <button key={suggestion} type="button" onClick={() => setTitle(suggestion)} className="apple-action-secondary min-h-11 max-w-full truncate px-3 text-xs">{suggestion}</button>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <label htmlFor="attendanceMinutes" className="mb-1 block text-xs font-bold text-[var(--app-text)]">받는 시간</label>

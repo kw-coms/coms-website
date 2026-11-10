@@ -1,5 +1,5 @@
 import PageHeading from '../components/PageHeading'
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Download, Link2, Plus, Trash2, UserPlus, Users } from 'lucide-react'
@@ -20,6 +20,7 @@ import {
   gatheringState,
   gatheringToCsv,
   parseCapacity,
+  splitGatherings,
   placesLabel,
   toApiDateTime,
   type Gathering,
@@ -27,6 +28,7 @@ import {
 } from '../utils/gathering'
 import { showToast } from '../components/common/Toast'
 import { confirmDialog } from '../components/common/ConfirmDialog'
+import ToolFlow from '../components/ToolFlow'
 import ErrorState from '../components/common/ErrorState'
 import { Skeleton, SkeletonGroup } from '../components/common/Skeleton'
 
@@ -89,6 +91,8 @@ function GatheringList() {
   const [creating, setCreating] = useState(false)
   const listQuery = useQuery({ queryKey: LIST_KEY, queryFn: listGatherings })
   const gatherings = listQuery.data ?? []
+  const { active, past } = useMemo(() => splitGatherings(listQuery.data ?? []), [listQuery.data])
+  const [showPast, setShowPast] = useState(false)
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-5xl space-y-4">
@@ -107,6 +111,7 @@ function GatheringList() {
             새 모임 열기
           </button>
         </PageHead>
+        <ToolFlow current="gatherings" />
 
         {creating && (
           <div className="border-b border-[var(--app-hairline)] p-4 sm:p-6">
@@ -137,36 +142,69 @@ function GatheringList() {
             </p>
           )}
           {gatherings.length > 0 && (
-            <ul className="grid gap-3 md:grid-cols-2" aria-label="모임 목록">
-              {gatherings.map((gathering) => (
-                <li key={gathering.id}>
-                  <button type="button" onClick={() => navigate(`/gatherings/${gathering.id}`)} className="coms-card w-full">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="coms-card-eyebrow">{gathering.creatorName}</span>
-                      <StateChip gathering={gathering} />
-                      {gathering.joined && (
-                        <span className="coms-gather-chip is-joined">
-                          <Check size={11} strokeWidth={3} aria-hidden="true" />
-                          신청함
-                        </span>
-                      )}
-                    </span>
-                    <span className="coms-card-title block">{gathering.title}</span>
-                    {gathering.description && <span className="coms-card-body line-clamp-2 block">{gathering.description}</span>}
-                    <span className="mt-4 block">
-                      <Places gathering={gathering} />
-                    </span>
-                    {gathering.closesAt && gathering.open && (
-                      <span className="mt-2 block text-xs font-semibold text-[var(--app-muted)]">{formatGatheringTime(gathering.closesAt)}까지</span>
-                    )}
+            <>
+              <h2 className="mb-3 text-sm font-bold text-[var(--app-text)]">진행 중 <span className="text-[var(--app-muted)]">{active.length}</span></h2>
+              {active.length === 0 ? (
+                <p className="py-6 text-center text-sm text-[var(--app-muted)]">지금 받고 있는 모임이 없습니다.</p>
+              ) : (
+                <GatheringCards gatherings={active} label="진행 중인 모임" />
+              )}
+              {past.length > 0 && (
+                <div className="mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowPast((value) => !value)}
+                    aria-expanded={showPast}
+                    aria-controls="gathering-past"
+                    className="apple-action-secondary min-h-11 px-4 text-sm"
+                  >
+                    지난 모임 {past.length}개 {showPast ? '접기' : '펼치기'}
                   </button>
-                </li>
-              ))}
-            </ul>
+                  {showPast && (
+                    <div id="gathering-past" className="mt-3">
+                      <GatheringCards gatherings={past} label="지난 모임" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>
     </div>
+  )
+}
+
+
+function GatheringCards({ gatherings, label }: { gatherings: Gathering[]; label: string }) {
+  const navigate = useNavigate()
+  return (
+    <ul className="grid gap-3 md:grid-cols-2" aria-label={label}>
+      {gatherings.map((gathering) => (
+        <li key={gathering.id}>
+          <button type="button" onClick={() => navigate(`/gatherings/${gathering.id}`)} className="coms-card w-full">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="coms-card-eyebrow">{gathering.creatorName}</span>
+              <StateChip gathering={gathering} />
+              {gathering.joined && (
+                <span className="coms-gather-chip is-joined">
+                  <Check size={11} strokeWidth={3} aria-hidden="true" />
+                  신청함
+                </span>
+              )}
+            </span>
+            <span className="coms-card-title block">{gathering.title}</span>
+            {gathering.description && <span className="coms-card-body line-clamp-2 block">{gathering.description}</span>}
+            <span className="mt-4 block">
+              <Places gathering={gathering} />
+            </span>
+            {gathering.closesAt && gathering.open && (
+              <span className="mt-2 block text-xs font-semibold text-[var(--app-muted)]">{formatGatheringTime(gathering.closesAt)}까지</span>
+            )}
+          </button>
+        </li>
+      ))}
+    </ul>
   )
 }
 

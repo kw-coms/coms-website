@@ -1,7 +1,8 @@
 import PageHeading from '../components/PageHeading'
 import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Copy, Dices, ListOrdered, Minus, Plus, Sparkles, Users, type LucideIcon } from 'lucide-react'
+import { Copy, Dices, ListOrdered, Minus, Plus, Sparkles, Users, UsersRound, type LucideIcon } from 'lucide-react'
 import {
   MAX_DRAW_NAMES,
   clampTeamCount,
@@ -14,11 +15,17 @@ import {
   teamsToText,
 } from '../utils/draw'
 import { showToast } from '../components/common/Toast'
+import { confirmDialog } from '../components/common/ConfirmDialog'
+import ToolFlow from '../components/ToolFlow'
+import { usePermissions } from '../contexts/usePermissions'
+import { canManageContent } from '../utils/roleAccess'
+import { getGathering, listGatherings } from '../services/gatheringApi'
+import { getAttendanceSession, listAttendanceSessions } from '../services/attendanceApi'
 import { companionServices } from '../data/homeContent'
 
 /**
  * Draw ("뽑기"): type names, then split them into teams, put them in an order or pick some.
- * Everything happens in the page: the names are not sent or stored anywhere.
+ * The names and the last result are kept in this browser only (localStorage), never sent.
  *
  * Teams here are a plain even split. TeamMate, one of the club's own apps, splits by roles and
  * rules and keeps rooms; the page points to it instead of growing into it.
@@ -41,21 +48,54 @@ const TEAM_MATE = companionServices.find((service) => service.eyebrow === 'Team 
 /** How long the names tumble before the result settles. */
 const ROLL_MS = 900
 
+const STORE_KEY = 'coms:draw:v1'
+
+const isNames = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string')
+
+/** The saved names and result; anything missing, unreadable or of another shape comes back empty. */
+function loadSaved(): { text: string; result: Result | null } {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(STORE_KEY) || 'null')
+    if (!saved || typeof saved !== 'object') return { text: '', result: null }
+    const text = typeof saved.text === 'string' ? saved.text : ''
+    const result = saved.result
+    const valid = result && (
+      (result.kind === 'teams' && Array.isArray(result.teams) && result.teams.every(isNames))
+      || (result.kind === 'order' && isNames(result.order))
+      || (result.kind === 'pick' && isNames(result.picked))
+    )
+    return { text, result: valid ? result : null }
+  } catch {
+    return { text: '', result: null }
+  }
+}
+
+function saveSaved(text: string, result: Result | null) {
+  try {
+    if (!text && !result) window.localStorage.removeItem(STORE_KEY)
+    else window.localStorage.setItem(STORE_KEY, JSON.stringify({ text, result }))
+  } catch {
+    // Storage may be blocked or full: the page works without it.
+  }
+}
+
 const prefersReducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export default function Draw() {
   const navigate = useNavigate()
-  const [text, setText] = useState('')
+  const [saved] = useState(loadSaved)
+  const [text, setText] = useState(saved.text)
   const [mode, setMode] = useState<Mode>('teams')
   const [teamCount, setTeamCount] = useState(2)
   const [pickCount, setPickCount] = useState(1)
   const [skipPicked, setSkipPicked] = useState(true)
   /** Places (in the list) of the names already picked, for "뽑힌 사람은 빼고". */
   const [alreadyPicked, setAlreadyPicked] = useState<number[]>([])
-  const [result, setResult] = useState<Result | null>(null)
+  const [result, setResult] = useState<Result | null>(saved.result)
   const [drawId, setDrawId] = useState(0)
   const [rolling, setRolling] = useState(false)
   const [flicker, setFlicker] = useState(0)
+  const [importing, setImporting] = useState(false)
 
   const { names, duplicates, dropped } = useMemo(() => parseNames(text), [text])
   const teams = clampTeamCount(teamCount, names.length)
@@ -63,6 +103,8 @@ export default function Draw() {
   const picks = Math.min(Math.max(1, pickCount), Math.max(1, pool))
   const enough = names.length >= 2
   const poolEmpty = mode === 'pick' && enough && pool === 0
+
+  useEffect(() => saveSaved(text, result), [text, result])
 
   useEffect(() => {
     if (!rolling) return undefined
@@ -126,6 +168,7 @@ export default function Draw() {
           <PageHeading className="apple-display mt-2 text-4xl sm:text-5xl">뽑기</PageHeading>
           <p className="apple-copy mt-3 max-w-2xl text-base sm:text-lg">이름을 넣고 조를 나누거나, 발표 순서를 정하거나, 한 명을 뽑습니다.</p>
         </div>
+        <ToolFlow current="draw" />
 
         <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <div>
@@ -133,11 +176,21 @@ export default function Draw() {
               <label htmlFor="drawNames" className="text-base font-bold text-[var(--app-text)]">
                 이름 <span className="text-[var(--app-accent-text)]">{names.length}명</span>
               </label>
-              <div className="flex gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
+                <button type="button" onClick={() => setImporting((open) => !open)} aria-expanded={importing} className="apple-action-secondary min-h-8 px-3 text-xs">가져오기</button>
                 <button type="button" onClick={() => changeText(SAMPLE.join('\n'))} className="apple-action-secondary min-h-8 px-3 text-xs">예시 넣기</button>
                 <button type="button" onClick={() => { changeText(''); setResult(null) }} disabled={text === ''} className="apple-action-secondary min-h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-50">지우기</button>
               </div>
             </div>
+            {importing && (
+              <ImportPanel
+                onPick={async (names) => {
+                  if (text.trim() && !(await confirmDialog({ message: '지금 적힌 이름을 가져온 이름으로 바꿀까요?' }))) return
+                  changeText(names.join('\n'))
+                  setImporting(false)
+                }}
+              />
+            )}
             <textarea
               id="drawNames"
               value={text}
@@ -148,7 +201,7 @@ export default function Draw() {
               aria-describedby="drawNamesHelp"
             />
             <p id="drawNamesHelp" className="mt-2 text-xs text-[var(--app-muted)]">
-              이름은 이 화면 안에서만 쓰이고 어디에도 저장되거나 전송되지 않습니다.
+              이름과 마지막 결과는 이 브라우저에만 저장되고 서버로 보내지 않습니다. 지우기를 누르면 저장한 내용도 사라집니다.
             </p>
             {duplicates.length > 0 && (
               <p className="mt-1 text-xs font-semibold text-amber-600 dark:text-amber-300">같은 이름이 여러 번 있습니다: {duplicates.join(', ')}</p>
@@ -275,6 +328,77 @@ function Stepper({ label, unit, value, min, max, onChange }: {
       <button type="button" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} aria-label={`${label} 늘리기`}>
         <Plus size={14} aria-hidden="true" />
       </button>
+    </div>
+  )
+}
+
+/**
+ * Names taken from a gathering's sign-ups (any member may see who signed up) or, for those who
+ * may run attendance, from who attended a check (the server shows that list to them only).
+ */
+function ImportPanel({ onPick }: { onPick: (names: string[]) => void }) {
+  const { permissions } = usePermissions()
+  const manager = canManageContent(permissions)
+  const [busy, setBusy] = useState(false)
+  const gatherings = useQuery({ queryKey: ['gatherings'], queryFn: listGatherings })
+  const sessions = useQuery({ queryKey: ['attendance', 'sessions'], queryFn: listAttendanceSessions, enabled: manager })
+
+  const take = async (load: () => Promise<string[]>) => {
+    setBusy(true)
+    try {
+      const names = await load()
+      if (names.length === 0) showToast({ message: '가져올 이름이 없습니다.', tone: 'error' })
+      else await onPick(names)
+    } catch (err) {
+      showToast({ message: (err as Error).message || '이름을 가져오지 못했습니다.', tone: 'error' })
+    } finally {
+      setBusy(false)
+    }
+  }
+  const row = 'apple-action-secondary flex min-h-11 w-full items-center justify-between gap-2 px-3 text-left text-xs disabled:opacity-50'
+
+  return (
+    <div className="mt-2 space-y-3 rounded-lg border border-[var(--app-hairline)] p-3" aria-label="이름 가져오기" role="group">
+      <div>
+        <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-[var(--app-text)]"><UsersRound size={13} aria-hidden="true" />모임 신청자</p>
+        {gatherings.isLoading && <p className="text-xs text-[var(--app-muted)]">불러오는 중...</p>}
+        {gatherings.isError && <p role="alert" className="text-xs font-semibold text-red-600 dark:text-red-300">모임 목록을 불러오지 못했습니다.</p>}
+        {gatherings.isSuccess && (gatherings.data.length === 0
+          ? <p className="text-xs text-[var(--app-muted)]">신청을 받은 모임이 없습니다.</p>
+          : (
+            <ul className="space-y-1.5">
+              {gatherings.data.map((gathering) => (
+                <li key={gathering.id}>
+                  <button type="button" disabled={busy} className={row} onClick={() => take(async () => (await getGathering(gathering.id)).participants.map((person) => person.name))}>
+                    <span className="min-w-0 truncate">{gathering.title}</span>
+                    <span className="shrink-0 text-[var(--app-muted)]">{gathering.participantCount}명</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ))}
+      </div>
+      {manager && (
+        <div>
+          <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-[var(--app-text)]"><Users size={13} aria-hidden="true" />출석한 사람</p>
+          {sessions.isLoading && <p className="text-xs text-[var(--app-muted)]">불러오는 중...</p>}
+          {sessions.isError && <p role="alert" className="text-xs font-semibold text-red-600 dark:text-red-300">출석 목록을 불러오지 못했습니다.</p>}
+          {sessions.isSuccess && (sessions.data.length === 0
+            ? <p className="text-xs text-[var(--app-muted)]">출석 기록이 없습니다.</p>
+            : (
+              <ul className="space-y-1.5">
+                {sessions.data.map((session) => (
+                  <li key={session.id}>
+                    <button type="button" disabled={busy} className={row} onClick={() => take(async () => (await getAttendanceSession(session.id)).attendees.map((person) => person.name))}>
+                      <span className="min-w-0 truncate">{session.title}</span>
+                      <span className="shrink-0 text-[var(--app-muted)]">{session.attendeeCount}명</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ))}
+        </div>
+      )}
     </div>
   )
 }
