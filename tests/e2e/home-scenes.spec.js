@@ -210,9 +210,13 @@ test.describe('a visitor on the home page', () => {
   test('turning reduced motion on drops the pointer offsets left on the opening', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/')
-    await page.mouse.move(900, 300)
-    await page.mouse.move(1000, 320)
-    await expect.poll(() => page.locator('#opening').evaluate((el) => el.style.getPropertyValue('--px'))).not.toBe('')
+    // The listener is attached once the scenes are ready; keep moving until it has answered.
+    await expect(page.locator('.cine-root')).toHaveClass(/cine-ready/)
+    let x = 900
+    await expect.poll(async () => {
+      await page.mouse.move((x += 7), 300)
+      return page.locator('#opening').evaluate((el) => el.style.getPropertyValue('--px'))
+    }).not.toBe('')
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await expect.poll(() => page.locator('#opening').evaluate((el) => el.style.getPropertyValue('--px'))).toBe('')
   })
