@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, Mail, Search, Send, UserRound } from 'lucide-react'
 import { lookupRecruitStatus, submitRecruitApplication } from '../services/recruitApi'
 import { showToast } from '../components/common/Toast'
+import { isValidKoreanPhone } from '../utils/koreanPhone'
 import RecruitFacts from '../components/RecruitFacts'
 import { useQuery } from '@tanstack/react-query'
 import { defaultSiteSettings, getPublicSiteSettings } from '../services/siteSettingsApi'
@@ -25,9 +26,15 @@ const inputClass =
   'w-full rounded-lg border border-black/10 bg-[var(--app-surface)] px-4 py-3 text-[15px] text-[var(--app-text)] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[var(--app-accent)]/24'
 const labelClass = 'mb-2 block text-sm font-semibold text-[var(--app-text)]'
 
-// Korean mobile (010-1234-5678) and landline (02-123-4567, 031-123-4567) numbers; hyphens optional.
-const PHONE_PATTERN = /^(01[016789]|02|0[3-6]\d)-?\d{3,4}-?\d{4}$/
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+
+// Each line is backed by the backend: RecruitApplicationService (save, promote, reject, mails), PersonalDataRetentionJob (periods).
+const PRIVACY_NOTICE: [string, string][] = [
+  ['수집 항목', '이름, 학번, 학과, 학년, 전화번호, 이메일, 관심 분야, 지원 동기, 관련 경험, 기대하는 활동, 접속 IP(제출 횟수 제한용, 30일 뒤 삭제).'],
+  ['이용 목적', '지원서 접수와 연락, 합격 여부 판단. 합격하면 이름·학번·학과·전화번호를 동아리 명부에 등록합니다.'],
+  ['열람', '관리자 권한을 가진 운영진만 볼 수 있으며, 접수 내용은 동아리 공식 메일로도 전달될 수 있습니다.'],
+  ['보관', '지원서는 합격·불합격이 정해지면 삭제하고, 정해지지 않으면 접수 1년 뒤 삭제합니다. 결정 기록에는 이름·학번·학과가 남고, 합격 기록의 전화번호와 이메일은 1년 뒤 지웁니다. 불합격 기록에는 연락처를 남기지 않습니다.'],
+]
 
 type FieldName = 'name' | 'studentId' | 'department' | 'otherGrade' | 'phone' | 'email' | 'otherInterest' | 'motive' | 'expectation' | 'consent'
 type FieldErrors = Partial<Record<FieldName, string>>
@@ -278,7 +285,7 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
     if (!form.department.trim()) errors.department = '학과를 입력해주세요.'
     if (form.grade === '기타' && !otherGrade.trim()) errors.otherGrade = '기타 학년 정보를 입력해주세요.'
     if (!form.phone.trim()) errors.phone = '전화번호를 입력해주세요.'
-    else if (!PHONE_PATTERN.test(form.phone.trim())) errors.phone = '전화번호 형식이 올바르지 않아요. 예: 010-1234-5678, 02-123-4567'
+    else if (!isValidKoreanPhone(form.phone)) errors.phone = '전화번호 형식이 올바르지 않아요. 예: 010-1234-5678, 02-123-4567, +82-10-1234-5678'
     if (!form.email.trim()) errors.email = '이메일을 입력해주세요.'
     else if (!EMAIL_PATTERN.test(form.email.trim())) errors.email = '이메일 형식이 올바르지 않아요. 예: name@example.com'
     if (interests.includes('기타') && !otherInterest.trim()) errors.otherInterest = '기타 관심 분야를 입력해주세요.'
@@ -376,7 +383,7 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
               </div>
               <h2 ref={doneRef} tabIndex={-1} className="text-xl font-bold outline-none">지원서를 접수했어요</h2>
               <p className="break-all text-sm leading-6 text-[var(--app-muted)]">
-                <strong className="text-[var(--app-text)]">{sentTo}</strong>로 확인 메일을 보냈어요. 몇 분이 지나도 오지 않으면 스팸함을 확인해 주세요.
+                입력하신 <strong className="text-[var(--app-text)]">{sentTo}</strong> 주소로 확인 메일이 갈 수 있어요. 메일이 오지 않아도 접수는 정상적으로 끝났어요.
               </p>
               <p className="text-sm leading-6 text-[var(--app-muted)]">
                 운영진이 내용을 확인한 뒤 지원서에 적은 연락처로 연락드려요. 진행 상황은 아래 &lsquo;지원 현황 확인&rsquo;에서 학번과 이름으로 볼 수 있어요.
@@ -507,12 +514,14 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
 
             <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-4 text-sm leading-6 text-[var(--app-muted)]">
               <p className="font-semibold text-[var(--app-text)]">개인정보 수집·이용 안내</p>
-              <p className="mt-1">
-                수집 항목: 이름, 학번, 학과, 학년, 전화번호, 이메일, 관심 분야, 지원 동기, 관련 경험, 기대하는 활동.
-                지원서 접수와 연락, 합격 여부 판단에만 사용합니다.
-                합격 또는 불합격이 정해지면 지원서를 삭제하고, 결정되지 않은 지원서도 접수 1년 뒤 삭제합니다.
-                결정 기록에 남는 연락처와 이메일도 1년 뒤 지웁니다.
-              </p>
+              <dl className="mt-2 grid gap-2">
+                {PRIVACY_NOTICE.map(([term, text]) => (
+                  <div key={term} className="grid gap-0.5 sm:grid-cols-[4.5rem_1fr] sm:gap-3">
+                    <dt className="font-semibold text-[var(--app-text)]">{term}</dt>
+                    <dd>{text}</dd>
+                  </div>
+                ))}
+              </dl>
               <label className="mt-3 flex items-start gap-2 font-semibold text-[var(--app-text)]" htmlFor="consent">
                 <input
                   id="consent"
