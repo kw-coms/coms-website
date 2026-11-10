@@ -55,5 +55,9 @@ assert.deepEqual(readNavVisits(storage), { '/about': 2 })
 const broken = { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('full') } }
 assert.deepEqual(readNavVisits(broken), {})
 assert.deepEqual(countNavVisit('/about', broken), { '/about': 1 })
+// No storage object at all (the global itself throws on access): nothing is read, nothing is written, nothing throws.
+Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('SecurityError') } })
+assert.deepEqual(readNavVisits(), {})
+assert.deepEqual(countNavVisit('/about'), { '/about': 1 })
 
 console.log('nav visits contract passed')

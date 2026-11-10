@@ -53,8 +53,16 @@ export function frequentNavPaths(visits: NavVisits, itemPaths: string[], limit =
   return counted.sort((a, b) => visits[b] - visits[a]).slice(0, limit)
 }
 
-// A browser that refuses storage just never builds a row.
-export function readNavVisits(storage: StorageLike | undefined = globalThis.localStorage): NavVisits {
+// A browser that refuses storage (even reading `localStorage` can throw) just never builds a row.
+const defaultStorage = (): StorageLike | undefined => {
+  try {
+    return globalThis.localStorage
+  } catch {
+    return undefined
+  }
+}
+
+export function readNavVisits(storage: StorageLike | undefined = defaultStorage()): NavVisits {
   try {
     return parseNavVisits(storage?.getItem(NAV_VISITS_KEY))
   } catch {
@@ -62,7 +70,7 @@ export function readNavVisits(storage: StorageLike | undefined = globalThis.loca
   }
 }
 
-export function countNavVisit(path: string, storage: StorageLike | undefined = globalThis.localStorage): NavVisits {
+export function countNavVisit(path: string, storage: StorageLike | undefined = defaultStorage()): NavVisits {
   const next = addNavVisit(readNavVisits(storage), path)
   try {
     storage?.setItem(NAV_VISITS_KEY, JSON.stringify(next))

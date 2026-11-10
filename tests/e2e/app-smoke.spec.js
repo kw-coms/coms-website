@@ -2298,8 +2298,8 @@ const expectSiteFontPending = async (page) => {
 const HEADER_MIN_GAP = 12
 for (const siteFont of ['arriving', 'blocked']) {
   for (const [theme, who] of [['light', 'member'], ['dark', 'member'], ['light', 'guest']]) {
-    // The guest variant draws a lock beside Notices, Resources and Community: the tightest the bar gets.
-    test(`header brand keeps a gap to the desktop nav at 1024, 1152 and 1280, ${theme}, site font ${siteFont}${who === 'guest' ? ', guest with locks' : ''}`, async ({ page }) => {
+    // The guest variant swaps the account cluster for the 로그인 button.
+    test(`header brand keeps a gap to the desktop nav at 1024, 1152 and 1280, ${theme}, site font ${siteFont}${who === 'guest' ? ', guest' : ''}`, async ({ page }) => {
       await page.addInitScript((mode) => {
         try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
         try { localStorage.setItem('kwcoms-theme-mode:v2', mode) } catch { /* ignore */ }
@@ -2314,7 +2314,7 @@ for (const siteFont of ['arriving', 'blocked']) {
         const brand = page.locator('header').getByRole('button', { name: '홈으로 이동' })
         const firstItem = page.locator('header nav').first().getByRole('button').first()
         await expect(firstItem).toBeVisible()
-        if (who === 'guest') await expect(page.locator('header nav [data-member-lock]').first()).toBeVisible()
+        if (who === 'guest') await expect(page.locator('header').getByRole('button', { name: '로그인', exact: true })).toBeVisible()
         const gap = async () => {
           const b = await brand.boundingBox()
           return (await firstItem.boundingBox()).x - (b.x + b.width)
@@ -2433,7 +2433,7 @@ test('top navigation shows four groups and one panel with the whole sitemap', as
   await expect(bar.getByRole('button')).toHaveCount(4)
   // Closed: no single page is listed in the bar.
   await expect(page.locator('#nav-panel')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /활동 기록/ })).toHaveCount(0)
+  await expect(page.locator('header').getByRole('button', { name: /활동 기록/ })).toHaveCount(0)
   // No group is active on the home page.
   for (const name of ['동아리', '배움', '멤버', '도구']) await expect(group(name)).not.toHaveAttribute('data-active', 'true')
 
