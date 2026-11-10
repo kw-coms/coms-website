@@ -133,7 +133,7 @@ export default function AskWidget() {
   const { data: settings } = useQuery({ queryKey: ['site-settings', 'public'], queryFn: getPublicSiteSettings })
   useEffect(() => {
     const viewport = window.visualViewport
-    const positionTrigger = () => {
+    const measure = () => {
       const trigger = triggerRef.current
       if (!trigger) return
       trigger.style.removeProperty('bottom')
@@ -148,14 +148,21 @@ export default function AskWidget() {
       const top = above >= minTop ? above : Math.max(minTop, controls.bottom + 8)
       trigger.style.bottom = `${Math.max(8, window.innerHeight - top - button.height)}px`
     }
+    // At most one measurement per frame: this is called on every scroll and every DOM change in the page.
+    let frame = 0
+    const positionTrigger = () => {
+      if (frame) return
+      frame = requestAnimationFrame(() => { frame = 0; measure() })
+    }
     const mutation = new MutationObserver(positionTrigger)
     mutation.observe(document.body, { childList: true, subtree: true })
     window.addEventListener('scroll', positionTrigger, { passive: true })
     window.addEventListener('resize', positionTrigger)
     viewport?.addEventListener('resize', positionTrigger)
     viewport?.addEventListener('scroll', positionTrigger)
-    positionTrigger()
+    measure()
     return () => {
+      if (frame) cancelAnimationFrame(frame)
       mutation.disconnect()
       window.removeEventListener('scroll', positionTrigger)
       window.removeEventListener('resize', positionTrigger)
