@@ -315,7 +315,7 @@ test('home section cards lead where they say', async ({ page }) => {
     await expect(members.getByRole('button', { name })).toBeVisible()
   }
   await expect(page.getByRole('heading', { name: '동아리 일정 캘린더' })).toHaveCount(0)
-  for (const heading of ['광운대에서 컴퓨터를 가장 자연스럽게 시작하는 곳.', '기초부터 실전까지, 매주 이어지는 학습 루틴.', '아이디어를 실제 서비스와 제작물로.', '함께 배울 다음 멤버를 기다립니다.']) {
+  for (const heading of ['배운 건 만들어 보고, 만든 건 함께 나눕니다.', '기초부터 실전까지, 매주 이어지는 학습 루틴.', '아이디어를 실제 서비스와 제작물로.', '함께 배울 다음 멤버를 기다립니다.']) {
     await expect(page.getByRole('heading', { name: heading })).toBeAttached()
   }
 
