@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockOptionalApis } from './visualSupport.js'
+import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
 
 // The four-group navigation: the panel (keyboard, hover, outside click), every route of the old
 // 13-item bar still reachable from the new menu on desktop and on phone, and "자주 가는 곳".
@@ -199,10 +199,11 @@ test.describe('frequent places', () => {
 
   test('phone menu shows the same row', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
+    // Seeded before the page loads, so the visit to /about that follows is counted on top of it.
+    await page.addInitScript(() => localStorage.setItem('kwcoms-nav-visits:v1', JSON.stringify({ '/study': 5, '/apps': 3 })))
     await page.goto('/about')
-    await page.evaluate(() => localStorage.setItem('kwcoms-nav-visits:v1', JSON.stringify({ '/study': 5, '/apps': 3 })))
+    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('kwcoms-nav-visits:v1')))).toEqual({ '/study': 5, '/apps': 3, '/about': 1 })
     await page.getByRole('button', { name: '메뉴 열기' }).click()
-    // The visit to /about that opened this page is counted too, so it comes third.
     await expect(page.getByRole('region', { name: '자주 가는 곳' }).getByRole('button')).toHaveText([/스터디 자료/, /앱/, /소개/])
   })
 })
@@ -266,5 +267,32 @@ test.describe('phone menu', () => {
     const request = page.waitForRequest((r) => r.isNavigationRequest() && new URL(r.url()).pathname === '/lab/')
     await entry(page.locator('#mobile-menu'), '회로 Lab').click()
     await request
+  })
+
+  test('notifications in the menu own Escape and Tab; the menu trap resumes after', async ({ page }) => {
+    await page.unroute('**/api/auth/me').catch(() => {})
+    await mockAdminApis(page)
+    await page.goto('/about')
+    const toggle = page.getByRole('button', { name: '메뉴 열기' })
+    await toggle.click()
+    const menu = page.getByRole('dialog', { name: '메뉴' })
+    const bell = menu.getByRole('button', { name: /알림/ })
+    await bell.click()
+    const popover = page.getByRole('dialog', { name: '알림' })
+    await expect(popover).toBeVisible()
+    // Tab and Shift+Tab stay in the popover (it is portaled outside the menu's own trap).
+    for (const key of ['Shift+Tab', 'Tab', 'Tab', 'Shift+Tab']) {
+      await page.keyboard.press(key)
+      expect(await popover.evaluate((el) => el.contains(document.activeElement)), key).toBe(true)
+    }
+    // One Escape closes only the notifications and returns focus to the bell.
+    await page.keyboard.press('Escape')
+    await expect(popover).toHaveCount(0)
+    await expect(menu).toBeVisible()
+    await expect(bell).toBeFocused()
+    // The next one closes the menu and returns focus to the hamburger.
+    await page.keyboard.press('Escape')
+    await expect(menu).toHaveCount(0)
+    await expect(toggle).toBeFocused()
   })
 })

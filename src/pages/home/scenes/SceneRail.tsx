@@ -8,21 +8,31 @@ export default function SceneRail({ items }: { items: RailItem[] }) {
   const key = items.map((item) => item.id).join('|')
 
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return
-    // A scene counts as current while it crosses the middle of the screen.
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) setActive(entry.target.id)
-        })
-      },
-      { rootMargin: '-45% 0px -45% 0px' },
-    )
-    key.split('|').forEach((id) => {
-      const el = document.getElementById(id)
-      if (el) io.observe(el)
-    })
-    return () => io.disconnect()
+    // A scene is current while it holds the middle of the screen: the last scene whose top edge
+    // has passed the middle line. Measured on scroll rather than by observing, so a tall (pinned)
+    // scene and a fast scroll in either direction both resolve to the scene actually under the line.
+    let raf = 0
+    const measure = () => {
+      raf = 0
+      const middle = window.innerHeight / 2
+      let current = key.split('|')[0]
+      for (const id of key.split('|')) {
+        const el = document.getElementById(id)
+        if (el && el.getBoundingClientRect().top <= middle) current = id
+      }
+      setActive(current)
+    }
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(measure)
+    }
+    measure()
+    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule)
+    return () => {
+      window.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+      if (raf) cancelAnimationFrame(raf)
+    }
   }, [key])
 
   const go = (id: string) => {

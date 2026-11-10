@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockOptionalApis } from './visualSupport.js'
+import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
 
 // The home page is a film in scenes (docs/design/specs/2026-11-10-cinematic-redesign.md).
 // These checks cover what a visitor sees and what must hold under every switch: reduced
@@ -133,4 +133,57 @@ for (const [label, setup] of [
       expect(await overflow(page)).toBeLessThanOrEqual(0)
     })
   })
+}
+
+
+test('a member\'s latest-notice buttons appear after a slow notices response', async ({ page }) => {
+  await mockAdminApis(page)
+  await skipIntro(page)
+  // Later routes win: the notices arrive well after the first scan of reveal elements.
+  await page.route('**/api/notices', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1200))
+    await route.fulfill({ json: [{ id: 3, title: '늦게 도착한 공지', content: '', category: 'GENERAL', createdAt: '2026-11-01T10:00:00' }] })
+  })
+  await page.goto('/')
+  const lead = page.locator('.scene-notice--lead')
+  await expect(lead).toBeAttached({ timeout: 8000 })
+  await lead.scrollIntoViewIfNeeded()
+  await expect(lead).toHaveCSS('opacity', '1')
+  await expect(page.locator('.scene-notice').first()).toHaveCSS('opacity', '1')
+})
+
+// The rail names the scene under the middle of the viewport, scrolling down and back up, with the
+// tall pinned manifesto and with the member's order (the members scene second).
+for (const [width, height] of [[1440, 900], [1280, 720]]) {
+  for (const who of ['guest', 'member']) {
+    test(`the scene rail follows the middle of the viewport at ${width}x${height}, ${who}`, async ({ page }) => {
+      await page.setViewportSize({ width, height })
+      if (who === 'member') await mockAdminApis(page)
+      else await mockOptionalApis(page)
+      await skipIntro(page)
+      await page.goto('/')
+      const rail = page.getByRole('navigation', { name: '장면 이동' })
+      await expect(rail.getByRole('button')).toHaveCount(6)
+      const ids = await page.locator('main > section').evaluateAll((els) => els.map((el) => el.id))
+      const total = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)
+      const stops = []
+      for (let y = 0; y <= total; y += 240) stops.push(y)
+      stops.push(total)
+      const seen = new Set()
+      for (const y of [...stops, ...[...stops].reverse()]) {
+        await page.evaluate((to) => window.scrollTo(0, to), y)
+        // The scene whose box holds the middle line.
+        const expected = await page.evaluate(() => {
+          const middle = window.innerHeight / 2
+          return [...document.querySelectorAll('main > section')].find((el) => { const r = el.getBoundingClientRect(); return r.top <= middle && middle < r.bottom })?.id
+        })
+        if (!expected) continue
+        seen.add(expected)
+        const index = ids.indexOf(expected)
+        await expect(rail.getByRole('button').nth(index), `y=${y} scene ${expected}`).toHaveAttribute('aria-current', 'true')
+        await expect(rail.locator('[aria-current="true"]')).toHaveCount(1)
+      }
+      expect([...seen].sort()).toEqual([...ids].sort())
+    })
+  }
 }

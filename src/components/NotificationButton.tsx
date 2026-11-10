@@ -121,8 +121,8 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
 
   // While open: a press outside closes the popover (it is portaled to <body>, so "outside"
   // means neither the popover nor the bell, whose own click already toggles) and so does
-  // Escape, which hands focus back to the bell. Escape is taken in the capture phase and
-  // stopped so the mobile menu this row sits in stays open until the next Escape.
+  // Escape, which hands focus back to the bell. Escape is taken on window in the capture
+  // phase and stopped so the mobile menu this row sits in stays open until the next Escape.
   useEffect(() => {
     if (!effectiveOpen) return undefined
     // The popover is the last element in <body>; Tab from the bell would never reach it.
@@ -132,17 +132,34 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
       if (btnRef.current?.contains(target) || dropdownRef.current?.contains(target)) return
       setOpen(false)
     }
+    // Inside a modal (the phone menu) the popover is the topmost layer: it owns Tab as well.
+    const inModal = Boolean(btnRef.current?.closest('[aria-modal="true"]'))
     const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Tab' && inModal) {
+        event.stopPropagation()
+        const dropdown = dropdownRef.current as HTMLElement | null
+        const items = Array.from(dropdown?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href]') ?? [])
+        const first = items[0]
+        const last = items[items.length - 1]
+        const active = document.activeElement
+        const inside = Boolean(dropdown?.contains(active)) && active !== dropdown
+        if (!first) event.preventDefault()
+        else if (event.shiftKey && (!inside || active === first)) { event.preventDefault(); last.focus() }
+        else if (!event.shiftKey && (!inside || active === last)) { event.preventDefault(); first.focus() }
+        return
+      }
       if (event.key !== 'Escape') return
       event.stopPropagation()
       setOpen(false)
       btnRef.current?.focus()
     }
+    // On window, in the capture phase: it runs before the modal's own document-level handlers, so
+    // one Escape (or Tab) is the popover's alone.
     document.addEventListener('mousedown', onDocMouseDown)
-    document.addEventListener('keydown', onKey, true)
+    window.addEventListener('keydown', onKey, true)
     return () => {
       document.removeEventListener('mousedown', onDocMouseDown)
-      document.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('keydown', onKey, true)
     }
   }, [effectiveOpen])
 

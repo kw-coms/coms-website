@@ -100,10 +100,20 @@ export function useCineReveal(dep?: unknown) {
       },
       { threshold: 0.15, rootMargin: '0px 0px -6% 0px' },
     )
-    root.querySelectorAll(REVEAL).forEach((el) => {
-      if (!el.classList.contains('is-revealed')) io.observe(el)
-    })
-    return () => io.disconnect()
+    const scan = () => {
+      root.querySelectorAll(REVEAL).forEach((el) => {
+        // observe() on an element that is already watched does nothing, so a rescan is safe.
+        if (!el.classList.contains('is-revealed')) io.observe(el)
+      })
+    }
+    scan()
+    // Elements that mount later (after a query resolves) are picked up too.
+    const mo = new MutationObserver(scan)
+    mo.observe(root, { childList: true, subtree: true })
+    return () => {
+      mo.disconnect()
+      io.disconnect()
+    }
   }, [dep])
 
   useEffect(() => {
