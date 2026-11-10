@@ -23,7 +23,10 @@ export default function SettingsSection({ id, title, children, needsAction = '' 
       if (window.location.hash !== `#${id}`) return
       if (ref.current) ref.current.open = true
       // Wait a frame so the section is expanded before scrolling to it.
-      window.requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }))
+      window.requestAnimationFrame(() => {
+        ref.current?.scrollIntoView({ block: 'start' })
+        ref.current?.querySelector('summary')?.focus({ preventScroll: true })
+      })
     }
     openForHash()
     window.addEventListener('hashchange', openForHash)

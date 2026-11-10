@@ -319,7 +319,8 @@ function ClubEventSection() {
               onRetry={() => { setDetailFailure(null); setRetryTick((tick) => tick + 1) }}
               selectedEvent={selectedEvent}
               notice={notice}
-              error={error || (failedHere && !failedHere.notFound ? failedHere.message : '')}
+              error={error}
+              detailError={failedHere && !failedHere.notFound ? failedHere.message : ''}
               rsvpPending={rsvpPending}
               onRsvp={handleRsvp}
               isAdmin={isAdmin}

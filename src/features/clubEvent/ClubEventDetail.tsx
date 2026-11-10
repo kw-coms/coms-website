@@ -12,6 +12,7 @@ export default function ClubEventDetail({
   selectedEvent,
   notice,
   error,
+  detailError,
   rsvpPending,
   onRsvp,
   isAdmin,
@@ -48,13 +49,13 @@ export default function ClubEventDetail({
       </div>
     )
   }
-  if (!selectedEvent && error) {
+  if (detailError || (!selectedEvent && error)) {
     return (
       <div className="activity-empty-state m-4 sm:m-8" role="alert" data-event-error>
         <Sparkles size={22} aria-hidden="true" />
         <div>
           <h3>이벤트를 불러오지 못했습니다.</h3>
-          <p>{error}</p>
+          <p>{detailError || error}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={onRetry} className="apple-action-primary inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">다시 시도</button>
             <button type="button" onClick={onBack} className="apple-action-secondary inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">이벤트 목록으로</button>

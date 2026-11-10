@@ -1,5 +1,7 @@
 // Per-browser drafts for the post and notice editors. Only text fields and the serialized body
 // are stored: pending uploads never reach the body string, so no attachment is ever kept here.
+import { canWriteMember } from './memberSession'
+import { blockJsonToPmDoc, pmDocToBlockJson } from '../pages/community/tiptapBlockConverters'
 
 export const DRAFT_VERSION = 'v1'
 // A draft this large is not worth a localStorage slot (browsers allow about 5 MB per origin).
@@ -28,7 +30,18 @@ function browserStorage(): DraftStorage | null {
 
 /** One key per signed-in member, editor and target ("new" or the id being edited). */
 export function draftStorageKey(owner: string | number | null | undefined, editor: 'post' | 'notice', target: number | string | null | undefined) {
-  return `kwcoms-draft:${DRAFT_VERSION}:${owner ?? 'anon'}:${editor}:${target ?? 'new'}`
+  return owner == null || String(owner).trim() === '' ? '' : `kwcoms-draft:${DRAFT_VERSION}:${owner}:${editor}:${target ?? 'new'}`
+}
+
+function keyOwner(key: string) {
+  if (!key.startsWith(`kwcoms-draft:${DRAFT_VERSION}:`)) return undefined
+  return key.split(':')[2] || null
+}
+
+function mayUseKey(key: string, epoch?: number) {
+  if (!key) return false
+  const owner = keyOwner(key)
+  return owner === undefined || canWriteMember(owner, epoch)
 }
 
 /** Blank paragraphs and an empty body count as "nothing written". */
@@ -37,7 +50,9 @@ export function normalizeDraftContent(content: string): string {
   try {
     const blocks = JSON.parse(content)
     if (!Array.isArray(blocks)) return content
-    const kept = blocks.filter((block) => !(block?.type === 'text' && !String(block.content ?? '').replace(/<[^>]*>|&nbsp;|\s/g, '')))
+    // Compare the same representation the mounted editor returns.
+    const canonical = pmDocToBlockJson(blockJsonToPmDoc(blocks))
+    const kept = canonical.filter((block) => !(block?.type === 'text' && !String(block.content ?? '').replace(/<[^>]*>|&nbsp;|\s/g, '')))
     return kept.length ? JSON.stringify(kept) : ''
   } catch {
     return content
@@ -52,12 +67,13 @@ export function draftFieldsEqual(a: DraftFields, b: DraftFields): boolean {
 }
 
 export function readDraft(key: string, storage: DraftStorage | null = browserStorage(), now = Date.now()): EditorDraft | null {
+  if (!mayUseKey(key)) return null
   try {
     const raw = storage?.getItem(key)
     if (!raw) return null
     const value = JSON.parse(raw)
     if (!value || typeof value !== 'object' || typeof value.title !== 'string' || typeof value.content !== 'string') return null
-    if (Number(value.savedAt) > 0 && now - Number(value.savedAt) > MAX_DRAFT_AGE_MS) {
+    if (!Number.isFinite(Number(value.savedAt)) || Number(value.savedAt) <= 0 || now - Number(value.savedAt) > MAX_DRAFT_AGE_MS) {
       removeDraft(key, storage)
       return null
     }
@@ -74,7 +90,8 @@ export function readDraft(key: string, storage: DraftStorage | null = browserSto
 }
 
 /** Returns false when the draft was too large or the browser refused it; never throws. */
-export function writeDraft(key: string, fields: DraftFields, storage: DraftStorage | null = browserStorage(), now = Date.now()): boolean {
+export function writeDraft(key: string, fields: DraftFields, storage: DraftStorage | null = browserStorage(), now = Date.now(), epoch?: number): boolean {
+  if (!mayUseKey(key, epoch)) return false
   try {
     const text = JSON.stringify({ ...fields, savedAt: now })
     if (!storage || text.length > MAX_DRAFT_CHARS) return false
@@ -85,7 +102,8 @@ export function writeDraft(key: string, fields: DraftFields, storage: DraftStora
   }
 }
 
-export function removeDraft(key: string, storage: DraftStorage | null = browserStorage()) {
+export function removeDraft(key: string, storage: DraftStorage | null = browserStorage(), epoch?: number) {
+  if (!mayUseKey(key, epoch)) return
   try {
     storage?.removeItem(key)
   } catch {
@@ -106,8 +124,8 @@ export function draftIsStale(draft: Pick<EditorDraft, 'savedAt'> | null, itemUpd
 /** Removes every draft of one member (used on logout). */
 export function clearMemberDrafts(owner: string | number | null | undefined, storage: (DraftStorage & { length: number; key(index: number): string | null }) | null = browserStorage() as never) {
   try {
-    if (!storage) return
-    const prefix = `kwcoms-draft:${DRAFT_VERSION}:${owner ?? 'anon'}:`
+    if (!storage || owner == null || String(owner).trim() === '') return
+    const prefix = `kwcoms-draft:${DRAFT_VERSION}:${owner}:`
     const keys: string[] = []
     for (let i = 0; i < storage.length; i += 1) {
       const key = storage.key(i)

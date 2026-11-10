@@ -39,9 +39,10 @@ import { canDeleteNotice, canEditNotice, canManageSensitiveAdmin, canWriteNotice
 import { usePermissions } from '../contexts/usePermissions'
 import Chip from '../components/common/Chip'
 import DraftNotice, { DraftConflictNotice } from '../components/common/DraftNotice'
-import { useEditorDraft } from '../hooks/useEditorDraft'
+import { confirmEditorLeave, useEditorDraft } from '../hooks/useEditorDraft'
 import { draftIsStale, draftStorageKey, readDraft } from '../utils/editorDraft'
 import { isNoticeUnread, loadNoticeReadState, markAllNoticesRead, markNoticeRead, saveNoticeReadState, visitList } from '../utils/noticeReads'
+import { memberSessionEpoch } from '../utils/memberSession'
 
 function NewDot() {
   return <span data-notice-new className="inline-flex shrink-0 items-center gap-1 text-[10px] font-black text-[var(--app-accent-text)]"><span className="size-1.5 rounded-full bg-[var(--app-accent)]" aria-hidden="true" />새 글</span>
@@ -114,12 +115,20 @@ function noticeCategoryMeta(value) {
   return NOTICE_CATEGORY_META[value] || NOTICE_CATEGORY_META.GENERAL
 }
 
-function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
+type NoticeFormProps = {
   initialNotice?: { id?: number; title?: string; category?: string; content?: string; [key: string]: unknown } | null
   defaultCategory?: string
   onCancel: () => void
   onSave: (saved: unknown) => void
-}) {
+}
+
+function NoticeForm(props: NoticeFormProps) {
+  const { user } = useAuth()
+  if (!user?.studentId) return null
+  return <NoticeEditor key={`${user.studentId}:${props.initialNotice?.id ?? 'new'}`} {...props} />
+}
+
+function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: NoticeFormProps) {
   const { user } = useAuth()
   const storageKey = draftStorageKey(user?.studentId, 'notice', initialNotice?.id)
   const [stored] = useState(() => readDraft(storageKey))
@@ -140,21 +149,21 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
   // Intentionally runs once: re-deriving blocks on every initialNotice change
   // would clobber in-progress edits, so the dependency array is empty by design.
   const savedBlocks = () => (initialNotice ? parseRichBodyBlocks(initialNotice.content || '') : [])
-  const [initialBlocks, setInitialBlocks] = useState(() => (restored?.content ? parseRichBodyBlocks(restored.content) : savedBlocks()))
+  const [initialBlocks, setInitialBlocks] = useState(() => (restored ? parseRichBodyBlocks(restored.content) : savedBlocks()))
   const [originalBlocks] = useState(savedBlocks)
   const draft = useEditorDraft({
     storageKey,
     baseline: () => ({ title: initialNotice?.title || '', category: savedCategory, anonymousName: '', content: serializeRichBody(originalBlocks) }),
     current: () => {
       const blocks = editorApiRef.current?.getBlocks()
-      return blocks ? { title: formData.title, category: formData.category, anonymousName: '', content: serializeRichBody(blocks) } : null
+      return { title: formData.title, category: formData.category, anonymousName: '', content: serializeRichBody(blocks ?? initialBlocks) }
     },
     hasPending: () => (editorApiRef.current?.getBlocks() || []).some((block) => block.type !== 'text' && block.status !== 'saved' && block.file),
     paused: Boolean(pendingDraft),
   })
   const applyDraft = (picked) => {
     setFormData({ title: picked.title, category: picked.category || savedCategory })
-    setInitialBlocks(picked.content ? parseRichBodyBlocks(picked.content) : savedBlocks())
+    setInitialBlocks(parseRichBodyBlocks(picked.content))
     setEditorKey((key) => key + 1)
     setRestored(picked)
     setPendingDraft(null)
@@ -199,6 +208,7 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
       {pendingDraft && <DraftConflictNotice savedAt={pendingDraft.savedAt} updatedAt={typeof initialNotice?.updatedAt === 'string' ? initialNotice.updatedAt : null} onApply={() => applyDraft(pendingDraft)} onKeep={keepCurrent} />}
       {draft.saveFailed && <p role="alert" className="text-xs font-semibold text-red-500">임시 저장하지 못했어요. 저장 공간이 부족하거나 막혀 있습니다. 이 페이지를 떠나면 작성한 내용이 사라질 수 있어요.</p>}
       {restored && <DraftNotice onDiscard={discardDraft} />}
+      <fieldset disabled={Boolean(pendingDraft)} inert={Boolean(pendingDraft)} className="min-w-0 space-y-3 sm:space-y-4">
       <input
         value={formData.title}
         onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
@@ -233,6 +243,7 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
           취소
         </button>
       </div>
+      </fieldset>
     </div>
   )
 }
@@ -318,7 +329,8 @@ export default function Notices() {
 
   // Unread markers live in this browser only (see utils/noticeReads).
   const [readState, setReadState] = useState(() => visitList(loadNoticeReadState(user?.studentId), Date.now()))
-  useEffect(() => { saveNoticeReadState(user?.studentId, readState) }, [readState, user?.studentId])
+  const [readEpoch] = useState(memberSessionEpoch)
+  useEffect(() => { saveNoticeReadState(user?.studentId, readState, undefined, readEpoch) }, [readState, user?.studentId, readEpoch])
   const unreadCount = notices.filter((notice) => isNoticeUnread(readState, notice)).length
   const markRead = (id) => setReadState((prev) => markNoticeRead(prev, id))
 
@@ -349,7 +361,8 @@ export default function Notices() {
     navigate('/notices/' + notice.id, { state: { listSearch: location.search } })
   }
 
-  const backToList = () => {
+  const backToList = async () => {
+    if (!(await confirmEditorLeave())) return
     setMode('list')
     setSelectedNotice(null)
     // Leaving write mode, the URL already is the list with its filter query; pushing a bare
@@ -472,6 +485,7 @@ export default function Notices() {
                       <span className="flex items-center gap-1.5 text-[11px] font-black text-[var(--app-accent-text)]">
                         {meta.featuredLabel}
                         {notice.pinned && <Chip variant="pinned">고정</Chip>}
+                        {isNoticeUnread(readState, notice) && <NewDot />}
                       </span>
                       <span className="mt-0.5 block truncate text-sm font-bold text-[var(--app-text)]">{notice.title}</span>
                     </button>
@@ -716,7 +730,8 @@ export default function Notices() {
           <div className="p-4 sm:p-6">
             <NoticeForm
               initialNotice={selectedNotice}
-              onCancel={() => {
+              onCancel={async () => {
+                if (!(await confirmEditorLeave())) return
                 setMode('list')
                 navigate('/notices/' + selectedNotice.id)
               }}

@@ -2,11 +2,17 @@ import { useContext, useEffect, useRef, useState } from 'react'
 import { UNSAFE_NavigationContext as NavigationContext } from 'react-router-dom'
 import { confirmDialog } from '../components/common/ConfirmDialog'
 import { draftFieldsEqual, removeDraft, writeDraft, type DraftFields } from '../utils/editorDraft'
+import { canWriteMember, memberSessionEpoch } from '../utils/memberSession'
 
 const SAVE_INTERVAL_MS = 1500
 const INPUT_DEBOUNCE_MS = 250
 
 type SaveState = 'saved' | 'failed' | 'none'
+let activeLeaveCheck: (() => Promise<boolean>) | null = null
+
+export function confirmEditorLeave(): Promise<boolean> {
+  return activeLeaveCheck?.() ?? Promise.resolve(true)
+}
 
 function leaveMessage(state: SaveState) {
   if (state === 'failed') return '저장하지 않은 내용이 있고, 임시 저장도 하지 못했습니다. 떠나면 작성한 내용이 사라집니다.'
@@ -46,12 +52,14 @@ export function useEditorDraft({ storageKey, baseline, current, hasPending, paus
   const closedRef = useRef(false)
   const saveState = useRef<SaveState>('none')
   const lastFields = useRef<DraftFields | null>(null)
+  const sessionEpoch = useRef(memberSessionEpoch())
+  const approvedNavigation = useRef(false)
   const latest = useRef({ baseline, current, hasPending, paused })
   useEffect(() => { latest.current = { baseline, current, hasPending, paused } })
 
   // Saves and recomputes dirtiness right now. `fallback` is used when the editor is already gone.
   const flush = (fallback = false) => {
-    if (closedRef.current || latest.current.paused) return
+    if (closedRef.current || latest.current.paused || !canWriteMember(storageKey.split(':')[2], sessionEpoch.current)) return
     const fields = latest.current.current() ?? (fallback ? lastFields.current : null)
     if (!fields) return
     lastFields.current = fields
@@ -60,11 +68,11 @@ export function useEditorDraft({ storageKey, baseline, current, hasPending, paus
     dirtyRef.current = changed
     setDirty(changed)
     if (differs) {
-      const ok = writeDraft(storageKey, fields)
+      const ok = writeDraft(storageKey, fields, undefined, Date.now(), sessionEpoch.current)
       saveState.current = ok ? 'saved' : 'failed'
       setSaveFailed(!ok)
     } else {
-      removeDraft(storageKey)
+      removeDraft(storageKey, undefined, sessionEpoch.current)
       saveState.current = 'none'
       setSaveFailed(false)
     }
@@ -73,6 +81,7 @@ export function useEditorDraft({ storageKey, baseline, current, hasPending, paus
   // eslint-disable-next-line react-hooks/immutability
   useEffect(() => {
     closedRef.current = false
+    sessionEpoch.current = memberSessionEpoch()
     const timer = window.setInterval(flush, SAVE_INTERVAL_MS)
     let debounce = 0
     const onInput = () => {
@@ -82,7 +91,7 @@ export function useEditorDraft({ storageKey, baseline, current, hasPending, paus
     const onHide = () => { if (document.visibilityState === 'hidden') flush() }
     const onUnload = (event: BeforeUnloadEvent) => {
       flush()
-      if (!dirtyRef.current) return
+      if (!dirtyRef.current || !canWriteMember(storageKey.split(':')[2], sessionEpoch.current)) return
       event.preventDefault()
       event.returnValue = ''
     }
@@ -92,16 +101,32 @@ export function useEditorDraft({ storageKey, baseline, current, hasPending, paus
     document.addEventListener('visibilitychange', onHide)
     document.addEventListener('input', onInput, true)
 
+    const checkLeave = async () => {
+      flush()
+      if (!dirtyRef.current || !canWriteMember(storageKey.split(':')[2], sessionEpoch.current)) return true
+      const leave = await confirmDialog({ message: leaveMessage(saveState.current), confirmText: '떠나기', cancelText: '계속 작성' })
+      if (leave) {
+        approvedNavigation.current = true
+        window.setTimeout(() => { approvedNavigation.current = false }, 0)
+      }
+      return leave
+    }
+    activeLeaveCheck = checkLeave
+
     // Guard the router's own push/replace; `leaving` lets the confirmed navigation through.
     // The navigator is the router's long-lived history object; wrapping it is the only hook BrowserRouter offers.
     const original = { push: navigator.push, replace: navigator.replace }
     let leaving = false
     const guard = (kind: 'push' | 'replace') => (...args: Parameters<typeof navigator.push>) => {
       const run = () => original[kind].apply(navigator, args as never)
-      if (leaving || isSameAddress(args[0] as NavigateTarget)) return run()
+      if (leaving || isSameAddress(args[0] as NavigateTarget) || !canWriteMember(storageKey.split(':')[2], sessionEpoch.current)) return run()
+      if (approvedNavigation.current) {
+        approvedNavigation.current = false
+        return run()
+      }
       flush()
       if (!dirtyRef.current) return run()
-      void confirmDialog({ message: leaveMessage(saveState.current), confirmText: '떠나기', cancelText: '계속 작성' }).then((leave) => {
+      void checkLeave().then((leave) => {
         if (!leave) return
         leaving = true
         try { run() } finally { leaving = false }
@@ -121,6 +146,7 @@ export function useEditorDraft({ storageKey, baseline, current, hasPending, paus
       window.removeEventListener('pagehide', onPageHide)
       document.removeEventListener('visibilitychange', onHide)
       document.removeEventListener('input', onInput, true)
+      if (activeLeaveCheck === checkLeave) activeLeaveCheck = null
       if (navigator.push === pushGuard) navigator.push = original.push
       if (navigator.replace === replaceGuard) navigator.replace = original.replace
       // Leaving by Back or any other route still keeps what was typed.
@@ -137,11 +163,11 @@ export function useEditorDraft({ storageKey, baseline, current, hasPending, paus
     saveState.current = 'none'
     setDirty(false)
     setSaveFailed(false)
-    removeDraft(storageKey)
+    removeDraft(storageKey, undefined, sessionEpoch.current)
   }
   /** Re-arms saving after `clear()` when the editor stays open (draft discarded, editing continues). */
   const reset = () => {
-    removeDraft(storageKey)
+    removeDraft(storageKey, undefined, sessionEpoch.current)
     closedRef.current = false
     dirtyRef.current = false
     saveState.current = 'none'

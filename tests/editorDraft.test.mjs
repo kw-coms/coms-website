@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { MAX_DRAFT_AGE_MS, MAX_DRAFT_CHARS, clearMemberDrafts, draftIsStale, draftFieldsEqual, draftStorageKey, normalizeDraftContent, readDraft, removeDraft, writeDraft } from '../src/utils/editorDraft.ts'
+import { beginMemberLogout, cancelMemberLogout, canWriteMember, finishMemberLogout, memberSessionEpoch, setMemberSessionOwner } from '../src/utils/memberSession.ts'
 
 const store = () => {
   const data = new Map()
@@ -34,6 +35,8 @@ assert.equal(writeDraft('k', fields, null), false)
 assert.equal(normalizeDraftContent('[{"type":"text","content":"<p><br></p>"},{"type":"text","content":""}]'), '', 'blank paragraphs are no content')
 assert.equal(draftFieldsEqual({ ...fields, content: '' }, { ...fields, content: '[{"type":"text","content":""}]' }), true)
 assert.equal(draftFieldsEqual(fields, { ...fields, title: '다른 제목' }), false)
+assert.equal(draftFieldsEqual(fields, { ...fields, content: '[{"type":"text","content":"본문<br>"}]' }), true, 'editor normalization does not make untouched server content dirty')
+assert.equal(draftFieldsEqual(fields, { ...fields, content: '[{"type":"text","content":"다른 본문<br>"}]' }), false, 'changed body still counts as dirty')
 
 // Old drafts are dropped on read.
 const old = store()
@@ -53,4 +56,37 @@ assert.equal(draftIsStale(null, '2026-07-01T11:00:00'), false)
 const multi = { keys: ['kwcoms-draft:v1:a:post:new', 'kwcoms-draft:v1:a:notice:3', 'kwcoms-draft:v1:b:post:new', 'other'], removeItem(k) { this.keys = this.keys.filter((x) => x !== k) }, get length() { return this.keys.length }, key(i) { return this.keys[i] ?? null }, getItem: () => null, setItem() {} }
 clearMemberDrafts('a', multi)
 assert.deepEqual(multi.keys, ['kwcoms-draft:v1:b:post:new', 'other'])
+
+// A pending or completed logout must fence off late writes from the old editor.
+setMemberSessionOwner('a')
+const memberStore = store()
+const memberKey = draftStorageKey('a', 'post', null)
+const oldEpoch = memberSessionEpoch()
+assert.equal(writeDraft(memberKey, fields, memberStore, 123, oldEpoch), true)
+assert.equal(beginMemberLogout(), true)
+assert.equal(beginMemberLogout(), false, 'a second logout cannot release the first request write fence')
+assert.equal(canWriteMember('a', oldEpoch), false)
+assert.equal(writeDraft(memberKey, fields, memberStore, 124, oldEpoch), false)
+cancelMemberLogout()
+assert.equal(canWriteMember('a', oldEpoch), true, 'failed logout resumes the same editor')
+beginMemberLogout()
+finishMemberLogout()
+clearMemberDrafts('a', { ...memberStore, length: 1, key: () => memberKey })
+assert.equal(writeDraft(memberKey, fields, memberStore, 125, oldEpoch), false, 'late unmount cannot recreate the removed draft')
+assert.equal(memberStore.getItem(memberKey), null)
+setMemberSessionOwner('b')
+assert.equal(writeDraft(memberKey, fields, memberStore, 126), false, 'a different member cannot write the old key')
+assert.equal(readDraft(memberKey, memberStore), null, 'a different member cannot restore the old key')
+assert.equal(writeDraft(draftStorageKey('b', 'post', null), fields, memberStore, 126), true)
+setMemberSessionOwner('a')
+assert.equal(canWriteMember('a', oldEpoch), false, 'even the same member has a fresh session epoch')
+assert.equal(writeDraft('', fields, memberStore), false, 'no anonymous draft key exists')
+
+// A 401 that lands during a pending logout must invalidate ownership even if logout fails.
+const beforeExpiry = memberSessionEpoch()
+beginMemberLogout()
+setMemberSessionOwner(null)
+cancelMemberLogout()
+assert.equal(canWriteMember('a', beforeExpiry), false)
+assert.equal(writeDraft(memberKey, fields, memberStore, 127, beforeExpiry), false)
 console.log('editorDraft ok')

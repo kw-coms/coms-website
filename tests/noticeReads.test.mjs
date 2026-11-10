@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { VISIT_GAP_MS, clearNoticeReadState, noticeReadKey, isNoticeUnread, loadNoticeReadState, markAllNoticesRead, markNoticeRead, saveNoticeReadState, visitList } from '../src/utils/noticeReads.ts'
 import { canDeleteNotice, canEditNotice } from '../src/utils/roleAccess.ts'
+import { beginMemberLogout, cancelMemberLogout, finishMemberLogout, memberSessionEpoch, setMemberSessionOwner } from '../src/utils/memberSession.ts'
 
 const t0 = new Date('2026-07-01T10:00:00').getTime()
 const old = { id: 1, createdAt: '2026-07-01T09:00:00' }
@@ -29,6 +30,7 @@ assert.equal(isNoticeUnread(markAllNoticesRead(visitList(null, t0), t0 + 10_000_
 
 const mem = new Map()
 const storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) }
+setMemberSessionOwner('a')
 saveNoticeReadState('a', state, storage)
 assert.deepEqual(loadNoticeReadState('a', storage), state)
 assert.equal(loadNoticeReadState('b', storage), null, 'another member starts fresh on the same browser')
@@ -38,6 +40,26 @@ assert.doesNotThrow(() => saveNoticeReadState('a', state, { setItem() { throw ne
 saveNoticeReadState('a', state, storage)
 clearNoticeReadState('a', { removeItem: (k) => mem.delete(k) })
 assert.equal(loadNoticeReadState('a', storage), null, 'cleared on logout')
+
+const editorEpoch = memberSessionEpoch()
+beginMemberLogout()
+saveNoticeReadState('a', state, storage, editorEpoch)
+assert.equal(loadNoticeReadState('a', storage), null, 'pending logout blocks read-mark writes')
+cancelMemberLogout()
+saveNoticeReadState('a', state, storage, editorEpoch)
+assert.deepEqual(loadNoticeReadState('a', storage), state, 'a failed logout keeps the current session usable')
+finishMemberLogout()
+mem.clear()
+saveNoticeReadState('a', state, storage, editorEpoch)
+assert.equal(mem.size, 0, 'logout cleanup cannot write read marks back')
+setMemberSessionOwner('b')
+saveNoticeReadState('a', state, storage)
+saveNoticeReadState(null, state, storage)
+assert.equal(mem.size, 0, 'a missing or different auth owner cannot write')
+assert.equal(noticeReadKey(null), '', 'there is no shared anonymous key')
+setMemberSessionOwner('a')
+saveNoticeReadState('a', state, storage, editorEpoch)
+assert.equal(mem.size, 0, 'an earlier session cannot write after signing back in')
 
 // Server rules: edit = author or ADMIN, delete = notice.write permission.
 const authored = { authorStudentId: '2023000002' }

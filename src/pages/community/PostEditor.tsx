@@ -31,15 +31,23 @@ import {
 } from './postEditorUtils'
 import { usePermissions } from '../../contexts/usePermissions'
 import DraftNotice, { DraftConflictNotice } from '../../components/common/DraftNotice'
-import { useEditorDraft } from '../../hooks/useEditorDraft'
+import { confirmEditorLeave, useEditorDraft } from '../../hooks/useEditorDraft'
 import { draftIsStale, draftStorageKey, readDraft } from '../../utils/editorDraft'
 
-export default function PostEditor({ initialPost, onCancel, onSave, user }: {
+type PostEditorProps = {
   initialPost?: { id?: number; title?: string; category?: string; anonymousName?: string; imageUrl?: string; [key: string]: unknown } | null
   onCancel: () => void
   onSave: (saved: unknown) => void
   user?: { role?: string; [key: string]: unknown } | null
-}) {
+}
+
+export default function PostEditor(props: PostEditorProps) {
+  const owner = props.user?.studentId
+  if (typeof owner !== 'string' || !owner) return null
+  return <PostEditorForm key={owner} {...props} />
+}
+
+function PostEditorForm({ initialPost, onCancel, onSave, user }: PostEditorProps) {
   const isEditing = Boolean(initialPost)
   const { permissions } = usePermissions()
   // A draft saved earlier for this same target (new post, or editing post N) is restored once.
@@ -62,7 +70,7 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
   const [pendingPost, setPendingPost] = useState<{ id: number; category: string } | null>(null)
   const savedBlocks = () => (isEditing ? parsePostBlocks(initialPost) : [])
   const [initialBlocks, setInitialBlocks] = useState(() => (
-    restored?.content ? parsePostBlocks({ ...(initialPost || {}), content: restored.content }) : savedBlocks()
+    restored ? parsePostBlocks({ ...(initialPost || {}), content: restored.content }) : savedBlocks()
   ))
   // What the editor held when the post was opened: the draft only counts as unsaved changes
   // when it differs from this.
@@ -86,7 +94,7 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
     }),
     current: () => {
       const blocks = editorApiRef.current?.getBlocks()
-      return blocks ? { title, category: effectiveCategory, anonymousName, content: serializePostBlocks(blocks) } : null
+      return { title, category: effectiveCategory, anonymousName, content: serializePostBlocks(blocks ?? initialBlocks) }
     },
     hasPending: () => (editorApiRef.current?.getBlocks() || []).some(needsUpload),
     paused: Boolean(pendingDraft),
@@ -96,7 +104,7 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
     setTitle(picked.title)
     setCategory(picked.category || initialPost?.category || 'GENERAL')
     setAnonymousName(picked.anonymousName)
-    setInitialBlocks(picked.content ? parsePostBlocks({ ...(initialPost || {}), content: picked.content }) : savedBlocks())
+    setInitialBlocks(parsePostBlocks({ ...(initialPost || {}), content: picked.content }))
     setEditorKey((key) => key + 1)
     setRestored(picked)
     setPendingDraft(null)
@@ -117,6 +125,7 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
   }
 
   const cancel = async () => {
+    if (!(await confirmEditorLeave())) return
     // Nothing was meant to be published: take back the half-made post rather than leave it on
     // the board with a stand-in body.
     if (pendingPost && !saving) {
@@ -225,10 +234,12 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
   }
 
   return (
-    <form onSubmit={submit} className="community-compose-form grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-      {pendingDraft && <DraftConflictNotice savedAt={pendingDraft.savedAt} updatedAt={typeof initialPost?.updatedAt === 'string' ? initialPost.updatedAt : null} onApply={() => applyDraft(pendingDraft)} onKeep={keepCurrent} className="order-first lg:col-span-2" />}
-      {draft.saveFailed && <p role="alert" className="order-first text-xs font-semibold text-red-500 lg:col-span-2">임시 저장하지 못했어요. 저장 공간이 부족하거나 막혀 있습니다. 이 페이지를 떠나면 작성한 내용이 사라질 수 있어요.</p>}
-      {restored && <DraftNotice onDiscard={discardDraft} className="order-first lg:col-span-2" />}
+    <>
+      {pendingDraft && <DraftConflictNotice savedAt={pendingDraft.savedAt} updatedAt={typeof initialPost?.updatedAt === 'string' ? initialPost.updatedAt : null} onApply={() => applyDraft(pendingDraft)} onKeep={keepCurrent} className="mx-4 mt-4 sm:mx-5" />}
+      {draft.saveFailed && <p role="alert" className="mx-4 mt-4 text-xs font-semibold text-red-500 sm:mx-5">임시 저장하지 못했어요. 저장 공간이 부족하거나 막혀 있습니다. 이 페이지를 떠나면 작성한 내용이 사라질 수 있어요.</p>}
+      {restored && <DraftNotice onDiscard={discardDraft} className="mx-4 mt-4 sm:mx-5" />}
+    <form onSubmit={submit} className="community-compose-form min-w-0">
+      <fieldset className="grid min-w-0 grid-cols-1 gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start" disabled={Boolean(pendingDraft)} inert={Boolean(pendingDraft)}>
       <div className="community-compose-meta order-2 flex flex-wrap gap-2 lg:col-start-2 lg:row-start-1">
         <select value={effectiveCategory} onChange={(e) => setCategory(e.target.value)}
           aria-label="게시판 분류"
@@ -288,6 +299,8 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
           <X size={14} />취소
         </button>
       </div>
+      </fieldset>
     </form>
+    </>
   )
 }

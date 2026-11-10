@@ -1,10 +1,11 @@
-// Which notices are new to this browser. A notice is new when it was posted after the member's
-// previous visit to the list and they have not opened it since. Kept per browser, not per account.
+import { canWriteMember, memberSessionEpoch } from './memberSession'
+
+// A notice is new when posted after this member's previous visit and not opened since.
 
 export const NOTICE_READ_KEY = 'kwcoms-notice-read:v1'
 /** One state per signed-in member, so a shared browser never hands one member's read marks to the next. */
 export function noticeReadKey(owner: string | number | null | undefined) {
-  return `${NOTICE_READ_KEY}:${owner ?? 'anon'}`
+  return owner == null || owner === '' ? '' : `${NOTICE_READ_KEY}:${owner}`
 }
 // Revisits within this gap belong to the same visit, so going to a notice and back keeps the dots.
 export const VISIT_GAP_MS = 30 * 60 * 1000
@@ -35,6 +36,7 @@ export function isNoticeUnread(state: NoticeReadState | null, notice: { id: numb
 }
 
 export function loadNoticeReadState(owner: string | number | null | undefined, storage: Pick<Storage, 'getItem'> | null = safeStorage()): NoticeReadState | null {
+  if (!owner) return null
   try {
     const value = JSON.parse(storage?.getItem(noticeReadKey(owner)) || 'null')
     if (!value || !Number.isFinite(value.seenAt) || !Number.isFinite(value.lastVisit) || !Array.isArray(value.readIds)) return null
@@ -44,7 +46,8 @@ export function loadNoticeReadState(owner: string | number | null | undefined, s
   }
 }
 
-export function saveNoticeReadState(owner: string | number | null | undefined, state: NoticeReadState, storage: Pick<Storage, 'setItem'> | null = safeStorage()) {
+export function saveNoticeReadState(owner: string | number | null | undefined, state: NoticeReadState, storage: Pick<Storage, 'setItem'> | null = safeStorage(), epoch = memberSessionEpoch()) {
+  if (!canWriteMember(owner, epoch)) return
   try {
     storage?.setItem(noticeReadKey(owner), JSON.stringify(state))
   } catch {

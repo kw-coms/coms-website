@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { showToast } from './Toast'
 
 const boxClass = 'flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text)]'
@@ -27,8 +27,10 @@ export function DraftConflictNotice({ savedAt, updatedAt, onApply, onKeep, class
   onKeep: () => void
   className?: string
 }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => { ref.current?.focus() }, [])
   return (
-    <div role="alert" className={`${boxClass} ${className}`}>
+    <div ref={ref} tabIndex={-1} role="alert" className={`${boxClass} ${className}`}>
       <span>
         임시 저장본({formatTime(savedAt)})보다 나중에 이 글이 수정되었어요({formatTime(updatedAt)}). 어느 쪽을 쓸까요?
       </span>

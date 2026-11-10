@@ -13,6 +13,7 @@ import MobileNavMenu from './MobileNavMenu'
 import { openQuickSearch } from '../utils/quickSearch'
 import { ROLE_LABELS, canAccessOperationsPanel } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
+import { confirmEditorLeave } from '../hooks/useEditorDraft'
 
 const floatingBarBaseClass = 'apple-topbar border-b border-[var(--app-hairline)]'
 
@@ -187,6 +188,7 @@ export default function GlobalNavigation() {
   }
 
   const handleLogout = async () => {
+    if (!(await confirmEditorLeave())) return
     // logout() resolves false when the server could not be reached: the member is still signed
     // in (and has been told so), so they stay where they are.
     const loggedOut = await logout()
