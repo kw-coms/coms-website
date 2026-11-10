@@ -44,6 +44,19 @@ function mayUseKey(key: string, epoch?: number) {
   return owner === undefined || canWriteMember(owner, epoch)
 }
 
+// True when the markup holds any character a reader would see. Used only to tell an empty paragraph
+// from a written one; nothing here is treated as sanitised HTML.
+function hasVisibleText(html: string): boolean {
+  let inTag = false
+  const text = html.split('&nbsp;').join(' ')
+  for (const char of text) {
+    if (char === '<') inTag = true
+    else if (char === '>') inTag = false
+    else if (!inTag && char.trim() !== '') return true
+  }
+  return false
+}
+
 /** Blank paragraphs and an empty body count as "nothing written". */
 export function normalizeDraftContent(content: string): string {
   if (!content) return ''
@@ -52,7 +65,7 @@ export function normalizeDraftContent(content: string): string {
     if (!Array.isArray(blocks)) return content
     // Compare the same representation the mounted editor returns.
     const canonical = pmDocToBlockJson(blockJsonToPmDoc(blocks))
-    const kept = canonical.filter((block) => !(block?.type === 'text' && !String(block.content ?? '').replace(/<[^>]*>|&nbsp;|\s/g, '')))
+    const kept = canonical.filter((block) => !(block?.type === 'text' && !hasVisibleText(String(block.content ?? ''))))
     return kept.length ? JSON.stringify(kept) : ''
   } catch {
     return content
