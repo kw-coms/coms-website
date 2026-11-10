@@ -39,6 +39,12 @@ function StudyBody({ id }: { id: string }) {
 
   useEffect(() => (html && layoutRef.current ? initStudyPage(layoutRef.current, study.progressKey) : undefined), [html, study.progressKey])
 
+  // A link from quick search (/study/c#pointer) arrives before the lesson markup exists, so the browser cannot scroll to it.
+  useEffect(() => {
+    if (!html || !location.hash || /^#(code-\d+|pg=)/.test(location.hash)) return
+    document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView()
+  }, [html, location.hash])
+
   // The playground calls the latest login handler without being re-created when the router state changes.
   const goLogin = useRef<(hash: string) => void>(() => {})
   useEffect(() => {

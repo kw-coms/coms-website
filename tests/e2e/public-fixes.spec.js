@@ -313,3 +313,69 @@ test.describe('study hub weight (item 8)', () => {
     await expect.poll(() => scripts.some((name) => /^problems-/.test(name))).toBe(true)
   })
 })
+
+test.describe('quick search finds study content (item 7)', () => {
+  async function openSearch(page) {
+    await skipIntro(page)
+    await mockOptionalApis(page)
+    await page.goto('/about')
+    await expect(page.getByRole('button', { name: '빠른 이동 열기' }).first()).toBeVisible() // the key handler is mounted by then
+    await page.keyboard.press('Control+k')
+    const dialog = page.getByRole('dialog', { name: '빠른 이동' })
+    await expect(dialog).toBeVisible()
+    return dialog
+  }
+
+  for (const [query, expected] of [['python', 'Python 기초'], ['포인터', '7. 포인터'], ['아두이노', '아두이노 기초'], ['회로', 'Circuit Lab']]) {
+    test(`"${query}" finds ${expected}`, async ({ page }) => {
+      const dialog = await openSearch(page)
+      await dialog.getByRole('combobox').fill(query)
+      await expect(dialog.getByRole('option', { name: new RegExp(expected) }).first()).toBeVisible()
+      await expect(dialog.getByText('스터디', { exact: true })).toBeVisible()
+    })
+  }
+
+  test('opening the dialog loads neither the problems nor the lessons', async ({ page }) => {
+    const scripts = []
+    page.on('request', (request) => { if (/\/assets\/.*\.js$/.test(request.url())) scripts.push(request.url().split('/').pop()) })
+    await openSearch(page)
+    await page.waitForLoadState('networkidle')
+    expect(scripts.filter((name) => /^(problems|study-content)-/.test(name))).toEqual([])
+  })
+
+  test('a chapter result navigates to its anchor and the lesson scrolls there', async ({ page }) => {
+    await skipIntro(page)
+    await mockOptionalApis(page)
+    await asMember(page)
+    await page.goto('/about')
+    await expect(page.getByRole('button', { name: '빠른 이동 열기' }).first()).toBeVisible()
+    await page.keyboard.press('Control+k')
+    const dialog = page.getByRole('dialog', { name: '빠른 이동' })
+    await dialog.getByRole('combobox').fill('포인터')
+    await dialog.getByRole('option', { name: /7\. 포인터/ }).click()
+    await expect(page).toHaveURL(/\/study\/c#pointer|\/study\/c#[a-z-]+$/)
+    const id = new URL(page.url()).hash.slice(1)
+    await expect(page.locator(`#${id}`)).toBeVisible()
+    await expect.poll(() => page.evaluate((anchor) => document.getElementById(anchor).getBoundingClientRect().top, id)).toBeLessThan(250)
+  })
+
+  test('a track result opens the track', async ({ page }) => {
+    const dialog = await openSearch(page)
+    await dialog.getByRole('combobox').fill('python')
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL(/\/study\/python$/)
+  })
+
+  for (const theme of ['light', 'dark']) {
+    for (const view of VIEWS) {
+      test(`screenshot quick search ${theme} ${view.name}`, async ({ page }) => {
+        await page.setViewportSize(view.size)
+        await setTheme(page, theme)
+        const dialog = await openSearch(page)
+        await dialog.getByRole('combobox').fill('회로')
+        await expect(dialog.getByRole('option').first()).toBeVisible()
+        await page.screenshot({ path: `${SHOTS}/quicksearch-${theme}-${view.name}.png` })
+      })
+    }
+  }
+})
