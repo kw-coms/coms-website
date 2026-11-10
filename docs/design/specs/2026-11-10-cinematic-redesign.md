@@ -154,3 +154,32 @@ components under `src/pages/home/scenes/`. Delete CSS the rewrite makes dead.
 `npm test`, `npm run build`, `npm run smoke`, `npx playwright test --project=accessibility` pass. Screenshots
 at 1440 and 390 wide, both themes, plus lite and reduced motion, reviewed for overlap and overflow. The
 darwin visual baselines are regenerated only for views this change intentionally redraws.
+
+## Round two (2026-11-10, owner decision)
+
+The owner saw the shipped home page: the first screen was too plain, the backgrounds too plain, the motion
+faded as the page went on, and the manifesto sentence was weak. Round one was too restrained. This round adds
+richness and motion in every scene while keeping it smooth and readable. It replaces the "Motion budget" above
+for full mode only; `:root[data-perf='lite']` and `prefers-reduced-motion` keep the static behaviour, and every
+scene stays fully readable there.
+
+Changed motion budget (full mode):
+
+- Ambient motion is allowed again, but only while its scene is on screen. A scene that leaves the viewport
+  loses `.is-onscreen` and every looping animation inside it is `animation-play-state: paused`. Background
+  loops are 20s or longer.
+- Still animate only `transform`, `opacity`, `clip-path`, plus the gradient position of a text sheen (and
+  `letter-spacing` on the single recruit title). No `filter` on large surfaces. Still no scroll-snap, no
+  horizontal scroll hijack, no smooth-scroll library, no new dependency.
+- Every scene has at least one scroll-linked effect (driven by `--p`) and one entrance sequence, so motion
+  never thins out toward the bottom of the page.
+- Decorative text (scene numerals, divider bands, the ticker) is drawn with `::before { content: attr() }`
+  so it is not DOM text and stays out of the accessibility tree.
+
+Built: an aurora, perspective grid floor, a wireframe cube, a sheen and a typed highlights line on the
+opening, with a ticker along its bottom edge; a backdrop per scene (colour wash that crossfades between scenes,
+glow fields and a texture that differ per scene, a giant outlined numeral); divider bands of outlined scene
+names between scenes; and per-scene scroll effects (a manifesto whose Club OS assembles and whose stats count
+up, parallax and tilt on activity frames, a projects index with a changing numeral and progress line, a members
+ripple, a recruit title that scales in with a marquee below it). The scene rail fills as the current scene
+passes. The manifesto sentence is now "배운 건 만들어 보고, 만든 건 함께 나눕니다."
