@@ -69,7 +69,7 @@ test('a member lesson keeps its original title and the shared reveal', async ({ 
   await page.goto('/study/c')
   await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
   await expect(page.getByRole('heading', { level: 1, name: '처음 배우는 C 언어 변수부터 포인터까지' })).toBeVisible()
-  await expect(page.locator('.page-crumb')).toHaveText("COM'S / C 기초")
+  await expect(page.locator('.page-crumb')).toHaveText("COM'S / 스터디 · C 101") // the lesson file's own crumb, with its course code
   await expect(page.locator('h1 .cine-m > span')).toHaveCSS('transform', 'none')
   await expect(page.locator('h1')).toHaveCSS('font-weight', '700')
 })
