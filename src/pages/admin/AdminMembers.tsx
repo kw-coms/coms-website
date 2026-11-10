@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { listEligibleMembers } from '../../services/adminApi'
 import { useAdminMembers } from './useAdminMembers'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog, promptDialog } from '../../components/common/ConfirmDialog'
@@ -48,6 +50,27 @@ function parseInterests(raw) {
 export default function AdminMembers({ currentUser }: { currentUser: { studentId?: string } }) {
   const { members, loading, error, refetch, addMember, updateRole, updateGeneration, removeMember, resetPassword } = useAdminMembers()
   const [expanded, setExpanded] = useState(null)
+  // The roster (명부), to show who is on it. The same list the 명부 인증 tab loads; if it cannot
+  // be loaded the mark is simply left out.
+  const rosterQuery = useQuery({
+    queryKey: ['admin', 'eligible-members'],
+    queryFn: async () => {
+      const data = await listEligibleMembers()
+      return Array.isArray(data) ? data : []
+    },
+  })
+  const rosterIds = useMemo(() => {
+    if (!rosterQuery.data) return null
+    return {
+      studentIds: new Set(rosterQuery.data.map((row) => String(row.studentId || '')).filter(Boolean)),
+      graduateIds: new Set(rosterQuery.data.map((row) => String(row.id))),
+    }
+  }, [rosterQuery.data])
+  const isOnRoster = (member) => {
+    if (!rosterIds) return null
+    const graduate = /^G\d{4}-(\d+)$/.exec(String(member.studentId || ''))
+    return graduate ? rosterIds.graduateIds.has(graduate[1]) : rosterIds.studentIds.has(String(member.studentId || ''))
+  }
   const [createExpanded, setCreateExpanded] = useState(false)
   const [createForm, setCreateForm] = useState(initialCreateForm)
   const [createError, setCreateError] = useState('')
@@ -324,6 +347,14 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
                   <span className="text-xs text-[var(--theme-body-muted)]">{displayStudentId(member.studentId)}</span>
                   {member.generation && <span className="text-xs font-semibold text-[var(--theme-body-muted)]">{member.generation}기</span>}
                   <RoleTag role={member.role} />
+                  {isOnRoster(member) !== null && (
+                    <span
+                      data-testid={`roster-mark-${member.id}`}
+                      className="rounded bg-black/8 px-2 py-0.5 text-xs font-semibold text-[var(--theme-body-dark)]"
+                    >
+                      {isOnRoster(member) ? '명부 등록' : '명부에 없음'}
+                    </span>
+                  )}
                 </div>
                 <p className="mt-0.5 text-xs text-[var(--theme-body-muted)]">
                   {member.email}

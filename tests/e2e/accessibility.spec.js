@@ -163,7 +163,8 @@ for (const theme of ['dark', 'light']) {
 test('admin panel has no serious or critical accessibility violations', async ({ page }) => {
   await mockAdminApis(page)
   await page.goto('/admin')
-  await expect(page.getByRole('tablist', { name: '관리자 패널 섹션' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: '운영 패널 메뉴' })).toBeVisible()
+  await expect(page.getByRole('tablist', { name: '사람' })).toBeVisible()
   await assertNoSeriousViolations(page)
 })
 

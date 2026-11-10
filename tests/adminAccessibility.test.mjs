@@ -2,11 +2,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const adminSource = readFileSync('src/pages/Admin.tsx', 'utf8')
+const tabNavSource = readFileSync('src/pages/admin/AdminTabNav.tsx', 'utf8')
 const adminMembersSource = readFileSync('src/pages/admin/AdminMembers.tsx', 'utf8')
 const deletedPostModalSource = readFileSync('src/pages/admin/DeletedPostDetailModal.tsx', 'utf8')
 
-assert.match(adminSource, /role="tablist"\s+aria-label="관리자 패널 섹션"/)
-assert.match(adminSource, /role="tab"[\s\S]*?aria-selected=\{resolvedActiveTab === tab\.id\}[\s\S]*?aria-controls=\{`admin-panel-\$\{tab\.id\}`\}/)
+// The tabs moved into the side menu, one labelled tablist per heading.
+assert.match(tabNavSource, /role="tablist"\s+aria-label=\{group\.label\}/)
+assert.match(tabNavSource, /role="tab"[\s\S]*?aria-selected=\{activeId === tab\.id\}[\s\S]*?aria-controls=\{`admin-panel-\$\{tab\.id\}`\}/)
 assert.match(adminSource, /role="tabpanel"[\s\S]*?aria-labelledby=\{`admin-tab-\$\{resolvedActiveTab\}`\}/)
 
 assert.match(deletedPostModalSource, /aria-modal="true"[\s\S]*?aria-labelledby="deleted-post-detail-title"/)
