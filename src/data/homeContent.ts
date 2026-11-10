@@ -244,7 +244,7 @@ export const sectionMeta = {
 
 export const sectionStories = {
   about: {
-    title: '광운대에서 컴퓨터를 가장 자연스럽게 시작하는 곳.',
+    title: '배운 건 만들어 보고, 만든 건 함께 나눕니다.',
     body: 'COM\'s는 세미나, 스터디, 프로젝트, 커뮤니티가 하나의 흐름으로 이어지는 중앙 컴퓨터 학술동아리입니다. 처음 배우는 사람도, 이미 만들고 있는 사람도 각자의 속도로 합류할 수 있습니다.',
     primary: 'About 더 알아보기',
     secondary: '활동 보기',

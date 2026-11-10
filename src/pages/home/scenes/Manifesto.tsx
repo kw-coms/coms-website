@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { experiencePills, heroHighlights, sectionStories, visualDetails } from '../../../data/homeContent'
 import { ClubOsVisual } from '../HomeVisuals'
 import { SceneActionRow, SceneStats, Slate, type SceneActions } from './parts'
@@ -6,12 +7,13 @@ import { cssVars } from './cssVars'
 // Scene 2, the one pinned moment: the statement sits still for about 80vh of scrolling while its
 // words light up one by one (--p comes from useSceneProgress). Reduced motion and lite drop the
 // pin and show every word lit.
-export default function Manifesto({ index, actions }: { index: number; actions: SceneActions }) {
+export default function Manifesto({ index, actions, backdrop }: { index: number; actions: SceneActions; backdrop: ReactNode }) {
   const story = sectionStories.about
   const words = story.title.split(/\s+/)
 
   return (
-    <section id="about" className="scene scene-about">
+    <section id="about" data-scene="about" className="scene scene-about">
+      {backdrop}
       <div className="scene-about__track" data-scene="manifesto" data-scene-pin>
         <div className="scene-about__pin">
           <Slate index={index} name="About" />
@@ -30,14 +32,14 @@ export default function Manifesto({ index, actions }: { index: number; actions: 
           <p className="scene-lede" data-cine>{story.body}</p>
           <SceneActionRow actions={actions} />
         </div>
-        <div className="scene-about__visual cine-wipe">
+        <div className="scene-about__visual cine-wipe" data-scene="os">
           <ClubOsVisual {...visualDetails.about} />
         </div>
         <div className="scene-about__facts">
           <SceneStats id="about" />
           <ul className="scene-highlights">
             {heroHighlights.map((item, i) => (
-              <li key={item.value} data-cine style={cssVars({ '--i': i })}>
+              <li key={item.value} data-cine data-rule style={cssVars({ '--i': i })}>
                 <span className="cine-hud">{item.label}</span>
                 <strong>{item.value}</strong>
                 <span>{item.detail}</span>

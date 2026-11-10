@@ -14,10 +14,6 @@
 	scroll-margin-top: var(--apple-nav-height);
 }
 
-.scene + .scene {
-	border-top: 1px solid var(--app-hairline);
-}
-
 .scene-inner {
 	max-width: 84rem;
 	margin-inline: auto;
@@ -40,7 +36,7 @@
 
 .scene-title--xl {
 	max-width: 17em;
-	font-size: clamp(2.5rem, 6.6vw, 6.25rem);
+	font-size: clamp(2.9rem, 6.6vw, 6.25rem);
 	line-height: 1.12;
 	letter-spacing: -0.035em;
 }
@@ -48,7 +44,7 @@
 .scene-lede {
 	max-width: 34rem;
 	margin-top: 2rem;
-	color: var(--app-muted);
+	color: var(--cine-body);
 	font-size: clamp(1.05rem, 1.5vw, 1.3rem);
 	font-weight: 500;
 	line-height: 1.75;
@@ -80,7 +76,7 @@
 }
 
 .scene-stats > div {
-	border-top: 1px solid var(--app-hairline-strong);
+	border-top: 0;
 	padding-top: 1rem;
 }
 
@@ -93,7 +89,7 @@
 
 .scene-stats dd {
 	margin: 0.5rem 0 0;
-	color: var(--app-muted);
+	color: var(--cine-body);
 	font-size: 0.875rem;
 	line-height: 1.5;
 	word-break: keep-all;
@@ -108,6 +104,7 @@
 	min-height: calc(100svh - var(--apple-nav-height));
 	padding: 1.75rem var(--cine-pad);
 	isolation: isolate;
+	overflow: hidden;
 	overflow: clip;
 	border-top: 0;
 }
@@ -117,10 +114,6 @@
 	inset: 0;
 	z-index: -1;
 	pointer-events: none;
-}
-
-.scene-opening .coms-hero-field {
-	opacity: 0.6;
 }
 
 .scene-opening__vignette {
@@ -350,7 +343,7 @@
 	display: grid;
 	align-content: start;
 	gap: 0.4rem;
-	border-top: 1px solid var(--app-hairline);
+	border-top: 0;
 	padding-top: 1rem;
 }
 
@@ -361,7 +354,7 @@
 }
 
 .scene-highlights li > span:last-child {
-	color: var(--app-muted);
+	color: var(--cine-body);
 	font-size: 0.875rem;
 	line-height: 1.6;
 	word-break: keep-all;
@@ -399,7 +392,7 @@
 .scene-frame {
 	position: relative;
 	display: block;
-	border-top: 1px solid var(--app-hairline-strong);
+	border-top: 0;
 	padding-top: 1.25rem;
 	text-align: left;
 }
@@ -429,7 +422,7 @@
 .scene-frame__body {
 	max-width: 30rem;
 	margin: 0.75rem 0 0;
-	color: var(--app-muted);
+	color: var(--cine-body);
 	font-size: 1rem;
 	line-height: 1.7;
 	word-break: keep-all;
@@ -554,7 +547,7 @@
 	grid-column: 2 / 4;
 	max-width: 40rem;
 	margin-top: 0.85rem;
-	color: var(--app-muted);
+	color: var(--cine-body);
 	font-size: 1rem;
 	line-height: 1.7;
 	word-break: keep-all;
@@ -655,7 +648,7 @@
 	align-content: start;
 	justify-items: start;
 	gap: 0.65rem;
-	border-top: 1px solid var(--app-hairline-strong);
+	border-top: 0;
 	padding-top: 1.25rem;
 	color: var(--app-text);
 	text-align: left;
@@ -688,7 +681,7 @@
 }
 
 .scene-hubcard__body {
-	color: var(--app-muted);
+	color: var(--cine-body);
 	font-size: 1rem;
 	line-height: 1.7;
 	word-break: keep-all;
@@ -778,8 +771,9 @@
 /* ---- Scene 6: recruit, the finale ------------------------------------------------------------------- */
 .scene.scene-recruit {
 	display: flex;
+	flex-direction: column;
+	justify-content: center;
 	min-height: 100svh;
-	align-items: center;
 }
 
 .scene-recruit .scene-inner {
@@ -862,7 +856,28 @@
 		color: var(--app-text);
 	}
 	.scene-rail__item[aria-current='true']::after {
-		transform: scaleX(2);
+		display: none;
+	}
+	/* The current scene's progress: a short line that fills as the middle of the screen passes through it. */
+	.scene-rail__fill {
+		display: none;
+	}
+	.scene-rail__item[aria-current='true'] .scene-rail__fill {
+		position: relative;
+		display: block;
+		width: 1.75rem;
+		height: 2px;
+		background: var(--app-hairline-strong);
+		overflow: hidden;
+		overflow: clip;
+	}
+	.scene-rail__item[aria-current='true'] .scene-rail__fill::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: var(--app-accent);
+		transform-origin: left;
+		transform: scaleX(var(--rail-p, 0));
 	}
 	/* The short name appears on hover and focus only, so it never covers a scene's content. */
 	.scene-rail__name {
@@ -883,7 +898,7 @@
 	}
 }
 
-/* ---- Artwork inside scenes: a hairline, no glow, nothing looping --------------------------------------------- */
+/* ---- Artwork inside scenes: a hairline, no glow (their own loops run only on screen) --------------------------------------------- */
 .scenes .coms-visual {
 	max-width: 34rem;
 	border-radius: 6px;
@@ -914,15 +929,6 @@
 	margin-bottom: 0;
 	border-radius: 6px;
 	background: transparent;
-}
-
-.scenes .coms-visual *,
-.scenes .coms-visual *::before,
-.scenes .coms-visual *::after,
-.scenes .coms-mini *,
-.scenes .coms-mini *::before,
-.scenes .coms-mini *::after {
-	animation: none;
 }
 
 /* ---- Small screens -------------------------------------------------------------------------------------------- */
