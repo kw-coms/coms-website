@@ -36,7 +36,7 @@
 
 .scene-title--xl {
 	max-width: 17em;
-	font-size: clamp(2.5rem, 6.6vw, 6.25rem);
+	font-size: clamp(2.9rem, 6.6vw, 6.25rem);
 	line-height: 1.12;
 	letter-spacing: -0.035em;
 }
