@@ -58,7 +58,8 @@ export function SceneActionRow({ actions, className = '' }: { actions: SceneActi
 /** A figure made only of digits counts up from zero once it is on screen; the final value is what is read aloud. */
 function CountUp({ value }: { value: string }) {
   const calm = useCalm()
-  const [shown, setShown] = useState(value)
+  // Starts at zeros when it will count, so the finished figure never flashes first.
+  const [shown, setShown] = useState(() => (calm ? value : '0'.repeat(value.length)))
   const ref = useRef<HTMLSpanElement | null>(null)
   useEffect(() => {
     const el = ref.current

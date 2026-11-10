@@ -49,6 +49,7 @@
    the matching negative margin keep descenders and tight line heights from being clipped. */
 .cine-lines .cine-m {
 	display: block;
+	overflow: hidden;
 	overflow: clip;
 	padding-block: 0.12em;
 	margin-block: -0.12em;

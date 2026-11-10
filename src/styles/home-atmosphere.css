@@ -8,6 +8,7 @@
 .scene-opening__aurora {
 	position: absolute;
 	inset: 0;
+	overflow: hidden;
 	overflow: clip;
 	transform: translate3d(calc(var(--px, 0) * -14px), calc(var(--py, 0) * -10px), 0);
 	transition: transform 700ms var(--cine-ease);
@@ -67,6 +68,7 @@
 	height: 44%;
 	perspective: 460px;
 	perspective-origin: 50% 0;
+	overflow: hidden;
 	overflow: clip;
 	-webkit-mask-image: radial-gradient(ellipse 62% 100% at 50% 100%, #000 18%, transparent 78%);
 	mask-image: radial-gradient(ellipse 62% 100% at 50% 100%, #000 18%, transparent 78%);
@@ -180,7 +182,7 @@
 
 /* The wordmark: a light sweeps across the letters every few seconds, and the word tilts a few degrees
    with the pointer. Between sweeps every letter is the plain text colour, so contrast is AA throughout;
-   the highlight is a brighter accent that is AA against the page in each theme. */
+   the highlight is lighter than the text in the dark theme and darker than the accent in the light theme, so it is at least 3:1 on the page for any accent a visitor picks. */
 @property --sheen {
 	syntax: '<number>';
 	inherits: true;
@@ -194,7 +196,8 @@
 }
 
 :root:not([data-theme-mode='dark']) .scene-wordmark {
-	--sheen-hi: color-mix(in srgb, var(--app-accent) 78%, #000000);
+	/* Mixed down to under 45% of the accent: even a white accent comes out at 4:1 or better on the paper background. */
+	--sheen-hi: color-mix(in srgb, var(--app-accent) 45%, #000000);
 }
 
 @supports (background-clip: text) or (-webkit-background-clip: text) {
@@ -273,6 +276,7 @@
 	grid-row: 5;
 	margin: 1rem calc(var(--cine-pad) * -1) -1.75rem;
 	padding: 0.8rem 0;
+	overflow: hidden;
 	overflow: clip;
 	border-top: 1px solid var(--app-hairline);
 	-webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
@@ -305,10 +309,6 @@
 	}
 }
 
-.scene-opening {
-	grid-template-rows: auto 1fr auto auto auto;
-}
-
 /* ---- Backdrops: every later scene has its own atmosphere ------------------------------------------ */
 .scene {
 	isolation: isolate;
@@ -318,6 +318,7 @@
 	position: absolute;
 	inset: 0;
 	z-index: -1;
+	overflow: hidden;
 	overflow: clip;
 	pointer-events: none;
 }
@@ -441,17 +442,18 @@
 
 /* ---- Dividers: large outlined scene names that slide with the scroll ---------------------------------- */
 .scene-divider {
+	overflow: hidden;
 	overflow: clip;
 	padding-block: clamp(0.5rem, 2vw, 1.5rem);
 	border-block: 1px solid var(--app-hairline);
 }
 
 .scene-divider__text {
-	display: block;
+	display: inline-block;
 	white-space: nowrap;
 	font: 800 clamp(4.5rem, 13vw, 12rem) / 1.05 var(--apple-font-family);
 	letter-spacing: -0.04em;
-	transform: translate3d(calc(-18vw + (var(--p, 0.5) - 0.5) * var(--dir) * 70vw), 0, 0);
+	transform: translate3d(calc(-36vw + (var(--p, 0.5) - 0.5) * var(--dir) * 70vw), 0, 0);
 }
 
 .scene-divider__text::before {
@@ -535,6 +537,7 @@
 		display: block;
 		height: clamp(7rem, 10vw, 9.5rem);
 		margin-bottom: 1.5rem;
+		overflow: hidden;
 		overflow: clip;
 	}
 	.scene-projects__numerals span {
@@ -566,6 +569,7 @@
 .scene-row__tag {
 	display: inline-block;
 	width: 4.5rem;
+	overflow: hidden;
 	overflow: clip;
 }
 
@@ -633,6 +637,7 @@
 .scene-recruit__marquee {
 	margin: clamp(3rem, 8vw, 6rem) calc(var(--cine-pad) * -1) 0;
 	padding-block: 1rem;
+	overflow: hidden;
 	overflow: clip;
 	border-block: 1px solid var(--app-hairline);
 }

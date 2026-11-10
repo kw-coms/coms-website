@@ -156,6 +156,67 @@ test.describe('a visitor on the home page', () => {
     await expect(figure.locator('[aria-hidden]')).toHaveText('01')
   })
 
+  test('every divider band covers the full width at both ends of its travel', async ({ page }) => {
+    for (const [width, height] of [[1440, 900], [390, 844], [1920, 1080]]) {
+      await page.setViewportSize({ width, height })
+      await page.goto('/')
+      await expect(page.locator('.scene-divider')).toHaveCount(5)
+      const gaps = await page.evaluate(() => {
+        const bad = []
+        for (const band of document.querySelectorAll('.scene-divider')) {
+          const text = band.querySelector('.scene-divider__text')
+          for (const p of [0, 1]) {
+            band.style.setProperty('--p', String(p))
+            const r = text.getBoundingClientRect()
+            if (r.left > 0.5 || r.right < window.innerWidth - 0.5) bad.push(`${text.dataset.t.slice(0, 8)} p=${p} ${Math.round(r.left)}..${Math.round(r.right)}`)
+          }
+          band.style.removeProperty('--p')
+        }
+        return bad
+      })
+      expect(gaps, `${width}px`).toEqual([])
+    }
+  })
+
+  test('the wordmark sheen peak stays at 3:1 or better on the paper theme for any accent', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    for (const accent of ['#0071e3', '#3c3c43', '#d70015', '#ff9f0a', '#8e5cf7', '#ffd60a', '#ffffff', '#f5f5f0']) {
+      await page.addInitScript((value) => {
+        localStorage.setItem('kwcoms-theme-mode:v2', 'light')
+        localStorage.setItem('kwcoms-accent-color', value)
+      }, accent)
+      await page.goto('/')
+      await expect(page.locator('.scene-wordmark')).toBeAttached()
+      const ratio = await page.evaluate(() => {
+        const probe = document.createElement('i')
+        probe.style.color = 'var(--sheen-hi)'
+        document.querySelector('.scene-wordmark').append(probe)
+        const rgb = (css) => {
+          const ctx = document.createElement('canvas').getContext('2d')
+          ctx.fillStyle = css
+          ctx.fillRect(0, 0, 1, 1)
+          return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3))
+        }
+        const lum = ([r, g, b]) => [r, g, b].map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4 }).reduce((s, c, i) => s + c * [0.2126, 0.7152, 0.0722][i], 0)
+        const fg = lum(rgb(getComputedStyle(probe).color))
+        const bg = lum(rgb(getComputedStyle(document.querySelector('.scenes')).backgroundColor))
+        probe.remove()
+        return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05)
+      })
+      expect(ratio, accent).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  test('turning reduced motion on drops the pointer offsets left on the opening', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    await page.mouse.move(900, 300)
+    await page.mouse.move(1000, 320)
+    await expect.poll(() => page.locator('#opening').evaluate((el) => el.style.getPropertyValue('--px'))).not.toBe('')
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await expect.poll(() => page.locator('#opening').evaluate((el) => el.style.getPropertyValue('--px'))).toBe('')
+  })
+
   test('has a divider band between scenes and a backdrop in each later scene', async ({ page }) => {
     await expect(page.locator('.scene-divider')).toHaveCount(5)
     for (const id of ['about', 'activities', 'projects', 'members', 'recruit']) {

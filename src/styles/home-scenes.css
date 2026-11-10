@@ -104,6 +104,7 @@
 	min-height: calc(100svh - var(--apple-nav-height));
 	padding: 1.75rem var(--cine-pad);
 	isolation: isolate;
+	overflow: hidden;
 	overflow: clip;
 	border-top: 0;
 }
@@ -867,6 +868,7 @@
 		width: 1.75rem;
 		height: 2px;
 		background: var(--app-hairline-strong);
+		overflow: hidden;
 		overflow: clip;
 	}
 	.scene-rail__item[aria-current='true'] .scene-rail__fill::after {
@@ -1006,4 +1008,11 @@
 
 :root[data-perf='lite'] .scene-recruit__drift {
 	transform: none;
+}
+
+/* Browsers without overflow: clip (Safari below 16) need the page's side overflow cut off too. */
+@supports not (overflow: clip) {
+	.scenes-main {
+		overflow-x: hidden;
+	}
 }

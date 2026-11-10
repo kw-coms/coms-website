@@ -251,11 +251,21 @@ export function usePointerFx() {
       opening?.style.removeProperty('--px')
       opening?.style.removeProperty('--py')
     }
+    // Lite or reduced motion turning on mid-visit drops the offsets the pointer left behind.
+    const offPerf = subscribePerf(() => {
+      if (reduced.matches || getPerfState().mode === 'lite') onLeave()
+    })
+    const onReduced = () => {
+      if (reduced.matches) onLeave()
+    }
+    reduced.addEventListener('change', onReduced)
     root.addEventListener('pointermove', onMove, { passive: true })
     root.addEventListener('pointerleave', onLeave)
     return () => {
       root.removeEventListener('pointermove', onMove)
       root.removeEventListener('pointerleave', onLeave)
+      offPerf()
+      reduced.removeEventListener('change', onReduced)
       if (raf) cancelAnimationFrame(raf)
     }
   }, [])
