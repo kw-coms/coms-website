@@ -126,12 +126,12 @@ public class AdminController {
     public ResponseEntity<Void> addEligibleMember(Authentication authentication, @Valid @RequestBody AddEligibleMemberRequest request) {
         if (request.studentId() != null && !request.studentId().isBlank()) {
             eligibleMemberService.addSingle(request.studentId(), request.name(), request.generation(), request.phone(),
-                    request.department(), com.coms.backend.domain.Member.Role.USER);
+                    request.department(), request.email(), com.coms.backend.domain.Member.Role.USER);
         } else if (request.admissionYear() != null && !request.admissionYear().isBlank()) {
-            eligibleMemberService.addGraduateSingle(request.name(), request.admissionYear(), request.generation(), request.phone(), request.department());
+            eligibleMemberService.addGraduateSingle(request.name(), request.admissionYear(), request.generation(), request.phone(), request.department(), request.email());
         } else {
             // 학번 미상 재학생: 이름+기수(+전화)만으로 임시 등록. 학번은 나중에 편집으로 채운다.
-            eligibleMemberService.addPendingByGeneration(request.name(), request.generation(), request.phone(), request.department());
+            eligibleMemberService.addPendingByGeneration(request.name(), request.generation(), request.phone(), request.department(), request.email());
         }
         auditLogService.record(authentication.getName(), "ADMIN_ELIGIBLE_MEMBER_ADD", "ELIGIBLE_MEMBER",
                 request.studentId(), "name=" + request.name(), null);
@@ -147,7 +147,7 @@ public class AdminController {
     public ResponseEntity<Void> updateEligibleMember(Authentication authentication,
                                                      @PathVariable Long id,
                                                      @Valid @RequestBody UpdateEligibleMemberRequest request) {
-        eligibleMemberService.updateEligibleMember(id, request.studentId(), request.name(), request.generation(), request.phone(), request.department());
+        eligibleMemberService.updateEligibleMember(id, request.studentId(), request.name(), request.generation(), request.phone(), request.department(), request.email());
         auditLogService.record(authentication.getName(), "ADMIN_ELIGIBLE_MEMBER_UPDATE", "ELIGIBLE_MEMBER",
                 String.valueOf(id), "studentId=" + request.studentId() + ", name=" + request.name(), null);
         return ResponseEntity.noContent().build();

@@ -24,7 +24,10 @@ export type SiteSettings = {
   homeHeroTitle: string
   homeHeroCopy: string
   contactLinks: SiteSettingsContactLink[]
+  askEnabled: boolean
 }
+
+export type AdminSiteSettings = SiteSettings & { askInboxEmail: string }
 
 export const defaultSiteSettings: SiteSettings = {
   semesterLabel: '2026 Semester Ready',
@@ -33,7 +36,10 @@ export const defaultSiteSettings: SiteSettings = {
   homeHeroTitle: 'COM\'s',
   homeHeroCopy: '배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.',
   contactLinks: [{ label: 'Mail', href: 'mailto:kwcoms69@gmail.com' }],
+  askEnabled: false,
 }
+
+export const defaultAdminSiteSettings: AdminSiteSettings = { ...defaultSiteSettings, askInboxEmail: '' }
 
 function clean(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
@@ -58,11 +64,18 @@ export function normalizeSiteSettings(value: Partial<SiteSettings> | null | unde
     homeHeroTitle: clean(value?.homeHeroTitle) || defaultSiteSettings.homeHeroTitle,
     homeHeroCopy: clean(value?.homeHeroCopy) || defaultSiteSettings.homeHeroCopy,
     contactLinks: cleanLinks(value?.contactLinks),
+    askEnabled: value?.askEnabled === true,
   }
 }
 
-export function siteSettingsPayload(settings: SiteSettings) {
-  return normalizeSiteSettings(settings)
+export function normalizeAdminSiteSettings(value: Partial<AdminSiteSettings> | null | undefined): AdminSiteSettings {
+  return { ...normalizeSiteSettings(value), askInboxEmail: clean(value?.askInboxEmail) }
+}
+
+export function siteSettingsPayload(settings: AdminSiteSettings) {
+  const { askEnabled, ...publicFields } = normalizeSiteSettings(settings)
+  void askEnabled
+  return { ...publicFields, askInboxEmail: clean(settings.askInboxEmail) }
 }
 
 export async function getPublicSiteSettings() {
@@ -71,11 +84,11 @@ export async function getPublicSiteSettings() {
 }
 
 export async function getAdminSiteSettings() {
-  return normalizeSiteSettings(await request('/api/admin/site-settings'))
+  return normalizeAdminSiteSettings(await request('/api/admin/site-settings'))
 }
 
-export async function publishSiteSettings(settings: SiteSettings) {
-  return normalizeSiteSettings(await request('/api/admin/site-settings', {
+export async function publishSiteSettings(settings: AdminSiteSettings) {
+  return normalizeAdminSiteSettings(await request('/api/admin/site-settings', {
     method: 'PUT',
     body: JSON.stringify(siteSettingsPayload(settings)),
   }))

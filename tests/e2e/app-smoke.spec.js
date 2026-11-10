@@ -939,7 +939,9 @@ test('admin password reset accepts simple temporary passwords without complexity
   await expect.poll(() => resetPayload).toEqual({ password: 'temp1' })
 })
 
-test('admin roster tab can add edit and delete eligible members', async ({ page }) => {
+for (const width of [1440, 390]) {
+test(`admin roster tab can add edit and delete eligible members at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
   await mockAdminApis(page)
   let roster = [
     {
@@ -947,7 +949,11 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
       studentId: '2025123456',
       name: '기존회원',
       generation: 59,
-      phone: '01011112222',
+      phone: '01000000000',
+      email: 'account@example.com',
+      studentIdFromAccount: true,
+      phoneFromAccount: true,
+      emailFromAccount: true,
     },
   ]
   let addPayload = null
@@ -969,6 +975,7 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
           name: addPayload.name,
           generation: 60,
           phone: '',
+          email: addPayload.email,
         },
       ]
       return route.fulfill({ status: 201, json: roster.at(-1) })
@@ -981,7 +988,7 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
       updatePayload = route.request().postDataJSON()
       roster = roster.map((member) => (
         member.id === id
-          ? { ...member, ...updatePayload }
+          ? { ...member, ...Object.fromEntries(Object.entries(updatePayload).filter(([, value]) => value !== null)) }
           : member
       ))
       return route.fulfill({ status: 204 })
@@ -998,44 +1005,74 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
   await page.getByRole('tab', { name: '명부 인증' }).click()
 
   await expect(page.getByText('명부 확인 · 편집')).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: '관리', exact: true })).toHaveCount(1)
+  const accountRow = page.getByRole('row').filter({ hasText: '기존회원' })
+  await expect(accountRow.getByLabel('계정에서 채운 학번')).toHaveText('계정')
+  await expect(accountRow.getByLabel('계정에서 채운 전화번호')).toHaveText('계정')
+  await expect(accountRow.getByLabel('계정에서 채운 이메일')).toHaveText('계정')
+  await accountRow.getByRole('button', { name: '편집' }).click()
+  roster = roster.map((member) => ({ ...member, studentId: '2025000001', phone: '01000000002', email: 'refreshed@example.com' }))
+  const refreshed = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/admin/eligible-members' && response.request().method() === 'GET')
+  await page.getByRole('button', { name: '새로고침', exact: true }).click()
+  await refreshed
+  await expect(page.locator('.coms-roster-edit').getByLabel('이메일', { exact: true })).toHaveValue('account@example.com')
+  await page.getByRole('button', { name: '저장', exact: true }).click()
+  await expect.poll(() => updatePayload).toMatchObject({ studentId: null, phone: null, email: null })
+  await expect(accountRow).toContainText('refreshed@example.com')
+  await accountRow.getByRole('button', { name: '편집' }).click()
+  await page.locator('.coms-roster-edit').getByLabel('이메일', { exact: true }).fill('changed@example.com')
+  await page.getByRole('button', { name: '저장', exact: true }).click()
+  await expect.poll(() => updatePayload.email).toBe('changed@example.com')
+  await expect(accountRow).toContainText('changed@example.com')
   await page.getByPlaceholder('학번 (10자리)').fill('2026123456')
   // exact: the roster search box below also mentions 이름 in its placeholder.
   await page.getByPlaceholder('이름', { exact: true }).fill('신규회원')
+  await page.getByPlaceholder('test@example.com', { exact: true }).fill('new@example.com')
   await page.getByRole('button', { name: '추가' }).click()
 
   await expect.poll(() => addPayload).toEqual({
     studentId: '2026123456',
     name: '신규회원',
+    email: 'new@example.com',
   })
   // 기수/전화번호 입력칸은 비워 뒀으므로 payload에 실리지 않아야 한다.
   await expect(page.getByText('신규회원 (2026123456) 명부에 추가됐습니다.')).toBeVisible()
   await expect(page.getByRole('row').filter({ hasText: '신규회원' })).toBeVisible()
 
   await page.getByRole('row').filter({ hasText: '신규회원' }).getByRole('button', { name: '편집' }).click()
-  // 편집 인라인 폼: 학번 / 이름 / 학부·학과 / 기수 / 전화번호 순.
-  const editInputs = page.locator('td[colspan="6"]').locator('input')
-  await editInputs.nth(1).fill('수정회원')
-  await editInputs.nth(0).fill('2026123999')
-  await editInputs.nth(2).fill('컴퓨터정보공학부')
-  await editInputs.nth(3).fill('60')
-  await editInputs.nth(4).fill('01099998888')
+  const editRow = page.getByRole('row').filter({ has: page.getByLabel('학번', { exact: true }) })
+  await editRow.getByLabel('이름', { exact: true }).fill('수정회원')
+  await editRow.getByLabel('학번', { exact: true }).fill('2026123999')
+  await editRow.getByLabel('학부/학과', { exact: true }).fill('컴퓨터정보공학부')
+  await editRow.getByLabel('기수', { exact: true }).fill('60')
+  await editRow.getByLabel('전화번호', { exact: true }).fill('01000000001')
+  await editRow.getByLabel('이메일', { exact: true }).fill('edited@example.com')
   await page.getByRole('button', { name: '저장' }).click()
 
   await expect.poll(() => updatePayload).toEqual({
     studentId: '2026123999',
     name: '수정회원',
     generation: '60',
-    phone: '01099998888',
+    phone: '01000000001',
+    email: 'edited@example.com',
     department: '컴퓨터정보공학부',
   })
   await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toBeVisible()
   await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toContainText('컴퓨터정보공학부')
 
+  await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toContainText('edited@example.com')
+  if (width === 390) {
+    const table = page.getByRole('table')
+    expect(await table.evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0)
+    expect(await table.locator('..').evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0)
+  }
   await page.getByRole('row').filter({ hasText: '수정회원' }).getByRole('button', { name: '삭제' }).click()
 
   await expect.poll(() => deletedId).toBe(2)
   await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toHaveCount(0)
 })
+
+}
 
 test('admin ban tab can ban and unban student ids', async ({ page }) => {
   await mockAdminApis(page)

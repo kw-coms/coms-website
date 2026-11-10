@@ -6,6 +6,7 @@ import com.coms.backend.dto.EligibleMemberResponse;
 import com.coms.backend.dto.EligibleMemberImportResponse;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.repository.EligibleMemberRepository;
+import com.coms.backend.repository.MemberRepository;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -36,6 +37,7 @@ import java.util.regex.Pattern;
 public class EligibleMemberService {
 
     private final EligibleMemberRepository eligibleMemberRepository;
+    private final MemberRepository memberRepository;
     private final com.coms.backend.repository.BannedStudentRepository bannedStudentRepository;
     private final Clock clock;
 
@@ -43,6 +45,7 @@ public class EligibleMemberService {
     private static final Pattern NAME_PATTERN = Pattern.compile("[가-힣]{2,10}");
     private static final Pattern TWO_DIGIT_YEAR_PATTERN = Pattern.compile("\\d{2}");
     private static final Pattern GENERATION_PATTERN = Pattern.compile("\\d{1,3}");
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s\\p{Cntrl}]+@[^@\\s\\p{Cntrl}]+\\.[^@\\s\\p{Cntrl}]+$");
     private static final int GRADUATE_AFTER_YEARS = 7;
     private static final int FIRST_GENERATION_YEAR = 1966;
     private static final long MAX_IMPORT_FILE_BYTES = 5L * 1024 * 1024;
@@ -51,9 +54,11 @@ public class EligibleMemberService {
 
     public EligibleMemberService(EligibleMemberRepository eligibleMemberRepository,
                                   com.coms.backend.repository.BannedStudentRepository bannedStudentRepository,
+                                  MemberRepository memberRepository,
                                   Clock clock) {
         this.eligibleMemberRepository = eligibleMemberRepository;
         this.bannedStudentRepository = bannedStudentRepository;
+        this.memberRepository = memberRepository;
         this.clock = clock;
     }
 
@@ -75,12 +80,22 @@ public class EligibleMemberService {
         addSingle(studentId, name, generation, phone, department, initialRole, false);
     }
 
+    public void addSingle(String studentId, String name, String generation, String phone,
+                          String department, String email, Member.Role initialRole) {
+        addSingle(studentId, name, generation, phone, department, email, initialRole, false);
+    }
+
     /**
      * @param keepExistingDepartment 리크루팅 합격 이관처럼 자동으로 채우는 경로는 true:
      *                               명부에 이미 적힌 학부/학과를 덮어쓰지 않고 빈 칸만 채운다.
      */
     public void addSingle(String studentId, String name, String generation, String phone,
                           String department, Member.Role initialRole, boolean keepExistingDepartment) {
+        addSingle(studentId, name, generation, phone, department, null, initialRole, keepExistingDepartment);
+    }
+
+    private void addSingle(String studentId, String name, String generation, String phone,
+                           String department, String email, Member.Role initialRole, boolean keepExistingDepartment) {
         String normalized = normalize(studentId);
         if (!STUDENT_ID_PATTERN.matcher(normalized).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
@@ -92,6 +107,10 @@ public class EligibleMemberService {
         String normalizedPhone = normalizePhone(phone);
         if (!normalizedPhone.isBlank()) {
             member.setPhone(normalizedPhone);
+        }
+        String normalizedEmail = normalizeEmail(email);
+        if (normalizedEmail != null) {
+            member.setEmail(normalizedEmail);
         }
         String normalizedDepartment = normalizeDepartment(department);
         if (normalizedDepartment != null
@@ -275,6 +294,11 @@ public class EligibleMemberService {
 
     public void addGraduateSingle(String name, String twoDigitYearStr, String generationStr, String phone,
                                   String department) {
+        addGraduateSingle(name, twoDigitYearStr, generationStr, phone, department, null);
+    }
+
+    public void addGraduateSingle(String name, String twoDigitYearStr, String generationStr, String phone,
+                                  String department, String email) {
         String normalizedName = normalize(name);
 
         Integer admissionYear = null;
@@ -302,6 +326,7 @@ public class EligibleMemberService {
         String verificationKey = verificationKey(normalizedName, admissionYear);
         String normalizedPhone = normalizePhone(phone);
         String normalizedDepartment = normalizeDepartment(department);
+        String normalizedEmail = normalizeEmail(email);
 
         Optional<EligibleMember> existing = eligibleMemberRepository.findByVerificationKey(verificationKey);
         if (existing.isPresent()) {
@@ -312,7 +337,10 @@ public class EligibleMemberService {
             if (normalizedDepartment != null) {
                 existing.get().setDepartment(normalizedDepartment);
             }
-            if (!normalizedPhone.isBlank() || normalizedDepartment != null) {
+            if (normalizedEmail != null) {
+                existing.get().setEmail(normalizedEmail);
+            }
+            if (!normalizedPhone.isBlank() || normalizedDepartment != null || normalizedEmail != null) {
                 eligibleMemberRepository.save(existing.get());
             }
             return;
@@ -320,6 +348,7 @@ public class EligibleMemberService {
 
         EligibleMember member = new EligibleMember();
         member.setName(normalizedName);
+        member.setEmail(normalizedEmail);
         member.setStudentId(null);
         member.setAdmissionYear(admissionYear);
         member.setGeneration(generation);
@@ -340,6 +369,10 @@ public class EligibleMemberService {
     }
 
     public void addPendingByGeneration(String name, String generationStr, String phone, String department) {
+        addPendingByGeneration(name, generationStr, phone, department, null);
+    }
+
+    public void addPendingByGeneration(String name, String generationStr, String phone, String department, String email) {
         String normalizedName = normalize(name);
         if (normalizedName.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름을 입력해주세요.");
@@ -350,7 +383,7 @@ public class EligibleMemberService {
         }
         int admissionYear = Integer.parseInt(digits) + FIRST_GENERATION_YEAR;
         if (isGraduate(admissionYear)) {
-            addGraduateSingle(normalizedName, null, digits, phone, department);
+            addGraduateSingle(normalizedName, null, digits, phone, department, email);
             return;
         }
         // 같은 이름+기수 임시 행이 이미 있으면 전화번호만 보강.
@@ -365,6 +398,10 @@ public class EligibleMemberService {
         String normalizedPhone = normalizePhone(phone);
         if (!normalizedPhone.isBlank()) {
             member.setPhone(normalizedPhone);
+        }
+        String normalizedEmail = normalizeEmail(email);
+        if (normalizedEmail != null) {
+            member.setEmail(normalizedEmail);
         }
         String normalizedDepartment = normalizeDepartment(department);
         if (normalizedDepartment != null) {
@@ -381,23 +418,77 @@ public class EligibleMemberService {
 
     @Transactional(readOnly = true)
     public List<EligibleMemberResponse> listRoster() {
-        return eligibleMemberRepository.findAllByOrderByStudentIdAscNameAsc()
-                .stream()
-                .map(member -> new EligibleMemberResponse(
-                        member.getId(),
-                        member.getStudentId(),
-                        member.getName(),
-                        member.getDepartment(),
-                        member.getGeneration(),
-                        member.getAdmissionYear(),
-                        member.getPhone(),
-                        member.getInitialRole().name()
-                ))
+        List<EligibleMember> roster = eligibleMemberRepository.findAllByOrderByStudentIdAscNameAsc();
+        Map<String, Member> accounts = new HashMap<>();
+        List<String> studentIds = roster.stream()
+                .map(EligibleMember::getStudentId)
+                .filter(id -> id != null && !id.isBlank())
                 .toList();
+        if (!studentIds.isEmpty()) {
+            memberRepository.findByStudentIdIn(studentIds)
+                    .forEach(account -> accounts.put(account.getStudentId(), account));
+        }
+        Map<NamePhone, Long> blankPairCounts = new HashMap<>();
+        for (EligibleMember member : roster) {
+            if (blank(member.getStudentId()) && !blank(member.getName()) && !phoneDigits(member.getPhone()).isEmpty()) {
+                blankPairCounts.merge(namePhone(member.getName(), member.getPhone()), 1L, Long::sum);
+            }
+        }
+        Map<NamePhone, List<Member>> accountsByPair = new HashMap<>();
+        if (!blankPairCounts.isEmpty()) {
+            Set<String> names = new HashSet<>();
+            blankPairCounts.keySet().forEach(pair -> names.add(pair.name()));
+            for (Member account : memberRepository.findByNormalizedNameIn(names)) {
+                if (!phoneDigits(account.getPhone()).isEmpty()) {
+                    accountsByPair.computeIfAbsent(namePhone(account.getName(), account.getPhone()), ignored -> new ArrayList<>())
+                            .add(account);
+                }
+            }
+        }
+        return roster
+                .stream()
+                .map(member -> {
+                    Member account = accounts.get(member.getStudentId());
+                    boolean studentIdFromAccount = false;
+                    if (account == null && blank(member.getStudentId()) && !blank(member.getName())
+                            && !phoneDigits(member.getPhone()).isEmpty()) {
+                        NamePhone pair = namePhone(member.getName(), member.getPhone());
+                        List<Member> matches = accountsByPair.getOrDefault(pair, List.of());
+                        if (blankPairCounts.getOrDefault(pair, 0L) == 1 && matches.size() == 1) {
+                            account = matches.getFirst();
+                            studentIdFromAccount = !blank(account.getStudentId());
+                        }
+                    }
+                    boolean phoneFromAccount = blank(member.getPhone()) && account != null && !blank(account.getPhone());
+                    boolean emailFromAccount = blank(member.getEmail()) && account != null && !blank(account.getEmail());
+                    return new EligibleMemberResponse(
+                            member.getId(), studentIdFromAccount ? account.getStudentId() : member.getStudentId(),
+                            member.getName(), member.getDepartment(),
+                            member.getGeneration(), member.getAdmissionYear(),
+                            phoneFromAccount ? account.getPhone() : member.getPhone(),
+                            emailFromAccount ? account.getEmail() : member.getEmail(),
+                            phoneFromAccount, emailFromAccount, studentIdFromAccount, member.getInitialRole().name());
+                })
+                .toList();
+    }
+
+    private record NamePhone(String name, String phone) {}
+
+    private NamePhone namePhone(String name, String phone) {
+        return new NamePhone(normalize(name), phoneDigits(phone));
+    }
+
+    private String phoneDigits(String phone) {
+        return normalize(phone).replaceAll("[^0-9]", "");
     }
 
     public void updateEligibleMember(Long id, String studentId, String name, String generation, String phone,
                                      String department) {
+        updateEligibleMember(id, studentId, name, generation, phone, department, null);
+    }
+
+    public void updateEligibleMember(Long id, String studentId, String name, String generation, String phone,
+                                     String department, String email) {
         EligibleMember member = eligibleMemberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "명부에서 해당 항목을 찾을 수 없습니다."));
         String normalizedStudentId = normalize(studentId);
@@ -417,6 +508,9 @@ public class EligibleMemberService {
         member.setPhone(normalizedPhone.isBlank() ? null : normalizedPhone);
         if (department != null) {
             member.setDepartment(normalizeDepartment(department));
+        }
+        if (email != null) {
+            member.setEmail(normalizeEmail(email));
         }
         eligibleMemberRepository.save(member);
     }
@@ -571,6 +665,9 @@ public class EligibleMemberService {
                 String department = colMap.containsKey("department")
                         ? normalizeDepartment(safeGet(record, colMap.get("department")))
                         : null;
+                String email = colMap.containsKey("email")
+                        ? normalizeEmail(safeGet(record, colMap.get("email")))
+                        : null;
 
                 Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
                 if (existing.isPresent()) {
@@ -580,6 +677,7 @@ public class EligibleMemberService {
                     if (fillMissingDepartment(existing.get(), name, department)) {
                         departmentFilled++;
                     }
+                    fillMissingEmail(existing.get(), name, email);
                     skipped++;
                     continue;
                 }
@@ -589,6 +687,7 @@ public class EligibleMemberService {
                 member.setName(name);
                 member.setDepartment(department);
                 member.setPhone(phone == null || phone.isBlank() ? null : phone);
+                member.setEmail(email);
                 member.setGeneration(generation);
                 member.setAdmissionYear(admissionYear);
                 member.setVerificationKey(verificationKey);
@@ -635,6 +734,7 @@ public class EligibleMemberService {
             if (flat.contains("기수")) map.putIfAbsent("generation", header);
             if (flat.contains("전화")) map.putIfAbsent("phone", header);
             if (flat.equalsIgnoreCase("phone")) map.putIfAbsent("phone", header);
+            if (flat.equals("이메일") || flat.equals("이메일 주소") || flat.equals("email") || flat.equals("e-mail")) map.putIfAbsent("email", header);
             if (isDepartmentHeader(flat)) map.putIfAbsent("department", header);
         }
         return map;
@@ -699,6 +799,9 @@ public class EligibleMemberService {
                 String department = header.containsKey("department")
                         ? normalizeDepartment(readCell(row, header.get("department"), evaluator))
                         : null;
+                String email = header.containsKey("email")
+                        ? normalizeEmail(readCell(row, header.get("email"), evaluator))
+                        : null;
 
                 Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
                 if (existing.isPresent()) {
@@ -708,6 +811,7 @@ public class EligibleMemberService {
                     if (fillMissingDepartment(existing.get(), name, department)) {
                         departmentFilled++;
                     }
+                    fillMissingEmail(existing.get(), name, email);
                     skipped++;
                     continue;
                 }
@@ -719,6 +823,7 @@ public class EligibleMemberService {
                 member.setName(name);
                 member.setDepartment(department);
                 member.setPhone(phone == null || phone.isBlank() ? null : phone);
+                member.setEmail(email);
                 member.setGeneration(generation);
                 member.setAdmissionYear(admissionYear);
                 member.setVerificationKey(verificationKey);
@@ -755,6 +860,7 @@ public class EligibleMemberService {
             else if (label.contains("학번")) header.putIfAbsent("studentId", cell.getColumnIndex());
             if (label.equals("이름") || label.equalsIgnoreCase("name")) header.putIfAbsent("name", cell.getColumnIndex());
             if (label.equals("전화번호") || label.contains("전화") || label.equalsIgnoreCase("phone")) header.putIfAbsent("phone", cell.getColumnIndex());
+            if (label.equals("이메일") || label.equals("이메일 주소") || label.equals("email") || label.equals("e-mail")) header.putIfAbsent("email", cell.getColumnIndex());
             if (label.contains("기수")) header.putIfAbsent("generation", cell.getColumnIndex());
             if (isDepartmentHeader(label)) header.putIfAbsent("department", cell.getColumnIndex());
             if (label.equals("특이사항") || label.equals("비고")) header.putIfAbsent("note", cell.getColumnIndex());
@@ -835,6 +941,14 @@ public class EligibleMemberService {
         return true;
     }
 
+    private void fillMissingEmail(EligibleMember member, String name, String email) {
+        if (email == null || !normalize(name).equals(normalize(member.getName())) || !blank(member.getEmail())) {
+            return;
+        }
+        member.setEmail(email);
+        eligibleMemberRepository.save(member);
+    }
+
     private Optional<EligibleMember> findExisting(String studentId, String verificationKey) {
         if (studentId != null && !studentId.isBlank()) {
             return eligibleMemberRepository.findByStudentId(studentId);
@@ -872,6 +986,19 @@ public class EligibleMemberService {
         String normalized = normalize(value);
         if (normalized.isBlank()) return null;
         return normalized.length() > 100 ? normalized.substring(0, 100) : normalized;
+    }
+
+    private String normalizeEmail(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isEmpty()) return null;
+        if (normalized.length() > 255 || !EMAIL_PATTERN.matcher(normalized).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이메일 형식을 확인해주세요.");
+        }
+        return normalized;
+    }
+
+    private boolean blank(String value) {
+        return value == null || value.isBlank();
     }
 
     private boolean isDepartmentHeader(String label) {

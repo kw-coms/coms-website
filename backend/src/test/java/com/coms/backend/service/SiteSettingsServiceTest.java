@@ -52,14 +52,16 @@ class SiteSettingsServiceTest {
                 "9월 초 별도 공지",
                 "새 학기 COM's",
                 "함께 공부하고 만드는 운영 공지입니다.",
-                List.of(new SiteSettingsRequest.ContactLinkRequest("  문의 메일  ", "  mailto:kwcoms69@gmail.com  "))
+                List.of(new SiteSettingsRequest.ContactLinkRequest("  문의 메일  ", "  mailto:test@example.com  ")),
+                "  inbox@example.com  "
         ));
 
         assertThat(updated.semesterLabel()).isEqualTo("2026-2 운영 중");
         assertThat(updated.recruitmentStatus()).isEqualTo("모집 예정");
         assertThat(updated.contactLinks()).hasSize(1);
         assertThat(updated.contactLinks().get(0).label()).isEqualTo("문의 메일");
-        assertThat(updated.contactLinks().get(0).href()).isEqualTo("mailto:kwcoms69@gmail.com");
+        assertThat(updated.contactLinks().get(0).href()).isEqualTo("mailto:test@example.com");
+        assertThat(updated.askInboxEmail()).isEqualTo("inbox@example.com");
         assertThat(siteSettingsRepository.count()).isEqualTo(1);
     }
 
@@ -71,7 +73,8 @@ class SiteSettingsServiceTest {
                 "9월 초 별도 공지",
                 "새 학기 COM's",
                 "함께 공부합니다.",
-                List.of(new SiteSettingsRequest.ContactLinkRequest("문의", "javascript:alert(1)"))
+                List.of(new SiteSettingsRequest.ContactLinkRequest("문의", "javascript:alert(1)")),
+                ""
         ))).isInstanceOf(ResponseStatusException.class);
 
         assertThatThrownBy(() -> siteSettingsService.publish(requestWithLink("https://admin@example.com/contact")))
@@ -87,7 +90,38 @@ class SiteSettingsServiceTest {
                 "9월 초 별도 공지",
                 "새 학기 COM's",
                 "함께 공부합니다.",
-                List.of(new SiteSettingsRequest.ContactLinkRequest("문의", href))
+                List.of(new SiteSettingsRequest.ContactLinkRequest("문의", href)),
+                ""
         );
+    }
+
+    @Test
+    void askInboxCanBeClearedAndRejectsHeaderInjection() {
+        siteSettingsService.publish(new SiteSettingsRequest(
+                "Semester", "모집 예정", "별도 공지", "COM's", "설명입니다.",
+                List.of(new SiteSettingsRequest.ContactLinkRequest("Mail", "mailto:test@example.com")),
+                "inbox@example.com"));
+        assertThat(siteSettingsService.adminCurrent().askInboxEmail()).isEqualTo("inbox@example.com");
+        assertThat(new SiteSettingsService(siteSettingsRepository, true).current().askEnabled()).isTrue();
+
+        assertThatThrownBy(() -> siteSettingsService.publish(new SiteSettingsRequest(
+                "Semester", "모집 예정", "별도 공지", "COM's", "설명입니다.",
+                List.of(new SiteSettingsRequest.ContactLinkRequest("Mail", "mailto:test@example.com")),
+                "inbox@example.com\r\nBcc: attacker@example.com")))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode().value()).isEqualTo(400));
+        assertThatThrownBy(() -> siteSettingsService.publish(new SiteSettingsRequest(
+                "Semester", "모집 예정", "별도 공지", "COM's", "설명입니다.",
+                List.of(new SiteSettingsRequest.ContactLinkRequest("Mail", "mailto:test@example.com")),
+                "group:test@example.com,other@example.com;")))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode().value()).isEqualTo(400));
+
+        siteSettingsService.publish(new SiteSettingsRequest(
+                "Semester", "모집 예정", "별도 공지", "COM's", "설명입니다.",
+                List.of(new SiteSettingsRequest.ContactLinkRequest("Mail", "mailto:test@example.com")),
+                ""));
+        assertThat(siteSettingsService.adminCurrent().askInboxEmail()).isEmpty();
+        assertThat(siteSettingsService.current().askEnabled()).isFalse();
     }
 }

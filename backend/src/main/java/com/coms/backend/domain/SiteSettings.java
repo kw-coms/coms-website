@@ -35,6 +35,10 @@ public class SiteSettings {
     @Column(name = "club_room_code", nullable = false, length = 60, columnDefinition = "VARCHAR(60) NOT NULL DEFAULT ''")
     private String clubRoomCode = "";
 
+    @Column(name = "ask_inbox_email", nullable = false, length = 254,
+            columnDefinition = "VARCHAR(254) NOT NULL DEFAULT ''")
+    private String askInboxEmail = "";
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -68,6 +72,8 @@ public class SiteSettings {
     public String getContactLinksJson() { return contactLinksJson; }
     public String getClubRoomCode() { return clubRoomCode == null ? "" : clubRoomCode; }
     public void setClubRoomCode(String clubRoomCode) { this.clubRoomCode = clubRoomCode == null ? "" : clubRoomCode; }
+    public String getAskInboxEmail() { return askInboxEmail == null ? "" : askInboxEmail; }
+    public void setAskInboxEmail(String askInboxEmail) { this.askInboxEmail = askInboxEmail == null ? "" : askInboxEmail; }
     public void setContactLinksJson(String contactLinksJson) { this.contactLinksJson = contactLinksJson; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
