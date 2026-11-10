@@ -363,6 +363,8 @@ export default function AppearanceControl({
                       aria-disabled={item.auth && authLoading || undefined}
                       onClick={(event) => {
                         if (item.auth && authLoading) { event.preventDefault(); return }
+                        // A modified or non-primary click opens elsewhere: leave this page where it is.
+                        if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return
                         scrollToTopInstant()
                       }}
                       className="coms-footer-link gap-1.5 rounded-sm text-[var(--app-muted)] hover:text-[var(--app-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-accent)]"

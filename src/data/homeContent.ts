@@ -483,6 +483,8 @@ export type NavItem = {
   auth?: boolean
   /** Extra words the quick jump matches (the old short descriptions, other spellings). */
   keywords?: string
+  /** Set on the items the home activity row lists (the records and tools of activitySectionNavItems). */
+  activityGroup?: 'records' | 'tools'
 }
 
 export type NavGroup = { id: string; label: string; sub: string; items: NavItem[] }
@@ -490,7 +492,7 @@ export type NavGroup = { id: string; label: string; sub: string; items: NavItem[
 const fromActivityItem = (id: string): NavItem => {
   const item = activitySectionNavItems.find((entry) => entry.id === id)
   if (!item) throw new Error(`Unknown activity nav item: ${id}`)
-  return { id, label: item.hint, sub: item.label, path: item.path, icon: item.icon, ...('auth' in item && item.auth ? { auth: true } : {}) }
+  return { id, label: item.hint, sub: item.label, path: item.path, icon: item.icon, activityGroup: item.group as 'records' | 'tools', ...('auth' in item && item.auth ? { auth: true } : {}) }
 }
 
 /**

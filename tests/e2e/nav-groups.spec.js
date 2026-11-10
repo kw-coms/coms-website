@@ -90,6 +90,34 @@ test.describe('desktop panel', () => {
     await expect(panel(page)).toHaveCount(0)
   })
 
+  test('a panel opened by click stays open when the pointer leaves; only a hover-opened one closes', async ({ page }) => {
+    await page.goto('/about')
+    await group(page, '멤버').click()
+    await expect(panel(page)).toBeVisible()
+    await page.mouse.move(700, 850)
+    await page.waitForTimeout(500)
+    await expect(panel(page)).toBeVisible()
+    // Hovering on to another group does not turn it into a hover panel.
+    await group(page, '도구').hover()
+    await expect(panel(page).getByRole('region', { name: '도구' })).toHaveAttribute('data-open', 'true')
+    await page.mouse.move(700, 850)
+    await page.waitForTimeout(500)
+    await expect(panel(page)).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(panel(page)).toHaveCount(0)
+  })
+
+  test('Escape on a hover-opened panel does not take focus from a field being typed in', async ({ page }) => {
+    await page.goto('/login')
+    const field = page.getByRole('textbox').first()
+    await field.focus()
+    await group(page, '멤버').hover()
+    await expect(panel(page)).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(panel(page)).toHaveCount(0)
+    await expect(field).toBeFocused()
+  })
+
   test('a press outside closes it, and a click on the same group toggles it', async ({ page }) => {
     await page.goto('/about')
     await group(page, '동아리').click()

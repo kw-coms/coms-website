@@ -6,7 +6,8 @@ import { NOT_FOUND_LABEL, routeLabel } from '../routes/pageTitles'
 /** Keeps the page's own title, including titles that change while editing. */
 export default function PageHeading({ children, className = '', ...props }: ComponentProps<'h1'>) {
   const { pathname } = useLocation()
-  useCineReveal(children)
+  // Keyed by route, not by children (a new object every render), so the observer is not rebuilt on each render.
+  useCineReveal(pathname)
   return (
     <div className="page-heading cine-root">
       <p className="cine-hud page-crumb">COM'S / {routeLabel(pathname) ?? NOT_FOUND_LABEL}</p>

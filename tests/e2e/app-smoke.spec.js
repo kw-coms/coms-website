@@ -289,12 +289,12 @@ test('home tools row lists entries of the header menu and opens a tool', async (
   await tools.scrollIntoViewIfNeeded()
   const tiles = tools.getByRole('button')
   const titles = await tiles.evaluateAll(items => items.map(item => item.querySelector('.scene-chip__label').textContent))
-  expect(titles.length).toBeGreaterThanOrEqual(4)
-  // Every tile is an entry of the header's panel, and they come in the panel's order.
+  // The chips are exactly the panel's records items then its tools items (marked data-nav-activity): same labels, order and count.
   await page.getByRole('button', { name: '멤버', exact: true }).click()
-  const labels = await page.locator('#nav-panel .nav-item-label').allTextContents()
+  const labels = await page.locator('#nav-panel [data-nav-activity] .nav-item-label').allTextContents()
   await page.keyboard.press('Escape')
-  expect(labels.filter(label => titles.includes(label))).toEqual(titles)
+  expect(labels).toHaveLength(7)
+  expect(titles).toEqual(labels)
 
   await tools.getByRole('button', { name: /일정 조율/ }).click()
   await expect(page).toHaveURL(/\/meet$/)
@@ -2445,11 +2445,31 @@ test('group buttons show the active underline on their pages', async ({ page }) 
       // The underline fades in (transition), so poll until it settles.
       await expect.poll(() => underline(name), { message: `${path}: ${name} underline` }).toBe(id === active ? 1 : 0)
       if (id !== active) await expect(toggle(name)).not.toHaveAttribute('data-active', 'true')
-      const width = (await toggle(name).boundingBox()).width
-      widths[id] ??= width
-      expect(Math.abs(width - widths[id]), `${name} width on ${path}`).toBeLessThanOrEqual(0.5)
+      const box = await toggle(name).boundingBox()
+      expect(box, `${name} box on ${path}`).not.toBeNull()
+      widths[id] ??= box.width
+      expect(Math.abs(box.width - widths[id]), `${name} width on ${path}`).toBeLessThanOrEqual(0.5)
     }
   }
+  // The underline is centred on its label and hangs at the same height under every group button.
+  await page.goto('/about')
+  await expect(toggle('동아리')).toHaveAttribute('data-active', 'true')
+  await page.evaluate(() => document.fonts.ready)
+  const lines = []
+  for (const name of Object.values(groups)) {
+    const label = toggle(name).locator('[data-nav-label]')
+    await expect(label).toBeVisible()
+    const geometry = await label.evaluate((el) => {
+      const text = el.getBoundingClientRect()
+      const after = getComputedStyle(el, '::after')
+      const width = parseFloat(after.width)
+      const left = text.left + parseFloat(after.left) // left: 50% resolves to px, so the centre is left + width / 2 under translateX(-50%)
+      return { labelCentre: text.left + text.width / 2, lineCentre: left, lineBottom: text.top + parseFloat(after.top) + parseFloat(after.height), width }
+    })
+    expect(Math.abs(geometry.lineCentre - geometry.labelCentre), `${name} underline centred`).toBeLessThanOrEqual(1)
+    lines.push(geometry.lineBottom)
+  }
+  for (const y of lines) expect(Math.abs(y - lines[0]), 'underline height').toBeLessThanOrEqual(1)
   // No group is active on the home page.
   await page.goto('/')
   for (const name of Object.values(groups)) await expect(toggle(name)).not.toHaveAttribute('data-active', 'true')
@@ -2562,10 +2582,10 @@ for (const width of [1024, 1100, 1280, 1440]) {
       expect(item.clipped).toBe(false)
       // one line: every item sits on the same row as the first one
       expect(Math.abs(item.mid - first.mid)).toBeLessThan(4)
-      expect(item.bottom - item.top).toBeLessThanOrEqual(48)
+      expect(item.bottom - item.top).toBeLessThan(48)
     }
     expect(cluster.x + cluster.width).toBeLessThanOrEqual(width)
-    expect(navBox.height).toBeLessThanOrEqual(48)
+    expect(navBox.height).toBeLessThan(48)
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
 
     await nav.getByRole('button', { name: '배움', exact: true }).click()

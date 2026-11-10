@@ -124,8 +124,11 @@ export default function GlobalNavigation() {
     }
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      // Hand focus back only if it is in the menu: a hover-opened panel must not take it from a field being typed in.
+      const focus = document.activeElement
+      const inMenu = !!focus && (panelRef.current?.contains(focus) || groupNavRef.current?.contains(focus))
       setOpenGroup(null)
-      groupToggleRefs.current[openGroup]?.focus()
+      if (inMenu) groupToggleRefs.current[openGroup]?.focus()
     }
     document.addEventListener('mousedown', onDocDown)
     document.addEventListener('keydown', onKey)
@@ -194,12 +197,14 @@ export default function GlobalNavigation() {
   const showPanel = (groupId: string, byHover: boolean) => {
     window.clearTimeout(hoverTimer.current)
     if (!openGroup) setFrequent(frequentItems())
-    openedByHover.current = byHover
+    // Hovering on to another group keeps the way the panel was opened: a click-opened panel stays click-opened.
+    if (!byHover || !openGroup) openedByHover.current = byHover
     setOpenGroup(groupId)
   }
 
   const scheduleClose = (event: React.PointerEvent) => {
-    if (event.pointerType !== 'mouse') return
+    // Only a hover-opened panel closes when the pointer leaves; a clicked or keyboard-opened one stays.
+    if (event.pointerType !== 'mouse' || !openedByHover.current) return
     window.clearTimeout(hoverTimer.current)
     hoverTimer.current = window.setTimeout(() => setOpenGroup(null), HOVER_CLOSE_MS)
   }
@@ -236,6 +241,7 @@ export default function GlobalNavigation() {
     <button
       type="button"
       className={className}
+      data-nav-activity={item.activityGroup}
       aria-current={activePath === item.path ? 'page' : undefined}
       disabled={item.auth && authLoading}
       onClick={() => goMenuPath(item.path, { auth: item.auth })}

@@ -7,7 +7,6 @@ import { findStudy } from './studies'
 import { loadStudyChapters, loadStudyHtml } from './studyContent'
 import { useAuth } from '../../contexts/useAuth'
 import { useCineReveal } from '../../hooks/useSceneProgress'
-import { routeLabel } from '../../routes/pageTitles'
 import MembersGate, { AuthCheckFailed } from '../../components/MembersGate'
 import { initStudyPage } from './studyDemos'
 import { initPlayground } from './playground'
@@ -39,11 +38,6 @@ function StudyBody({ id }: { id: string }) {
   }, [id])
 
   useEffect(() => (html && layoutRef.current ? initStudyPage(layoutRef.current, study.progressKey) : undefined), [html, study.progressKey])
-
-  useEffect(() => {
-    const crumb = layoutRef.current?.querySelector('.page-crumb')
-    if (crumb) crumb.textContent = `COM'S / ${routeLabel(location.pathname)}`
-  }, [html, location.pathname])
 
   // The playground calls the latest login handler without being re-created when the router state changes.
   const goLogin = useRef<(hash: string) => void>(() => {})
