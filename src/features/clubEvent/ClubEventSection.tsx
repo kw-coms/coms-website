@@ -31,6 +31,7 @@ function ClubEventSection() {
   const selectedEventId = idParam == null ? null : Number(idParam)
   const [selectedSnapshot, setSelectedSnapshot] = useState(null)
   const [detailFailure, setDetailFailure] = useState(null)
+  const [retryTick, setRetryTick] = useState(0)
   const mode = selectedEventId != null ? 'detail' : writing ? 'write' : 'list'
   const [eventForm, setEventForm] = useState({ title: '', description: '', startsOn: '', endsOn: '' })
   const {
@@ -95,7 +96,7 @@ function ClubEventSection() {
     return () => { cancelled = true }
     // mergeEvent only writes to the query cache; reloading on its identity would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEventId, user])
+  }, [selectedEventId, user, retryTick])
 
   const submitEvent = async (event) => {
     event.preventDefault()
@@ -315,6 +316,7 @@ function ClubEventSection() {
           {mode === 'detail' && (
             <ClubEventDetail
               notFound={notFound}
+              onRetry={() => { setDetailFailure(null); setRetryTick((tick) => tick + 1) }}
               selectedEvent={selectedEvent}
               notice={notice}
               error={error || (failedHere && !failedHere.notFound ? failedHere.message : '')}

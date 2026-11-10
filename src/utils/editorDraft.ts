@@ -4,6 +4,8 @@
 export const DRAFT_VERSION = 'v1'
 // A draft this large is not worth a localStorage slot (browsers allow about 5 MB per origin).
 export const MAX_DRAFT_CHARS = 200_000
+// Drafts nobody came back to are dropped when read.
+export const MAX_DRAFT_AGE_MS = 30 * 24 * 60 * 60 * 1000
 
 export type DraftFields = {
   title: string
@@ -49,12 +51,16 @@ export function draftFieldsEqual(a: DraftFields, b: DraftFields): boolean {
     && normalizeDraftContent(a.content) === normalizeDraftContent(b.content)
 }
 
-export function readDraft(key: string, storage: DraftStorage | null = browserStorage()): EditorDraft | null {
+export function readDraft(key: string, storage: DraftStorage | null = browserStorage(), now = Date.now()): EditorDraft | null {
   try {
     const raw = storage?.getItem(key)
     if (!raw) return null
     const value = JSON.parse(raw)
     if (!value || typeof value !== 'object' || typeof value.title !== 'string' || typeof value.content !== 'string') return null
+    if (Number(value.savedAt) > 0 && now - Number(value.savedAt) > MAX_DRAFT_AGE_MS) {
+      removeDraft(key, storage)
+      return null
+    }
     return {
       title: value.title,
       category: typeof value.category === 'string' ? value.category : '',
@@ -84,5 +90,31 @@ export function removeDraft(key: string, storage: DraftStorage | null = browserS
     storage?.removeItem(key)
   } catch {
     // Storage blocked: there is nothing to clear.
+  }
+}
+
+/**
+ * True when the item was changed on the server after the draft was saved, so applying the draft
+ * would silently overwrite newer content. Server times are zone-less local date-times.
+ */
+export function draftIsStale(draft: Pick<EditorDraft, 'savedAt'> | null, itemUpdatedAt: string | null | undefined): boolean {
+  if (!draft || !draft.savedAt || !itemUpdatedAt) return false
+  const updated = Date.parse(itemUpdatedAt)
+  return Number.isFinite(updated) && updated > draft.savedAt
+}
+
+/** Removes every draft of one member (used on logout). */
+export function clearMemberDrafts(owner: string | number | null | undefined, storage: (DraftStorage & { length: number; key(index: number): string | null }) | null = browserStorage() as never) {
+  try {
+    if (!storage) return
+    const prefix = `kwcoms-draft:${DRAFT_VERSION}:${owner ?? 'anon'}:`
+    const keys: string[] = []
+    for (let i = 0; i < storage.length; i += 1) {
+      const key = storage.key(i)
+      if (key?.startsWith(prefix)) keys.push(key)
+    }
+    keys.forEach((key) => storage.removeItem(key))
+  } catch {
+    // Storage blocked: nothing to clear.
   }
 }

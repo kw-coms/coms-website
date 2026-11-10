@@ -8,6 +8,8 @@ import { queryClient } from '../services/queryClient'
 import { showToast } from '../components/common/Toast'
 import { buildAuthLoadError, isLoggedOutAuthError } from './authErrors'
 import { AuthContext } from './useAuth'
+import { clearMemberDrafts } from '../utils/editorDraft'
+import { clearNoticeReadState } from '../utils/noticeReads'
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState(null)
@@ -155,6 +157,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       showToast({ message: '로그아웃하지 못했습니다. 아직 로그인된 상태이니 잠시 후 다시 시도해주세요.', tone: 'error' })
       return false
     }
+    // A deliberate logout on a shared browser leaves nothing of this member behind. A session that
+    // merely expired keeps its drafts so the member can sign back in and finish the post.
+    const owner = userRef.current?.studentId
+    clearMemberDrafts(owner)
+    clearNoticeReadState(owner)
     clearSession()
     return true
   }, [clearSession])

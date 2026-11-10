@@ -8,6 +8,7 @@ import { formatEventWindow, isContestEvent } from './clubEventUtils'
 
 export default function ClubEventDetail({
   notFound,
+  onRetry,
   selectedEvent,
   notice,
   error,
@@ -43,6 +44,21 @@ export default function ClubEventDetail({
           <h3>이벤트를 찾을 수 없습니다.</h3>
           <p>삭제되었거나 주소가 잘못되었을 수 있습니다.</p>
           <button type="button" onClick={onBack} className="apple-action-primary mt-3 inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">이벤트 목록으로</button>
+        </div>
+      </div>
+    )
+  }
+  if (!selectedEvent && error) {
+    return (
+      <div className="activity-empty-state m-4 sm:m-8" role="alert" data-event-error>
+        <Sparkles size={22} aria-hidden="true" />
+        <div>
+          <h3>이벤트를 불러오지 못했습니다.</h3>
+          <p>{error}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={onRetry} className="apple-action-primary inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">다시 시도</button>
+            <button type="button" onClick={onBack} className="apple-action-secondary inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">이벤트 목록으로</button>
+          </div>
         </div>
       </div>
     )

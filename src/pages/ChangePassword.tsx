@@ -707,7 +707,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
           />
           </SettingsSection>
 
-          <SettingsSection id="settings-email" title="이메일">
+          <SettingsSection id="settings-email" title="이메일" needsAction={user && !user.emailVerified ? '미인증' : ''}>
           <div className={cardClass}>
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>

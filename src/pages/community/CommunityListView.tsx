@@ -2,7 +2,6 @@ import RoleTag from '../../components/common/RoleTag'
 import Chip from '../../components/common/Chip'
 import {
   Bookmark,
-  Ellipsis,
   ChevronsLeft,
   ChevronsRight,
   ChevronLeft,
@@ -18,6 +17,7 @@ import CommunityPostRow from './CommunityPostRow'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 import { canModerateCommunity } from '../../utils/roleAccess'
 import { usePermissions } from '../../contexts/usePermissions'
+import OverflowMenu from './OverflowMenu'
 import {
   SORT_OPTIONS,
   clickableCell,
@@ -223,21 +223,13 @@ export default function CommunityListView({
             글쓰기
           </button>
           {/* Phones: the two secondary actions share one menu. */}
-          <details className="relative sm:hidden" data-community-more>
-            <summary aria-label="더보기" className="apple-action-secondary flex size-12 cursor-pointer list-none items-center justify-center [&::-webkit-details-marker]:hidden">
-              <Ellipsis size={18} aria-hidden="true" />
-            </summary>
-            <div className="absolute right-0 z-20 mt-2 flex w-44 flex-col gap-1 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] p-1.5 shadow-lg">
-              <button type="button" onClick={onOpenBookmarks} className="flex min-h-11 items-center gap-2 rounded-md px-3 text-left text-sm font-semibold hover:bg-[var(--app-surface-soft)]">
-                <Bookmark size={14} aria-hidden="true" />
-                내 스크랩
-              </button>
-              <button type="button" onClick={onOpenDeletedRecords} className="flex min-h-11 items-center gap-2 rounded-md px-3 text-left text-sm font-semibold hover:bg-[var(--app-surface-soft)]">
-                <ShieldAlert size={14} aria-hidden="true" />
-                내 삭제 기록
-              </button>
-            </div>
-          </details>
+          <OverflowMenu
+            className="sm:hidden"
+            items={[
+              { label: '내 스크랩', icon: <Bookmark size={14} aria-hidden="true" />, onSelect: onOpenBookmarks },
+              { label: '내 삭제 기록', icon: <ShieldAlert size={14} aria-hidden="true" />, onSelect: onOpenDeletedRecords },
+            ]}
+          />
         </div>
       </BoardHeader>
       <div className="apple-control-strip px-4 py-4 sm:px-8">
@@ -285,6 +277,7 @@ export default function CommunityListView({
               </span>
             </div>
           </div>
+          <p className="-mt-2 text-right text-xs font-bold text-[var(--app-subtle)] sm:hidden" data-community-count>{filteredPosts.length.toLocaleString('ko-KR')}개</p>
           <div className="-mx-1 hidden overflow-x-auto pb-1 touch-pan-x sm:block">
             <div className="flex min-w-max items-center gap-2 px-1 text-xs font-black text-[var(--app-muted)]">
               <span className="shrink-0">정렬</span>

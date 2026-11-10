@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { VISIT_GAP_MS, isNoticeUnread, loadNoticeReadState, markAllNoticesRead, markNoticeRead, saveNoticeReadState, visitList } from '../src/utils/noticeReads.ts'
+import { VISIT_GAP_MS, clearNoticeReadState, noticeReadKey, isNoticeUnread, loadNoticeReadState, markAllNoticesRead, markNoticeRead, saveNoticeReadState, visitList } from '../src/utils/noticeReads.ts'
 import { canDeleteNotice, canEditNotice } from '../src/utils/roleAccess.ts'
 
 const t0 = new Date('2026-07-01T10:00:00').getTime()
@@ -29,11 +29,15 @@ assert.equal(isNoticeUnread(markAllNoticesRead(visitList(null, t0), t0 + 10_000_
 
 const mem = new Map()
 const storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) }
-saveNoticeReadState(state, storage)
-assert.deepEqual(loadNoticeReadState(storage), state)
-mem.set('kwcoms-notice-read:v1', 'nope')
-assert.equal(loadNoticeReadState(storage), null)
-assert.doesNotThrow(() => saveNoticeReadState(state, { setItem() { throw new Error('full') } }))
+saveNoticeReadState('a', state, storage)
+assert.deepEqual(loadNoticeReadState('a', storage), state)
+assert.equal(loadNoticeReadState('b', storage), null, 'another member starts fresh on the same browser')
+mem.set(noticeReadKey('a'), 'nope')
+assert.equal(loadNoticeReadState('a', storage), null)
+assert.doesNotThrow(() => saveNoticeReadState('a', state, { setItem() { throw new Error('full') } }))
+saveNoticeReadState('a', state, storage)
+clearNoticeReadState('a', { removeItem: (k) => mem.delete(k) })
+assert.equal(loadNoticeReadState('a', storage), null, 'cleared on logout')
 
 // Server rules: edit = author or ADMIN, delete = notice.write permission.
 const authored = { authorStudentId: '2023000002' }

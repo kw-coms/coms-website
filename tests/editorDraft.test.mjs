@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { MAX_DRAFT_CHARS, draftFieldsEqual, draftStorageKey, normalizeDraftContent, readDraft, removeDraft, writeDraft } from '../src/utils/editorDraft.ts'
+import { MAX_DRAFT_AGE_MS, MAX_DRAFT_CHARS, clearMemberDrafts, draftIsStale, draftFieldsEqual, draftStorageKey, normalizeDraftContent, readDraft, removeDraft, writeDraft } from '../src/utils/editorDraft.ts'
 
 const store = () => {
   const data = new Map()
@@ -14,7 +14,7 @@ assert.notEqual(draftStorageKey('a', 'post', 7), draftStorageKey('b', 'post', 7)
 const s = store()
 assert.equal(readDraft('k', s), null)
 assert.equal(writeDraft('k', fields, s, 123), true)
-assert.deepEqual(readDraft('k', s), { ...fields, savedAt: 123 })
+assert.deepEqual(readDraft('k', s, 123), { ...fields, savedAt: 123 })
 removeDraft('k', s)
 assert.equal(readDraft('k', s), null)
 
@@ -34,4 +34,23 @@ assert.equal(writeDraft('k', fields, null), false)
 assert.equal(normalizeDraftContent('[{"type":"text","content":"<p><br></p>"},{"type":"text","content":""}]'), '', 'blank paragraphs are no content')
 assert.equal(draftFieldsEqual({ ...fields, content: '' }, { ...fields, content: '[{"type":"text","content":""}]' }), true)
 assert.equal(draftFieldsEqual(fields, { ...fields, title: '다른 제목' }), false)
+
+// Old drafts are dropped on read.
+const old = store()
+writeDraft('k', fields, old, 1000)
+assert.equal(readDraft('k', old, 1000 + MAX_DRAFT_AGE_MS + 1), null)
+assert.equal(old.getItem('k'), null, 'and removed from storage')
+assert.notEqual(readDraft('k', (writeDraft('k', fields, old, 1000), old), 1000 + MAX_DRAFT_AGE_MS - 1), null)
+
+// A draft older than the server's last change must not be applied silently.
+const d = { savedAt: new Date('2026-07-01T10:00:00').getTime() }
+assert.equal(draftIsStale(d, '2026-07-01T11:00:00'), true)
+assert.equal(draftIsStale(d, '2026-07-01T09:00:00'), false)
+assert.equal(draftIsStale(d, null), false)
+assert.equal(draftIsStale(null, '2026-07-01T11:00:00'), false)
+
+// Logout removes only that member's drafts.
+const multi = { keys: ['kwcoms-draft:v1:a:post:new', 'kwcoms-draft:v1:a:notice:3', 'kwcoms-draft:v1:b:post:new', 'other'], removeItem(k) { this.keys = this.keys.filter((x) => x !== k) }, get length() { return this.keys.length }, key(i) { return this.keys[i] ?? null }, getItem: () => null, setItem() {} }
+clearMemberDrafts('a', multi)
+assert.deepEqual(multi.keys, ['kwcoms-draft:v1:b:post:new', 'other'])
 console.log('editorDraft ok')

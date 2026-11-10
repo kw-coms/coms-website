@@ -2,6 +2,10 @@
 // previous visit to the list and they have not opened it since. Kept per browser, not per account.
 
 export const NOTICE_READ_KEY = 'kwcoms-notice-read:v1'
+/** One state per signed-in member, so a shared browser never hands one member's read marks to the next. */
+export function noticeReadKey(owner: string | number | null | undefined) {
+  return `${NOTICE_READ_KEY}:${owner ?? 'anon'}`
+}
 // Revisits within this gap belong to the same visit, so going to a notice and back keeps the dots.
 export const VISIT_GAP_MS = 30 * 60 * 1000
 const MAX_READ_IDS = 200
@@ -30,9 +34,9 @@ export function isNoticeUnread(state: NoticeReadState | null, notice: { id: numb
   return Number.isFinite(created) && created > state.seenAt && !state.readIds.includes(notice.id)
 }
 
-export function loadNoticeReadState(storage: Pick<Storage, 'getItem'> | null = safeStorage()): NoticeReadState | null {
+export function loadNoticeReadState(owner: string | number | null | undefined, storage: Pick<Storage, 'getItem'> | null = safeStorage()): NoticeReadState | null {
   try {
-    const value = JSON.parse(storage?.getItem(NOTICE_READ_KEY) || 'null')
+    const value = JSON.parse(storage?.getItem(noticeReadKey(owner)) || 'null')
     if (!value || !Number.isFinite(value.seenAt) || !Number.isFinite(value.lastVisit) || !Array.isArray(value.readIds)) return null
     return { seenAt: value.seenAt, lastVisit: value.lastVisit, readIds: value.readIds.filter(Number.isSafeInteger) }
   } catch {
@@ -40,9 +44,9 @@ export function loadNoticeReadState(storage: Pick<Storage, 'getItem'> | null = s
   }
 }
 
-export function saveNoticeReadState(state: NoticeReadState, storage: Pick<Storage, 'setItem'> | null = safeStorage()) {
+export function saveNoticeReadState(owner: string | number | null | undefined, state: NoticeReadState, storage: Pick<Storage, 'setItem'> | null = safeStorage()) {
   try {
-    storage?.setItem(NOTICE_READ_KEY, JSON.stringify(state))
+    storage?.setItem(noticeReadKey(owner), JSON.stringify(state))
   } catch {
     // Storage full or blocked: the dots just come back next visit.
   }
@@ -53,5 +57,15 @@ function safeStorage(): Storage | null {
     return typeof localStorage === 'undefined' ? null : localStorage
   } catch {
     return null
+  }
+}
+
+/** Forgets one member's read marks (and the older shared key) on logout. */
+export function clearNoticeReadState(owner: string | number | null | undefined, storage: Pick<Storage, 'removeItem'> | null = safeStorage()) {
+  try {
+    storage?.removeItem(noticeReadKey(owner))
+    storage?.removeItem(NOTICE_READ_KEY)
+  } catch {
+    // Storage blocked: nothing to clear.
   }
 }

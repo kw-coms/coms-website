@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { asMember, mockAdminApis, mockOptionalApis } from './visualSupport.js'
 
-const SHOTS = '/private/tmp/claude-501/-Users-choi-Documents-project/e43260bf-49ca-468b-9a62-7fea75ac4e6a/scratchpad/fix-members'
 const day = (offset) => {
   const date = new Date(Date.now() + offset * 86400000)
   return `${date.toISOString().slice(0, 10)}T00:00:00`
@@ -90,7 +89,6 @@ test.describe('club events', () => {
     expect(await page.locator('.club-event-list-card .club-event-list-button strong').allTextContents()).toEqual(['진행 중 인기투표', '봄 MT', '지난 회지 투표'])
     const plain = page.locator('.club-event-list-card').filter({ hasText: '봄 MT' })
     await expect(plain.getByText('표', { exact: false })).toHaveCount(0)
-    await page.screenshot({ path: `${SHOTS}/events-list-${test.info().project.name}.png`, fullPage: true })
   })
 
   test('the entry form tells the truth: only admins upload works', async ({ page }) => {
@@ -128,7 +126,6 @@ test.describe('notices', () => {
     await expect(card).toContainText('이번 주 최신 공지')
     await expect(card).not.toContainText('오래된 고정 공지')
     await expect(page.locator('tbody tr').filter({ hasText: '오래된 고정 공지' }).getByText('고정', { exact: true })).toBeVisible()
-    await page.screenshot({ path: `${SHOTS}/notices-${test.info().project.name}.png`, fullPage: true })
   })
 
   test('the search box says it searches the body and does', async ({ page }) => {
@@ -143,9 +140,9 @@ test.describe('notices', () => {
   test('new notices show a dot per browser, opening one clears it, 모두 읽음 clears the rest', async ({ page }) => {
     await noticesAsMember(page)
     await page.addInitScript(() => {
-      if (!localStorage.getItem('kwcoms-notice-read:v1')) {
+      if (!localStorage.getItem('kwcoms-notice-read:v1:2023000002')) {
         const seenAt = new Date('2026-05-15T00:00:00').getTime()
-        localStorage.setItem('kwcoms-notice-read:v1', JSON.stringify({ seenAt, lastVisit: Date.now(), readIds: [] }))
+        localStorage.setItem('kwcoms-notice-read:v1:2023000002', JSON.stringify({ seenAt, lastVisit: Date.now(), readIds: [] }))
       }
     })
     await page.goto('/notices')
@@ -163,7 +160,7 @@ test.describe('notices', () => {
   test('모두 읽음 marks everything read', async ({ page }) => {
     await noticesAsMember(page)
     await page.addInitScript(() => {
-      if (!localStorage.getItem('kwcoms-notice-read:v1')) localStorage.setItem('kwcoms-notice-read:v1', JSON.stringify({ seenAt: new Date('2026-04-01T00:00:00').getTime(), lastVisit: Date.now(), readIds: [] }))
+      if (!localStorage.getItem('kwcoms-notice-read:v1:2023000002')) localStorage.setItem('kwcoms-notice-read:v1:2023000002', JSON.stringify({ seenAt: new Date('2026-04-01T00:00:00').getTime(), lastVisit: Date.now(), readIds: [] }))
     })
     await page.goto('/notices')
     await expect(page.locator('[data-notice-new]:visible')).toHaveCount(2)
@@ -182,7 +179,6 @@ test.describe('notices', () => {
     await expect(row).toBeVisible()
     expect((await row.boundingBox()).height).toBeLessThan(90)
     await expect(page.locator('button:visible').filter({ hasText: '이번 주 최신 공지' }).first()).toBeVisible()
-    await page.screenshot({ path: `${SHOTS}/notices-390-${test.info().project.name}.png` })
   })
 
   test('an author sees 수정 but not 삭제; an officer with notice.write sees 삭제 but not 수정 on others', async ({ page }) => {
@@ -201,6 +197,7 @@ test.describe('notices', () => {
   })
 })
 
+const inlineDraftNotice = (page) => page.locator('div[role="status"]').filter({ has: page.getByRole('button', { name: '임시 저장본 삭제' }) })
 const draftKeys = (page) => page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('kwcoms-draft:v1:')))
 
 test.describe('editor drafts', () => {
@@ -222,13 +219,12 @@ test.describe('editor drafts', () => {
 
     await page.reload()
     await page.getByRole('button', { name: '글쓰기' }).click()
-    await expect(page.getByText('임시 저장된 글을 불러왔어요')).toBeVisible()
+    await expect(inlineDraftNotice(page)).toBeVisible()
     await expect(page.locator('.community-compose-title')).toHaveValue('쓰다 만 글')
     await expect(page.locator('.community-compose-editor [contenteditable="true"]')).toContainText('본문 초안')
-    await page.screenshot({ path: `${SHOTS}/draft-restored-${test.info().project.name}.png` })
 
-    await page.getByRole('button', { name: '삭제', exact: true }).click()
-    await expect(page.getByText('임시 저장된 글을 불러왔어요')).toHaveCount(0)
+    await page.getByRole('button', { name: '임시 저장본 삭제' }).click()
+    await expect(inlineDraftNotice(page)).toHaveCount(0)
     await expect(page.locator('.community-compose-title')).toHaveValue('')
     await expect.poll(() => draftKeys(page)).toHaveLength(0)
 
@@ -241,28 +237,46 @@ test.describe('editor drafts', () => {
     expect(await draftKeys(page)).toHaveLength(0)
   })
 
-  test('leaving with unsaved changes asks first; a clean editor does not', async ({ page }) => {
+  test('leaving through the header (button navigate) asks first, even right after typing', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
     await adminCommunity(page)
     await page.goto('/community')
     await page.getByRole('button', { name: '글쓰기' }).click()
-    const link = () => page.evaluate(() => {
-      const anchor = document.createElement('a')
-      anchor.href = '/notices'
-      anchor.textContent = 'go'
-      document.body.append(anchor)
-      anchor.click()
-      anchor.remove()
-    })
-    await page.locator('.community-compose-title').fill('작성 중')
-    await expect.poll(() => draftKeys(page)).toHaveLength(1)
-    await link()
+    await page.locator('.community-compose-title').click()
+    // No wait: the autosave timer has not fired yet.
+    await page.keyboard.type('방금 쓴 글')
+    await page.getByRole('button', { name: '홈으로 이동' }).click()
     const dialog = page.locator('.coms-confirm-card')
     await expect(dialog).toContainText('저장하지 않은 내용이 있습니다')
+    await expect(dialog).toContainText('임시 저장되어 있고')
+    expect(await draftKeys(page)).toHaveLength(1)
     await dialog.getByRole('button', { name: '계속 작성' }).click()
     await expect(page).toHaveURL(/\/community$/)
-    await link()
+    // A header menu item is a button that calls navigate() too.
+    await page.getByRole('button', { name: '멤버', exact: true }).click()
+    await page.getByRole('link', { name: /공지/ }).or(page.getByRole('button', { name: /^공지/ })).first().click()
+    await expect(page.locator('.coms-confirm-card')).toContainText('저장하지 않은 내용이 있습니다')
     await page.locator('.coms-confirm-card').getByRole('button', { name: '떠나기' }).click()
     await expect(page).toHaveURL(/\/notices$/)
+  })
+
+  test('the leave dialog and the editor say so when the draft could not be saved', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.addInitScript(() => {
+      const original = Storage.prototype.setItem
+      Storage.prototype.setItem = function (key, value) {
+        if (String(key).startsWith('kwcoms-draft:')) throw new DOMException('full', 'QuotaExceededError')
+        return original.call(this, key, value)
+      }
+    })
+    await adminCommunity(page)
+    await page.goto('/community')
+    await page.getByRole('button', { name: '글쓰기' }).click()
+    await page.locator('.community-compose-title').click()
+    await page.keyboard.type('저장 안 되는 글')
+    await expect(page.getByText('임시 저장하지 못했어요')).toBeVisible()
+    await page.getByRole('button', { name: '홈으로 이동' }).click()
+    await expect(page.locator('.coms-confirm-card')).toContainText('임시 저장도 하지 못했습니다')
   })
 
   test('closing the tab with unsaved changes raises the browser prompt', async ({ page }) => {
@@ -292,7 +306,7 @@ test.describe('editor drafts', () => {
     await expect.poll(() => draftKeys(page)).toHaveLength(1)
     await page.reload()
     await page.getByRole('button', { name: '공지 작성' }).click()
-    await expect(page.getByText('임시 저장된 글을 불러왔어요')).toBeVisible()
+    await expect(inlineDraftNotice(page)).toBeVisible()
     await expect(page.getByPlaceholder('제목', { exact: true })).toHaveValue('공지 초안')
   })
 })
@@ -307,7 +321,6 @@ test.describe('account settings', () => {
     for (const id of SECTIONS) await expect(page.locator(`details#${id}`)).toHaveAttribute('open', '')
     await expect(page.getByText('입력 영역을 분리했습니다')).toHaveCount(0)
     await expect(page.getByText('따로 관리합니다')).toHaveCount(0)
-    await page.screenshot({ path: `${SHOTS}/settings-1440-${test.info().project.name}.png`, fullPage: true })
     await page.locator('details#settings-email > summary').click()
     await expect(page.locator('details#settings-email')).not.toHaveAttribute('open', '')
     await page.reload()
@@ -322,7 +335,6 @@ test.describe('account settings', () => {
     await expect(page.locator('details#settings-password > summary')).toBeVisible()
     for (const id of SECTIONS) await expect(page.locator(`details#${id}`)).not.toHaveAttribute('open', '')
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(2200)
-    await page.screenshot({ path: `${SHOTS}/settings-390-collapsed-${test.info().project.name}.png`, fullPage: true })
 
     await page.locator('details#settings-password > summary').focus()
     await page.keyboard.press('Enter')
@@ -331,7 +343,6 @@ test.describe('account settings', () => {
 
     await page.goto('/settings#settings-email')
     await expect(page.locator('details#settings-email')).toHaveAttribute('open', '')
-    await page.screenshot({ path: `${SHOTS}/settings-390-anchor-${test.info().project.name}.png` })
   })
 })
 
@@ -351,7 +362,6 @@ test.describe('phone layouts', () => {
     await expect(page.getByTestId('calendar-mobile-agenda')).toBeVisible()
     await expect(page.getByTestId('calendar-month-summary')).toBeHidden()
     await expect(page.locator('li:visible').filter({ hasText: '정기 회의' }).filter({ hasNot: page.locator('.club-calendar-event') })).toHaveCount(1)
-    await page.screenshot({ path: `${SHOTS}/calendar-390-${test.info().project.name}.png` })
   })
 
   test('community: secondary actions live in one menu and the first post is on the first screen', async ({ page }) => {
@@ -362,8 +372,8 @@ test.describe('phone layouts', () => {
     await expect(page.locator('.community-mobile-posts').getByText('첫 화면 글 1')).toBeVisible()
     await expect(page.getByRole('button', { name: '내 스크랩' })).toBeHidden()
     await page.getByLabel('더보기').click()
-    await expect(page.getByRole('button', { name: '내 스크랩' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '내 삭제 기록' })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: '내 스크랩' })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: '내 삭제 기록' })).toBeVisible()
     await page.getByLabel('더보기').click()
     // One pager (the bottom one) and the sort control shares a row with the search box.
     await expect(page.locator('.community-pagination:visible')).toHaveCount(1)
@@ -372,6 +382,122 @@ test.describe('phone layouts', () => {
     expect(Math.abs(search.y - sort.y)).toBeLessThan(12)
     const first = await page.locator('.community-mobile-posts').getByText('첫 화면 글 1').boundingBox()
     expect(first.y + first.height).toBeLessThan(844)
-    await page.screenshot({ path: `${SHOTS}/community-390-${test.info().project.name}.png` })
+  })
+})
+
+test.describe('review fixes', () => {
+  test('a draft older than the server copy is offered, not applied; either choice works', async ({ page }) => {
+    await noticesAsMember(page, { studentId: 'staff' })
+    const edited = { ...noticeRows[1], updatedAt: '2026-06-10T09:00:00' }
+    await page.route('**/api/notices/2', (route) => route.fulfill({ json: edited }))
+    await page.addInitScript(() => {
+      const key = 'kwcoms-draft:v1:staff:notice:2'
+      if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ title: '오래된 임시 제목', category: 'GENERAL', anonymousName: '', content: '', savedAt: new Date('2026-06-02T09:00:00').getTime() + 0 }))
+    })
+    await page.clock.setFixedTime(new Date('2026-06-12T09:00:00'))
+    await page.goto('/notices/2')
+    await page.getByRole('button', { name: '수정', exact: true }).click()
+    const input = page.getByPlaceholder('제목', { exact: true })
+    await expect(page.getByRole('alert').filter({ hasText: '나중에 이 글이 수정되었어요' })).toBeVisible()
+    await expect(input).toHaveValue('이번 주 최신 공지')
+    await page.getByRole('button', { name: '임시 저장본 불러오기' }).click()
+    await expect(input).toHaveValue('오래된 임시 제목')
+    await expect(inlineDraftNotice(page)).toBeVisible()
+  })
+
+  test('choosing 현재 내용 유지 discards the old draft', async ({ page }) => {
+    await noticesAsMember(page, { studentId: 'staff' })
+    await page.route('**/api/notices/2', (route) => route.fulfill({ json: { ...noticeRows[1], updatedAt: '2026-06-10T09:00:00' } }))
+    await page.addInitScript(() => {
+      localStorage.setItem('kwcoms-draft:v1:staff:notice:2', JSON.stringify({ title: '오래된 임시 제목', category: 'GENERAL', anonymousName: '', content: '', savedAt: new Date('2026-06-02T09:00:00').getTime() }))
+    })
+    await page.clock.setFixedTime(new Date('2026-06-12T09:00:00'))
+    await page.goto('/notices/2')
+    await page.getByRole('button', { name: '수정', exact: true }).click()
+    await page.getByRole('button', { name: '현재 내용 유지, 임시 저장본 삭제' }).click()
+    await expect(page.getByPlaceholder('제목', { exact: true })).toHaveValue('이번 주 최신 공지')
+    expect(await draftKeys(page)).toHaveLength(0)
+  })
+
+  test('logging out removes this member\'s drafts and notice marks; another member starts fresh', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await noticesAsMember(page)
+    await page.route('**/api/auth/logout', (route) => route.fulfill({ status: 204 }))
+    await page.addInitScript(() => {
+      if (sessionStorage.getItem('seeded')) return
+      sessionStorage.setItem('seeded', '1')
+      localStorage.setItem('kwcoms-draft:v1:2023000002:post:new', JSON.stringify({ title: 'a', category: 'GENERAL', anonymousName: '', content: '', savedAt: Date.now() }))
+      localStorage.setItem('kwcoms-draft:v1:other:post:new', JSON.stringify({ title: 'b', category: 'GENERAL', anonymousName: '', content: '', savedAt: Date.now() }))
+      localStorage.setItem('kwcoms-notice-read:v1:other', JSON.stringify({ seenAt: 1, lastVisit: Date.now(), readIds: [] }))
+    })
+    await page.goto('/notices')
+    // Another member's old read marks must not give this member dots (first visit shows none).
+    await expect(page.locator('tbody tr').first()).toBeVisible()
+    await expect(page.locator('[data-notice-new]:visible')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Logout' }).click()
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((key) => key.includes('2023000002')))).toEqual([])
+    expect(await page.evaluate(() => localStorage.getItem('kwcoms-draft:v1:other:post:new'))).not.toBeNull()
+  })
+
+  test('an event that fails to load shows the error with retry; loading and not-found stay separate', async ({ page }) => {
+    await signedInMember(page)
+    // The list does not contain the event, so the page has nothing to show while the detail loads.
+    await page.route('**/api/club-events', (route) => route.fulfill({ status: 200, json: events.filter((item) => item.id !== 7) }))
+    let attempts = 0
+    await page.route(/\/api\/club-events\/7$/, async (route) => {
+      attempts += 1
+      if (attempts === 1) { await new Promise((resolve) => setTimeout(resolve, 600)); return route.fulfill({ status: 500, json: { message: 'boom' } }) }
+      return route.fulfill({ status: 200, json: events.find((item) => item.id === 7) })
+    })
+    await page.goto('/activity-events/7')
+    await expect(page.getByText('이벤트를 여는 중...')).toBeVisible()
+    await expect(page.locator('[data-event-error]')).toContainText('이벤트를 불러오지 못했습니다.')
+    await expect(page.getByRole('button', { name: '이벤트 목록으로' })).toBeVisible()
+    await expect(page.getByText('이벤트를 찾을 수 없습니다.')).toHaveCount(0)
+    await page.getByRole('button', { name: '다시 시도' }).click()
+    await expect(page.getByRole('heading', { name: '봄 MT', level: 2 })).toBeVisible()
+  })
+
+  test('phone: an unverified e-mail opens its section and shows 미인증 in the summary', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await mockAdminApis(page)
+    await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 1, name: '관리자', studentId: '2020123456', role: 'ADMIN', emailVerified: false, email: 'a@b.c' } }))
+    await page.goto('/settings')
+    await expect(page.locator('details#settings-email')).toHaveAttribute('open', '')
+    await expect(page.locator('details#settings-email > summary')).toContainText('미인증')
+    await expect(page.locator('details#settings-password')).not.toHaveAttribute('open', '')
+  })
+
+  test('the community overflow menu is a real menu button', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await mockAdminApis(page)
+    await page.route('**/api/community/posts{,?*}', (route) => route.fulfill({ json: [] }))
+    await page.goto('/community')
+    const button = page.getByRole('button', { name: '더보기' })
+    await expect(button).toHaveAttribute('aria-haspopup', 'menu')
+    await expect(button).toHaveAttribute('aria-expanded', 'false')
+    await button.click()
+    await expect(button).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByRole('menuitem')).toHaveCount(2)
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    await expect(button).toBeFocused()
+    await button.click()
+    await page.getByRole('heading', { level: 1 }).click()
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    await button.click()
+    await page.getByRole('menuitem', { name: '내 스크랩' }).click()
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    await expect(page.locator('[data-community-count]')).toBeVisible()
+  })
+
+  test('the restored-draft notice and 모두 읽음 are announced in the polite live region', async ({ page }) => {
+    await noticesAsMember(page)
+    await page.addInitScript(() => {
+      if (!localStorage.getItem('kwcoms-notice-read:v1:2023000002')) localStorage.setItem('kwcoms-notice-read:v1:2023000002', JSON.stringify({ seenAt: new Date('2026-04-01T00:00:00').getTime(), lastVisit: Date.now(), readIds: [] }))
+    })
+    await page.goto('/notices')
+    await page.getByRole('button', { name: '모두 읽음' }).click()
+    await expect(page.getByRole('region', { name: '알림' })).toContainText('모든 공지를 읽음으로 표시했습니다.')
   })
 })

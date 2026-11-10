@@ -38,9 +38,9 @@ import { parsePostBlocks } from './community/postEditorUtils'
 import { canDeleteNotice, canEditNotice, canManageSensitiveAdmin, canWriteNotice } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
 import Chip from '../components/common/Chip'
-import DraftNotice from '../components/common/DraftNotice'
+import DraftNotice, { DraftConflictNotice } from '../components/common/DraftNotice'
 import { useEditorDraft } from '../hooks/useEditorDraft'
-import { draftStorageKey, readDraft } from '../utils/editorDraft'
+import { draftIsStale, draftStorageKey, readDraft } from '../utils/editorDraft'
 import { isNoticeUnread, loadNoticeReadState, markAllNoticesRead, markNoticeRead, saveNoticeReadState, visitList } from '../utils/noticeReads'
 
 function NewDot() {
@@ -122,7 +122,11 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
 }) {
   const { user } = useAuth()
   const storageKey = draftStorageKey(user?.studentId, 'notice', initialNotice?.id)
-  const [restored, setRestored] = useState(() => readDraft(storageKey))
+  const [stored] = useState(() => readDraft(storageKey))
+  // A draft older than the notice's last server change is offered, never applied on its own.
+  const conflict = Boolean(stored) && Boolean(initialNotice) && draftIsStale(stored, typeof initialNotice?.updatedAt === 'string' ? initialNotice.updatedAt : null)
+  const [restored, setRestored] = useState(conflict ? null : stored)
+  const [pendingDraft, setPendingDraft] = useState(conflict ? stored : null)
   const savedCategory = initialNotice?.category || defaultCategory || 'GENERAL'
   const [formData, setFormData] = useState({
     title: restored?.title ?? (initialNotice?.title || ''),
@@ -146,7 +150,19 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
       return blocks ? { title: formData.title, category: formData.category, anonymousName: '', content: serializeRichBody(blocks) } : null
     },
     hasPending: () => (editorApiRef.current?.getBlocks() || []).some((block) => block.type !== 'text' && block.status !== 'saved' && block.file),
+    paused: Boolean(pendingDraft),
   })
+  const applyDraft = (picked) => {
+    setFormData({ title: picked.title, category: picked.category || savedCategory })
+    setInitialBlocks(picked.content ? parseRichBodyBlocks(picked.content) : savedBlocks())
+    setEditorKey((key) => key + 1)
+    setRestored(picked)
+    setPendingDraft(null)
+  }
+  const keepCurrent = () => {
+    draft.reset()
+    setPendingDraft(null)
+  }
   const discardDraft = () => {
     draft.reset()
     setRestored(null)
@@ -180,6 +196,8 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
 
   return (
     <div className="apple-soft-panel space-y-3 p-4 sm:space-y-4 sm:p-5">
+      {pendingDraft && <DraftConflictNotice savedAt={pendingDraft.savedAt} updatedAt={typeof initialNotice?.updatedAt === 'string' ? initialNotice.updatedAt : null} onApply={() => applyDraft(pendingDraft)} onKeep={keepCurrent} />}
+      {draft.saveFailed && <p role="alert" className="text-xs font-semibold text-red-500">임시 저장하지 못했어요. 저장 공간이 부족하거나 막혀 있습니다. 이 페이지를 떠나면 작성한 내용이 사라질 수 있어요.</p>}
       {restored && <DraftNotice onDiscard={discardDraft} />}
       <input
         value={formData.title}
@@ -299,8 +317,8 @@ export default function Notices() {
   )
 
   // Unread markers live in this browser only (see utils/noticeReads).
-  const [readState, setReadState] = useState(() => visitList(loadNoticeReadState(), Date.now()))
-  useEffect(() => { saveNoticeReadState(readState) }, [readState])
+  const [readState, setReadState] = useState(() => visitList(loadNoticeReadState(user?.studentId), Date.now()))
+  useEffect(() => { saveNoticeReadState(user?.studentId, readState) }, [readState, user?.studentId])
   const unreadCount = notices.filter((notice) => isNoticeUnread(readState, notice)).length
   const markRead = (id) => setReadState((prev) => markNoticeRead(prev, id))
 
@@ -517,7 +535,7 @@ export default function Notices() {
                 <ListSelect value={sortKey} onChange={setSortKey} options={NOTICE_SORT_OPTIONS} label="공지 정렬" />
                 <span className="shrink-0 text-xs font-semibold text-[var(--app-subtle)]">{filteredNotices.length}개</span>
                 {unreadCount > 0 && (
-                  <button type="button" onClick={() => setReadState((prev) => markAllNoticesRead(prev, Date.now()))} className="apple-action-secondary shrink-0 px-3 py-1.5 text-xs">
+                  <button type="button" onClick={() => { setReadState((prev) => markAllNoticesRead(prev, Date.now())); showToast({ message: '모든 공지를 읽음으로 표시했습니다.', duration: 2500 }) }} className="apple-action-secondary shrink-0 px-3 py-1.5 text-xs">
                     모두 읽음
                   </button>
                 )}
