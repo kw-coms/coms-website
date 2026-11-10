@@ -51,13 +51,51 @@ export function useSceneProgress() {
         entries.forEach((entry) => {
           const el = entry.target as HTMLElement
           if (entry.isIntersecting) near.add(el)
-          else near.delete(el)
+          else {
+            near.delete(el)
+            // Far from the screen a scene rests in its finished state (its CSS falls back to it).
+            clear(el)
+          }
         })
         schedule()
       },
       { rootMargin: '100% 0px' },
     )
-    root.querySelectorAll<HTMLElement>(SCENE).forEach((el) => io.observe(el))
+    // Looping animation runs only while its scene is on the screen (see cinema-core.css).
+    const live = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => entry.target.classList.toggle('is-onscreen', entry.isIntersecting))
+    })
+    root.querySelectorAll<HTMLElement>(SCENE).forEach((el) => {
+      io.observe(el)
+      live.observe(el)
+    })
+
+    // Tickers speed up with the scroll velocity and settle back.
+    const tickers = Array.from(root.querySelectorAll<HTMLElement>('[data-ticker]'))
+    let lastY = window.scrollY
+    let rate = 1
+    let rateRaf = 0
+    const setRate = (value: number) => {
+      tickers.forEach((el) => el.getAnimations({ subtree: true }).forEach((a) => { a.playbackRate = value }))
+    }
+    const settle = () => {
+      rate += (1 - rate) * 0.06
+      if (Math.abs(rate - 1) < 0.02) {
+        rate = 1
+        rateRaf = 0
+      } else rateRaf = requestAnimationFrame(settle)
+      setRate(rate)
+    }
+    const onVelocity = () => {
+      const y = window.scrollY
+      const v = Math.min(6, Math.abs(y - lastY) / 16)
+      lastY = y
+      if (!tickers.length || off() || v < 0.05) return
+      rate = Math.max(rate, 1 + v)
+      setRate(rate)
+      if (!rateRaf) rateRaf = requestAnimationFrame(settle)
+    }
+    window.addEventListener('scroll', onVelocity, { passive: true })
 
     const sync = () => {
       if (off()) root.querySelectorAll<HTMLElement>(SCENE).forEach(clear)
@@ -69,6 +107,9 @@ export function useSceneProgress() {
     window.addEventListener('resize', schedule)
     return () => {
       io.disconnect()
+      live.disconnect()
+      if (rateRaf) cancelAnimationFrame(rateRaf)
+      window.removeEventListener('scroll', onVelocity)
       offPerf()
       reduced.removeEventListener('change', sync)
       window.removeEventListener('scroll', schedule)
@@ -78,7 +119,7 @@ export function useSceneProgress() {
   }, [])
 }
 
-const REVEAL = '.cine-lines:not([data-cine-hold]), .cine-wipe, [data-cine]:not([data-cine-hold])'
+const REVEAL = '.cine-lines:not([data-cine-hold]), .cine-wipe, [data-cine]:not([data-cine-hold]), [data-rule]'
 
 /**
  * Marks `.cine-root` ready (hidden states only apply once this ran, so the page reads without
@@ -118,5 +159,63 @@ export function useCineReveal(dep?: unknown) {
 
   useEffect(() => {
     return () => document.querySelector('.cine-root')?.classList.remove('cine-ready')
+  }, [])
+}
+
+/**
+ * Pointer effects (full mode only): the opening's layers shift a few pixels against the pointer
+ * (--px, --py in -1..1 on the opening scene) and a `[data-tilt]` frame tilts toward it with a
+ * moving highlight (--tx, --ty, --mx, --my). One listener, rAF-throttled.
+ */
+export function usePointerFx() {
+  useEffect(() => {
+    const root = document.querySelector<HTMLElement>('.cine-root')
+    if (!root || typeof window.matchMedia !== 'function') return
+    const reduced = window.matchMedia(REDUCED)
+    let raf = 0
+    let ev: PointerEvent | null = null
+    let tilted: HTMLElement | null = null
+    const reset = (el: HTMLElement) => ['--tx', '--ty', '--mx', '--my'].forEach((k) => el.style.removeProperty(k))
+    const run = () => {
+      raf = 0
+      if (!ev || reduced.matches || getPerfState().mode === 'lite') return
+      const opening = root.querySelector<HTMLElement>('[data-scene="opening"]')
+      if (opening && ev.clientY < opening.getBoundingClientRect().bottom) {
+        opening.style.setProperty('--px', ((ev.clientX / window.innerWidth) * 2 - 1).toFixed(3))
+        opening.style.setProperty('--py', ((ev.clientY / window.innerHeight) * 2 - 1).toFixed(3))
+      }
+      const target = (ev.target as Element | null)?.closest?.<HTMLElement>('[data-tilt]') ?? null
+      if (tilted && tilted !== target) reset(tilted)
+      tilted = target
+      if (target) {
+        const r = target.getBoundingClientRect()
+        const x = (ev.clientX - r.left) / r.width
+        const y = (ev.clientY - r.top) / r.height
+        target.style.setProperty('--tx', (x * 2 - 1).toFixed(3))
+        target.style.setProperty('--ty', (y * 2 - 1).toFixed(3))
+        target.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`)
+        target.style.setProperty('--my', `${(y * 100).toFixed(1)}%`)
+      }
+    }
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') return
+      ev = e
+      if (!raf) raf = requestAnimationFrame(run)
+    }
+    const onLeave = () => {
+      ev = null
+      if (tilted) reset(tilted)
+      tilted = null
+      const opening = root.querySelector<HTMLElement>('[data-scene="opening"]')
+      opening?.style.removeProperty('--px')
+      opening?.style.removeProperty('--py')
+    }
+    root.addEventListener('pointermove', onMove, { passive: true })
+    root.addEventListener('pointerleave', onLeave)
+    return () => {
+      root.removeEventListener('pointermove', onMove)
+      root.removeEventListener('pointerleave', onLeave)
+      if (raf) cancelAnimationFrame(raf)
+    }
   }, [])
 }

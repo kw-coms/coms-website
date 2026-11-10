@@ -1,4 +1,5 @@
-import type { ElementType } from 'react'
+import { useEffect, useRef, useState, type ElementType } from 'react'
+import { useCalm } from '../../../hooks/useCalm'
 import { sectionMetrics } from '../../../data/homeContent'
 import { cssVars } from './cssVars'
 
@@ -54,13 +55,50 @@ export function SceneActionRow({ actions, className = '' }: { actions: SceneActi
   )
 }
 
-/** Three figures with a hairline above each. */
+/** A figure made only of digits counts up from zero once it is on screen; the final value is what is read aloud. */
+function CountUp({ value }: { value: string }) {
+  const calm = useCalm()
+  const [shown, setShown] = useState(value)
+  const ref = useRef<HTMLSpanElement | null>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (calm || !el || typeof IntersectionObserver === 'undefined') return
+    const target = Number(value)
+    let raf = 0
+    setShown('0'.repeat(value.length))
+    const io = new IntersectionObserver((entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return
+      io.disconnect()
+      const t0 = performance.now()
+      const tick = (now: number) => {
+        const k = Math.min(1, (now - t0) / 1200)
+        const eased = 1 - Math.pow(1 - k, 3)
+        setShown(String(Math.round(target * eased)).padStart(value.length, '0'))
+        if (k < 1) raf = requestAnimationFrame(tick)
+      }
+      raf = requestAnimationFrame(tick)
+    })
+    io.observe(el)
+    return () => {
+      io.disconnect()
+      cancelAnimationFrame(raf)
+    }
+  }, [calm, value])
+  return (
+    <>
+      <span ref={ref} aria-hidden="true">{shown}</span>
+      <span className="sr-only">{value}</span>
+    </>
+  )
+}
+
+/** Three figures with a rule above each that draws itself. Digit-only figures count up; others fade in. */
 export function SceneStats({ id }: { id: keyof typeof sectionMetrics }) {
   return (
     <dl className="scene-stats">
       {sectionMetrics[id].map((item, i) => (
-        <div key={item.value} data-cine style={cssVars({ '--i': i })}>
-          <dt>{item.value}</dt>
+        <div key={item.value} data-cine data-rule style={cssVars({ '--i': i })}>
+          <dt>{/^\d+$/.test(item.value) ? <CountUp value={item.value} /> : item.value}</dt>
           <dd>{item.label}</dd>
         </div>
       ))}

@@ -19,8 +19,8 @@ const hiddenTextElements = (page) => page.evaluate(() => {
   const hidden = []
   for (const el of document.querySelectorAll('main *')) {
     const ownText = Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.textContent.trim())
-    // Screen-reader-only text is meant to be 1px.
-    if (!ownText || el.classList.contains('sr-only')) continue
+    // Screen-reader-only text is meant to be 1px; a hidden duplicate (a marquee copy) is not shown on purpose.
+    if (!ownText || el.closest('.sr-only') || (el.hasAttribute('aria-hidden') && getComputedStyle(el).display === 'none')) continue
     let opacity = 1
     let clipped = false
     for (let node = el; node && node !== document.body; node = node.parentElement) {
@@ -85,6 +85,46 @@ test.describe('a visitor on the home page', () => {
     }
   })
 
+  test('says the new manifesto sentence, word by word', async ({ page }) => {
+    const title = page.locator('.scene-about__pin h2')
+    await expect(title).toHaveText('배운 건 만들어 보고, 만든 건 함께 나눕니다.')
+    expect(await page.locator('.scene-about__pin .cine-w').count()).toBe(8)
+  })
+
+  test('types the three highlights for the eye and lists them once for a screen reader', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    // The typing is hidden from assistive technology...
+    await expect(page.locator('.scene-typed__line')).toHaveAttribute('aria-hidden', 'true')
+    // ...and the three items are read once, as a plain list.
+    const items = await page.locator('.scene-typed ul.sr-only li').allTextContents()
+    expect(items).toHaveLength(3)
+    expect(items[0]).toContain('Weekly Seminar')
+    expect(items[1]).toContain('Team Project')
+    expect(items[2]).toContain('Campus Network')
+    // It really types: a moment later some of the first item is on screen.
+    await expect.poll(async () => (await page.locator('.scene-typed__line').textContent()).length).toBeGreaterThan(3)
+  })
+
+  test('loops run only while their scene is on screen', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    const state = (selector) => page.locator(selector).first().evaluate((el) => getComputedStyle(el).animationPlayState)
+    await expect.poll(() => state('.floor__plane i')).toBe('running')
+    await expect.poll(() => state('.coms-os-ring')).toBe('paused')
+    await page.locator('.scene-about__visual').scrollIntoViewIfNeeded()
+    await page.evaluate(() => window.scrollBy(0, 200))
+    await expect.poll(() => state('.coms-os-ring')).toBe('running')
+    await expect.poll(() => state('.floor__plane i')).toBe('paused')
+  })
+
+  test('has a divider band between scenes and a backdrop in each later scene', async ({ page }) => {
+    await expect(page.locator('.scene-divider')).toHaveCount(5)
+    for (const id of ['about', 'activities', 'projects', 'members', 'recruit']) {
+      await expect(page.locator(`#${id} .scene-bg__numeral`)).toHaveCount(1)
+    }
+  })
+
   test('the manifesto stays pinned while its words light up, then lets go', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/')
@@ -128,8 +168,14 @@ for (const [label, setup] of [
       expect(await page.locator('.scene-about__pin').evaluate((el) => getComputedStyle(el).position)).toBe('static')
       // Straight from load, without scrolling an inch: nothing is left transparent, clipped or lowered.
       expect(await hiddenTextElements(page)).toEqual([])
-      // The grain is off.
+      // The grain, the cube, the floor and the ticker are off; the first highlight is shown typed out.
       await expect(page.locator('.cine-grain')).toBeHidden()
+      await expect(page.locator('.scene-opening__cube')).toBeHidden()
+      await expect(page.locator('.scene-opening__floor')).toBeHidden()
+      await expect(page.locator('.scene-opening__ticker')).toBeHidden()
+      await expect(page.locator('.scene-typed__line')).toContainText('Weekly Seminar')
+      // Numbers are finished figures, not mid-count.
+      await expect(page.locator('#activities .scene-stats dt').first()).toContainText('01')
       expect(await overflow(page)).toBeLessThanOrEqual(0)
     })
   })

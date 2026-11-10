@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export type RailItem = { id: string; label: string }
 
 // A thin index at the right edge (wide screens): where you are in the film and how much is left.
 export default function SceneRail({ items }: { items: RailItem[] }) {
   const [active, setActive] = useState(items[0]?.id ?? '')
+  const nav = useRef<HTMLElement | null>(null)
   const key = items.map((item) => item.id).join('|')
 
   useEffect(() => {
@@ -16,10 +17,18 @@ export default function SceneRail({ items }: { items: RailItem[] }) {
       raf = 0
       const middle = window.innerHeight / 2
       let current = key.split('|')[0]
+      let fill = 0
       for (const id of key.split('|')) {
         const el = document.getElementById(id)
-        if (el && el.getBoundingClientRect().top <= middle) current = id
+        if (!el) continue
+        const r = el.getBoundingClientRect()
+        if (r.top <= middle) {
+          current = id
+          // How far the middle line has travelled through this scene.
+          fill = Math.min(1, Math.max(0, (middle - r.top) / Math.max(1, r.height)))
+        }
       }
+      nav.current?.style.setProperty('--rail-p', fill.toFixed(3))
       setActive(current)
     }
     const schedule = () => {
@@ -41,7 +50,7 @@ export default function SceneRail({ items }: { items: RailItem[] }) {
   }
 
   return (
-    <nav className="scene-rail" aria-label="장면 이동">
+    <nav ref={nav} className="scene-rail" aria-label="장면 이동">
       <ol>
         {items.map((item, i) => (
           <li key={item.id}>
@@ -54,6 +63,7 @@ export default function SceneRail({ items }: { items: RailItem[] }) {
             >
               <span className="scene-rail__num">{String(i + 1).padStart(2, '0')}</span>
               <span className="scene-rail__name">{item.label}</span>
+              <span className="scene-rail__fill" aria-hidden="true" />
             </button>
           </li>
         ))}

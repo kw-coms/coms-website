@@ -1,0 +1,729 @@
+/* ===== Home, round two: layers, backdrops and scroll-linked motion ============ */
+/* Everything here is decoration or motion on top of the scenes in home-scenes.css. It runs only
+   in full mode: reduced motion and lite (see the end of the file) keep the still scenes. Loops
+   pause when their scene leaves the screen (cinema-core.css). Only transform, opacity and
+   clip-path move, plus the gradient stops of the wordmark sheen. */
+
+/* ---- Opening: layers from back to front ------------------------------------------------ */
+.scene-opening__aurora {
+	position: absolute;
+	inset: 0;
+	overflow: clip;
+	transform: translate3d(calc(var(--px, 0) * -14px), calc(var(--py, 0) * -10px), 0);
+	transition: transform 700ms var(--cine-ease);
+}
+
+.aurora {
+	position: absolute;
+	width: 72vmax;
+	height: 72vmax;
+	border-radius: 50%;
+	background: radial-gradient(closest-side, color-mix(in srgb, var(--c) var(--cine-glow), transparent), transparent);
+	will-change: transform;
+}
+
+.aurora--a {
+	--c: var(--app-accent);
+	left: -22vmax;
+	top: -26vmax;
+	animation: aurora-a 36s ease-in-out infinite alternate;
+}
+
+.aurora--b {
+	--c: var(--theme-glow-violet, #b26dff);
+	right: -26vmax;
+	top: -8vmax;
+	animation: aurora-b 44s ease-in-out infinite alternate;
+}
+
+.aurora--c {
+	--c: color-mix(in srgb, var(--app-accent) 35%, #00dcff);
+	left: 12vmax;
+	bottom: -40vmax;
+	animation: aurora-c 52s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-a {
+	to {
+		transform: translate3d(14vmax, 10vmax, 0) scale(1.12);
+	}
+}
+
+@keyframes aurora-b {
+	to {
+		transform: translate3d(-16vmax, 12vmax, 0) scale(0.9);
+	}
+}
+
+@keyframes aurora-c {
+	to {
+		transform: translate3d(18vmax, -8vmax, 0) scale(1.1);
+	}
+}
+
+/* A grid floor in the lower third: lines flow toward the viewer, fading at the horizon and the sides. */
+.scene-opening__floor {
+	position: absolute;
+	inset: auto 0 0;
+	height: 44%;
+	perspective: 460px;
+	perspective-origin: 50% 0;
+	overflow: clip;
+	-webkit-mask-image: radial-gradient(ellipse 62% 100% at 50% 100%, #000 18%, transparent 78%);
+	mask-image: radial-gradient(ellipse 62% 100% at 50% 100%, #000 18%, transparent 78%);
+}
+
+.floor__plane {
+	position: absolute;
+	inset: 0 -40% 0;
+	transform: rotateX(68deg);
+	transform-origin: 50% 0;
+	--floor-line: color-mix(in srgb, var(--app-accent) 46%, transparent);
+}
+
+.floor__plane i {
+	position: absolute;
+	inset: -256px 0 0;
+	background:
+		repeating-linear-gradient(0deg, var(--floor-line) 0 1px, transparent 1px 64px),
+		repeating-linear-gradient(90deg, var(--floor-line) 0 1px, transparent 1px 64px);
+	animation: floor-flow 20s linear infinite;
+	will-change: transform;
+}
+
+@keyframes floor-flow {
+	to {
+		transform: translate3d(0, 256px, 0);
+	}
+}
+
+/* A wireframe cube behind and to the right of the wordmark; scrolling turns it and pushes it back. */
+.scene-opening__cube {
+	--cs: clamp(8rem, 16vw, 16rem);
+	position: absolute;
+	top: 8%;
+	right: 5.5vw;
+	width: var(--cs);
+	height: var(--cs);
+	perspective: 1100px;
+}
+
+.cube-rig {
+	width: 100%;
+	height: 100%;
+	transform-style: preserve-3d;
+	transform: translate3d(calc(var(--px, 0) * -22px), calc(var(--py, 0) * -14px + var(--hero-out, 0) * -70px), calc(var(--hero-out, 0) * -480px))
+		rotateY(calc(var(--hero-out, 0) * 220deg));
+	transition: transform 450ms var(--cine-ease);
+}
+
+.cube {
+	position: absolute;
+	inset: 0;
+	transform-style: preserve-3d;
+	transform: rotateX(-24deg) rotateY(30deg);
+	animation: cube-spin 54s linear infinite;
+}
+
+.cube i {
+	position: absolute;
+	inset: 0;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 72%, var(--app-text));
+	background: color-mix(in srgb, var(--app-accent) 5%, transparent);
+}
+
+.cube i:nth-child(1) {
+	transform: translateZ(calc(var(--cs) / 2));
+}
+.cube i:nth-child(2) {
+	transform: rotateY(90deg) translateZ(calc(var(--cs) / 2));
+}
+.cube i:nth-child(3) {
+	transform: rotateY(180deg) translateZ(calc(var(--cs) / 2));
+}
+.cube i:nth-child(4) {
+	transform: rotateY(-90deg) translateZ(calc(var(--cs) / 2));
+}
+.cube i:nth-child(5) {
+	transform: rotateX(90deg) translateZ(calc(var(--cs) / 2));
+}
+.cube i:nth-child(6) {
+	transform: rotateX(-90deg) translateZ(calc(var(--cs) / 2));
+}
+
+@keyframes cube-spin {
+	to {
+		transform: rotateX(-24deg) rotateY(390deg);
+	}
+}
+
+/* The wordmark: a light sweeps across the letters every few seconds, and the word tilts a few degrees
+   with the pointer. Between sweeps every letter is the plain text colour, so contrast is AA throughout;
+   the highlight is a brighter accent that is AA against the page in each theme. */
+@property --sheen {
+	syntax: '<number>';
+	inherits: true;
+	initial-value: -40;
+}
+
+.scene-wordmark {
+	--sheen-hi: color-mix(in srgb, var(--app-accent) 40%, #ffffff);
+	transform: perspective(1000px) rotateY(calc(var(--px, 0) * 4deg)) rotateX(calc(var(--py, 0) * -3deg));
+	transition: transform 600ms var(--cine-ease);
+}
+
+:root:not([data-theme-mode='dark']) .scene-wordmark {
+	--sheen-hi: color-mix(in srgb, var(--app-accent) 78%, #000000);
+}
+
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+	.cine-ready .scene-wordmark.is-revealed .cine-m > span {
+		background-image: linear-gradient(
+			100deg,
+			var(--app-text) calc(var(--sheen) * 1% - 14%),
+			var(--sheen-hi) calc(var(--sheen) * 1%),
+			var(--app-text) calc(var(--sheen) * 1% + 14%)
+		);
+		background-size: calc(var(--len) * 100%) 100%;
+		background-position-x: calc(var(--k) * 100% / max(1, var(--len) - 1));
+		background-repeat: no-repeat;
+		-webkit-background-clip: text;
+		background-clip: text;
+		color: transparent;
+		-webkit-text-fill-color: transparent;
+	}
+	.cine-ready .scene-wordmark.is-revealed {
+		animation: wordmark-sheen 10s ease-in-out 1.6s infinite;
+	}
+}
+
+@keyframes wordmark-sheen {
+	0%,
+	55% {
+		--sheen: -40;
+	}
+	85%,
+	100% {
+		--sheen: 140;
+	}
+}
+
+/* The typed line under the opening copy. */
+.scene-typed {
+	min-height: 3.1em;
+	margin-top: 1.25rem;
+}
+
+.scene-typed__line {
+	margin: 0;
+	color: var(--app-muted);
+	font: 500 0.8125rem/1.55 var(--cine-mono);
+	letter-spacing: 0.04em;
+	word-break: keep-all;
+}
+
+.scene-typed__line b {
+	color: var(--app-text);
+	font-weight: 600;
+}
+
+.scene-typed__caret {
+	display: inline-block;
+	width: 0.55em;
+	height: 1.05em;
+	margin-left: 0.2em;
+	vertical-align: -0.18em;
+	background: var(--app-accent);
+	animation: caret-blink 1.05s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+	50% {
+		opacity: 0;
+	}
+}
+
+/* The ticker along the bottom edge. Its text is drawn by the pseudo-element (decoration, not content). */
+.scene-opening__ticker {
+	grid-column: 1 / -1;
+	grid-row: 5;
+	margin: 1rem calc(var(--cine-pad) * -1) -1.75rem;
+	padding: 0.8rem 0;
+	overflow: clip;
+	border-top: 1px solid var(--app-hairline);
+	-webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+	mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+	position: relative;
+	z-index: 1;
+}
+
+.scene-opening__ticker-run,
+.scene-recruit__marquee-run {
+	display: inline-block;
+	white-space: nowrap;
+	will-change: transform;
+}
+
+.scene-opening__ticker-run {
+	animation: ticker 70s linear infinite;
+}
+
+.scene-opening__ticker-run::before {
+	content: attr(data-t);
+	color: var(--app-muted);
+	font: 500 0.75rem/1 var(--cine-mono);
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+}
+
+@keyframes ticker {
+	to {
+		transform: translate3d(-50%, 0, 0);
+	}
+}
+
+.scene-opening {
+	grid-template-rows: auto 1fr auto auto auto;
+}
+
+/* ---- Backdrops: every later scene has its own atmosphere ------------------------------------------ */
+.scene {
+	isolation: isolate;
+}
+
+.scene-bg {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	overflow: clip;
+	pointer-events: none;
+}
+
+.scene-bg__wash {
+	position: absolute;
+	inset: -14vh 0;
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--m-prev) var(--cine-wash), transparent) 0%,
+		color-mix(in srgb, var(--m-me) calc(var(--cine-wash) * 1.4), transparent) 50%,
+		color-mix(in srgb, var(--m-next) var(--cine-wash), transparent) 100%
+	);
+	transform: translate3d(0, calc((var(--p, 0.5) - 0.5) * -9vh), 0);
+}
+
+.scene-bg__glow {
+	position: absolute;
+	width: min(95vw, 64rem);
+	aspect-ratio: 1;
+	border-radius: 50%;
+	background: radial-gradient(closest-side, color-mix(in srgb, var(--g) var(--cine-glow), transparent), transparent);
+	will-change: transform;
+}
+
+.scene-bg__glow--a {
+	--g: var(--m-me);
+	left: var(--ax, -20%);
+	top: var(--ay, 6%);
+	transform: translate3d(calc((var(--p, 0.5) - 0.5) * 26vw), calc((var(--p, 0.5) - 0.5) * -34vh), 0);
+}
+
+.scene-bg__glow--b {
+	--g: var(--m-next);
+	right: var(--bx, -24%);
+	bottom: var(--by, 4%);
+	transform: translate3d(calc((var(--p, 0.5) - 0.5) * -22vw), calc((var(--p, 0.5) - 0.5) * 28vh), 0);
+}
+
+.scene-bg__tex {
+	position: absolute;
+	inset: -60px 0;
+	-webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+	mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+	transform: translate3d(0, calc((var(--p, 0.5) - 0.5) * 48px), 0);
+	--tex: color-mix(in srgb, var(--app-text) 11%, transparent);
+}
+
+.scene-bg--about .scene-bg__tex {
+	background: radial-gradient(circle, var(--tex) 1px, transparent 1.5px) 0 0 / 28px 28px;
+}
+
+.scene-bg--activities .scene-bg__tex {
+	background: repeating-linear-gradient(135deg, var(--tex) 0 1px, transparent 1px 16px);
+}
+
+.scene-bg--projects .scene-bg__tex {
+	background: repeating-linear-gradient(180deg, var(--tex) 0 1px, transparent 1px 56px);
+}
+
+.scene-bg--members .scene-bg__tex {
+	background:
+		linear-gradient(90deg, var(--tex) 1px, transparent 1px) 0 0 / 64px 64px,
+		linear-gradient(180deg, var(--tex) 1px, transparent 1px) 0 0 / 64px 64px;
+}
+
+.scene-bg--recruit .scene-bg__tex {
+	background: repeating-radial-gradient(circle at 50% 100%, var(--tex) 0 1px, transparent 1px 72px);
+}
+
+.scene-bg--activities {
+	--ax: 52%;
+	--ay: 2%;
+	--bx: auto;
+	--by: 10%;
+}
+
+.scene-bg--projects {
+	--ax: -26%;
+	--ay: 28%;
+	--by: 0%;
+}
+
+.scene-bg--members {
+	--ax: 20%;
+	--ay: 0%;
+	--bx: -30%;
+}
+
+.scene-bg--recruit {
+	--ax: 4%;
+	--ay: 4%;
+}
+
+/* A giant outlined numeral that drifts against the scroll. */
+.scene-bg__numeral {
+	position: absolute;
+	top: 3vh;
+	right: 1vw;
+	font: 800 clamp(12rem, 34vw, 38rem) / 0.8 var(--apple-font-family);
+	letter-spacing: -0.04em;
+	color: transparent;
+	-webkit-text-stroke: 1px color-mix(in srgb, var(--app-text) 13%, transparent);
+	transform: translate3d(0, calc((var(--p, 0.5) - 0.5) * -34vh), 0);
+	will-change: transform;
+}
+
+.scene-bg__numeral::before {
+	content: attr(data-n);
+}
+
+/* The recruit finale: an accent wash rises from the bottom as the scene arrives. */
+.scene-bg--recruit .scene-bg__glow--b {
+	--g: var(--app-accent);
+	right: 5%;
+	bottom: -30vmax;
+	width: 120vmax;
+	opacity: 0.7;
+	transform: translate3d(0, calc((1 - var(--p, 1)) * 34vh), 0);
+}
+
+/* ---- Dividers: large outlined scene names that slide with the scroll ---------------------------------- */
+.scene-divider {
+	overflow: clip;
+	padding-block: clamp(0.5rem, 2vw, 1.5rem);
+	border-block: 1px solid var(--app-hairline);
+}
+
+.scene-divider__text {
+	display: block;
+	white-space: nowrap;
+	font: 800 clamp(4.5rem, 13vw, 12rem) / 1.05 var(--apple-font-family);
+	letter-spacing: -0.04em;
+	transform: translate3d(calc(-18vw + (var(--p, 0.5) - 0.5) * var(--dir) * 70vw), 0, 0);
+	will-change: transform;
+}
+
+.scene-divider__text::before {
+	content: attr(data-t);
+	color: transparent;
+	-webkit-text-stroke: 1px color-mix(in srgb, var(--app-text) 30%, transparent);
+}
+
+/* ---- Manifesto: the Club OS assembles as it arrives --------------------------------------------------- */
+.scene-about__visual .coms-os-core {
+	--k: clamp(0, (var(--p, 1) - 0.02) / 0.2, 1);
+	opacity: var(--k);
+	transform: scale(calc(0.7 + 0.3 * var(--k)));
+}
+
+.scene-about__visual .coms-os-rows li {
+	--k: clamp(0, (var(--p, 1) - 0.08 - var(--i, 0) * 0.09) / 0.2, 1);
+	opacity: var(--k);
+	transform: translateX(calc((1 - var(--k)) * 40px));
+}
+
+.scene-stats dt {
+	font-variant-numeric: tabular-nums;
+}
+
+/* ---- Activities: parallax inside frames, a tilt with a moving highlight -------------------------------- */
+.scene-frame__media {
+	position: relative;
+	transform: perspective(900px) rotateY(calc(var(--tx, 0) * 5deg)) rotateX(calc(var(--ty, 0) * -5deg));
+	transition: transform 350ms var(--cine-ease);
+}
+
+.scene-frame__media > * {
+	translate: 0 calc((var(--p, 0.5) - 0.5) * -26px);
+}
+
+.scene-frame__media::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: 6px;
+	pointer-events: none;
+	background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--app-text) 14%, transparent), transparent 52%);
+	opacity: 0;
+	transition: opacity 350ms;
+}
+
+.scene-frame:hover .scene-frame__media::after {
+	opacity: 1;
+}
+
+/* ---- Projects: a progress line, a changing numeral, a marquee tag --------------------------------------- */
+.scene-projects__list {
+	position: relative;
+}
+
+.scene-projects__line {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: -0.9rem;
+	width: 2px;
+	background: var(--app-hairline);
+}
+
+.scene-projects__line i {
+	position: absolute;
+	inset: 0;
+	background: var(--app-accent);
+	transform-origin: top;
+	transform: scaleY(var(--p, 1));
+}
+
+.scene-projects__numerals {
+	display: none;
+}
+
+@media (min-width: 1024px) {
+	.scene-projects__numerals {
+		position: relative;
+		display: block;
+		height: clamp(7rem, 10vw, 9.5rem);
+		margin-bottom: 1.5rem;
+		overflow: clip;
+	}
+	.scene-projects__numerals span {
+		position: absolute;
+		inset: 0;
+		font: 800 clamp(7rem, 10vw, 9.5rem) / 1 var(--apple-font-family);
+		letter-spacing: -0.04em;
+		transform: translateY(100%);
+		transition: transform 650ms var(--cine-ease);
+	}
+	.scene-projects__numerals span::before {
+		content: attr(data-n);
+		color: transparent;
+		-webkit-text-stroke: 1.5px var(--app-accent);
+	}
+	[data-active='0'] .scene-projects__numerals span:nth-child(1),
+	[data-active='1'] .scene-projects__numerals span:nth-child(2),
+	[data-active='2'] .scene-projects__numerals span:nth-child(3),
+	[data-active='3'] .scene-projects__numerals span:nth-child(4) {
+		transform: none;
+	}
+	[data-active='1'] .scene-projects__numerals span:nth-child(1),
+	[data-active='2'] .scene-projects__numerals span:nth-child(-n + 2),
+	[data-active='3'] .scene-projects__numerals span:nth-child(-n + 3) {
+		transform: translateY(-100%);
+	}
+}
+
+.scene-row__tag {
+	display: inline-block;
+	width: 4.5rem;
+	overflow: clip;
+}
+
+/* At rest the tag is one word; on hover or focus it runs as a small marquee. */
+.scene-row__tagrun > [aria-hidden] {
+	display: none;
+}
+
+.scene-row:hover .scene-row__tag,
+.scene-row:focus-visible .scene-row__tag {
+	-webkit-mask-image: linear-gradient(90deg, #000 72%, transparent);
+	mask-image: linear-gradient(90deg, #000 72%, transparent);
+}
+
+.scene-row:hover .scene-row__tagrun > [aria-hidden],
+.scene-row:focus-visible .scene-row__tagrun > [aria-hidden] {
+	display: inline;
+}
+
+.scene-row__tagrun {
+	display: inline-flex;
+	gap: 1.5rem;
+	white-space: nowrap;
+}
+
+.scene-row:hover .scene-row__tagrun,
+.scene-row:focus-visible .scene-row__tagrun {
+	animation: tag-run 3.4s linear infinite;
+}
+
+@keyframes tag-run {
+	to {
+		transform: translate3d(-50%, 0, 0);
+	}
+}
+
+/* ---- Members: icons draw in, chips ripple ---------------------------------------------------------------- */
+.cine-ready .scene-hubcard > svg * {
+	stroke-dasharray: 100;
+	stroke-dashoffset: 100;
+	transition: stroke-dashoffset 1300ms var(--cine-ease);
+	transition-delay: calc(var(--i, 0) * 90ms + 350ms);
+}
+
+.cine-ready li.is-revealed .scene-hubcard > svg * {
+	stroke-dashoffset: 0;
+}
+
+/* A member goes straight to the controls: their scene arrives faster. */
+.cine-ready .scene-members--today [data-cine] {
+	transition-delay: calc(var(--i, 0) * 35ms);
+}
+
+/* ---- Recruit: the title scales in as the scene arrives, a marquee under it ------------------------------ */
+.scene-recruit__drift {
+	--grow: min(1, calc(var(--p, 1) * 2.4));
+	transform-origin: 0 60%;
+	transform: translate3d(calc((var(--p, 0.5) - 0.5) * -8%), 0, 0) scale(calc(0.6 + 0.4 * var(--grow)));
+}
+
+.scene-title--finale {
+	letter-spacing: calc(-0.04em + (1 - var(--grow, 1)) * 0.14em);
+}
+
+.scene-recruit__marquee {
+	margin: clamp(3rem, 8vw, 6rem) calc(var(--cine-pad) * -1) 0;
+	padding-block: 1rem;
+	overflow: clip;
+	border-block: 1px solid var(--app-hairline);
+}
+
+.scene-recruit__marquee-run {
+	animation: ticker 60s linear infinite reverse;
+}
+
+.scene-recruit__marquee-run::before {
+	content: attr(data-t);
+	color: transparent;
+	font: 800 clamp(2.25rem, 6.5vw, 6rem) / 1.1 var(--apple-font-family);
+	letter-spacing: -0.03em;
+	-webkit-text-stroke: 1px color-mix(in srgb, var(--app-text) 40%, transparent);
+}
+
+/* ---- Small screens ----------------------------------------------------------------------------------------- */
+@media (max-width: 767px) {
+	.scene-opening__cube {
+		--cs: 8.5rem;
+		top: 9%;
+		right: -1.5rem;
+	}
+	.scene-bg__numeral {
+		font-size: 12rem;
+	}
+	.scene-divider__text {
+		font-size: clamp(3.5rem, 16vw, 6rem);
+	}
+}
+
+/* ---- Reduced motion and lite: the still scenes. Static layers stay; nothing moves. ---------------------- */
+@media (prefers-reduced-motion: reduce) {
+	.scene-opening__cube,
+	.scene-opening__floor,
+	.scene-opening__ticker {
+		display: none;
+	}
+	.aurora,
+	.coms-visual *,
+	.coms-visual *::before,
+	.coms-visual *::after,
+	.coms-mini *,
+	.coms-mini *::before,
+	.coms-mini *::after,
+	.scene-row__tagrun,
+	.scene-recruit__marquee-run {
+		animation: none;
+	}
+	.scene-recruit__marquee {
+		display: none;
+	}
+	.cine-ready .scene-wordmark.is-revealed .cine-m > span {
+		background-image: none;
+		color: var(--app-text);
+		-webkit-text-fill-color: currentColor;
+	}
+	.cine-ready .scene-wordmark.is-revealed {
+		animation: none;
+	}
+	.scene-wordmark,
+	.scene-frame__media {
+		transform: none;
+	}
+	.cine-ready .scene-hubcard > svg * {
+		stroke-dasharray: none;
+		stroke-dashoffset: 0;
+		transition: none;
+	}
+	.scene-projects__numerals span {
+		transition: none;
+	}
+}
+
+:root[data-perf='lite'] .scene-opening__cube,
+:root[data-perf='lite'] .scene-opening__floor,
+:root[data-perf='lite'] .scene-opening__ticker,
+:root[data-perf='lite'] .scene-recruit__marquee {
+	display: none;
+}
+
+:root[data-perf='lite'] .aurora,
+:root[data-perf='lite'] .coms-visual *,
+:root[data-perf='lite'] .coms-visual *::before,
+:root[data-perf='lite'] .coms-visual *::after,
+:root[data-perf='lite'] .coms-mini *,
+:root[data-perf='lite'] .coms-mini *::before,
+:root[data-perf='lite'] .coms-mini *::after,
+:root[data-perf='lite'] .scene-row__tagrun {
+	animation: none;
+}
+
+:root[data-perf='lite'] .cine-ready .scene-wordmark.is-revealed .cine-m > span {
+	background-image: none;
+	color: var(--app-text);
+	-webkit-text-fill-color: currentColor;
+}
+
+:root[data-perf='lite'] .cine-ready .scene-wordmark.is-revealed {
+	animation: none;
+}
+
+:root[data-perf='lite'] .scene-wordmark,
+:root[data-perf='lite'] .scene-frame__media {
+	transform: none;
+}
+
+:root[data-perf='lite'] .cine-ready .scene-hubcard > svg * {
+	stroke-dasharray: none;
+	stroke-dashoffset: 0;
+	transition: none;
+}
+
+:root[data-perf='lite'] .scene-projects__numerals span {
+	transition: none;
+}
