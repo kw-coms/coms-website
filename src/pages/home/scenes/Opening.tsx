@@ -65,6 +65,9 @@ export default function Opening({ title, copy, semester, total, noticeTitle, onM
             <div className="cube">
               <i /><i /><i /><i /><i /><i />
             </div>
+            <div className="cube cube--inner">
+              <i /><i /><i /><i /><i /><i />
+            </div>
           </div>
         </div>
         <div className="scene-opening__vignette" />
