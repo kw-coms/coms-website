@@ -49,9 +49,25 @@ function StudyBody({ id }: { id: string }) {
     } catch {
       // Not decodable.
     }
+    const go = () => document.getElementById(anchor)?.scrollIntoView()
     // A frame later: the route's scroll-to-top effect runs after this one when the lesson is already cached.
-    const frame = requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView())
-    return () => cancelAnimationFrame(frame)
+    const frame = requestAnimationFrame(go)
+    // The playgrounds and code blocks above the chapter are built after the markup lands and push it down.
+    // Keep the chapter in place while the page settles, and stop the moment the reader takes over.
+    const layout = layoutRef.current
+    const settle = typeof ResizeObserver === 'undefined' || !layout ? null : new ResizeObserver(go)
+    const stop = () => {
+      settle?.disconnect()
+      window.clearTimeout(limit)
+      for (const type of ['wheel', 'touchstart', 'keydown', 'pointerdown']) window.removeEventListener(type, stop)
+    }
+    const limit = window.setTimeout(stop, 3000)
+    if (layout) settle?.observe(layout)
+    for (const type of ['wheel', 'touchstart', 'keydown', 'pointerdown']) window.addEventListener(type, stop, { passive: true })
+    return () => {
+      cancelAnimationFrame(frame)
+      stop()
+    }
   }, [html, location.hash])
 
   // The playground calls the latest login handler without being re-created when the router state changes.
