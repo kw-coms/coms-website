@@ -1,7 +1,7 @@
 import PageHeading from '../../components/PageHeading'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Sparkles, Trophy } from 'lucide-react'
 import {
   createClubEvent,
@@ -16,7 +16,7 @@ import { normalizeRichTextForSubmit } from '../../shared/homeUi'
 import ClubEventDetail from './ClubEventDetail'
 import ClubEventForm from './ClubEventForm'
 import ClubEventListCard from './ClubEventListCard'
-import { CLUB_EVENT_RSVP_OPTIONS, toEventDateTime } from './clubEventUtils'
+import { CLUB_EVENT_RSVP_OPTIONS, sortClubEvents, toEventDateTime } from './clubEventUtils'
 import { useClubEventEntryForm } from './useClubEventEntryForm'
 import { useClubEvents } from './useClubEvents'
 import { canManageContent } from '../../utils/roleAccess'
@@ -26,9 +26,12 @@ function ClubEventSection() {
   const navigate = useNavigate()
   const { user, authLoading, events, loading, loadError, prependEvent, mergeEvent, removeEvent } = useClubEvents('이벤트를 불러오지 못했습니다.')
   const { permissions } = usePermissions()
-  const [mode, setMode] = useState('list')
-  const [selectedEventId, setSelectedEventId] = useState(null)
+  const { id: idParam } = useParams()
+  const [writing, setWriting] = useState(false)
+  const selectedEventId = idParam == null ? null : Number(idParam)
   const [selectedSnapshot, setSelectedSnapshot] = useState(null)
+  const [notFound, setNotFound] = useState(false)
+  const mode = selectedEventId != null ? 'detail' : writing ? 'write' : 'list'
   const [eventForm, setEventForm] = useState({ title: '', description: '', startsOn: '', endsOn: '' })
   const {
     entryForm,
@@ -54,10 +57,10 @@ function ClubEventSection() {
   const [rsvpPending, setRsvpPending] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
 
-  const eventItems = user ? events || [] : []
+  const eventItems = useMemo(() => (user ? sortClubEvents(events || []) : []), [user, events])
   const selectedEvent = selectedEventId == null
     ? null
-    : eventItems.find((item) => item.id === selectedEventId) || selectedSnapshot
+    : eventItems.find((item) => item.id === selectedEventId) || (selectedSnapshot?.id === selectedEventId ? selectedSnapshot : null)
   const isLocked = !authLoading && !user
   const isAdmin = canManageContent(permissions)
   const visibleError = error || loadError
@@ -66,20 +69,37 @@ function ClubEventSection() {
     setEventForm({ title: '', description: '', startsOn: '', endsOn: '' })
   }
 
-  const openEvent = async (item) => {
-    setMode('detail')
-    setSelectedEventId(item.id)
+  const openEvent = (item) => {
     setSelectedSnapshot(item)
     setNotice('')
-    setError('')
-    try {
-      const detail = await getClubEvent(item.id)
-      mergeEvent(detail)
-      setSelectedSnapshot(detail)
-    } catch (err) {
-      setError(err.message || '이벤트 상세를 불러오지 못했습니다.')
-    }
+    navigate(`/activity-events/${item.id}`)
   }
+
+  // The address decides which event is open, so reload, Back and shared links all land on it.
+  useEffect(() => {
+    setError('')
+    setNotFound(false)
+    if (selectedEventId == null || !user) return undefined
+    if (!Number.isInteger(selectedEventId) || selectedEventId <= 0) {
+      setNotFound(true)
+      return undefined
+    }
+    let cancelled = false
+    getClubEvent(selectedEventId)
+      .then((detail) => {
+        if (cancelled) return
+        mergeEvent(detail)
+        setSelectedSnapshot(detail)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        if (err?.status === 404) setNotFound(true)
+        else setError(err.message || '이벤트 상세를 불러오지 못했습니다.')
+      })
+    return () => { cancelled = true }
+    // mergeEvent only writes to the query cache; reloading on its identity would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEventId, user])
 
   const submitEvent = async (event) => {
     event.preventDefault()
@@ -95,11 +115,11 @@ function ClubEventSection() {
         endsAt: toEventDateTime(eventForm.endsOn, true),
       })
       prependEvent(created)
-      setSelectedEventId(created.id)
       setSelectedSnapshot(created)
-      setMode('detail')
+      setWriting(false)
       resetEventForm()
-      setNotice('이벤트를 열었습니다. 이제 회지와 작품을 업로드할 수 있습니다.')
+      navigate(`/activity-events/${created.id}`)
+      setNotice('이벤트를 열었습니다.')
     } catch (err) {
       setError(err.message || '이벤트를 만들지 못했습니다.')
     } finally {
@@ -181,9 +201,8 @@ function ClubEventSection() {
       await deleteClubEvent(item.id)
       removeEvent(item.id)
       if (selectedEventId === item.id) {
-        setSelectedEventId(null)
         setSelectedSnapshot(null)
-        setMode('list')
+        navigate('/activity-events')
       }
     } catch (err) {
       setError(err.message || '이벤트를 삭제하지 못했습니다.')
@@ -219,10 +238,10 @@ function ClubEventSection() {
                   <div className="min-w-0">
                     <span className="coms-icon coms-board-icon" aria-hidden="true"><Trophy size={22} strokeWidth={2} /></span>
                     <PageHeading className="apple-display mt-3 break-words text-4xl sm:text-6xl">이벤트</PageHeading>
-                    <p className="apple-copy mt-4 max-w-2xl text-base sm:text-lg">회지, 작품, 활동 결과물을 모아 투표하고 랭킹으로 확인합니다. 등록된 실제 이벤트만 보여줍니다.</p>
+                    <p className="apple-copy mt-4 max-w-2xl text-base sm:text-lg">동아리 이벤트와 일정을 모아 봅니다. 회지·작품 이벤트는 투표와 랭킹도 확인할 수 있습니다.</p>
                   </div>
                   {isAdmin && !isLocked && (
-                    <button type="button" onClick={() => { setMode('write'); setError(''); setNotice('') }} className="apple-action-primary inline-flex w-full items-center justify-center px-5 py-3 text-sm sm:w-auto sm:py-2.5">
+                    <button type="button" onClick={() => { setWriting(true); setError(''); setNotice('') }} className="apple-action-primary inline-flex w-full items-center justify-center px-5 py-3 text-sm sm:w-auto sm:py-2.5">
                       이벤트 열기
                     </button>
                   )}
@@ -241,7 +260,7 @@ function ClubEventSection() {
                   <Sparkles size={22} aria-hidden="true" />
                   <div>
                     <h3>로그인 하세요</h3>
-                    <p>회원 로그인 후 이벤트와 인기투표에 참여할 수 있습니다.</p>
+                    <p>회원 로그인 후 이벤트를 볼 수 있습니다.</p>
                     <button type="button" onClick={() => navigate('/login')} className="apple-action-primary mt-3 inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">로그인</button>
                   </div>
                 </div>
@@ -271,7 +290,7 @@ function ClubEventSection() {
                   <Sparkles size={22} aria-hidden="true" />
                   <div>
                     <h3>열린 이벤트가 없습니다.</h3>
-                    <p>관리자가 회지 인기투표나 작품 이벤트를 열면 이곳에 표시됩니다.</p>
+                    <p>관리자가 이벤트를 열면 이곳에 표시됩니다.</p>
                   </div>
                 </div>
               )}
@@ -286,19 +305,20 @@ function ClubEventSection() {
                     <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
                     <PageHeading className="text-xs font-semibold text-[var(--app-muted)]">이벤트 열기</PageHeading>
                   </div>
-                  <button type="button" onClick={() => setMode('list')} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
+                  <button type="button" onClick={() => setWriting(false)} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
                     <ArrowLeft size={14} />
                     목록
                   </button>
                 </div>
               </div>
               <div className="p-4 sm:p-5">
-                <ClubEventForm eventForm={eventForm} setEventForm={setEventForm} onSubmit={submitEvent} onCancel={() => setMode('list')} saving={savingEvent} />
+                <ClubEventForm eventForm={eventForm} setEventForm={setEventForm} onSubmit={submitEvent} onCancel={() => setWriting(false)} saving={savingEvent} />
               </div>
             </>
           )}
           {mode === 'detail' && (
             <ClubEventDetail
+              notFound={notFound}
               selectedEvent={selectedEvent}
               notice={notice}
               error={error}
@@ -324,7 +344,7 @@ function ClubEventSection() {
               onVote={handleVote}
               deletingId={deletingId}
               onDeleteEntry={handleDeleteEntry}
-              onBack={() => setMode('list')}
+              onBack={() => navigate('/activity-events')}
             />
           )}
           {mode !== 'detail' && (notice || error) && <div className={`club-event-toast ${error ? 'club-event-toast-error' : ''}`}>{error || notice}</div>}

@@ -173,6 +173,7 @@ function App() {
         <Route path="/activities" element={<ActivitiesDetailPage />} />
         <Route path="/activity-log" element={<RequireAuth><ActivityLogPage /></RequireAuth>} />
         <Route path="/activity-events" element={<RequireAuth><ClubEventPage /></RequireAuth>} />
+        <Route path="/activity-events/:id" element={<RequireAuth><ClubEventPage /></RequireAuth>} />
         <Route path="/monthly-calendar" element={<RequireAuth><MonthlyCalendarPage /></RequireAuth>} />
         <Route path="/attendance" element={<RequireAuth><AttendancePage /></RequireAuth>} />
         <Route path="/meet" element={<RequireAuth><MeetingPollsPage /></RequireAuth>} />
