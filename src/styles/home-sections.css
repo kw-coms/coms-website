@@ -59,10 +59,6 @@
 	--gy: 78%;
 }
 
-.coms-sec-tight {
-	padding-block: clamp(3rem, 6vw, 5rem);
-}
-
 .coms-sec-inner {
 	width: 100%;
 	max-width: 76rem;
@@ -80,34 +76,8 @@
 	.coms-split {
 		grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
 	}
-	.coms-split-flip > :first-child {
-		order: 2;
-	}
 }
-
 /* ---- Type ---------------------------------------------------------------- */
-.coms-label {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.7rem;
-	color: var(--app-accent-text);
-	font: 600 0.75rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-	letter-spacing: 0.1em;
-	text-transform: uppercase;
-}
-
-.coms-label b {
-	color: var(--app-muted);
-	font-weight: 600;
-}
-
-.coms-label i {
-	display: block;
-	width: 2.25rem;
-	height: 1px;
-	background: currentColor;
-	opacity: 0.55;
-}
 
 .coms-title {
 	margin-top: 1.1rem;
@@ -137,96 +107,7 @@
 	line-height: 1.72;
 	word-break: keep-all;
 }
-
-.coms-center {
-	text-align: center;
-}
-
-.coms-center .coms-lede {
-	margin-inline: auto;
-}
-
-.coms-actions {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.75rem;
-	margin-top: 1.9rem;
-}
-
-.coms-center .coms-actions {
-	justify-content: center;
-}
-
 /* ---- Small pieces -------------------------------------------------------- */
-.coms-stats {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 0.75rem;
-	margin-top: 2.25rem;
-}
-
-.coms-stat {
-	border-radius: 14px;
-	border: 1px solid var(--app-hairline);
-	background: color-mix(in srgb, var(--app-surface) 66%, transparent);
-	padding: 1rem;
-}
-
-.coms-stat::before {
-	content: '';
-	display: block;
-	width: 1.5rem;
-	height: 2px;
-	margin-bottom: 0.85rem;
-	border-radius: 2px;
-	background: var(--app-accent);
-	box-shadow: 0 0 10px color-mix(in srgb, var(--app-accent) 70%, transparent);
-}
-
-.coms-stat strong {
-	display: block;
-	color: var(--app-text);
-	font-size: 1.15rem;
-	font-weight: 700;
-}
-
-.coms-stat span {
-	display: block;
-	margin-top: 0.3rem;
-	color: var(--app-muted);
-	font-size: 0.78rem;
-	font-weight: 600;
-	line-height: 1.45;
-	word-break: keep-all;
-}
-
-.coms-stats-column {
-	grid-template-columns: minmax(0, 1fr);
-	margin-top: 0;
-}
-
-.coms-stats-column .coms-stat {
-	display: grid;
-	grid-template-columns: 4.5rem minmax(0, 1fr);
-	align-items: center;
-	gap: 1rem;
-	padding: 1.15rem 1.25rem;
-}
-
-.coms-stats-column .coms-stat::before {
-	display: none;
-}
-
-.coms-stats-column .coms-stat strong {
-	color: var(--app-accent-text);
-	font: 700 1.05rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-
-.coms-stats-column .coms-stat span {
-	margin-top: 0;
-	color: var(--app-text);
-	font-size: 0.95rem;
-}
 
 /* A card that lights up under the pointer (--spot-x / --spot-y come from useSpotlight). */
 .coms-card {
@@ -304,16 +185,6 @@
 	transform: translateX(4px);
 }
 
-.coms-card-num {
-	position: absolute;
-	right: 1.15rem;
-	top: 0.95rem;
-	color: transparent;
-	font: 700 2.5rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-	-webkit-text-stroke: 1px color-mix(in srgb, var(--app-text) 22%, transparent);
-	pointer-events: none;
-}
-
 .coms-icon {
 	display: grid;
 	width: 2.9rem;
@@ -330,51 +201,6 @@
 .coms-card .coms-icon + .coms-card-title {
 	margin-top: 1.15rem;
 }
-
-.coms-rowhead {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: flex-end;
-	justify-content: space-between;
-	gap: 1.25rem;
-}
-
-.coms-rowhead .coms-title {
-	font-size: clamp(1.9rem, 3.4vw, 2.9rem);
-}
-
-.coms-rowhead .coms-lede {
-	margin-top: 0.85rem;
-}
-
-/* ---- Projects: artwork beside its three tracks, the projects under both -- */
-.coms-bento {
-	display: grid;
-	gap: 1rem;
-	margin-top: clamp(2.25rem, 4vw, 3.5rem);
-}
-
-@media (min-width: 1024px) {
-	.coms-bento {
-		grid-template-columns: repeat(12, minmax(0, 1fr));
-	}
-	.coms-bento-wide {
-		grid-column: span 7;
-	}
-	.coms-bento-side {
-		grid-column: span 5;
-	}
-	.coms-bento-third {
-		grid-column: span 4;
-	}
-}
-
-.coms-bento-side {
-	display: grid;
-	align-content: stretch;
-	gap: 1rem;
-}
-
 /* ---- Recruit: one lit panel ---------------------------------------------- */
 .coms-cta {
 	position: relative;
@@ -1259,15 +1085,6 @@
 }
 
 @media (max-width: 639px) {
-	.coms-stats {
-		gap: 0.5rem;
-	}
-	.coms-stat {
-		padding: 0.8rem 0.7rem;
-	}
-	.coms-stat strong {
-		font-size: 1rem;
-	}
 	.coms-visual-sub {
 		display: none;
 	}
@@ -1296,87 +1113,13 @@
 		transition: none;
 	}
 }
-
 /* ---- Tools row: the Records and Tools menu entries as small tiles under the hub cards ---------- */
-.coms-tools {
-	margin-top: 2.25rem;
-}
 
 .coms-tools-grid {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 0.6rem;
 	margin-top: 0.9rem;
-}
-
-.coms-tool {
-	display: flex;
-	width: 100%;
-	min-height: 3.6rem;
-	align-items: center;
-	gap: 0.75rem;
-	border-radius: 14px;
-	border: 1px solid var(--app-hairline);
-	background: color-mix(in srgb, var(--app-surface) 78%, transparent);
-	padding: 0.65rem 0.85rem;
-	text-align: left;
-	transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
-}
-
-.coms-tool:hover {
-	border-color: var(--app-accent-border);
-	background: var(--app-surface);
-	transform: translateY(-2px);
-}
-
-.coms-tool:focus-visible {
-	outline: 2px solid var(--app-accent);
-	outline-offset: 2px;
-}
-
-.coms-tool-icon {
-	display: grid;
-	width: 2.2rem;
-	height: 2.2rem;
-	flex: none;
-	place-items: center;
-	border-radius: 10px;
-	border: 1px solid var(--app-accent-border);
-	background: var(--app-accent-soft);
-	color: var(--app-accent-text);
-}
-
-.coms-tool-title {
-	display: block;
-	overflow: hidden;
-	color: var(--app-text);
-	font-size: 0.92rem;
-	font-weight: 700;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.coms-tool-sub {
-	display: block;
-	margin-top: 0.2rem;
-	overflow: hidden;
-	color: var(--app-muted);
-	font: 600 0.64rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-	letter-spacing: 0.08em;
-	text-overflow: ellipsis;
-	text-transform: uppercase;
-	white-space: nowrap;
-}
-
-.coms-tool-go {
-	flex: none;
-	color: var(--app-muted);
-	transition: transform 160ms ease, color 160ms ease;
-}
-
-.coms-tool:hover .coms-tool-go {
-	color: var(--app-accent-text);
-	transform: translateX(3px);
 }
 
 /* A short last row stretches over the empty cells instead of leaving an orphan tile. */
@@ -1402,30 +1145,8 @@
 	}
 }
 
-/* On a phone the arrow gives its room to the title. */
-@media (max-width: 479px) {
-	.coms-tool {
-		gap: 0.6rem;
-		padding-inline: 0.7rem;
-	}
-
-	.coms-tool-go {
-		display: none;
-	}
-}
-
 @media (max-width: 359px) {
 	.coms-tools-grid {
 		grid-template-columns: minmax(0, 1fr);
-	}
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.coms-tool,
-	.coms-tool:hover,
-	.coms-tool-go,
-	.coms-tool:hover .coms-tool-go {
-		transform: none;
-		transition: none;
 	}
 }

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockOptionalApis } from './visualSupport.js'
+import { mockAdminApis, mockOptionalApis, expectMembersGate } from './visualSupport.js'
 
 // The footer's "화면 설정" control: one button that opens a popover (desktop) or a bottom sheet (phones).
 const trigger = (page) => page.getByRole('button', { name: '화면 설정', exact: true })
@@ -17,6 +17,42 @@ const openFromFooter = async (page) => {
   await expect(dialog(page)).toBeVisible()
   await expect(trigger(page)).toHaveAttribute('aria-controls', (await dialog(page).getAttribute('id')) ?? '')
 }
+
+test('footer has the four Korean sitemap groups and keeps external destinations', async ({ page }) => {
+  await page.goto('/activities')
+  const sitemap = page.getByRole('navigation', { name: '사이트맵' })
+  await expect(sitemap.getByRole('heading')).toHaveText(['동아리', '배움', '멤버', '도구'])
+  const paths = await sitemap.getByRole('link').evaluateAll((links) => links.map((link) => link.getAttribute('href')))
+  expect(paths).toEqual(['/about', '/activities', '/projects', '/sponsors', '/recruit', '/study', '/notices', '/community', '/resources', '/activity-log', '/monthly-calendar', '/activity-events', '/gatherings', '/meet', '/attendance', '/draw', '/apps'])
+  await expect(sitemap.getByRole('link', { name: /^공지/ }).locator('[data-member-lock]')).toHaveCount(1)
+  await expect(page.locator('.coms-footer-wordmark')).toHaveAttribute('aria-hidden', 'true')
+  await expect(page.locator('.coms-footer-wordmark')).toHaveCSS('-webkit-text-stroke-width', '1px')
+  for (const [name, url] of [['Instagram', 'https://www.instagram.com/kw_coms'], ['GitHub', 'https://github.com/kw-coms'], ['YouTube', 'https://www.youtube.com/@kw_coms'], ['메일', 'mailto:kwcoms69@gmail.com']]) {
+    await expect(page.locator('footer').getByRole('link', { name, exact: true })).toHaveAttribute('href', url)
+  }
+  await sitemap.getByRole('link', { name: /^자료실/ }).click()
+  await expectMembersGate(page, '/resources')
+  await page.getByRole('link', { name: '로그인', exact: true }).click()
+  await expect(page).toHaveURL(/\/login$/)
+})
+
+test('signed-in footer removes locks and internal links stay in the SPA', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.goto('/activities')
+  await page.evaluate(() => { window.footerSpaMarker = true })
+  const sitemap = page.getByRole('navigation', { name: '사이트맵' })
+  await expect(sitemap.locator('[data-member-lock]')).toHaveCount(0)
+  await sitemap.getByRole('link', { name: '프로젝트', exact: true }).click()
+  await expect(page).toHaveURL(/\/projects$/)
+  expect(await page.evaluate(() => window.footerSpaMarker)).toBe(true)
+})
+
+test('footer sitemap leaves the Lab to the header menu', async ({ page }) => {
+  await page.goto('/activities')
+  const sitemap = page.getByRole('navigation', { name: '사이트맵' })
+  await expect(sitemap.getByRole('link', { name: '스터디 자료' })).toBeVisible()
+  await expect(sitemap.locator('a[href*="/lab"]')).toHaveCount(0)
+})
 
 test.describe('desktop popover', () => {
   test('opens with focus inside; Esc closes it and returns focus to the button', async ({ page }) => {
@@ -43,7 +79,10 @@ test.describe('desktop popover', () => {
     await openFromFooter(page)
     // Keyboard navigation: a pointer press on the link would already count as an outside click.
     // A public route: /notices needs a login and redirects to /login, which breaks the goBack() below.
-    const link = page.locator('.apple-global-nav').getByRole('button', { name: 'Projects', exact: true }).first()
+    // The keyboard opens the 동아리 group and moves into it; 프로젝트 is a public entry there.
+    await page.locator('.apple-global-nav').getByRole('button', { name: '동아리', exact: true }).focus()
+    await page.keyboard.press('Enter')
+    const link = page.locator('#nav-panel').getByRole('button', { name: /^프로젝트/ })
     await link.focus()
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL(/\/projects/)

@@ -1,3 +1,4 @@
+import PageHeading from '../PageHeading'
 import { useEffect, useState } from 'react'
 import { listClubProjects, listClubProjectCategories, listClubProjectLinkStatuses } from '../../services/clubProjectApi'
 import { linkStateOf } from '../../utils/appProjectStatus'
@@ -77,7 +78,7 @@ function CompanionServicesSection() {
       <div className="site-page-inner">
         <div className="site-head">
           <div>
-            <h1>COM&apos;s Apps</h1>
+            <PageHeading>COM&apos;s Apps</PageHeading>
             <p className="site-head-lead">
               동아리 부원들이 직접 만든 웹사이트·앱·게임 프로젝트를 한곳에 모았습니다. 링크로 바로 열거나 배포 파일을 내려받아 사용해 보세요.
             </p>

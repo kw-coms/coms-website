@@ -165,7 +165,7 @@ function App() {
       {location.pathname === '/' && <ComsIntro />}
       <ScrollToTop />
       <GlobalNavigation />
-      <div key={location.pathname} id="main-content" tabIndex={-1} className="coms-page-enter">
+      <div key={location.pathname} id="main-content" tabIndex={-1} className={`coms-page-enter${location.pathname === '/' ? '' : ' coms-inner-page'}`}>
       <RouteErrorBoundary>
       <Routes location={location}>
         <Route path="/" element={<HomeView />} />

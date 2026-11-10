@@ -6,7 +6,7 @@ import { asMember, mockAdminApis, mockOptionalApis } from './visualSupport.js'
 // issues that we surface in the attachment but do not gate on yet.
 const BLOCKING_IMPACTS = ['serious', 'critical']
 
-// The route-enter fade (.coms-page-enter) animates opacity for 360ms; if axe
+// The route entrance (.coms-page-enter) animates opacity for 450ms; if axe
 // scans mid-fade it measures semi-transparent text against the backdrop and
 // reports bogus color-contrast violations. The app disables the fade under
 // prefers-reduced-motion, so run the scans in that mode for determinism.
@@ -17,7 +17,7 @@ test.describe('first-visit intro', () => {
 
   test('visible skip control is available to assistive technology', async ({ page }) => {
     await mockAdminApis(page)
-    await page.goto('/')
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
     const skip = page.getByRole('button', { name: /skip/i })
     await expect(skip).toBeVisible()
     await skip.click()
@@ -83,15 +83,15 @@ test('home page has no serious or critical accessibility violations', async ({ p
   await assertNoSeriousViolations(page)
 })
 
-for (const [button, menu] of [['Records', '기록·일정 메뉴'], ['Tools', '참여 도구 메뉴']]) {
-  test(`desktop ${button} disclosure uses navigation semantics and closes with Escape`, async ({ page }) => {
+for (const button of ['동아리', '배움', '멤버', '도구']) {
+  test(`desktop ${button} group opens the sitemap panel with navigation semantics and closes with Escape`, async ({ page }) => {
     await mockAdminApis(page)
     await page.goto('/')
     const toggle = page.getByRole('button', { name: button, exact: true })
     await expect(toggle).toHaveAttribute('aria-expanded', 'false')
     await toggle.click()
     await expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    const navigation = page.getByRole('navigation', { name: menu })
+    const navigation = page.getByRole('navigation', { name: '전체 메뉴' })
     await expect(navigation).toBeVisible()
     await assertNoSeriousViolations(page)
     await page.keyboard.press('Escape')

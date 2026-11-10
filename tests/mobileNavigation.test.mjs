@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const nav = readFileSync(new URL('../src/components/GlobalNavigation.tsx', import.meta.url), 'utf8')
+const mobileMenu = readFileSync(new URL('../src/components/MobileNavMenu.tsx', import.meta.url), 'utf8')
 const notificationButton = readFileSync(new URL('../src/components/NotificationButton.tsx', import.meta.url), 'utf8')
 const indexCss = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
 const css = [...indexCss.matchAll(/@import "(\.\/.+?)";/g)]
@@ -9,7 +10,7 @@ const css = [...indexCss.matchAll(/@import "(\.\/.+?)";/g)]
   .join('\n')
 
 assert.match(
-  nav,
+  mobileMenu,
   /<NotificationButton alignLeft variant="mobileMenu" \/>/,
   'mobile menu should render notifications as a menu row',
 )
@@ -38,36 +39,67 @@ assert.match(
   'mobile notification row should not add a separate card-like button surface',
 )
 
+// The menu is a full-screen overlay with every group open (not a dropdown list), and it is modal.
 assert.match(
-  nav,
-  /className="apple-mobile-menu-item apple-mobile-menu-subitem"/,
-  'mobile Records/Tools submenu rows should reuse the shared menu item touch sizing',
+  mobileMenu,
+  /role="dialog" aria-modal="true"/,
+  'the phone menu should be a modal overlay',
+)
+
+assert.match(
+  mobileMenu,
+  /useModalFocus\(true, onClose\)/,
+  'the phone menu should trap focus and close on Escape',
+)
+
+assert.match(
+  mobileMenu,
+  /document\.body\.style\.overflow = 'hidden'[\s\S]*?document\.body\.style\.overflow = previous/,
+  'the page behind the phone menu should not scroll, and be released on close',
+)
+
+assert.match(
+  mobileMenu,
+  /navGroups\.map\(\(group\) => \(\s*<section/,
+  'the phone menu should list every navGroups group as a headed section',
 )
 
 assert.match(
   css,
-  /\.apple-mobile-menu-subitem \{[\s\S]*?min-height: 3\.75rem;[\s\S]*?align-items: flex-start;[\s\S]*?padding: 0\.75rem 1\.25rem 0\.75rem 1\.5rem;/,
-  'mobile Records/Tools submenu rows should keep stable finger-sized hit areas',
+  /\.nav-m-item \{[\s\S]*?width: 100%;[\s\S]*?min-height: 2\.75rem;[\s\S]*?text-align: left;/,
+  'phone menu rows should keep finger-sized (44px) full-width hit areas',
 )
 
 assert.doesNotMatch(
   css,
-  /\.apple-mobile-menu-panel \.apple-mobile-menu-item \{[\s\S]*?animation:/,
-  'mobile menu should not stagger every row with a separate cascade animation',
+  /\.nav-m-item \{[^}]*animation:/,
+  'phone menu rows should not each run a cascade animation',
 )
 
 assert.match(
   css,
-  /animation: menu-slide-down 160ms ease-out both;/,
-  'mobile menu panel should use a short, restrained open animation',
+  /\.nav-m-overlay \{[\s\S]*?animation: nav-panel-in 250ms cubic-bezier\(0\.16, 1, 0\.3, 1\) both;/,
+  'the phone menu should use one short rise-and-fade open animation',
+)
+
+assert.match(
+  css,
+  /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.nav-m-overlay \{\s*animation: none;/,
+  'the phone menu should not animate under reduced motion',
+)
+
+assert.match(
+  css,
+  /:root\[data-perf='lite'\] \.nav-panel,\s*:root\[data-perf='lite'\] \.nav-m-overlay \{\s*animation: none;/,
+  'the panels should not animate in lite mode',
 )
 
 // The brand link, a notification row and the browser's Back button navigate without going
 // through the menu's own closeAndGo, so the menu has to follow the route itself.
 assert.match(
   nav,
-  /if \(location\.key !== menuLocationKey\) \{[\s\S]*?setMobileMenuOpen\(false\)[\s\S]*?setMobileOpenGroups\(\[\]\)/,
-  'mobile menu should close on every route change, not only from its own links',
+  /if \(location\.key !== menuLocationKey\) \{[\s\S]*?setMobileMenuOpen\(false\)[\s\S]*?setOpenGroup\(null\)/,
+  'the menus should close on every route change, not only from their own links',
 )
 
 assert.match(

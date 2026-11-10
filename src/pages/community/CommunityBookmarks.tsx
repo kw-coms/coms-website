@@ -1,3 +1,4 @@
+import PageHeading from '../../components/PageHeading'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Bookmark } from 'lucide-react'
@@ -46,11 +47,10 @@ export default function CommunityBookmarks({ onBack }: { onBack: () => void }) {
         </BoardComposeBar>
 
         <div className="apple-board-hero px-4 py-6 sm:px-8 sm:py-8">
-          <p className="apple-eyebrow">Bookmarks</p>
-          <h1 className="apple-display mt-2 flex items-center gap-3 break-words text-3xl sm:text-4xl">
+          <PageHeading className="apple-display mt-2 flex items-center gap-3 break-words text-3xl sm:text-4xl">
             <Bookmark size={26} className="text-[var(--app-accent-text)]" />
             내 스크랩
-          </h1>
+          </PageHeading>
           <p className="apple-copy mt-3 max-w-2xl text-sm sm:text-base">스크랩한 글을 한곳에서 모아봅니다.</p>
         </div>
 

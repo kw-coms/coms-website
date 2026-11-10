@@ -68,7 +68,9 @@ test.describe('/activities timeline', () => {
 
   test('lightbox opens, steps and closes with Esc, returning focus', async ({ page }) => {
     await page.goto('/activities')
-    const trigger = page.locator('#timeline .act-photo').first()
+    // The lightbox trigger is a button. While the login check runs, every photo is the locked placeholder (a div) and is then
+    // replaced, so a locator on the first .act-photo can resolve to a placeholder that goes away.
+    const trigger = page.locator('#timeline button.act-photo').first()
     await trigger.scrollIntoViewIfNeeded()
     await trigger.focus()
     await page.keyboard.press('Enter')

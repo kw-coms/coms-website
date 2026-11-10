@@ -27,7 +27,8 @@
 :root[data-perf='lite'] .coms-toast {
 	background: var(--app-surface);
 }
-:root[data-perf='lite'] .apple-mobile-menu-panel,
+:root[data-perf='lite'] .nav-panel,
+:root[data-perf='lite'] .nav-m-overlay,
 :root[data-perf='lite'] .activity-detail-header,
 :root[data-perf='lite'] .apple-product-panel {
 	background: var(--app-surface);
@@ -50,10 +51,9 @@
 :root[data-perf='lite'] .coms-cta,
 :root[data-perf='lite'] .coms-card,
 :root[data-perf='lite'] .coms-card:hover,
-:root[data-perf='lite'] .coms-3d-card,
 :root[data-perf='lite'] .coms-toast,
 :root[data-perf='lite'] .coms-to-top,
-:root[data-perf='lite'] .apple-mobile-menu-panel,
+:root[data-perf='lite'] .nav-panel,
 :root[data-perf='lite'] .coms-confirm-card {
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -87,17 +87,11 @@
 :root[data-perf='lite'] .coms-stack-layer .coms-stack-plate,
 :root[data-perf='lite'] .coms-flow-mark,
 :root[data-perf='lite'] .coms-mini-rail i,
-:root[data-perf='lite'] .coms-stat::before,
 :root[data-perf='lite'] .coms-scroll-progress {
 	box-shadow: none;
 }
-
 /* ---- Filters: no blur / drop-shadow layers ------------------------------------------------ */
-:root[data-perf='lite'] .coms-cinema-pin::before {
-	filter: none;
-	animation: none;
-	will-change: auto;
-}
+
 :root[data-perf='lite'] .coms-cinema-title,
 :root[data-perf='lite'][data-theme-mode='dark'] .coms-cinema-title {
 	filter: none;
@@ -118,36 +112,17 @@
 :root[data-perf='lite'] img[class*='drop-shadow'] {
 	filter: none !important;
 }
-
 /* ---- 3D and parallax: flat --------------------------------------------------------------- */
-:root[data-perf='lite'] .coms-3d-stage {
-	perspective: none;
-}
-:root[data-perf='lite'] .coms-3d-stage-inner,
-:root[data-perf='lite'] .coms-cinema-content,
-:root[data-perf='lite'] .coms-depth-sm,
-:root[data-perf='lite'] .coms-depth-md,
-:root[data-perf='lite'] .coms-depth-lg,
-:root[data-perf='lite'] .coms-logo-3d,
-:root[data-perf='lite'] .coms-3d-card,
-:root[data-perf='lite'] .coms-3d-card:hover,
+
 :root[data-perf='lite'] .coms-hero-field {
 	transform: none !important;
 	transform-style: flat;
 	will-change: auto;
 }
-:root[data-perf='lite'] .coms-cinema-content {
-	opacity: 1;
-	transition: none;
-}
 
 /* ---- Decorative looping animation: off ------------------------------------------------------ */
 :root[data-perf='lite'] .animate-blob,
 :root[data-perf='lite'] .coms-attend-pulse,
-:root[data-perf='lite'] .coms-logo-3d,
-:root[data-perf='lite'] .coms-live-dot::after,
-:root[data-perf='lite'] .coms-cinema-hint,
-:root[data-perf='lite'] .coms-marquee-track,
 :root[data-perf='lite'] .skeleton::after,
 :root[data-perf='lite'] .coms-os-ring,
 :root[data-perf='lite'] .coms-os-led,
@@ -165,15 +140,6 @@
 :root[data-perf='lite'] .coms-mini-face-new {
 	animation: none !important;
 	will-change: auto;
-}
-/* A marquee that no longer moves shows its first copy, wrapped, rather than a cut-off strip. */
-:root[data-perf='lite'] .coms-marquee-track {
-	flex-wrap: wrap;
-	row-gap: 0.5rem;
-	white-space: normal;
-}
-:root[data-perf='lite'] .coms-marquee-track > *:nth-child(n + 9) {
-	display: none;
 }
 :root[data-perf='lite'] .will-change-transform,
 :root[data-perf='lite'] .will-change-auto {

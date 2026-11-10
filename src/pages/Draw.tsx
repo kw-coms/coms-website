@@ -1,3 +1,4 @@
+import PageHeading from '../components/PageHeading'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Copy, Dices, ListOrdered, Minus, Plus, Sparkles, Users, type LucideIcon } from 'lucide-react'
@@ -122,8 +123,7 @@ export default function Draw() {
       <section className="apple-board-shell">
         <div className="apple-board-hero px-5 py-6 sm:px-8 sm:py-8">
           <span className="coms-icon coms-board-icon" aria-hidden="true"><Dices size={22} strokeWidth={2} /></span>
-          <p className="apple-eyebrow">Draw</p>
-          <h1 className="apple-display mt-2 text-4xl sm:text-5xl">뽑기</h1>
+          <PageHeading className="apple-display mt-2 text-4xl sm:text-5xl">뽑기</PageHeading>
           <p className="apple-copy mt-3 max-w-2xl text-base sm:text-lg">이름을 넣고 조를 나누거나, 발표 순서를 정하거나, 한 명을 뽑습니다.</p>
         </div>
 

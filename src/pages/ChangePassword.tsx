@@ -1,3 +1,4 @@
+import PageHeading from '../components/PageHeading'
 import { useEffect, useState } from 'react'
 import {
   changePassword,
@@ -580,7 +581,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
           <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left">
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
             <div className="min-w-0">
-              <h1 className="text-lg font-bold leading-snug sm:text-xl">계정 설정</h1>
+              <PageHeading className="text-lg font-bold leading-snug sm:text-xl">계정 설정</PageHeading>
               <p className="text-sm leading-5 text-[var(--theme-body-muted)]/85">회원 정보, 이메일 인증, 비밀번호를 관리합니다.</p>
             </div>
           </div>

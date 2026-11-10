@@ -1,3 +1,4 @@
+import PageHeading from '../../components/PageHeading'
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, type LucideIcon } from 'lucide-react'
@@ -17,7 +18,6 @@ import ClubEventSection from '../../features/clubEvent/ClubEventSection'
 import ActivityTimeline from '../../components/activities/ActivityTimeline'
 import ClubCalendarSection from '../../features/clubCalendar/ClubCalendarSection'
 import { useScrollReveal } from '../../hooks/useScrollReveal'
-import HeroField from './HeroField'
 import '../../styles/site-pages.css'
 import { ClubOsVisual, LearningStackVisual, ProjectLabVisual } from './HomeVisuals'
 
@@ -26,7 +26,6 @@ const DETAIL_TITLE_MIN_FIT = 0.74
 export function AboutPage() {
   return (
     <DetailStoryPage
-      eyebrow="About COM's"
       title="함께 배우고, 바로 만듭니다."
       body="COM's는 광운대학교 학생들이 컴퓨터와 소프트웨어를 함께 공부하고, 실제 프로젝트로 연결하는 중앙 컴퓨터 학술동아리입니다."
       visual={<ClubOsVisual title="Club OS" subtitle="Study · Build · Share" rows={['학습 로드맵', '프로젝트 트랙', '커뮤니티 로그']} />}
@@ -40,7 +39,6 @@ export function AboutPage() {
 }
 
 export function DetailStoryPage({
-  eyebrow,
   title,
   body,
   visual,
@@ -54,7 +52,6 @@ export function DetailStoryPage({
   lead,
   className = '',
 }: {
-  eyebrow?: React.ReactNode
   title?: React.ReactNode
   body?: React.ReactNode
   visual: React.ReactNode
@@ -132,14 +129,12 @@ export function DetailStoryPage({
       <main className="apple-detail-main coms-detail relative overflow-hidden">
         <section className="apple-detail-hero relative grid min-h-[calc(88svh-44px)] items-center gap-12 overflow-hidden bg-[var(--app-surface-soft)] px-5 py-16 lg:grid-cols-[1fr_0.88fr] lg:px-12">
           <div className="home-hero-surface absolute inset-0" />
-          <HeroField />
           <div className="relative z-10 mx-auto max-w-3xl text-center lg:text-left">
             <button type="button" onClick={() => navigate('/')} className="apple-detail-home-button mx-auto mb-8 lg:mx-0">
               <ArrowLeft size={15} />
               메인으로 돌아가기
             </button>
-            <p className="apple-eyebrow">{eyebrow}</p>
-            <h1 ref={titleRef} className="apple-display apple-detail-title mt-4">{title}</h1>
+            <PageHeading ref={titleRef} className="apple-display apple-detail-title mt-4">{title}</PageHeading>
             <p className="apple-copy mt-6 text-xl sm:text-2xl">{body}</p>
           </div>
 
@@ -220,7 +215,6 @@ export function DetailStoryPage({
 export function ActivitiesDetailPage() {
   return (
     <DetailStoryPage
-      eyebrow="Activities"
       title={(
         <>
           <span className="apple-detail-title-phrase">배움이 매주 쌓이고,</span>{' '}
@@ -261,7 +255,6 @@ export function AppsPage() {
 export function ProjectsDetailPage() {
   return (
     <DetailStoryPage
-      eyebrow="Projects"
       title="아이디어를 실제 서비스와 제작물로."
       body="COM's의 프로젝트는 동아리 안에서 쓰이는 서비스, 교육용 실습, 웹 개발 결과물처럼 실제로 동작하는 결과물을 만드는 데 집중합니다. 기획부터 구현, 배포와 개선까지 팀으로 경험합니다."
       visual={<ProjectLabVisual title="Project Lab" subtitle="Prototype · Launch · Iterate" rows={['서비스 기획', '팀 구현', '배포와 개선']} />}

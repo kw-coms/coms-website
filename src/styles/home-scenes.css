@@ -1,0 +1,1005 @@
+/* ===== Home: a film in scenes =============================================== */
+/* One subject per screen, wide empty space, type that leads. Pieces from cinema-core.css do the
+   moving; this file only lays the scenes out. Cards are not boxes here: a scene's items are
+   separated by one hairline each. Reduced motion and lite show everything at once. */
+
+.scenes {
+	background: var(--app-bg);
+	color: var(--app-text);
+}
+
+.scene {
+	position: relative;
+	padding: var(--cine-gap) var(--cine-pad);
+	scroll-margin-top: var(--apple-nav-height);
+}
+
+.scene + .scene {
+	border-top: 1px solid var(--app-hairline);
+}
+
+.scene-inner {
+	max-width: 84rem;
+	margin-inline: auto;
+}
+
+.scene-slate {
+	margin-bottom: 1.5rem;
+}
+
+.scene-title {
+	margin: 0;
+	color: var(--app-text);
+	font-size: clamp(2.25rem, 5.4vw, 5rem);
+	font-weight: 700;
+	line-height: 1.14;
+	letter-spacing: -0.03em;
+	word-break: keep-all;
+	text-wrap: balance;
+}
+
+.scene-title--xl {
+	max-width: 17em;
+	font-size: clamp(2.5rem, 6.6vw, 6.25rem);
+	line-height: 1.12;
+	letter-spacing: -0.035em;
+}
+
+.scene-lede {
+	max-width: 34rem;
+	margin-top: 2rem;
+	color: var(--app-muted);
+	font-size: clamp(1.05rem, 1.5vw, 1.3rem);
+	font-weight: 500;
+	line-height: 1.75;
+	word-break: keep-all;
+}
+
+.scene-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	margin-top: 2.25rem;
+}
+
+.scene-btn {
+	display: inline-flex;
+	min-height: 2.75rem;
+	align-items: center;
+	justify-content: center;
+	padding: 0.65rem 1.5rem;
+	font-size: 0.9375rem;
+}
+
+/* Three figures: a hairline above each, the figure large, its label small. */
+.scene-stats {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: clamp(1rem, 3vw, 3rem);
+	margin: clamp(3rem, 7vw, 5rem) 0 0;
+}
+
+.scene-stats > div {
+	border-top: 1px solid var(--app-hairline-strong);
+	padding-top: 1rem;
+}
+
+.scene-stats dt {
+	font-size: clamp(1.5rem, 3vw, 2.5rem);
+	font-weight: 700;
+	letter-spacing: -0.03em;
+	line-height: 1.1;
+}
+
+.scene-stats dd {
+	margin: 0.5rem 0 0;
+	color: var(--app-muted);
+	font-size: 0.875rem;
+	line-height: 1.5;
+	word-break: keep-all;
+}
+
+/* ---- Scene 1: the opening ------------------------------------------------------------ */
+.scene.scene-opening {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	grid-template-rows: auto 1fr auto auto;
+	/* <main> already clears the fixed bar, so the scene fills what is left of the screen. */
+	min-height: calc(100svh - var(--apple-nav-height));
+	padding: 1.75rem var(--cine-pad);
+	isolation: isolate;
+	overflow: clip;
+	border-top: 0;
+}
+
+.scene-opening__bg {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+}
+
+.scene-opening .coms-hero-field {
+	opacity: 0.6;
+}
+
+.scene-opening__vignette {
+	position: absolute;
+	inset: 0;
+	background: radial-gradient(ellipse 85% 75% at 50% 46%, transparent 38%, rgba(0, 0, 0, 0.06) 100%);
+}
+
+:root[data-theme-mode='dark'] .scene-opening__vignette {
+	background: radial-gradient(ellipse 80% 70% at 50% 46%, transparent 30%, rgba(0, 0, 0, 0.62) 100%);
+}
+
+/* Letterbox bars: closed (scaleY 0) at rest, they close in from top and bottom as the opening leaves. */
+.scene-opening__bar {
+	position: absolute;
+	inset-inline: 0;
+	z-index: 3;
+	height: 22svh;
+	background: var(--app-bg);
+	pointer-events: none;
+	transform: scaleY(var(--hero-out, 0));
+}
+
+.scene-opening__bar--top {
+	top: 0;
+	transform-origin: top;
+}
+
+.scene-opening__bar--bottom {
+	bottom: 0;
+	transform-origin: bottom;
+}
+
+.scene-opening > .cine-hud,
+.scene-opening__stage,
+.scene-opening__copy {
+	position: relative;
+	z-index: 1;
+}
+
+.scene-opening__tl {
+	grid-column: 1;
+	grid-row: 1;
+}
+
+.scene-opening__tr {
+	grid-column: 2;
+	grid-row: 1;
+	justify-self: end;
+}
+
+.scene-opening__bl {
+	grid-column: 1;
+	grid-row: 4;
+	align-self: end;
+}
+
+.scene-opening__br {
+	display: flex;
+	grid-column: 2;
+	grid-row: 4;
+	align-items: center;
+	align-self: end;
+	justify-self: end;
+	gap: 0.75rem;
+}
+
+.scene-opening__br i {
+	display: block;
+	width: 2.5rem;
+	height: 1px;
+	background: currentColor;
+}
+
+.scene-opening__stage {
+	grid-column: 1 / -1;
+	grid-row: 2;
+	align-self: center;
+	transform: scale(calc(1 - var(--hero-out, 0) * 0.1));
+	opacity: calc(1 - var(--hero-out, 0) * 1.2);
+}
+
+/* The wordmark. Each letter has its own mask; the mask's own padding and negative margin set
+   the tracking (-0.05em) without clipping the glyph's overhang. */
+.scene-wordmark {
+	display: flex;
+	justify-content: center;
+	margin: 0;
+	font-size: calc(clamp(5rem, 21vw, 22rem) * var(--fit, 1));
+	font-weight: 800;
+	line-height: 0.92;
+	color: var(--app-text);
+}
+
+.scene-wordmark .cine-m {
+	display: inline-block;
+	padding-inline: 0.08em;
+	margin-inline: -0.105em;
+	padding-block: 0.1em;
+	margin-block: -0.1em;
+}
+
+.scene-opening__copy {
+	grid-column: 1 / -1;
+	grid-row: 3;
+	max-width: 34rem;
+	margin-bottom: 2.75rem;
+	opacity: calc(1 - var(--hero-out, 0) * 1.6);
+}
+
+.scene-opening__lede {
+	color: var(--app-text);
+	font-size: clamp(1.05rem, 1.5vw, 1.3rem);
+	font-weight: 500;
+	line-height: 1.7;
+	word-break: keep-all;
+}
+
+.scene-opening .scene-actions {
+	margin-top: 1.5rem;
+}
+
+.scene-notice {
+	display: inline-flex;
+	max-width: 100%;
+	align-items: center;
+	gap: 0.55rem;
+	margin-top: 1.5rem;
+	padding: 0.5rem 0.95rem;
+	border: 1px solid var(--app-hairline-strong);
+	border-radius: 999px;
+	color: var(--app-text);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	transition: border-color 300ms var(--cine-ease);
+}
+
+.scene-notice:hover {
+	border-color: var(--app-accent);
+}
+
+.scene-notice__title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.scene-notice__tag {
+	flex-shrink: 0;
+	color: var(--app-accent-text);
+	font-size: 0.6875rem;
+	font-weight: 700;
+}
+
+.scene-notice--lead {
+	margin-top: 2rem;
+}
+
+@media (max-width: 479px) {
+	.scene-opening__tl-more {
+		display: none;
+	}
+}
+
+@media (max-width: 767px) {
+	.scene-wordmark {
+		font-size: calc(clamp(5rem, 27vw, 9rem) * var(--fit, 1));
+	}
+	.scene-opening__copy {
+		justify-self: center;
+		text-align: center;
+	}
+	.scene-opening .scene-actions {
+		justify-content: center;
+	}
+}
+
+/* ---- Scene 2: the manifesto (the one pinned moment) ------------------------------------- */
+.scene.scene-about {
+	padding-top: 0;
+}
+
+.scene-about__track {
+	height: 180svh;
+}
+
+.scene-about__pin {
+	position: sticky;
+	top: 0;
+	display: flex;
+	height: 100svh;
+	flex-direction: column;
+	justify-content: center;
+	padding-top: var(--apple-nav-height);
+}
+
+.scene-about__after {
+	display: grid;
+	gap: clamp(3rem, 6vw, 5rem) clamp(2rem, 6vw, 6rem);
+	max-width: 84rem;
+	margin: clamp(2rem, 6vh, 4rem) auto 0;
+}
+
+.scene-about__copy .scene-lede {
+	margin-top: 0;
+}
+
+.scene-about__facts {
+	display: grid;
+	gap: clamp(2.5rem, 5vw, 4rem);
+}
+
+.scene-about__facts .scene-stats {
+	margin-top: 0;
+}
+
+.scene-highlights {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: clamp(1rem, 3vw, 3rem);
+	padding: 0;
+	list-style: none;
+}
+
+.scene-highlights li {
+	display: grid;
+	align-content: start;
+	gap: 0.4rem;
+	border-top: 1px solid var(--app-hairline);
+	padding-top: 1rem;
+}
+
+.scene-highlights strong {
+	font-size: 1.125rem;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+}
+
+.scene-highlights li > span:last-child {
+	color: var(--app-muted);
+	font-size: 0.875rem;
+	line-height: 1.6;
+	word-break: keep-all;
+}
+
+.scene-pills {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 2rem;
+	padding: 0;
+	list-style: none;
+	color: var(--app-muted);
+	font: 500 0.75rem/1.5 var(--cine-mono);
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}
+
+@media (min-width: 1024px) {
+	.scene-about__after {
+		grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+		align-items: center;
+	}
+	.scene-about__facts {
+		grid-column: 1 / -1;
+	}
+}
+
+/* ---- Scene 3: activities, a run of frames ------------------------------------------------- */
+.scene-frames {
+	display: grid;
+	gap: clamp(3rem, 6vw, 5rem) clamp(1.5rem, 4vw, 4rem);
+	margin-top: clamp(4rem, 9vw, 7rem);
+}
+
+.scene-frame {
+	position: relative;
+	display: block;
+	border-top: 1px solid var(--app-hairline-strong);
+	padding-top: 1.25rem;
+	text-align: left;
+}
+
+.scene-activities__head .scene-frame--lead {
+	margin-top: clamp(2.5rem, 6vw, 4rem);
+}
+
+.scene-frame__media {
+	display: block;
+	margin: 1.25rem 0 1.5rem;
+}
+
+.scene-frame__code {
+	display: block;
+}
+
+.scene-frame__title {
+	margin: 0.6rem 0 0;
+	font-size: clamp(1.4rem, 2.2vw, 2rem);
+	font-weight: 700;
+	letter-spacing: -0.025em;
+	line-height: 1.25;
+	word-break: keep-all;
+}
+
+.scene-frame__body {
+	max-width: 30rem;
+	margin: 0.75rem 0 0;
+	color: var(--app-muted);
+	font-size: 1rem;
+	line-height: 1.7;
+	word-break: keep-all;
+}
+
+/* The title's button covers the whole frame, so the frame is one target with one name. */
+.scene-frame__link {
+	color: inherit;
+	font: inherit;
+	letter-spacing: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.scene-frame__link::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+}
+
+.scene-frame__link:focus-visible {
+	outline: none;
+}
+
+.scene-frame--link:has(.scene-frame__link:focus-visible) {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 6px;
+}
+
+.scene-frame__go {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-top: 1.25rem;
+	color: var(--app-accent-text);
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+
+.scene-frame__go svg {
+	transition: transform 400ms var(--cine-ease);
+}
+
+.scene-frame--link:hover .scene-frame__go svg {
+	transform: translateX(4px);
+}
+
+.scene-frame--link:hover .scene-frame__title {
+	color: var(--app-accent-text);
+}
+
+@media (min-width: 900px) {
+	.scene-activities__head {
+		display: grid;
+		grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+		gap: clamp(2rem, 5vw, 5rem);
+		align-items: end;
+	}
+	.scene-frame--lead .scene-frame__media {
+		margin-bottom: 0;
+	}
+	/* Six tracks: three pictures to a row, the text frames two to a row. */
+	.scene-frames {
+		grid-template-columns: repeat(6, minmax(0, 1fr));
+	}
+	.scene-frame--third {
+		grid-column: span 2;
+	}
+	.scene-frame--text {
+		grid-column: span 3;
+	}
+}
+
+/* ---- Scene 4: projects, an index ------------------------------------------------------------ */
+.scene-projects__grid {
+	display: grid;
+	gap: 3.5rem;
+	margin-top: clamp(3.5rem, 8vw, 6rem);
+}
+
+.scene-index {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	border-bottom: 1px solid var(--app-hairline-strong);
+}
+
+.scene-index > li {
+	border-top: 1px solid var(--app-hairline-strong);
+}
+
+.scene-row {
+	position: relative;
+	display: grid;
+	grid-template-columns: 2.25rem minmax(0, 1fr) auto 1.75rem;
+	align-items: baseline;
+	column-gap: 1rem;
+	width: 100%;
+	padding: clamp(1.25rem, 2.6vw, 2.1rem) 0;
+	color: var(--app-text);
+	text-align: left;
+	cursor: pointer;
+}
+
+.scene-row__title {
+	font-size: clamp(1.35rem, 2.8vw, 2.5rem);
+	font-weight: 700;
+	letter-spacing: -0.025em;
+	line-height: 1.2;
+	transition: transform 500ms var(--cine-ease);
+}
+
+.scene-row__go {
+	align-self: center;
+	color: var(--app-muted);
+	transition:
+		transform 500ms var(--cine-ease),
+		color 300ms;
+}
+
+.scene-row__desc {
+	grid-column: 2 / 4;
+	max-width: 40rem;
+	margin-top: 0.85rem;
+	color: var(--app-muted);
+	font-size: 1rem;
+	line-height: 1.7;
+	word-break: keep-all;
+}
+
+.scene-row:hover .scene-row__title,
+.scene-row:focus-visible .scene-row__title {
+	transform: translateX(0.6rem);
+}
+
+.scene-row:hover .scene-row__go,
+.scene-row:focus-visible .scene-row__go {
+	color: var(--app-accent-text);
+	transform: translate(4px, -4px);
+}
+
+.scene-row:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 4px;
+}
+
+@keyframes scene-desc-in {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* On a wide screen with a pointer, a row opens to its description on hover or focus. Touch,
+   reduced motion and lite keep every description in view. */
+@media (hover: hover) and (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+	:root:not([data-perf='lite']) .scene-row__desc {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: 0;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+	:root:not([data-perf='lite']) .scene-row:hover .scene-row__desc,
+	:root:not([data-perf='lite']) .scene-row:focus-visible .scene-row__desc {
+		position: static;
+		width: auto;
+		height: auto;
+		margin-top: 0.85rem;
+		clip-path: none;
+		white-space: normal;
+		animation: scene-desc-in 600ms var(--cine-ease) both;
+	}
+}
+
+.scene-projects__side {
+	display: grid;
+	gap: 0;
+	min-width: 0;
+}
+
+.scene-projects__side .scene-stats {
+	grid-template-columns: 1fr;
+	gap: 1.25rem;
+	margin-top: 2.5rem;
+}
+
+@media (min-width: 1024px) {
+	.scene-projects__grid {
+		grid-template-columns: minmax(0, 1fr) 24rem;
+		align-items: start;
+		gap: clamp(3rem, 6vw, 6rem);
+	}
+	.scene-projects__side {
+		position: sticky;
+		top: calc(var(--apple-nav-height) + 2rem);
+	}
+}
+
+/* ---- Scene 5: members --------------------------------------------------------------------------- */
+.scene-members--today {
+	padding-block: clamp(4rem, 9vh, 7rem);
+}
+
+.scene-hub {
+	display: grid;
+	gap: 2.5rem 3rem;
+	margin: clamp(3rem, 7vw, 5rem) 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.scene-hubcard {
+	position: relative;
+	display: grid;
+	width: 100%;
+	align-content: start;
+	justify-items: start;
+	gap: 0.65rem;
+	border-top: 1px solid var(--app-hairline-strong);
+	padding-top: 1.25rem;
+	color: var(--app-text);
+	text-align: left;
+}
+
+/* The title's button covers the whole card, so the card is one target with one name. */
+.scene-hubcard__link {
+	color: inherit;
+	font: inherit;
+	letter-spacing: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.scene-hubcard__link::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+}
+
+.scene-hubcard svg {
+	color: var(--app-accent-text);
+}
+
+.scene-hubcard__title {
+	font-size: clamp(1.4rem, 2.2vw, 2rem);
+	font-weight: 700;
+	letter-spacing: -0.025em;
+	line-height: 1.25;
+}
+
+.scene-hubcard__body {
+	color: var(--app-muted);
+	font-size: 1rem;
+	line-height: 1.7;
+	word-break: keep-all;
+}
+
+.scene-hubcard__go {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-top: 0.5rem;
+	color: var(--app-accent-text);
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+
+.scene-hubcard__go svg {
+	transition: transform 400ms var(--cine-ease);
+}
+
+.scene-hubcard:hover .scene-hubcard__go svg {
+	transform: translateX(4px);
+}
+
+.scene-chip:focus-visible,
+.scene-notice:focus-visible,
+.scene-hubcard:has(.scene-hubcard__link:focus-visible) {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 4px;
+}
+
+.scene-hubcard__link:focus-visible {
+	outline: none;
+}
+
+.scene-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem;
+	margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.scene-chip {
+	display: inline-flex;
+	min-height: 2.5rem;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.5rem 1rem;
+	border: 1px solid var(--app-hairline-strong);
+	border-radius: 999px;
+	color: var(--app-text);
+	font-size: 0.875rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: border-color 300ms var(--cine-ease);
+}
+
+.scene-chip:hover {
+	border-color: var(--app-accent);
+}
+
+.scene-chip svg {
+	color: var(--app-muted);
+}
+
+.scene-chip__sub {
+	color: var(--app-muted);
+	font: 500 0.6875rem/1 var(--cine-mono);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.scene-members__calendar {
+	margin-top: clamp(3.5rem, 8vw, 6rem);
+	overflow: hidden;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+}
+
+@media (min-width: 800px) {
+	.scene-hub {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+/* ---- Scene 6: recruit, the finale ------------------------------------------------------------------- */
+.scene.scene-recruit {
+	display: flex;
+	min-height: 100svh;
+	align-items: center;
+}
+
+.scene-recruit .scene-inner {
+	width: 100%;
+}
+
+.scene-title--finale {
+	max-width: 9em;
+	font-size: clamp(2.75rem, 9.5vw, 9.5rem);
+	font-weight: 800;
+	line-height: 1.08;
+	letter-spacing: -0.04em;
+}
+
+/* Scroll-tied only: the title drifts a few percent sideways while the scene passes. */
+.scene-recruit__drift {
+	margin: 0 0 clamp(3rem, 7vw, 6rem);
+	transform: translate3d(calc((var(--p, 0.5) - 0.5) * -8%), 0, 0);
+}
+
+.scene-recruit__body {
+	display: grid;
+	gap: clamp(2.5rem, 6vw, 5rem);
+	align-items: center;
+}
+
+.scene-recruit .scene-lede {
+	margin-top: 0;
+}
+
+@media (min-width: 1024px) {
+	.scene-recruit__body {
+		grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+	}
+}
+
+/* ---- Scene rail (wide screens) ---------------------------------------------------------------------------- */
+.scene-rail {
+	display: none;
+}
+
+@media (min-width: 1024px) {
+	.scene-rail {
+		position: fixed;
+		top: 50%;
+		right: 0.75rem;
+		z-index: 30;
+		display: block;
+		transform: translateY(-50%);
+	}
+	.scene-rail ol {
+		display: grid;
+		gap: 0.15rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.scene-rail__item {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.5rem;
+		min-height: 1.6rem;
+		padding: 0 0.25rem;
+		color: var(--app-muted);
+		font: 500 11px/1 var(--cine-mono);
+		letter-spacing: 0.14em;
+		cursor: pointer;
+	}
+	.scene-rail__item::after {
+		content: '';
+		display: block;
+		width: 0.5rem;
+		height: 1px;
+		background: currentColor;
+		transition: transform 400ms var(--cine-ease);
+		transform-origin: right;
+	}
+	.scene-rail__item[aria-current='true'] {
+		color: var(--app-text);
+	}
+	.scene-rail__item[aria-current='true']::after {
+		transform: scaleX(2);
+	}
+	/* The short name appears on hover and focus only, so it never covers a scene's content. */
+	.scene-rail__name {
+		display: none;
+		padding: 0.2rem 0.5rem;
+		border-radius: 3px;
+		background: var(--app-bg);
+		color: var(--app-text);
+		letter-spacing: 0.04em;
+	}
+	.scene-rail__item:hover .scene-rail__name,
+	.scene-rail__item:focus-visible .scene-rail__name {
+		display: inline;
+	}
+	.scene-rail__item:focus-visible {
+		outline: 2px solid var(--app-accent);
+		outline-offset: 2px;
+	}
+}
+
+/* ---- Artwork inside scenes: a hairline, no glow, nothing looping --------------------------------------------- */
+.scenes .coms-visual {
+	max-width: 34rem;
+	border-radius: 6px;
+	background: transparent;
+	box-shadow: none;
+}
+
+.scenes .coms-visual::before,
+.scenes .coms-visual::after {
+	display: none;
+}
+
+.scenes .coms-visual-bar {
+	flex-wrap: wrap;
+	background: transparent;
+}
+
+.scenes .coms-visual-dots i:last-child {
+	box-shadow: none;
+}
+
+.scenes .coms-mini-pass {
+	background: transparent;
+}
+
+.scenes .coms-mini {
+	height: 8.5rem;
+	margin-bottom: 0;
+	border-radius: 6px;
+	background: transparent;
+}
+
+.scenes .coms-visual *,
+.scenes .coms-visual *::before,
+.scenes .coms-visual *::after,
+.scenes .coms-mini *,
+.scenes .coms-mini *::before,
+.scenes .coms-mini *::after {
+	animation: none;
+}
+
+/* ---- Small screens -------------------------------------------------------------------------------------------- */
+@media (max-width: 639px) {
+	.scene-stats,
+	.scene-highlights {
+		grid-template-columns: 1fr;
+	}
+	.scene-stats > div {
+		display: flex;
+		align-items: baseline;
+		gap: 1rem;
+	}
+	.scene-stats dd {
+		margin: 0;
+	}
+	.scene-row {
+		grid-template-columns: 1.75rem minmax(0, 1fr) 1.5rem;
+		row-gap: 0.4rem;
+	}
+	.scene-row__tag {
+		grid-column: 2;
+		grid-row: 2;
+	}
+	.scene-row__desc {
+		grid-column: 2 / 4;
+		grid-row: 3;
+	}
+	.scene-row__go {
+		grid-column: 3;
+		grid-row: 1;
+	}
+}
+
+/* ---- Reduced motion and lite: no pin, no drift, no scaling; everything in plain flow -------------------------- */
+@media (prefers-reduced-motion: reduce) {
+	.scene-about__track {
+		height: auto;
+	}
+	.scene-about__pin {
+		position: static;
+		height: auto;
+		padding-top: var(--cine-gap);
+	}
+	.scene-opening__stage,
+	.scene-opening__copy {
+		transform: none;
+		opacity: 1;
+	}
+	.scene-opening__bar {
+		display: none;
+	}
+	.scene-recruit__drift {
+		transform: none;
+	}
+}
+
+:root[data-perf='lite'] .scene-about__track {
+	height: auto;
+}
+
+:root[data-perf='lite'] .scene-about__pin {
+	position: static;
+	height: auto;
+	padding-top: var(--cine-gap);
+}
+
+:root[data-perf='lite'] .scene-opening__stage,
+:root[data-perf='lite'] .scene-opening__copy {
+	transform: none;
+	opacity: 1;
+}
+
+:root[data-perf='lite'] .scene-opening__bar {
+	display: none;
+}
+
+:root[data-perf='lite'] .scene-recruit__drift {
+	transform: none;
+}

@@ -1,0 +1,439 @@
+/* Navigation: four groups in the 44px bar, one panel with the whole sitemap, a full-screen phone menu.
+   Colours come from tokens only, so light, dark and the accent colour follow the theme. */
+
+/* ---- Bar --------------------------------------------------------------------------------- */
+.nav-groups {
+	align-items: stretch;
+	justify-content: center;
+	gap: 0.25rem;
+	align-self: stretch;
+}
+
+.nav-group-btn {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	padding: 0 0.9rem;
+	color: var(--app-muted);
+	font-size: 0.875rem;
+	font-weight: 600;
+	letter-spacing: 0;
+	transition: color 160ms ease;
+}
+
+.nav-group-btn:hover,
+.nav-group-btn[aria-expanded='true'],
+.nav-group-btn[data-active='true'] {
+	color: var(--app-text);
+}
+
+.nav-group-btn:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -4px;
+	border-radius: 0.5rem;
+}
+
+/* The accent underline: current group always, hovered or opened group dimmer. */
+.nav-group-label {
+	position: relative;
+}
+
+.nav-group-label::after {
+	content: '';
+	position: absolute;
+	left: 50%;
+	bottom: -0.95rem;
+	width: 1rem;
+	height: 2px;
+	border-radius: 9999px;
+	background: var(--app-accent);
+	opacity: 0;
+	transform: translateX(-50%) scaleX(0.3);
+	transition: opacity 200ms ease, transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-group-btn:hover .nav-group-label::after,
+.nav-group-btn[aria-expanded='true'] .nav-group-label::after {
+	opacity: 0.55;
+	transform: translateX(-50%) scaleX(1);
+}
+
+.nav-group-btn[data-active='true'] .nav-group-label::after {
+	opacity: 1;
+	transform: translateX(-50%) scaleX(1);
+}
+
+.nav-search {
+	display: inline-flex;
+	height: 1.75rem;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0 0.4rem 0 0.65rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 9999px;
+	color: var(--app-muted);
+	font-size: 0.75rem;
+	font-weight: 600;
+	transition: color 160ms ease, border-color 160ms ease;
+}
+
+.nav-search:hover {
+	color: var(--app-text);
+	border-color: var(--app-hairline-strong);
+}
+
+.nav-search:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 2px;
+}
+
+.nav-search kbd {
+	padding: 0.05rem 0.4rem;
+	border-radius: 9999px;
+	background: var(--app-surface-soft);
+	font-family: inherit;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0;
+}
+
+/* Under xl the pill is just a magnifier, as the old icon button was. */
+@media (max-width: 1279px) {
+	.nav-search-text,
+	.nav-search kbd {
+		display: none;
+	}
+
+	.nav-search {
+		width: 2rem;
+		height: 2rem;
+		justify-content: center;
+		padding: 0;
+		border-color: transparent;
+	}
+}
+
+/* While the panel is open the bar is solid, even at the very top of the page. */
+.apple-global-nav.is-panel-open .apple-topbar {
+	background: var(--app-surface) !important;
+	border-bottom-color: var(--app-hairline) !important;
+	backdrop-filter: none;
+}
+
+/* ---- Panel: the whole sitemap -------------------------------------------------------------- */
+.nav-panel {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	max-height: calc(100dvh - var(--apple-nav-height));
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	border-bottom: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	box-shadow: 0 18px 40px rgba(0, 0, 0, 0.1);
+	animation: nav-panel-in 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes nav-panel-in {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+}
+
+.nav-panel-inner {
+	max-width: 68rem;
+	margin: 0 auto;
+	padding: 1.5rem 1.5rem 2rem;
+}
+
+.nav-frequent {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	margin-bottom: 1.25rem;
+	padding-bottom: 1.25rem;
+	border-bottom: 1px solid var(--app-hairline);
+}
+
+.nav-frequent-title {
+	flex: none;
+	color: var(--app-muted);
+	font-size: 0.75rem;
+	font-weight: 700;
+}
+
+.nav-frequent ul {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.nav-chip {
+	display: inline-flex;
+	min-height: 2rem;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0 0.85rem 0 0.7rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 9999px;
+	color: var(--app-text);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	transition: background-color 160ms ease;
+}
+
+.nav-chip:hover {
+	background: var(--app-surface-soft);
+}
+
+.nav-chip .nav-item-sub {
+	display: none;
+}
+
+.nav-cols {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.5rem;
+}
+
+.nav-col {
+	padding: 0.75rem 0.5rem 0.5rem;
+	border-radius: 1rem;
+	transition: background-color 200ms ease;
+}
+
+/* The group that was opened, held a little forward. */
+.nav-col[data-open='true'] {
+	background: var(--app-surface-soft);
+}
+
+.nav-col-title {
+	display: flex;
+	align-items: baseline;
+	gap: 0.5rem;
+	padding: 0 0.75rem 0.6rem;
+	color: var(--app-muted);
+	font-size: 0.875rem;
+	font-weight: 700;
+}
+
+.nav-col-title span {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.nav-col[data-open='true'] .nav-col-title {
+	color: var(--app-accent-text);
+}
+
+.nav-item {
+	display: flex;
+	width: 100%;
+	min-height: 2.5rem;
+	align-items: center;
+	gap: 0.65rem;
+	padding: 0 0.75rem;
+	border-radius: 0.625rem;
+	color: var(--app-text);
+	font-size: 0.875rem;
+	font-weight: 600;
+	text-align: left;
+	transition: background-color 160ms ease;
+}
+
+.nav-item:hover {
+	background: color-mix(in srgb, var(--app-text) 6%, transparent);
+}
+
+.nav-item:focus-visible,
+.nav-chip:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
+}
+
+.nav-item:disabled {
+	cursor: wait;
+	opacity: 0.6;
+}
+
+.nav-item[aria-current='page'] .nav-item-label {
+	color: var(--app-accent-text);
+}
+
+.nav-item-icon {
+	flex: none;
+	color: var(--app-muted);
+}
+
+.nav-item-sub {
+	margin-left: auto;
+	color: var(--app-subtle);
+	font-size: 0.75rem;
+	font-weight: 500;
+}
+
+/* ---- Phone: full-screen menu --------------------------------------------------------------- */
+.nav-m-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 90;
+	display: flex;
+	flex-direction: column;
+	background: var(--app-bg);
+	animation: nav-panel-in 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.nav-m-top {
+	display: flex;
+	flex: none;
+	height: calc(var(--apple-nav-height) + env(safe-area-inset-top));
+	align-items: center;
+	justify-content: space-between;
+	padding: env(safe-area-inset-top) 1rem 0;
+	border-bottom: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+}
+
+.nav-m-brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.75rem;
+	color: var(--app-text);
+	font-size: 0.875rem;
+	font-weight: 700;
+}
+
+.nav-m-close {
+	display: inline-flex;
+	width: 2.75rem;
+	height: 2.75rem;
+	align-items: center;
+	justify-content: center;
+	margin-right: -0.5rem;
+	border-radius: 9999px;
+	color: var(--app-text);
+}
+
+.nav-m-close:focus-visible,
+.nav-m-item:focus-visible,
+.nav-m-login:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
+}
+
+.nav-m-body {
+	flex: 1;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	-webkit-overflow-scrolling: touch;
+	padding: 0.5rem 0 calc(1.5rem + env(safe-area-inset-bottom));
+}
+
+.nav-m-section {
+	padding: 0.75rem 0;
+}
+
+.nav-m-title {
+	display: flex;
+	align-items: baseline;
+	gap: 0.5rem;
+	padding: 0 1.25rem 0.35rem;
+	color: var(--app-text);
+	font-size: 1.125rem;
+	font-weight: 800;
+	letter-spacing: -0.01em;
+}
+
+.nav-m-title span {
+	color: var(--app-subtle);
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.nav-m-item {
+	display: flex;
+	width: 100%;
+	min-height: 2.75rem;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0 1.25rem;
+	color: var(--app-text);
+	font-size: 0.9375rem;
+	font-weight: 600;
+	text-align: left;
+}
+
+.nav-m-item:active {
+	background: color-mix(in srgb, var(--app-text) 6%, transparent);
+}
+
+.nav-m-item:disabled {
+	opacity: 0.6;
+}
+
+.nav-m-item[aria-current='page'] .nav-m-label {
+	color: var(--app-accent-text);
+}
+
+.nav-m-icon {
+	flex: none;
+	color: var(--app-muted);
+}
+
+.nav-m-sub {
+	margin-left: auto;
+	color: var(--app-subtle);
+	font-size: 0.75rem;
+	font-weight: 500;
+}
+
+.nav-m-account {
+	margin-top: 0.5rem;
+	border-top: 1px solid var(--app-hairline);
+}
+
+.nav-m-login {
+	display: flex;
+	width: calc(100% - 2.5rem);
+	min-height: 2.75rem;
+	align-items: center;
+	justify-content: center;
+	margin: 0 1.25rem;
+	border-radius: 9999px;
+	background: var(--app-accent);
+	color: #fff;
+	font-size: 0.9375rem;
+	font-weight: 700;
+}
+
+.nav-m-login:disabled {
+	cursor: wait;
+	opacity: 0.7;
+}
+
+/* No motion for the panels under lite mode or reduced motion; the underline stops animating too. */
+:root[data-perf='lite'] .nav-panel,
+:root[data-perf='lite'] .nav-m-overlay {
+	animation: none;
+}
+
+:root[data-perf='lite'] .nav-group-label::after {
+	transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.nav-panel,
+	.nav-m-overlay {
+		animation: none;
+	}
+
+	.nav-group-label::after {
+		transition: none;
+	}
+}

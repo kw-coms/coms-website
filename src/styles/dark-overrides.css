@@ -91,30 +91,6 @@
 	background-color: color-mix(in srgb, #f59e0b 18%, transparent) !important;
 }
 
-.apple-mobile-menu-panel {
-	max-height: calc(100dvh - var(--apple-nav-height, 44px) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-	overflow-y: auto;
-	overscroll-behavior: contain;
-	-webkit-overflow-scrolling: touch;
-	border-bottom: 1px solid var(--app-hairline);
-	background: color-mix(in srgb, var(--app-surface) 94%, transparent);
-	box-shadow: 0 18px 40px rgba(0, 0, 0, 0.1);
-	backdrop-filter: saturate(180%) blur(22px);
-	transform-origin: top center;
-	animation: menu-slide-down 160ms ease-out both;
-}
-
-@keyframes menu-slide-down {
-	0% {
-		opacity: 0;
-		transform: translateY(-4px);
-	}
-	100% {
-		opacity: 1;
-		transform: translateY(0);
-	}
-}
-
 .apple-mobile-menu-item {
 	display: flex;
 	min-height: 3.25rem;
@@ -133,17 +109,6 @@
 .apple-mobile-menu-notification {
 	border: 0;
 	background: transparent;
-}
-
-.apple-mobile-menu-subitem {
-	min-height: 3.75rem;
-	align-items: flex-start;
-	padding: 0.75rem 1.25rem 0.75rem 1.5rem;
-	background: color-mix(in srgb, var(--app-surface-soft) 54%, transparent);
-}
-
-.apple-mobile-menu-subitem > span:last-child {
-	min-width: 0;
 }
 
 .apple-mobile-menu-item:hover {

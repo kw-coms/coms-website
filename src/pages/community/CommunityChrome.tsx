@@ -1,3 +1,4 @@
+import PageHeading from '../../components/PageHeading'
 import { MessagesSquare } from 'lucide-react'
 import { categoryLabel } from './postEditorUtils'
 import { shortDate } from './communityBoardUtils'
@@ -11,8 +12,7 @@ export function BoardHeader({ title = "COM's 게시판", children }: {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <span className="coms-icon coms-board-icon" aria-hidden="true"><MessagesSquare size={22} strokeWidth={2} /></span>
-          <p className="apple-eyebrow">Community</p>
-          <h1 className="apple-display mt-3 break-words text-4xl sm:text-6xl">{title}</h1>
+          <PageHeading className="apple-display mt-3 break-words text-4xl sm:text-6xl">{title}</PageHeading>
           <p className="apple-copy mt-4 max-w-2xl text-base sm:text-lg">스터디 기록, 질문, 프로젝트 공유를 말머리별로 빠르게 확인합니다.</p>
         </div>
         {children && <div className="flex w-full shrink-0 sm:w-auto sm:justify-end">{children}</div>}

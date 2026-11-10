@@ -10,20 +10,15 @@ import {
   Sparkles,
   Dices,
   FlaskConical,
+  FolderOpen,
+  Grid3x3,
+  HeartHandshake,
+  Megaphone,
+  MessagesSquare,
+  type LucideIcon,
 } from 'lucide-react'
 import { ActivityCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
-
-export const tabs = [
-  // Menu-row icon tints: the 200-level shades these used were nearly invisible on the light surface.
-  { id: 'about', label: 'About', hint: '정체성', icon: Binary, accent: 'text-cyan-500' },
-  { id: 'activities', label: 'Activities', hint: '세미나·스터디', icon: Sparkles, accent: 'text-rose-500' },
-  { id: 'study', label: 'Study', hint: '스터디 자료', icon: BookOpen, accent: 'text-emerald-500' },
-  // A separate app at /lab/, not a router page: `path` overrides the /<id> route (see isFullPageLink).
-  { id: 'lab', label: 'Lab', hint: '회로 시뮬레이터', path: '/lab/', icon: FlaskConical, accent: 'text-emerald-500' },
-  { id: 'projects', label: 'Projects', hint: '실전 제작', icon: CircuitBoard, accent: 'text-violet-500' },
-  { id: 'recruit', label: 'Recruit', hint: '지원 안내', icon: Rocket, accent: 'text-sky-500' },
-]
 
 export const activityDetails = [
   {
@@ -402,52 +397,8 @@ export const accentSwatches = [
   { name: 'Violet', value: '#8e5cf7' },
 ]
 
-export const footerLinkGroups = [
-  {
-    title: "COM's",
-    links: [
-      { label: 'About', href: '/about' },
-      { label: 'Activities', href: '/activities' },
-      { label: 'Projects', href: '/projects' },
-      { label: 'Recruit', href: '/recruit' },
-    ],
-  },
-  {
-    title: 'Explore',
-    links: [
-      { label: 'Notices', href: '/notices' },
-      { label: 'Community', href: '/community' },
-      { label: 'Archive', href: '/resources' },
-      { label: 'Admin', href: '/admin' },
-    ],
-  },
-  {
-    title: 'Connect',
-    links: [
-      { label: 'Instagram', href: 'https://www.instagram.com/kw_coms', external: true },
-      { label: 'GitHub', href: 'https://github.com/kw-coms', external: true },
-      { label: 'YouTube', href: 'https://www.youtube.com/@kw_coms', external: true },
-      { label: 'Mail', href: 'mailto:kwcoms69@gmail.com' },
-    ],
-  },
-]
-
-export const navExtraItems = [
-  { id: 'notices', label: 'Notices', path: '/notices', auth: true },
-  // 후원자 페이지는 로그아웃 상태에서도 열리므로 auth 플래그를 붙이지 않는다.
-  { id: 'sponsors', label: 'Sponsors', path: '/sponsors' },
-  { id: 'resources', label: 'Resources', path: '/resources', auth: true },
-  { id: 'community', label: 'Community', path: '/community', auth: true },
-]
-
-// Two top-level nav dropdowns (Records, Tools): what the club did and when, and the tools members use.
-// Keep activitySectionNavItems ordered group by group: the home tools row lists the same flat
-// array and must read in the same order as the menu.
-export const activityNavGroups = [
-  { id: 'records', label: '기록·일정', navLabel: 'Records' },
-  { id: 'tools', label: '참여 도구', navLabel: 'Tools' },
-] as const
-
+// The home tools row lists these same items; keep them ordered group by group ('records' then
+// 'tools') so the row reads in the order of the menu. navGroups below builds the menu from them.
 export const activitySectionNavItems = [
   {
     id: 'activity-log',
@@ -517,5 +468,83 @@ export const activitySectionNavItems = [
     path: '/draw',
     icon: Dices,
     accent: 'text-violet-500',
+  },
+]
+
+export type NavItem = {
+  id: string
+  /** Korean name, shown first. */
+  label: string
+  /** The English name, shown small beside it. */
+  sub: string
+  path: string
+  icon: LucideIcon
+  /** Members only: a guest sees the lock and lands on the login guide. */
+  auth?: boolean
+  /** Extra words the quick jump matches (the old short descriptions, other spellings). */
+  keywords?: string
+  /** Set on the items the home activity row lists (the records and tools of activitySectionNavItems). */
+  activityGroup?: 'records' | 'tools'
+}
+
+export type NavGroup = { id: string; label: string; sub: string; items: NavItem[] }
+
+const fromActivityItem = (id: string): NavItem => {
+  const item = activitySectionNavItems.find((entry) => entry.id === id)
+  if (!item) throw new Error(`Unknown activity nav item: ${id}`)
+  return { id, label: item.hint, sub: item.label, path: item.path, icon: item.icon, activityGroup: item.group as 'records' | 'tools', ...('auth' in item && item.auth ? { auth: true } : {}) }
+}
+
+/**
+ * The whole sitemap, in four groups: the one source for the header bar and its panel, the mobile
+ * menu and the quick jump. Sponsors is open to guests; Lab is a separate app at /lab/, not a router
+ * page (see isFullPageLink).
+ */
+export const navGroups: NavGroup[] = [
+  {
+    id: 'club',
+    label: '동아리',
+    sub: 'Club',
+    items: [
+      { id: 'about', label: '소개', sub: 'About', path: '/about', icon: Binary, keywords: '정체성' },
+      { id: 'activities', label: '활동', sub: 'Activities', path: '/activities', icon: Sparkles, keywords: '세미나·스터디' },
+      { id: 'projects', label: '프로젝트', sub: 'Projects', path: '/projects', icon: CircuitBoard, keywords: '실전 제작' },
+      { id: 'sponsors', label: '후원', sub: 'Sponsors', path: '/sponsors', icon: HeartHandshake },
+      { id: 'recruit', label: '지원', sub: 'Recruit', path: '/recruit', icon: Rocket, keywords: '지원 안내' },
+    ],
+  },
+  {
+    id: 'learn',
+    label: '배움',
+    sub: 'Learn',
+    items: [
+      { id: 'study', label: '스터디 자료', sub: 'Study', path: '/study', icon: BookOpen, keywords: '스터디 자료' },
+      { id: 'lab', label: '회로 Lab', sub: 'Lab', path: '/lab/', icon: FlaskConical, keywords: '회로 시뮬레이터 circuit lab 아두이노' },
+    ],
+  },
+  {
+    id: 'members',
+    label: '멤버',
+    sub: 'Members',
+    items: [
+      { id: 'notices', label: '공지', sub: 'Notices', path: '/notices', icon: Megaphone, auth: true },
+      { id: 'community', label: '커뮤니티', sub: 'Community', path: '/community', icon: MessagesSquare, auth: true },
+      { id: 'resources', label: '자료실', sub: 'Resources', path: '/resources', icon: FolderOpen, auth: true },
+      fromActivityItem('activity-log'),
+      fromActivityItem('monthly-calendar'),
+      fromActivityItem('activity-events'),
+    ],
+  },
+  {
+    id: 'tools',
+    label: '도구',
+    sub: 'Tools',
+    items: [
+      fromActivityItem('gatherings'),
+      fromActivityItem('meet'),
+      fromActivityItem('attendance'),
+      fromActivityItem('draw'),
+      { id: 'apps', label: '앱', sub: 'Apps', path: '/apps', icon: Grid3x3, keywords: '앱 미니앱' },
+    ],
   },
 ]

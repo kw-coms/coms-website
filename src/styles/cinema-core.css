@@ -1,0 +1,143 @@
+/* ===== Cinema core: the shared pieces of the film-like pages ================ */
+/* One subject per screen, slow moves caused by the visitor (scroll, hover, focus), calm
+   everywhere else. Hidden "before" states only exist under `.cine-ready` (set by
+   hooks/useSceneProgress.ts), so the page reads without JS. Under reduced motion and in lite
+   mode every piece rests in its finished state: no pinning, no scrubbing, no grain. */
+
+:root {
+	--cine-ease: cubic-bezier(0.16, 1, 0.3, 1);
+	--cine-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	/* Where an unlit scrub word sits between the page colour (0) and the text colour (100).
+	   Large text needs 3:1, so the paper theme cannot dim as far as the dark one. */
+	--cine-dim: 52;
+	--cine-pad: clamp(1.25rem, 5vw, 5rem);
+	--cine-gap: clamp(6rem, 14vh, 11rem);
+}
+
+:root[data-theme-mode='dark'] {
+	--cine-dim: 40;
+}
+
+/* ---- Slate text ---------------------------------------------------------- */
+.cine-hud {
+	font-family: var(--cine-mono);
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 1.5;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--app-muted);
+}
+
+/* ---- Heading lines: rise out of a mask, once ---------------------------------- */
+/* `.cine-m` is the mask (one line, or one letter), its span is what travels. The padding and
+   the matching negative margin keep descenders and tight line heights from being clipped. */
+.cine-lines .cine-m {
+	display: block;
+	overflow: clip;
+	padding-block: 0.12em;
+	margin-block: -0.12em;
+}
+
+.cine-lines .cine-m > span {
+	display: block;
+}
+
+.cine-ready .cine-lines .cine-m > span {
+	transform: translateY(110%);
+	transition: transform 900ms var(--cine-ease);
+	transition-delay: calc(var(--i, 0) * 90ms);
+}
+
+.cine-ready .cine-lines.is-revealed .cine-m > span {
+	transform: none;
+}
+
+/* Blocks that arrive with their heading: a short rise and fade, once. */
+.cine-ready [data-cine] {
+	opacity: 0;
+	transform: translateY(24px);
+	transition:
+		opacity 800ms var(--cine-ease),
+		transform 800ms var(--cine-ease);
+	transition-delay: calc(var(--i, 0) * 90ms);
+}
+
+.cine-ready [data-cine].is-revealed {
+	opacity: 1;
+	transform: none;
+}
+
+/* ---- Media: opened by a clip-path, once ------------------------------------------- */
+/* The wrapper is what is observed; its child is what gets clipped (an observer sees nothing
+   of an element that is clipped to nothing). */
+.cine-ready .cine-wipe > * {
+	clip-path: inset(0 0 100% 0);
+	transition: clip-path 900ms var(--cine-ease);
+	transition-delay: calc(var(--i, 0) * 90ms);
+}
+
+.cine-ready .cine-wipe.is-revealed > * {
+	clip-path: inset(0);
+}
+
+/* ---- Scrub words: lit one by one as the scene's --p passes them -------------------- */
+/* Each word's colour runs from the dim step to full text colour. --n is the word count (on the
+   parent), --i the word's place. Colour rather than opacity: the dim words must stay readable. */
+.cine-scrub-words .cine-w {
+	color: color-mix(
+		in srgb,
+		var(--app-text) calc(clamp(var(--cine-dim), var(--cine-dim) + (var(--p, 0) * 1.18 * var(--n) - var(--i)) * (100 - var(--cine-dim)), 100) * 1%),
+		var(--app-bg)
+	);
+}
+
+/* ---- Grain: one static overlay ------------------------------------------------------ */
+.cine-grain {
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+	pointer-events: none;
+	opacity: 0.05;
+	background-size: 220px 220px;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.4 -.2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+:root[data-theme-mode='dark'] .cine-grain {
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1.4 -.2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---- Finished state: reduced motion and lite ------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+	.cine-ready .cine-lines .cine-m > span,
+	.cine-ready [data-cine],
+	.cine-ready .cine-wipe > * {
+		opacity: 1;
+		transform: none;
+		clip-path: none;
+		transition: none;
+	}
+	.cine-scrub-words .cine-w {
+		color: var(--app-text);
+	}
+	.cine-grain {
+		display: none;
+	}
+}
+
+:root[data-perf='lite'] .cine-ready .cine-lines .cine-m > span,
+:root[data-perf='lite'] .cine-ready [data-cine],
+:root[data-perf='lite'] .cine-ready .cine-wipe > * {
+	opacity: 1;
+	transform: none;
+	clip-path: none;
+	transition: none;
+}
+
+:root[data-perf='lite'] .cine-scrub-words .cine-w {
+	color: var(--app-text);
+}
+
+:root[data-perf='lite'] .cine-grain {
+	display: none;
+}

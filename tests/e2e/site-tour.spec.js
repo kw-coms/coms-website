@@ -214,7 +214,8 @@ test.describe('navigation', () => {
     await asMember(page)
     await skipIntro(page)
     await page.goto('/about')
-    await page.locator('[data-tour="nav-projects"]').click()
+    await page.locator('[data-tour="nav-club"]').click()
+    await page.locator('#nav-panel').getByRole('button', { name: /^프로젝트/ }).click()
     await expect(page).toHaveURL(/\/projects$/)
     await footerStart(page).click()
     await expect(tour(page)).toBeVisible()
@@ -245,9 +246,9 @@ test.describe('guest tour', () => {
     await expect(card).toHaveAccessibleName("COM's는 이런 동아리예요")
     await expect(card).toHaveAttribute('aria-modal', 'true')
     await expect(page.getByRole('button', { name: '이전' })).toBeDisabled()
-    // The nav is on screen at 1280px: the spotlight sits on About.
+    // The nav is on screen at 1280px: the spotlight sits on the 동아리 group, which holds About.
     await expect(spot).not.toHaveClass(/is-none/)
-    const about = await page.locator('[data-tour="nav-about"]').boundingBox()
+    const about = await page.locator('[data-tour="nav-club"]').boundingBox()
     const lit = await spot.boundingBox()
     expect(Math.abs(lit.x + lit.width / 2 - (about.x + about.width / 2))).toBeLessThan(2)
 

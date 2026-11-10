@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import * as nodeModule from 'node:module'
 import { act, createElement, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { MemoryRouter } from 'react-router-dom'
 
 import { AuthContext } from '../src/contexts/useAuth.ts'
 import { ToastHost } from '../src/components/common/Toast.tsx'
@@ -100,7 +101,7 @@ async function mount(member) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  await act(async () => { root.render(createElement(Harness, { member })) })
+  await act(async () => { root.render(createElement(MemoryRouter, { initialEntries: ['/settings'] }, createElement(Harness, { member }))) })
   await flush()
   return {
     container,
