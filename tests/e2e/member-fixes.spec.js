@@ -334,3 +334,44 @@ test.describe('account settings', () => {
     await page.screenshot({ path: `${SHOTS}/settings-390-anchor-${test.info().project.name}.png` })
   })
 })
+
+test.describe('phone layouts', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('monthly calendar lists each event once on a phone', async ({ page }) => {
+    await mockAdminApis(page)
+    await page.clock.setFixedTime(new Date('2026-07-01T09:00:00'))
+    await page.unroute('**/api/club-activities/schedule**')
+    await page.route('**/api/club-activities/schedule**', (route) => {
+      const url = new URL(route.request().url())
+      const here = url.searchParams.get('year') === '2026' && url.searchParams.get('month') === '7'
+      return route.fulfill({ json: here ? [{ recurringScheduleId: 3, date: '2026-07-06', title: '정기 회의', category: 'MEETING', startTime: '18:00', endTime: '19:00', location: '동아리방' }] : [] })
+    })
+    await page.goto('/monthly-calendar')
+    await expect(page.getByTestId('calendar-mobile-agenda')).toBeVisible()
+    await expect(page.getByTestId('calendar-month-summary')).toBeHidden()
+    await expect(page.locator('li:visible').filter({ hasText: '정기 회의' }).filter({ hasNot: page.locator('.club-calendar-event') })).toHaveCount(1)
+    await page.screenshot({ path: `${SHOTS}/calendar-390-${test.info().project.name}.png` })
+  })
+
+  test('community: secondary actions live in one menu and the first post is on the first screen', async ({ page }) => {
+    await mockAdminApis(page)
+    const posts = [1, 2, 3].map((id) => ({ id, title: `첫 화면 글 ${id}`, content: '본문', category: 'GENERAL', authorName: '관리자', authorDisplayName: '관리자', authorStudentId: '2020123456', createdAt: '2026-06-22T01:00:00', viewCount: 0, upvotes: 0, downvotes: 0, myVote: 0, commentCount: 0 }))
+    await page.route('**/api/community/posts{,?*}', (route) => route.fulfill({ json: posts }))
+    await page.goto('/community')
+    await expect(page.locator('.community-mobile-posts').getByText('첫 화면 글 1')).toBeVisible()
+    await expect(page.getByRole('button', { name: '내 스크랩' })).toBeHidden()
+    await page.getByLabel('더보기').click()
+    await expect(page.getByRole('button', { name: '내 스크랩' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '내 삭제 기록' })).toBeVisible()
+    await page.getByLabel('더보기').click()
+    // One pager (the bottom one) and the sort control shares a row with the search box.
+    await expect(page.locator('.community-pagination:visible')).toHaveCount(1)
+    const search = await page.getByPlaceholder('제목, 본문, 작성자 검색').boundingBox()
+    const sort = await page.getByLabel('정렬').boundingBox()
+    expect(Math.abs(search.y - sort.y)).toBeLessThan(12)
+    const first = await page.locator('.community-mobile-posts').getByText('첫 화면 글 1').boundingBox()
+    expect(first.y + first.height).toBeLessThan(844)
+    await page.screenshot({ path: `${SHOTS}/community-390-${test.info().project.name}.png` })
+  })
+})

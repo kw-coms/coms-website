@@ -2,6 +2,7 @@ import RoleTag from '../../components/common/RoleTag'
 import Chip from '../../components/common/Chip'
 import {
   Bookmark,
+  Ellipsis,
   ChevronsLeft,
   ChevronsRight,
   ChevronLeft,
@@ -209,18 +210,34 @@ export default function CommunityListView({
   return (
     <>
       <BoardHeader>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          <button type="button" onClick={onOpenBookmarks} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-5 py-3 text-sm sm:w-auto sm:py-2.5">
+        <div className="flex w-full gap-2 sm:w-auto sm:flex-row">
+          <button type="button" onClick={onOpenBookmarks} className="apple-action-secondary hidden items-center justify-center gap-1 px-5 py-3 text-sm sm:inline-flex sm:w-auto sm:py-2.5">
             <Bookmark size={14} />
             내 스크랩
           </button>
-          <button type="button" onClick={onOpenDeletedRecords} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-5 py-3 text-sm sm:w-auto sm:py-2.5">
+          <button type="button" onClick={onOpenDeletedRecords} className="apple-action-secondary hidden items-center justify-center gap-1 px-5 py-3 text-sm sm:inline-flex sm:w-auto sm:py-2.5">
             <ShieldAlert size={14} />
             내 삭제 기록
           </button>
-          <button type="button" onClick={onWrite} className="apple-action-primary w-full px-5 py-3 text-sm sm:w-auto sm:py-2.5">
+          <button type="button" onClick={onWrite} className="apple-action-primary min-w-0 flex-1 px-5 py-3 text-sm sm:w-auto sm:flex-none sm:py-2.5">
             글쓰기
           </button>
+          {/* Phones: the two secondary actions share one menu. */}
+          <details className="relative sm:hidden" data-community-more>
+            <summary aria-label="더보기" className="apple-action-secondary flex size-12 cursor-pointer list-none items-center justify-center [&::-webkit-details-marker]:hidden">
+              <Ellipsis size={18} aria-hidden="true" />
+            </summary>
+            <div className="absolute right-0 z-20 mt-2 flex w-44 flex-col gap-1 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] p-1.5 shadow-lg">
+              <button type="button" onClick={onOpenBookmarks} className="flex min-h-11 items-center gap-2 rounded-md px-3 text-left text-sm font-semibold hover:bg-[var(--app-surface-soft)]">
+                <Bookmark size={14} aria-hidden="true" />
+                내 스크랩
+              </button>
+              <button type="button" onClick={onOpenDeletedRecords} className="flex min-h-11 items-center gap-2 rounded-md px-3 text-left text-sm font-semibold hover:bg-[var(--app-surface-soft)]">
+                <ShieldAlert size={14} aria-hidden="true" />
+                내 삭제 기록
+              </button>
+            </div>
+          </details>
         </div>
       </BoardHeader>
       <div className="apple-control-strip px-4 py-4 sm:px-8">
@@ -244,8 +261,8 @@ export default function CommunityListView({
                 ))}
               </div>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="relative flex items-center">
+            <div className="flex gap-2 sm:flex-row sm:items-center">
+              <div className="relative flex min-w-0 flex-1 items-center sm:flex-none">
                 <Search size={15} className="pointer-events-none absolute left-3 text-[var(--app-subtle)]" />
                 <input
                   type="text"
@@ -255,12 +272,20 @@ export default function CommunityListView({
                   className="h-11 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-9 pr-3 text-base text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none transition focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:h-10 sm:w-64 sm:text-sm"
                 />
               </div>
-              <span className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-center text-xs font-bold text-[var(--app-subtle)]">
+              <select
+                aria-label="정렬"
+                value={sortMode}
+                onChange={(event) => onSortChange(event.target.value)}
+                className="h-11 shrink-0 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-sm font-semibold text-[var(--app-text)] sm:hidden"
+              >
+                {SORT_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+              <span className="hidden rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-center text-xs font-bold text-[var(--app-subtle)] sm:inline">
                 {filteredPosts.length.toLocaleString('ko-KR')}개
               </span>
             </div>
           </div>
-          <div className="-mx-1 overflow-x-auto pb-1 touch-pan-x">
+          <div className="-mx-1 hidden overflow-x-auto pb-1 touch-pan-x sm:block">
             <div className="flex min-w-max items-center gap-2 px-1 text-xs font-black text-[var(--app-muted)]">
               <span className="shrink-0">정렬</span>
               {SORT_OPTIONS.map((item) => (
@@ -280,7 +305,7 @@ export default function CommunityListView({
               )}
             </div>
           </div>
-          <div className="border-t border-[var(--app-hairline)] pt-4">
+          <div className="hidden border-t border-[var(--app-hairline)] pt-4 sm:block">
             {renderPagination('top')}
           </div>
         </div>
