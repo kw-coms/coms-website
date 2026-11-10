@@ -326,7 +326,7 @@ test.describe('quick search finds study content (item 7)', () => {
     return dialog
   }
 
-  for (const [query, expected] of [['python', 'Python 기초'], ['포인터', '7. 포인터'], ['아두이노', '아두이노 기초'], ['회로', 'Circuit Lab']]) {
+  for (const [query, expected] of [['python', 'Python 기초'], ['포인터', '7. 포인터'], ['아두이노', '아두이노 기초'], ['회로', '기본 구조와 회로 기초'], ['신호등', 'Lab 미션']]) {
     test(`"${query}" finds ${expected}`, async ({ page }) => {
       const dialog = await openSearch(page)
       await dialog.getByRole('combobox').fill(query)
@@ -334,6 +334,14 @@ test.describe('quick search finds study content (item 7)', () => {
       await expect(dialog.getByText('스터디', { exact: true })).toBeVisible()
     })
   }
+
+  test('"회로" also finds the Lab page, and a mission opens in the Lab', async ({ page }) => {
+    const dialog = await openSearch(page)
+    await dialog.getByRole('combobox').fill('회로')
+    await expect(dialog.getByRole('option', { name: /Lab/ }).first()).toBeVisible()
+    await dialog.getByRole('combobox').fill('신호등')
+    await expect(dialog.getByRole('option', { name: /순서 지키는 신호등/ })).toHaveCount(1)
+  })
 
   test('opening the dialog loads neither the problems nor the lessons', async ({ page }) => {
     const scripts = []

@@ -2299,7 +2299,7 @@ test('quick jump is offered beside the menu button on a phone', async ({ page })
   await page.getByRole('button', { name: '빠른 이동 열기' }).click()
   const dialog = page.getByRole('dialog', { name: '빠른 이동' })
   await dialog.getByRole('combobox', { name: '어디로 갈까요?' }).fill('ㅎㄷ')
-  await expect(dialog.getByRole('option')).toHaveText([/활동/, /활동 기록/])
+  await expect(dialog.getByRole('option')).toHaveText([/활동/, /활동 기록/, /순서 지키는 신호등/])
   // A tap goes there. The page is for members, so a guest lands on its guide screen (not a redirect).
   await dialog.getByRole('option', { name: /활동 기록/ }).click()
   await expectMembersGate(page, '/activity-log')

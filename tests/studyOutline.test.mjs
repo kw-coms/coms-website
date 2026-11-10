@@ -15,7 +15,8 @@ assert.ok(ids('python').includes('study:python'), 'python finds the Python track
 assert.equal(first('python')[0].path, '/study/python')
 assert.ok(first('포인터').some((item) => item.path.startsWith('/study/c#')), 'pointer finds a C chapter anchor')
 assert.ok(first('아두이노').some((item) => item.path === '/study/arduino'), 'arduino finds its track')
-assert.ok(first('회로').some((item) => item.path === '/lab/' || item.path.startsWith('/lab/')), 'circuit finds the Lab')
+assert.ok(first('신호등').some((item) => item.path === '/lab/#mission=traffic-light'), 'a mission is found by its title')
+assert.ok(first('회로').some((item) => item.path === '/study/arduino#basics'), 'circuit finds the Arduino chapter')
 
 // Every chapter link points at an anchor that exists in the lesson markup.
 for (const item of studyQuickItems) {

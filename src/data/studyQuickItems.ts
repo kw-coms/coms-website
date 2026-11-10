@@ -3,20 +3,10 @@ import { studyOutline } from '../pages/study/studyOutline'
 import { labMissions, missionUrl } from '../pages/study/exercises/labMissions'
 import type { QuickItem } from '../utils/quickSearch'
 
-// Study tracks, their chapters and the Circuit Lab missions for quick search. Built from small static
+// Study tracks, their chapters and the Circuit Lab missions for quick search. The Lab itself is already a page entry (navGroups). Built from small static
 // modules (no lesson text, no problem statements), so the dialog opens as fast as before.
 
-const missionTitles = labMissions.map((mission) => mission.title).join(' ')
-
 export const studyQuickItems: QuickItem[] = [
-  {
-    id: 'study:lab',
-    group: 'study',
-    title: '회로 시뮬레이터',
-    hint: 'Circuit Lab',
-    path: '/lab/',
-    keywords: `circuit lab 회로 아두이노 arduino 시뮬레이터 브레드보드 부품 ${missionTitles}`,
-  },
   ...STUDIES.flatMap((study) => [
     {
       id: `study:${study.id}`,
@@ -39,8 +29,8 @@ export const studyQuickItems: QuickItem[] = [
     id: `study:lab-${mission.id}`,
     group: 'study',
     title: mission.title,
-    hint: `Circuit Lab 미션 ${mission.level}단계`,
+    hint: `Lab 미션 ${mission.level}단계`,
     path: missionUrl(mission.id),
-    keywords: '회로 아두이노 circuit lab 미션',
+    keywords: '회로 아두이노 미션',
   })),
 ]
