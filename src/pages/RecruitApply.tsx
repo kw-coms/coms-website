@@ -3,6 +3,9 @@ import { useMemo, useState } from 'react'
 import { CheckCircle2, Mail, Search, Send, UserRound } from 'lucide-react'
 import { lookupRecruitStatus, submitRecruitApplication } from '../services/recruitApi'
 import { showToast } from '../components/common/Toast'
+import RecruitFacts from '../components/RecruitFacts'
+import { useQuery } from '@tanstack/react-query'
+import { defaultSiteSettings, getPublicSiteSettings } from '../services/siteSettingsApi'
 
 const INTEREST_OPTIONS = ['웹', '앱', '보안', '알고리즘', '아두이노', '디자인', '기타']
 
@@ -220,6 +223,11 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const settings = useQuery({ queryKey: ['site-settings', 'public'], queryFn: getPublicSiteSettings }).data
+  const settingRows = [
+    { label: '현황', value: settings?.recruitmentStatus, skip: defaultSiteSettings.recruitmentStatus },
+    { label: '일정', value: settings?.recruitmentPeriod, skip: defaultSiteSettings.recruitmentPeriod },
+  ].filter((row) => row.value && row.value !== row.skip) as { label: string; value: string }[]
 
   const gradeText = useMemo(() => {
     if (form.grade === '기타') return `기타: ${otherGrade.trim()}`
@@ -309,6 +317,10 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
           <p className="apple-copy mt-5 max-w-3xl text-base sm:text-lg">
             로그인 없이 지원서를 작성할 수 있습니다. 작성한 내용은 웹페이지에서 바로 COM&apos;s 공식 메일로 제출됩니다.
           </p>
+        </div>
+
+        <div className="bg-[var(--app-surface)] px-6 pt-6 sm:px-8">
+          <RecruitFacts extra={settingRows} />
         </div>
 
         <div className="grid gap-0 lg:grid-cols-[1fr_320px]">
@@ -458,7 +470,7 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
                   문의
                 </div>
                 <a href="mailto:kwcoms69@gmail.com" className="mt-2 block break-all text-sm text-[var(--app-accent-text)] hover:text-[var(--app-accent-hover)]">
-                  kwcoms69@gmail.com
+                  메일로 문의 (kwcoms69@gmail.com)
                 </a>
               </div>
             </div>
