@@ -16,6 +16,9 @@ globalThis.IntersectionObserver = class {
   disconnect() { this.disconnected = true }
 }
 
+// The reveal hook also watches for elements that mount later; the fake DOM has no MutationObserver.
+globalThis.MutationObserver ??= class { observe() {} disconnect() {} }
+
 for (const [path, title, crumb] of [
   ['/activities', '배움이 매주 쌓이고, 서로에게 남습니다.', '활동'],
   ['/notices/3', '공지 수정', '공지사항'],
