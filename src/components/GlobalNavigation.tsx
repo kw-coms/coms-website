@@ -1,65 +1,46 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation, type NavigateOptions, type To } from 'react-router-dom'
-import {
-  CalendarDays,
-  ChevronDown,
-  CircuitBoard,
-  Grid3x3,
-  HeartHandshake,
-  LogOut,
-  Menu,
-  Megaphone,
-  Compass,
-  Search,
-  Wrench,
-  Sparkles,
-  X,
-} from 'lucide-react'
+import { ChevronDown, LogOut, Menu, Search } from 'lucide-react'
 import { getLogoAsset } from '../utils/logoAssets'
 import { useAuth } from '../contexts/useAuth'
-import {
-  tabs,
-  navExtraItems,
-  activitySectionNavItems,
-  activityNavGroups,
-} from '../data/homeContent'
+import { navGroups, type NavItem } from '../data/homeContent'
 import { scrollToTopInstant } from '../utils/themeColors'
 import { isFullPageLink } from '../utils/fullPageLink'
+import { countNavVisit, frequentNavPaths, navPathFor, readNavVisits } from '../utils/navVisits'
 import NotificationButton from './NotificationButton'
 import MemberLock from './MemberLock'
+import MobileNavMenu from './MobileNavMenu'
 import { openQuickSearch } from '../utils/quickSearch'
-import { startSiteTour } from './tour/tourState'
 import { ROLE_LABELS, canAccessOperationsPanel } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
 
 const floatingBarBaseClass = 'apple-topbar border-b border-[var(--app-hairline)]'
 
-// The bottom tab bar has room for three; Study stays reachable from the menu.
-const MOBILE_TAB_IDS = ['about', 'activities', 'projects']
+const ITEMS: NavItem[] = navGroups.flatMap((group) => group.items)
+const ITEM_PATHS = ITEMS.map((item) => item.path)
 
-function getTabRoute(id) {
-  return id === 'recruit' ? '/recruit' : `/${id}`
+// The bottom tab bar has room for three; everything else is in the menu.
+const MOBILE_TAB_IDS = ['about', 'activities', 'projects']
+const MOBILE_TABS = ITEMS.filter((item) => MOBILE_TAB_IDS.includes(item.id))
+
+// Wait a moment before a hover opens or closes the panel, so a pointer crossing the bar does not flash it.
+const HOVER_OPEN_MS = 120
+const HOVER_CLOSE_MS = 220
+
+const SHORTCUT_LABEL = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform) ? '⌘K' : 'Ctrl K'
+
+function frequentItems(): NavItem[] {
+  return frequentNavPaths(readNavVisits(), ITEM_PATHS).flatMap((path) => ITEMS.filter((item) => item.path === path))
 }
 
-function getActiveNavKey(pathname) {
-  if (pathname === '/about') return 'about'
-  if (pathname === '/activities') return 'activities'
-  if (pathname === '/activity-log') return 'activity-log'
-  if (pathname === '/activity-events') return 'activity-events'
-  if (pathname === '/monthly-calendar') return 'monthly-calendar'
-  if (pathname === '/meet' || pathname.startsWith('/meet/')) return 'meet'
-  if (pathname === '/attendance') return 'attendance'
-  if (pathname === '/gatherings' || pathname.startsWith('/gatherings/')) return 'gatherings'
-  if (pathname === '/projects') return 'projects'
-  if (pathname === '/study' || pathname.startsWith('/study/')) return 'study'
-  if (pathname === '/apps') return 'apps'
-  if (pathname === '/draw') return 'draw'
-  if (pathname.startsWith('/recruit')) return 'recruit'
-  if (pathname.startsWith('/notices')) return 'notices'
-  if (pathname.startsWith('/sponsors')) return 'sponsors'
-  if (pathname.startsWith('/resources')) return 'resources'
-  if (pathname.startsWith('/community')) return 'community'
-  return null
+function QuickSearchPill() {
+  return (
+    <button type="button" onClick={openQuickSearch} className="nav-search" aria-label="빠른 이동 열기" aria-keyshortcuts="Control+K Meta+K" title={`빠른 이동 (${SHORTCUT_LABEL})`}>
+      <Search size={14} aria-hidden="true" />
+      <span className="nav-search-text">빠른 이동</span>
+      <kbd aria-hidden="true">{SHORTCUT_LABEL}</kbd>
+    </button>
+  )
 }
 
 export default function GlobalNavigation() {
@@ -69,29 +50,39 @@ export default function GlobalNavigation() {
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [openGroup, setOpenGroup] = useState<string | null>(null)
-  const [mobileOpenGroups, setMobileOpenGroups] = useState<string[]>([])
+  const [frequent, setFrequent] = useState<NavItem[]>([])
   const [scrolled, setScrolled] = useState(false)
   const [showTop, setShowTop] = useState(false)
-  const groupWrapperRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const groupToggleRefs = useRef<Record<string, HTMLButtonElement | null>>({})
-  const mobileMenuToggleRef = useRef<HTMLButtonElement | null>(null)
+  const groupNavRef = useRef<HTMLElement | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
   const progressRef = useRef<HTMLDivElement | null>(null)
-  // Every navigation closes the mobile menu, not only its own links: the brand link, a
-  // notification row and the browser's Back button change the route without closeAndGo.
+  const hoverTimer = useRef(0)
+  // True while the panel was opened by hovering: a click on that group then keeps it open.
+  const openedByHover = useRef(false)
+  // Set when the keyboard opened a group: focus moves into its column once it is drawn.
+  const focusColumn = useRef<string | null>(null)
+  const countedKey = useRef('')
+  // Every navigation closes the menus, not only their own links: the brand link, a
+  // notification row and the browser's Back button change the route without our handlers.
   // location.key (not pathname) so /admin -> /admin?tab=… from a notification counts too.
   // Reset while rendering, as useVisibleCount does, instead of in a setState effect.
   const [menuLocationKey, setMenuLocationKey] = useState(location.key)
   if (location.key !== menuLocationKey) {
     setMenuLocationKey(location.key)
     setMobileMenuOpen(false)
-    setMobileOpenGroups([])
+    setOpenGroup(null)
   }
-  const activeKey = getActiveNavKey(location.pathname)
-  const mobileTabs = MOBILE_TAB_IDS.flatMap((id) => tabs.filter((tab) => tab.id === id))
-  const showMobileTabs = mobileTabs.some((tab) => tab.id === activeKey)
-  const primaryNavItems = tabs.map((tab) => ({ ...tab, path: 'path' in tab ? tab.path : getTabRoute(tab.id) }))
-  const noticesNavItem = navExtraItems.find((item) => item.id === 'notices')
-  const memberNavItems = navExtraItems.filter((item) => item.id !== 'notices')
+  const activePath = navPathFor(location.pathname, ITEM_PATHS)
+  const activeGroupId = navGroups.find((group) => group.items.some((item) => item.path === activePath))?.id ?? null
+  const showMobileTabs = MOBILE_TABS.some((item) => item.path === activePath)
+
+  // Count the visit to a menu page for "자주 가는 곳".
+  useEffect(() => {
+    if (countedKey.current === location.key || !activePath) return
+    countedKey.current = location.key
+    countNavVisit(activePath)
+  }, [location.key, activePath])
 
   // Kakao-style header: solidify on scroll, drive the top progress bar, and
   // toggle the back-to-top button.
@@ -119,37 +110,35 @@ export default function GlobalNavigation() {
     }
   }, [])
 
+  useEffect(() => () => window.clearTimeout(hoverTimer.current), [])
+
+  // Panel open: Escape and a press outside close it.
   useEffect(() => {
     if (!openGroup) return undefined
-    const onDocClick = (event) => {
-      const wrapper = groupWrapperRefs.current[openGroup]
-      if (wrapper && !wrapper.contains(event.target)) setOpenGroup(null)
+    const onDocDown = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (panelRef.current?.contains(target) || groupNavRef.current?.contains(target)) return
+      setOpenGroup(null)
     }
-    const onKey = (event) => {
-      if (event.key === 'Escape') {
-        setOpenGroup(null)
-        groupToggleRefs.current[openGroup]?.focus()
-      }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setOpenGroup(null)
+      groupToggleRefs.current[openGroup]?.focus()
     }
-    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('mousedown', onDocDown)
     document.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('mousedown', onDocDown)
       document.removeEventListener('keydown', onKey)
     }
   }, [openGroup])
 
+  // After the keyboard opened a group, put focus on its first entry.
   useEffect(() => {
-    if (!mobileMenuOpen) return undefined
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      setMobileMenuOpen(false)
-      setMobileOpenGroups([])
-      mobileMenuToggleRef.current?.focus()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [mobileMenuOpen])
+    if (!openGroup || focusColumn.current !== openGroup) return
+    focusColumn.current = null
+    panelRef.current?.querySelector<HTMLElement>(`[data-nav-col="${openGroup}"] button`)?.focus()
+  }, [openGroup])
 
   useEffect(() => {
     if (!location.hash) return undefined
@@ -178,24 +167,18 @@ export default function GlobalNavigation() {
   }
 
   const closeAndGo = (to: To, options?: NavigateOptions) => {
+    window.clearTimeout(hoverTimer.current)
     setMobileMenuOpen(false)
-    setMobileOpenGroups([])
+    setOpenGroup(null)
     goPageTop(to, options)
   }
 
-  const goProtected = (to) => {
-    if (authLoading) return
-    closeAndGo(to)
-  }
-
-  const goNavItem = (item) => {
-    const target = `${item.path}${item.hash || ''}`
-    setOpenGroup(null)
-    if (item.auth) {
-      goProtected(target)
-      return
-    }
-    goPageTop(target)
+  // A menu entry. Member pages wait for the login check, then go on to the guide for a guest.
+  const goMenuPath = (path: string, { auth = false } = {}) => {
+    if (auth && authLoading) return
+    // /lab/ is a separate app reached by a full page load, so the router never sees it.
+    if (isFullPageLink(path)) countNavVisit(path)
+    closeAndGo(path)
   }
 
   const handleLogout = async () => {
@@ -206,12 +189,60 @@ export default function GlobalNavigation() {
     if (loggedOut !== false) goPageTop('/')
   }
 
-  const navClass = (key, active = activeKey === key) => (
-    `relative px-0 text-xs xl:px-1 font-semibold transition ${
-      active
-        ? 'text-[var(--app-text)]'
-        : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'
-    }`
+  const showPanel = (groupId: string, byHover: boolean) => {
+    window.clearTimeout(hoverTimer.current)
+    if (!openGroup) setFrequent(frequentItems())
+    openedByHover.current = byHover
+    setOpenGroup(groupId)
+  }
+
+  const scheduleClose = (event: React.PointerEvent) => {
+    if (event.pointerType !== 'mouse') return
+    window.clearTimeout(hoverTimer.current)
+    hoverTimer.current = window.setTimeout(() => setOpenGroup(null), HOVER_CLOSE_MS)
+  }
+
+  const onGroupClick = (event: React.MouseEvent, groupId: string) => {
+    if (openGroup === groupId && !openedByHover.current) {
+      window.clearTimeout(hoverTimer.current)
+      setOpenGroup(null)
+      return
+    }
+    // detail is 0 for Enter and Space: a keyboard user continues inside the panel.
+    if (event.detail === 0) focusColumn.current = groupId
+    showPanel(groupId, false)
+  }
+
+  const onGroupEnter = (event: React.PointerEvent, groupId: string) => {
+    if (event.pointerType !== 'mouse') return
+    window.clearTimeout(hoverTimer.current)
+    if (openGroup === groupId) return
+    hoverTimer.current = window.setTimeout(() => showPanel(groupId, true), openGroup ? 0 : HOVER_OPEN_MS)
+  }
+
+  const onPanelBlur = (event: React.FocusEvent) => {
+    const next = event.relatedTarget as Node | null
+    if (next && !panelRef.current?.contains(next) && !groupNavRef.current?.contains(next)) setOpenGroup(null)
+  }
+
+  const openMobileMenu = () => {
+    setFrequent(frequentItems())
+    setMobileMenuOpen(true)
+  }
+
+  const itemButton = (item: NavItem, className: string) => (
+    <button
+      type="button"
+      className={className}
+      aria-current={activePath === item.path ? 'page' : undefined}
+      disabled={item.auth && authLoading}
+      onClick={() => goMenuPath(item.path, { auth: item.auth })}
+    >
+      <item.icon size={15} aria-hidden="true" className="nav-item-icon" />
+      <span className="nav-item-label">{item.label}</span>
+      {item.auth && <MemberLock />}
+      <span className="nav-item-sub" aria-hidden="true">{item.sub}</span>
+    </button>
   )
 
   return (
@@ -225,16 +256,12 @@ export default function GlobalNavigation() {
     >
       <ChevronDown size={20} className="rotate-180" />
     </button>
-    <header className={`apple-global-nav fixed inset-x-0 top-0 z-[80] ${scrolled ? 'is-scrolled' : ''}`}>
-      {/* From lg up the bar is a 1fr / auto / 1fr grid: the nav stays optically centred while
-          there is room and is pushed aside — never painted over — when the account cluster
-          needs more width. Below lg the hamburger menu takes over; the centred nav used to
-          show from 768px, where it overlapped the brand and the account buttons. The brand never
-          shrinks at lg (min-w-max), so the grid gap is the least that ever separates it from the nav;
-          the horizontal padding and the xl nav gap are trimmed to leave room for that at 1024-1535px
-          whichever face is drawn (the Linux fallback face used to push the nav 3px from the brand). The account name is capped at
-          7rem below 2xl so even a very long name leaves the cluster inside the bar at 1280px. */}
-      <div className={`${floatingBarBaseClass} relative mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:px-6 2xl:px-8`}>
+    <header className={`apple-global-nav fixed inset-x-0 top-0 z-[80] ${scrolled ? 'is-scrolled' : ''} ${openGroup ? 'is-panel-open' : ''}`}>
+      {/* From lg up the bar is a 1fr / auto / 1fr grid: the four groups stay optically centred
+          while there is room and are pushed aside, never painted over, when the account cluster
+          needs more width. Below lg the hamburger menu takes over. The bar is not positioned, so the
+          panel (a child of it, for tab order) is placed against the header instead. */}
+      <div className={`${floatingBarBaseClass} mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:px-6 2xl:px-8`}>
         <button
           type="button"
           onClick={() => goPageTop('/')}
@@ -245,113 +272,76 @@ export default function GlobalNavigation() {
           <span className="whitespace-nowrap text-sm font-bold text-[var(--app-text)]">KW COM&apos;s</span>
         </button>
 
-        {/* Tight below 2xl (gap-1 and no button padding at lg, gap-1.5 at xl: with the Lab item, gap-2 pushed a 20-character name 4px out of the bar at 1280px): with the Records and Tools buttons and the
-            quick-jump button in the account cluster, wider gaps no longer fitted at 1024px and
-            1280px and the brand was painted over. */}
-        <nav className="hidden items-center lg:flex lg:gap-1 xl:gap-1.5 2xl:gap-5">
-          {primaryNavItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              data-tour={`nav-${item.id}`}
-              onClick={() => goNavItem(item)}
-              className={`${navClass(item.id)} disabled:cursor-wait disabled:opacity-60`}
-            >
-              {item.label}
-              <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === item.id ? 'opacity-100' : 'opacity-0'}`} />
-            </button>
-          ))}
-          {noticesNavItem && (
-            <button
-              type="button"
-              data-tour="nav-notices"
-              onClick={() => goNavItem(noticesNavItem)}
-              disabled={noticesNavItem.auth && authLoading}
-              className={`${navClass(noticesNavItem.id)} disabled:cursor-wait`}
-            >
-              {noticesNavItem.label}
-              <MemberLock />
-              <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === noticesNavItem.id ? 'opacity-100' : 'opacity-0'}`} />
-            </button>
-          )}
-          {activityNavGroups.map((group) => {
-            const groupItems = activitySectionNavItems.filter((item) => item.group === group.id)
+        <nav
+          ref={groupNavRef}
+          aria-label="주요 메뉴"
+          className="nav-groups hidden lg:flex"
+          onPointerLeave={scheduleClose}
+        >
+          {navGroups.map((group) => {
             const open = openGroup === group.id
-            const groupActive = groupItems.some((item) => item.id === activeKey)
+            const active = activeGroupId === group.id
             return (
-              <div key={group.id} ref={(node) => { groupWrapperRefs.current[group.id] = node }} className="relative">
-                <button
-                  ref={(node) => { groupToggleRefs.current[group.id] = node }}
-                  type="button"
-                  data-tour={`nav-${group.id}`}
-                  onClick={() => setOpenGroup(open ? null : group.id)}
-                  className={`${navClass(group.id, groupActive)} inline-flex items-center gap-1`}
-                  data-active={groupActive ? 'true' : undefined}
-                  aria-current={groupActive ? 'true' : undefined}
-                  aria-expanded={open}
-                  aria-controls={`${group.id}-nav-panel`}
-                >
-                  <span data-nav-label className="relative">
-                    {group.navLabel}
-                    <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${groupActive ? 'opacity-100' : 'opacity-0'}`} />
-                  </span>
-                  <ChevronDown size={12} className={`transition ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
-                </button>
-                {open && (
-                  <nav
-                    id={`${group.id}-nav-panel`}
-                    aria-label={`${group.label} 메뉴`}
-                    className="absolute left-1/2 top-full z-[90] mt-4 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 overflow-hidden rounded-2xl border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 shadow-[0_18px_45px_rgba(0,0,0,0.12)]"
-                  >
-                    <ul className="flex flex-col">
-                      {groupItems.map((item) => (
-                        <li key={item.id}>
-                          <button
-                            type="button"
-                            onClick={() => goNavItem(item)}
-                            className="flex w-full items-start gap-3 px-4 py-2.5 transition hover:bg-[var(--app-surface-soft)]"
-                          >
-                            <span className="mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]">
-                              <item.icon size={14} aria-hidden="true" />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-left text-sm font-semibold text-[var(--app-text)]">{item.label}{item.auth && <> <MemberLock /></>}</span>
-                              <span className="block text-left text-xs font-medium text-[var(--app-subtle)]">{item.hint}</span>
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </nav>
-                )}
-              </div>
+              <button
+                key={group.id}
+                ref={(node) => { groupToggleRefs.current[group.id] = node }}
+                type="button"
+                data-tour={`nav-${group.id}`}
+                data-active={active ? 'true' : undefined}
+                aria-current={active ? 'true' : undefined}
+                aria-expanded={open}
+                aria-controls="nav-panel"
+                className="nav-group-btn"
+                onClick={(event) => onGroupClick(event, group.id)}
+                onPointerEnter={(event) => onGroupEnter(event, group.id)}
+              >
+                <span data-nav-label className="nav-group-label">{group.label}</span>
+              </button>
             )
           })}
-          {memberNavItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              data-tour={`nav-${item.id}`}
-              onClick={() => goNavItem(item)}
-              disabled={item.auth && authLoading}
-              className={`${navClass(item.id)} disabled:cursor-wait`}
-            >
-              {item.label}
-              {item.auth && <MemberLock />}
-              <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === item.id ? 'opacity-100' : 'opacity-0'}`} />
-            </button>
-          ))}
-          <button type="button" onClick={() => goPageTop('/apps')} className={navClass('apps', activeKey === 'apps')}>
-            Apps
-            <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === 'apps' ? 'opacity-100' : 'opacity-0'}`} />
-          </button>
         </nav>
+
+        {openGroup && (
+          <div
+            ref={panelRef}
+            id="nav-panel"
+            className="nav-panel hidden lg:block"
+            onPointerEnter={() => window.clearTimeout(hoverTimer.current)}
+            onPointerLeave={scheduleClose}
+            onBlur={onPanelBlur}
+          >
+            <nav aria-label="전체 메뉴" className="nav-panel-inner">
+              {frequent.length > 0 && (
+                <div className="nav-frequent">
+                  <p className="nav-frequent-title">자주 가는 곳</p>
+                  <ul>
+                    {frequent.map((item) => <li key={item.id}>{itemButton(item, 'nav-chip')}</li>)}
+                  </ul>
+                </div>
+              )}
+              <div className="nav-cols">
+                {navGroups.map((group) => (
+                  <section
+                    key={group.id}
+                    data-nav-col={group.id}
+                    data-open={group.id === openGroup ? 'true' : undefined}
+                    aria-labelledby={`nav-col-${group.id}`}
+                    className="nav-col"
+                  >
+                    <p id={`nav-col-${group.id}`} className="nav-col-title">{group.label}<span>{group.sub}</span></p>
+                    <ul>
+                      {group.items.map((item) => <li key={item.id}>{itemButton(item, 'nav-item')}</li>)}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            </nav>
+          </div>
+        )}
 
         {user ? (
           <div className="hidden items-center gap-1 lg:flex lg:justify-self-end">
-            <button type="button" onClick={openQuickSearch} className="coms-quick-open" aria-label="빠른 이동 열기" aria-keyshortcuts="Control+K Meta+K" title="빠른 이동 (Ctrl+K)">
-              <Search size={15} aria-hidden="true" />
-            </button>
+            <QuickSearchPill />
             <NotificationButton />
             <button
               type="button"
@@ -375,9 +365,7 @@ export default function GlobalNavigation() {
           </div>
         ) : (
           <div className="hidden items-center gap-2 lg:flex lg:justify-self-end">
-            <button type="button" onClick={openQuickSearch} className="coms-quick-open" aria-label="빠른 이동 열기" aria-keyshortcuts="Control+K Meta+K" title="빠른 이동 (Ctrl+K)">
-              <Search size={15} aria-hidden="true" />
-            </button>
+            <QuickSearchPill />
             <button
               type="button"
               onClick={() => goPageTop('/login')}
@@ -395,154 +383,37 @@ export default function GlobalNavigation() {
             <Search size={19} aria-hidden="true" />
           </button>
           <button
-            ref={mobileMenuToggleRef}
             type="button"
-            onClick={() => setMobileMenuOpen((open) => !open)}
+            onClick={openMobileMenu}
             className="apple-global-nav-menu lg:hidden"
-            aria-label={mobileMenuOpen ? '메뉴 닫기' : '메뉴 열기'}
+            aria-label="메뉴 열기"
             aria-expanded={mobileMenuOpen}
             aria-controls="mobile-menu"
           >
-            {mobileMenuOpen ? <X size={21} strokeWidth={2.1} /> : <Menu size={22} strokeWidth={2.25} />}
+            <Menu size={22} strokeWidth={2.25} />
           </button>
         </div>
       </div>
 
       {mobileMenuOpen && (
-        <nav
-          id="mobile-menu"
-          aria-label="모바일 메뉴"
-          className="apple-mobile-menu-panel mx-auto lg:hidden"
-        >
-          <div className="flex flex-col divide-y divide-[var(--app-hairline)]">
-            {primaryNavItems.map((item) => (
-              <button key={item.id} type="button" onClick={() => closeAndGo(`${item.path}${(item as { hash?: string }).hash || ''}`)} className="apple-mobile-menu-item">
-                <item.icon size={15} className={item.accent} />
-                <span>{item.label}</span>
-                <span className="ml-auto text-xs text-[var(--app-muted)]">{item.hint}</span>
-              </button>
-            ))}
-            <button type="button" onClick={() => closeAndGo('/notices')} className="apple-mobile-menu-item">
-              <Megaphone size={15} className="text-cyan-500" />
-              <span>Notices <MemberLock /></span>
-              <span className="ml-auto text-xs text-[var(--app-muted)]">공지사항</span>
-            </button>
-            {activityNavGroups.map((group) => {
-              const open = mobileOpenGroups.includes(group.id)
-              return (
-                <Fragment key={group.id}>
-                  <button
-                    type="button"
-                    onClick={() => setMobileOpenGroups((ids) => (open ? ids.filter((id) => id !== group.id) : [...ids, group.id]))}
-                    aria-expanded={open}
-                    aria-controls={`mobile-${group.id}-panel`}
-                    className="apple-mobile-menu-item"
-                  >
-                    {group.id === 'tools'
-                      ? <Wrench size={15} className="text-amber-500" />
-                      : <CalendarDays size={15} className="text-sky-500" />}
-                    <span>{group.navLabel}</span>
-                    <span className="ml-auto inline-flex items-center gap-1 text-xs text-[var(--app-muted)]">
-                      {group.label}
-                      <ChevronDown size={14} className={`transition ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
-                    </span>
-                  </button>
-                  {open && (
-                    <ul id={`mobile-${group.id}-panel`} className="flex flex-col divide-y divide-[var(--app-hairline)] bg-black/[0.015]">
-                      {activitySectionNavItems.filter((item) => item.group === group.id).map((item) => (
-                        <li key={item.id}>
-                          <button
-                            type="button"
-                            onClick={() => closeAndGo(item.path)}
-                            className="apple-mobile-menu-item apple-mobile-menu-subitem"
-                          >
-                            <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]">
-                              <item.icon size={13} aria-hidden="true" />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-sm font-semibold text-[var(--app-text)]">{item.label}{item.auth && <> <MemberLock /></>}</span>
-                              <span className="mt-0.5 block text-xs leading-relaxed text-[var(--app-muted)]">{item.hint}</span>
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </Fragment>
-              )
-            })}
-            <button type="button" onClick={() => closeAndGo('/sponsors')} className="apple-mobile-menu-item">
-              <HeartHandshake size={15} className="text-emerald-500" />
-              <span>Sponsors</span>
-              <span className="ml-auto text-xs text-[var(--app-muted)]">후원자</span>
-            </button>
-            <button type="button" onClick={() => goProtected('/resources')} disabled={authLoading} className="apple-mobile-menu-item disabled:opacity-50">
-              <CircuitBoard size={15} className="text-violet-400" />
-              <span>Resources <MemberLock /></span>
-              <span className="ml-auto text-xs text-[var(--app-muted)]">자료실</span>
-            </button>
-            <button type="button" onClick={() => goProtected('/community')} disabled={authLoading} className="apple-mobile-menu-item disabled:opacity-50">
-              <Sparkles size={15} className="text-rose-400" />
-              <span>Community <MemberLock /></span>
-              <span className="ml-auto text-xs text-[var(--app-muted)]">커뮤니티</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => closeAndGo('/apps')}
-              className="apple-mobile-menu-item"
-            >
-              <Grid3x3 size={15} className="text-sky-500" />
-              <span>Apps</span>
-              <span className="ml-auto text-xs text-[var(--app-muted)]">서비스</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMobileMenuOpen(false); setMobileOpenGroups([]); startSiteTour() }}
-              className="apple-mobile-menu-item"
-            >
-              <Compass size={15} className="text-sky-500" />
-              <span>튜토리얼 시작</span>
-              <span className="ml-auto text-xs text-[var(--app-muted)]">사이트 둘러보기</span>
-            </button>
-            {!user && (
-              <button type="button" onClick={() => closeAndGo('/login')} disabled={authLoading} className="apple-mobile-menu-item apple-mobile-menu-item-accent disabled:opacity-50">
-                <span>로그인</span>
-              </button>
-            )}
-            {user && (
-              <div className="border-t border-[var(--app-hairline)]">
-                <div className="flex flex-col divide-y divide-[var(--app-hairline)]">
-                  <button type="button" onClick={() => closeAndGo('/settings')} className="apple-mobile-menu-item">
-                    <span className="flex size-5 items-center justify-center rounded-full bg-black/10 text-[10px] font-black">{user.name?.[0] ?? '?'}</span>
-                    <span>{user.name}</span>
-                    <span className="ml-auto text-xs text-[var(--app-muted)]">계정 설정</span>
-                  </button>
-                  {canAccessOperationsPanel(permissions) && (
-                    <button type="button" onClick={() => closeAndGo('/admin')} className="apple-mobile-menu-item apple-mobile-menu-item-warning">
-                      <span>{(ROLE_LABELS[user.role] || '임원') + ' 패널'}</span>
-                    </button>
-                  )}
-                  <NotificationButton alignLeft variant="mobileMenu" />
-                  <button type="button" onClick={handleLogout} className="apple-mobile-menu-item">
-                    <LogOut size={15} />
-                    <span>로그아웃</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </nav>
+        <MobileNavMenu
+          frequent={frequent}
+          activePath={activePath}
+          onGo={(path, options) => goMenuPath(path, options)}
+          onLogout={handleLogout}
+          onClose={() => setMobileMenuOpen(false)}
+        />
       )}
 
       {showMobileTabs && (
         <nav className="apple-mobile-tabs md:hidden" aria-label="상세 화면 이동">
-          {mobileTabs.map((tab) => {
-            const active = activeKey === tab.id
+          {MOBILE_TABS.map((tab) => {
+            const active = activePath === tab.path
             return (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => closeAndGo('path' in tab ? tab.path : getTabRoute(tab.id))}
+                onClick={() => closeAndGo(tab.path)}
                 className={`apple-mobile-tab ${active ? 'apple-mobile-tab-active' : ''}`}
               >
                 {tab.label}

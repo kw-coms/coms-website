@@ -103,29 +103,6 @@ select {
 		0 8px 24px rgba(0, 0, 0, 0.06);
 }
 
-/* Nav link underline grows on hover (Kakao). */
-.apple-global-nav nav > button {
-	overflow: visible;
-}
-.apple-global-nav nav > button::after {
-	content: '';
-	position: absolute;
-	left: 50%;
-	bottom: -1rem;
-	height: 2px;
-	width: 1rem;
-	border-radius: 9999px;
-	background: var(--app-accent);
-	opacity: 0;
-	transform: translateX(-50%) scaleX(0.3);
-	transition: opacity 220ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-	pointer-events: none;
-}
-.apple-global-nav nav > button:hover::after {
-	opacity: 0.55;
-	transform: translateX(-50%) scaleX(1);
-}
-
 .apple-global-nav-brand {
 	min-height: 100%;
 	transition: opacity 160ms ease;
