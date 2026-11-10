@@ -30,7 +30,7 @@ function ClubEventSection() {
   const [writing, setWriting] = useState(false)
   const selectedEventId = idParam == null ? null : Number(idParam)
   const [selectedSnapshot, setSelectedSnapshot] = useState(null)
-  const [notFound, setNotFound] = useState(false)
+  const [detailFailure, setDetailFailure] = useState(null)
   const mode = selectedEventId != null ? 'detail' : writing ? 'write' : 'list'
   const [eventForm, setEventForm] = useState({ title: '', description: '', startsOn: '', endsOn: '' })
   const {
@@ -61,6 +61,9 @@ function ClubEventSection() {
   const selectedEvent = selectedEventId == null
     ? null
     : eventItems.find((item) => item.id === selectedEventId) || (selectedSnapshot?.id === selectedEventId ? selectedSnapshot : null)
+  const validId = Number.isInteger(selectedEventId) && selectedEventId > 0
+  const failedHere = detailFailure?.id === selectedEventId ? detailFailure : null
+  const notFound = selectedEventId != null && (!validId || Boolean(failedHere?.notFound))
   const isLocked = !authLoading && !user
   const isAdmin = canManageContent(permissions)
   const visibleError = error || loadError
@@ -77,13 +80,7 @@ function ClubEventSection() {
 
   // The address decides which event is open, so reload, Back and shared links all land on it.
   useEffect(() => {
-    setError('')
-    setNotFound(false)
-    if (selectedEventId == null || !user) return undefined
-    if (!Number.isInteger(selectedEventId) || selectedEventId <= 0) {
-      setNotFound(true)
-      return undefined
-    }
+    if (selectedEventId == null || !user || !validId) return undefined
     let cancelled = false
     getClubEvent(selectedEventId)
       .then((detail) => {
@@ -93,8 +90,7 @@ function ClubEventSection() {
       })
       .catch((err) => {
         if (cancelled) return
-        if (err?.status === 404) setNotFound(true)
-        else setError(err.message || '이벤트 상세를 불러오지 못했습니다.')
+        setDetailFailure({ id: selectedEventId, notFound: err?.status === 404, message: err.message || '이벤트 상세를 불러오지 못했습니다.' })
       })
     return () => { cancelled = true }
     // mergeEvent only writes to the query cache; reloading on its identity would loop.
@@ -321,7 +317,7 @@ function ClubEventSection() {
               notFound={notFound}
               selectedEvent={selectedEvent}
               notice={notice}
-              error={error}
+              error={error || (failedHere && !failedHere.notFound ? failedHere.message : '')}
               rsvpPending={rsvpPending}
               onRsvp={handleRsvp}
               isAdmin={isAdmin}

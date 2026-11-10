@@ -146,6 +146,18 @@ export function canWriteNotice(permissions: PermissionSet) {
   return has(permissions, PERMISSIONS.noticeWrite)
 }
 
+// 공지 수정은 서버(NoticeService.requireEditable)가 작성자 본인 또는 회장(ADMIN)만 허용한다.
+// notice.write 권한만으로는 남의 공지를 고칠 수 없다.
+export function canEditNotice(user: { role?: string | null; studentId?: string | null } | null | undefined, notice: { authorStudentId?: string | null } | null | undefined) {
+  if (!user || !notice) return false
+  return user.role === 'ADMIN' || (!!user.studentId && notice.authorStudentId === user.studentId)
+}
+
+// 공지 삭제는 notice.write 권한이 있어야 한다(NoticeController). 작성자라는 이유만으로는 지울 수 없다.
+export function canDeleteNotice(permissions: PermissionSet) {
+  return has(permissions, PERMISSIONS.noticeWrite)
+}
+
 // COM's 프로젝트 관리: project.write (기본 임원 이상).
 export function canManageProjects(permissions: PermissionSet) {
   return has(permissions, PERMISSIONS.projectWrite)
