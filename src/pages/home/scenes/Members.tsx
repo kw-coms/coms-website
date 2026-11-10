@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { ArrowRight, FolderOpen, Megaphone, MessagesSquare } from 'lucide-react'
 import { activityHubItems, activitySectionNavItems } from '../../../data/homeContent'
 import MemberLock from '../../../components/MemberLock'
@@ -12,14 +13,16 @@ type Props = {
   member: boolean
   noticeTitle: string | null
   onGo: (path: string) => void
+  backdrop: ReactNode
 }
 
 // Scene 5 for a visitor ("멤버가 되면": what opens up, locks shown, no calendar). For a member it
 // moves up under the opening as "오늘의 COM's" and leads with function: the latest notice, the
 // hub, the tools and the calendar.
-export default function Members({ index, member, noticeTitle, onGo }: Props) {
+export default function Members({ index, member, noticeTitle, onGo, backdrop }: Props) {
   return (
-    <section id="members" className={`scene scene-members ${member ? 'scene-members--today' : ''}`}>
+    <section id="members" data-scene="members" className={`scene scene-members ${member ? 'scene-members--today' : ''}`}>
+      {backdrop}
       <div className="scene-inner">
         <Slate index={index} name={member ? 'Today' : 'Members'} />
         <CineTitle text={member ? "오늘의 COM's" : '멤버가 되면'} />
@@ -41,7 +44,7 @@ export default function Members({ index, member, noticeTitle, onGo }: Props) {
             const Icon = HUB_ICONS[i % HUB_ICONS.length]
             return (
               <li key={item.title} data-cine style={cssVars({ '--i': i })}>
-                <article className="scene-hubcard">
+                <article className="scene-hubcard" data-rule>
                   <Icon size={20} aria-hidden="true" />
                   <h3 className="scene-hubcard__title">
                     <button type="button" className="scene-hubcard__link" onClick={() => onGo(item.route)}>
@@ -56,9 +59,9 @@ export default function Members({ index, member, noticeTitle, onGo }: Props) {
           })}
         </ul>
 
-        <ul className="scene-chips" aria-label="활동 도구 바로가기" data-cine>
-          {activitySectionNavItems.map((item) => (
-            <li key={item.id}>
+        <ul className="scene-chips" aria-label="활동 도구 바로가기">
+          {activitySectionNavItems.map((item, i) => (
+            <li key={item.id} data-cine="ripple" style={cssVars({ '--i': i })}>
               <button type="button" className="scene-chip" onClick={() => onGo(item.path)}>
                 <item.icon size={15} aria-hidden="true" />
                 <span className="scene-chip__label">{item.hint}</span>

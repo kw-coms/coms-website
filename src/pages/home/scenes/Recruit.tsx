@@ -1,15 +1,19 @@
+import type { ReactNode } from 'react'
 import { sectionStories, visualDetails } from '../../../data/homeContent'
 import { JoinFlowVisual } from '../HomeVisuals'
 import { CineTitle, SceneActionRow, SceneStats, Slate, type SceneActions } from './parts'
 import { cssVars } from './cssVars'
 
+const MARQUEE = Array.from({ length: 2 }, () => `${sectionStories.recruit.primary}   ·   ${sectionStories.recruit.secondary}   ·   `).join('')
+
 // The finale. The title is set very large and drifts a few percent sideways as the scene passes
 // (--p, scroll only), then the copy, the actions, the steps and the join flow.
-export default function Recruit({ index, actions }: { index: number; actions: SceneActions }) {
+export default function Recruit({ index, actions, backdrop }: { index: number; actions: SceneActions; backdrop: ReactNode }) {
   const story = sectionStories.recruit
 
   return (
     <section id="recruit" data-scene="recruit" className="scene scene-recruit">
+      {backdrop}
       <div className="scene-inner">
         <Slate index={index} name="Recruit" />
         <div className="scene-recruit__drift">
@@ -25,6 +29,9 @@ export default function Recruit({ index, actions }: { index: number; actions: Sc
             <JoinFlowVisual {...visualDetails.recruit} />
           </div>
         </div>
+      </div>
+      <div className="scene-recruit__marquee" aria-hidden="true">
+        <span className="scene-recruit__marquee-run" data-t={MARQUEE} />
       </div>
     </section>
   )

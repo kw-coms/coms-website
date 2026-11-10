@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { activityDetails, sectionStories, showcaseItems, visualDetails } from '../../../data/homeContent'
 import { BuildMini, FlowMini, JoinMini, LearningStackVisual } from '../HomeVisuals'
@@ -9,11 +10,12 @@ const SHOWCASE_ART = [FlowMini, BuildMini, JoinMini]
 const code = (n: number) => `A-${String(n).padStart(2, '0')}`
 
 // Scene 3. The routine as rows of frames: three pictures to a row, then the details two to a row.
-export default function Activities({ index, actions, onOpen }: { index: number; actions: SceneActions; onOpen: (id: string) => void }) {
+export default function Activities({ index, actions, onOpen, backdrop }: { index: number; actions: SceneActions; onOpen: (id: string) => void; backdrop: ReactNode }) {
   const story = sectionStories.activities
 
   return (
-    <section id="activities" className="scene scene-activities">
+    <section id="activities" data-scene="activities" className="scene scene-activities">
+      {backdrop}
       <div className="scene-inner">
         <div className="scene-activities__head">
           <div>
@@ -23,7 +25,7 @@ export default function Activities({ index, actions, onOpen }: { index: number; 
             <SceneActionRow actions={actions} />
           </div>
           {/* The first frame sits beside the words it illustrates. */}
-          <article className="scene-frame scene-frame--lead">
+          <article className="scene-frame scene-frame--lead" data-scene="frame" data-tilt data-rule>
             <p className="cine-hud scene-frame__code" data-cine>{code(1)} · {visualDetails.activities.title}</p>
             <div className="scene-frame__media cine-wipe">
               <LearningStackVisual {...visualDetails.activities} />
@@ -36,7 +38,7 @@ export default function Activities({ index, actions, onOpen }: { index: number; 
           {showcaseItems.map((item, i) => {
             const Art = SHOWCASE_ART[i % SHOWCASE_ART.length]
             return (
-              <article key={item.title} className="scene-frame scene-frame--link scene-frame--third">
+              <article key={item.title} className="scene-frame scene-frame--link scene-frame--third" data-scene="frame" data-tilt data-rule style={cssVars({ '--i': i })}>
                 <div className="scene-frame__media cine-wipe">
                   <Art />
                 </div>
@@ -51,7 +53,7 @@ export default function Activities({ index, actions, onOpen }: { index: number; 
           })}
 
           {activityDetails.map((item, i) => (
-            <article key={item.title} className="scene-frame scene-frame--text">
+            <article key={item.title} className="scene-frame scene-frame--text" data-rule style={cssVars({ '--i': i % 2 })}>
               <span className="cine-hud scene-frame__code" data-cine>{code(showcaseItems.length + i + 2)}</span>
               <h3 className="scene-frame__title" data-cine>{item.title}</h3>
               <p className="scene-frame__body" data-cine>{item.description}</p>

@@ -19,8 +19,8 @@ const hiddenTextElements = (page) => page.evaluate(() => {
   const hidden = []
   for (const el of document.querySelectorAll('main *')) {
     const ownText = Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.textContent.trim())
-    // Screen-reader-only text is meant to be 1px.
-    if (!ownText || el.classList.contains('sr-only')) continue
+    // Screen-reader-only text is meant to be 1px; a hidden duplicate (a marquee copy) is not shown on purpose.
+    if (!ownText || el.closest('.sr-only') || (el.hasAttribute('aria-hidden') && getComputedStyle(el).display === 'none')) continue
     let opacity = 1
     let clipped = false
     for (let node = el; node && node !== document.body; node = node.parentElement) {
@@ -85,6 +85,159 @@ test.describe('a visitor on the home page', () => {
     }
   })
 
+  test('says the new manifesto sentence, word by word', async ({ page }) => {
+    const title = page.locator('.scene-about__pin h2')
+    await expect(title).toHaveText('배운 건 만들어 보고, 만든 건 함께 나눕니다.')
+    expect(await page.locator('.scene-about__pin .cine-w').count()).toBe(8)
+  })
+
+  test('types the three highlights for the eye and lists them once for a screen reader', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    // The typing is hidden from assistive technology...
+    await expect(page.locator('.scene-typed__line')).toHaveAttribute('aria-hidden', 'true')
+    // ...and the three items are read once, as a plain list.
+    const items = await page.locator('.scene-typed ul.sr-only li').allTextContents()
+    expect(items).toHaveLength(3)
+    expect(items[0]).toContain('Weekly Seminar')
+    expect(items[1]).toContain('Team Project')
+    expect(items[2]).toContain('Campus Network')
+    // It really types: a moment later some of the first item is on screen.
+    await expect.poll(async () => (await page.locator('.scene-typed__line').textContent()).length).toBeGreaterThan(3)
+  })
+
+  test('loops run only while their scene is on screen', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    const state = (selector) => page.locator(selector).first().evaluate((el) => getComputedStyle(el).animationPlayState)
+    await expect.poll(() => state('.floor__plane i')).toBe('running')
+    await expect.poll(() => state('.coms-os-ring')).toBe('paused')
+    await page.locator('.scene-about__visual').scrollIntoViewIfNeeded()
+    await page.evaluate(() => window.scrollBy(0, 200))
+    await expect.poll(() => state('.coms-os-ring')).toBe('running')
+    await expect.poll(() => state('.floor__plane i')).toBe('paused')
+  })
+
+  test('no running loop belongs to a scene that is off screen, wherever the page is scrolled', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    const strays = () => page.evaluate(() => {
+      const bad = []
+      let loops = 0
+      for (const a of document.getAnimations()) {
+        const target = a.effect?.target
+        if (!(a instanceof CSSAnimation) || !target || !target.closest('.cine-root')) continue
+        if (a.effect.getComputedTiming().iterations !== Infinity || a.playState !== 'running') continue
+        loops += 1
+        const off = target.closest('[data-scene]:not(.is-onscreen)') || !target.closest('[data-scene]')
+        if (off) bad.push(`${a.animationName} on ${target.tagName.toLowerCase()}.${String(target.className).slice(0, 30)}`)
+      }
+      return { bad, loops }
+    })
+    for (const selector of ['#opening', '.scene-about__visual', '#activities', '#projects', '#members', '#recruit']) {
+      await page.locator(selector).first().scrollIntoViewIfNeeded()
+      await page.evaluate(() => window.scrollBy(0, 120))
+      await page.waitForTimeout(400)
+      const { bad } = await strays()
+      expect(bad, `at ${selector}`).toEqual([])
+    }
+    // The check is not vacuous: back at the top the opening's own loops are running.
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.waitForTimeout(400)
+    expect((await strays()).loops).toBeGreaterThan(3)
+  })
+
+  test('a figure that is mid-count when calm turns on at runtime shows its final value', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    const figure = page.locator('#activities .scene-stats dt').first()
+    await expect(figure.locator('[aria-hidden]')).toHaveText('00')
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await expect(figure.locator('[aria-hidden]')).toHaveText('01')
+  })
+
+  test('every divider band covers the full width at both ends of its travel', async ({ page }) => {
+    for (const [width, height] of [[1440, 900], [390, 844], [1920, 1080]]) {
+      await page.setViewportSize({ width, height })
+      await page.goto('/')
+      await expect(page.locator('.scene-divider')).toHaveCount(5)
+      const gaps = await page.evaluate(() => {
+        const bad = []
+        for (const band of document.querySelectorAll('.scene-divider')) {
+          const text = band.querySelector('.scene-divider__text')
+          for (const p of [0, 1]) {
+            band.style.setProperty('--p', String(p))
+            const r = text.getBoundingClientRect()
+            if (r.left > 0.5 || r.right < window.innerWidth - 0.5) bad.push(`${text.dataset.t.slice(0, 8)} p=${p} ${Math.round(r.left)}..${Math.round(r.right)}`)
+          }
+          band.style.removeProperty('--p')
+        }
+        return bad
+      })
+      expect(gaps, `${width}px`).toEqual([])
+    }
+  })
+
+  test('the wordmark sheen peak and bottom tone stay at 3:1 or better in both themes for any accent', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    for (const theme of ['light', 'dark']) {
+      for (const accent of ['#0071e3', '#3c3c43', '#d70015', '#ff9f0a', '#8e5cf7', '#ffd60a', '#ffffff', '#f5f5f0', '#000000']) {
+        const page2 = await page.context().newPage()
+        await page2.addInitScript(([t, value]) => {
+          localStorage.setItem('kwcoms-theme-mode:v2', t)
+          localStorage.setItem('kwcoms-accent-color', value)
+          sessionStorage.setItem('coms.intro.played:v1', '1')
+        }, [theme, accent])
+        await mockOptionalApis(page2)
+        await page2.goto('/')
+        await expect(page2.locator('.scene-wordmark')).toBeAttached()
+        const ratios = await page2.evaluate(() => {
+          const rgb = (css) => {
+            const ctx = document.createElement('canvas').getContext('2d')
+            ctx.fillStyle = css
+            ctx.fillRect(0, 0, 1, 1)
+            return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3))
+          }
+          const lum = ([r, g, b]) => [r, g, b].map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4 }).reduce((s, c, i) => s + c * [0.2126, 0.7152, 0.0722][i], 0)
+          const bg = lum(rgb(getComputedStyle(document.querySelector('.scenes')).backgroundColor))
+          const ratio = (css) => {
+            const probe = document.createElement('i')
+            probe.style.color = css
+            document.querySelector('.scene-wordmark').append(probe)
+            const fg = lum(rgb(getComputedStyle(probe).color))
+            probe.remove()
+            return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05)
+          }
+          return { peak: ratio('var(--sheen-hi)'), tone: ratio('color-mix(in srgb, var(--app-text) 70%, var(--app-accent))') }
+        })
+        await page2.close()
+        expect(ratios.peak, `${theme} ${accent} peak`).toBeGreaterThanOrEqual(3)
+        expect(ratios.tone, `${theme} ${accent} tone`).toBeGreaterThanOrEqual(3)
+      }
+    }
+  })
+
+  test('turning reduced motion on drops the pointer offsets left on the opening', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    // The listener is attached once the scenes are ready; keep moving until it has answered.
+    await expect(page.locator('.cine-root')).toHaveClass(/cine-ready/)
+    let x = 900
+    await expect.poll(async () => {
+      await page.mouse.move((x += 7), 300)
+      return page.locator('#opening').evaluate((el) => el.style.getPropertyValue('--px'))
+    }).not.toBe('')
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await expect.poll(() => page.locator('#opening').evaluate((el) => el.style.getPropertyValue('--px'))).toBe('')
+  })
+
+  test('has a divider band between scenes and a backdrop in each later scene', async ({ page }) => {
+    await expect(page.locator('.scene-divider')).toHaveCount(5)
+    for (const id of ['about', 'activities', 'projects', 'members', 'recruit']) {
+      await expect(page.locator(`#${id} .scene-bg__numeral`)).toHaveCount(1)
+    }
+  })
+
   test('the manifesto stays pinned while its words light up, then lets go', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/')
@@ -99,6 +252,10 @@ test.describe('a visitor on the home page', () => {
       await page.waitForTimeout(150)
     }
     await at(0.05)
+    // The web font can arrive after first paint and change the line height by a pixel: wait for it.
+    await page.evaluate(() => document.fonts.ready)
+    // The title rises into place when it first appears: measure once that entrance has finished.
+    await title.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished.catch(() => {}))))
     const y1 = (await title.boundingBox()).y
     const earlyLast = await last.evaluate((el) => getComputedStyle(el).color)
     await at(0.6)
@@ -128,9 +285,26 @@ for (const [label, setup] of [
       expect(await page.locator('.scene-about__pin').evaluate((el) => getComputedStyle(el).position)).toBe('static')
       // Straight from load, without scrolling an inch: nothing is left transparent, clipped or lowered.
       expect(await hiddenTextElements(page)).toEqual([])
-      // The grain is off.
+      // The grain, the cube, the floor and the ticker are off; the first highlight is shown typed out.
       await expect(page.locator('.cine-grain')).toBeHidden()
+      await expect(page.locator('.scene-opening__cube')).toBeHidden()
+      await expect(page.locator('.scene-opening__floor')).toBeHidden()
+      await expect(page.locator('.scene-opening__ticker')).toBeHidden()
+      await expect(page.locator('.scene-typed__line')).toContainText('Weekly Seminar')
+      // Numbers are finished figures, not mid-count.
+      await expect(page.locator('#activities .scene-stats dt').first()).toContainText('01')
       expect(await overflow(page)).toBeLessThanOrEqual(0)
+      // Nothing animates anywhere on the page: no running CSS animation, however far it is scrolled.
+      await page.evaluate(async () => {
+        for (let y = 0; y <= document.body.scrollHeight; y += 600) {
+          window.scrollTo(0, y)
+          await new Promise((resolve) => setTimeout(resolve, 30))
+        }
+      })
+      const running = await page.evaluate(() =>
+        document.getAnimations().filter((a) => a instanceof CSSAnimation && a.playState === 'running' && a.effect?.target?.closest('.cine-root')).map((a) => a.animationName),
+      )
+      expect(running).toEqual([])
     })
   })
 }

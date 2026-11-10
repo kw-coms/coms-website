@@ -12,10 +12,25 @@
 	--cine-dim: 52;
 	--cine-pad: clamp(1.25rem, 5vw, 5rem);
 	--cine-gap: clamp(6rem, 14vh, 11rem);
+	/* One mood colour per scene (opening, about, activities, projects, members, recruit); a scene's
+	   backdrop washes from the previous mood to its own and on to the next. */
+	--mood-0: var(--app-accent);
+	--mood-1: var(--app-accent);
+	--mood-2: var(--theme-glow-violet, #b26dff);
+	--mood-3: color-mix(in srgb, var(--app-accent) 35%, #00dcff);
+	--mood-4: color-mix(in srgb, var(--theme-glow-violet, #b26dff) 55%, #ff5fa2);
+	--mood-5: var(--app-accent);
+	/* How strong washes and glows are: soft tints on paper, richer on the dark stage. */
+	/* Body copy over a tinted backdrop: stronger than the muted token so it stays AA on any wash. */
+	--cine-body: color-mix(in srgb, var(--app-text) 78%, var(--app-bg));
+	--cine-wash: 9%;
+	--cine-glow: 22%;
 }
 
 :root[data-theme-mode='dark'] {
 	--cine-dim: 40;
+	--cine-wash: 15%;
+	--cine-glow: 36%;
 }
 
 /* ---- Slate text ---------------------------------------------------------- */
@@ -34,6 +49,7 @@
    the matching negative margin keep descenders and tight line heights from being clipped. */
 .cine-lines .cine-m {
 	display: block;
+	overflow: hidden;
 	overflow: clip;
 	padding-block: 0.12em;
 	margin-block: -0.12em;
@@ -66,6 +82,53 @@
 .cine-ready [data-cine].is-revealed {
 	opacity: 1;
 	transform: none;
+}
+
+/* Variants of the entrance: a row slides in from the side, a chip ripples in. */
+.cine-ready [data-cine='slide'] {
+	transform: translateX(-48px);
+}
+
+.cine-ready [data-cine='ripple'] {
+	transform: translateY(12px) scale(0.88);
+	transition-delay: calc(var(--i, 0) * 55ms);
+}
+
+.cine-ready [data-cine='slide'].is-revealed,
+.cine-ready [data-cine='ripple'].is-revealed {
+	transform: none;
+}
+
+/* A rule that draws itself: the element's top edge, scaled in from the left. */
+[data-rule] {
+	position: relative;
+}
+
+[data-rule]::before {
+	content: '';
+	position: absolute;
+	inset: 0 0 auto;
+	height: 1px;
+	background: var(--app-hairline-strong);
+	transform-origin: left;
+	pointer-events: none;
+}
+
+.cine-ready [data-rule]:not(.is-revealed)::before {
+	transform: scaleX(0);
+}
+
+.cine-ready [data-rule]::before {
+	transition: transform 1100ms var(--cine-ease);
+	transition-delay: calc(var(--i, 0) * 90ms);
+}
+
+/* Looping animation runs only while its scene is on the screen (the hook toggles .is-onscreen). */
+.cine-ready [data-scene]:not(.is-onscreen) *,
+.cine-ready [data-scene]:not(.is-onscreen) *::before,
+.cine-ready [data-scene]:not(.is-onscreen) *::after {
+	/* important: an `animation:` shorthand elsewhere resets the play state, and must not win. */
+	animation-play-state: paused !important;
 }
 
 /* ---- Media: opened by a clip-path, once ------------------------------------------- */
@@ -117,6 +180,11 @@
 		clip-path: none;
 		transition: none;
 	}
+	.cine-ready [data-rule]:not(.is-revealed)::before,
+	.cine-ready [data-rule]::before {
+		transform: none;
+		transition: none;
+	}
 	.cine-scrub-words .cine-w {
 		color: var(--app-text);
 	}
@@ -131,6 +199,11 @@
 	opacity: 1;
 	transform: none;
 	clip-path: none;
+	transition: none;
+}
+
+:root[data-perf='lite'] .cine-ready [data-rule]::before {
+	transform: none;
 	transition: none;
 }
 
