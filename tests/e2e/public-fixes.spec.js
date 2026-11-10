@@ -121,3 +121,36 @@ test.describe('/activities for guests (items 2, 3)', () => {
     }
   }
 })
+
+test.describe('404 page (item 4)', () => {
+  test('is noindex only while mounted, and offers next steps', async ({ page }) => {
+    await skipIntro(page)
+    await mockOptionalApis(page)
+    await page.goto('/no-such-page')
+    await expect(page.getByRole('heading', { name: '페이지를 찾을 수 없어요' })).toBeVisible()
+    await expect(page.locator('meta[name="robots"][content="noindex"]')).toHaveCount(1)
+    const steps = page.getByRole('navigation', { name: '이런 페이지는 어때요' })
+    for (const group of ['동아리', '배움', '멤버', '도구']) await expect(steps.getByText(group, { exact: true })).toBeVisible()
+    await expect(steps.getByRole('link', { name: '소개' })).toHaveAttribute('href', '/about')
+    await page.getByRole('button', { name: '빠른 검색' }).click()
+    await expect(page.getByRole('dialog', { name: /빠른 이동/ })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await steps.getByRole('link', { name: '소개' }).click()
+    await expect(page).toHaveURL(/\/about$/)
+    await expect(page.locator('meta[name="robots"]')).toHaveCount(0)
+  })
+
+  for (const theme of ['light', 'dark']) {
+    for (const view of VIEWS) {
+      test(`screenshot 404 ${theme} ${view.name}`, async ({ page }) => {
+        await page.setViewportSize(view.size)
+        await skipIntro(page)
+        await setTheme(page, theme)
+        await mockOptionalApis(page)
+        await page.goto('/no-such-page')
+        await expect(page.getByRole('navigation', { name: '이런 페이지는 어때요' })).toBeVisible()
+        await shot(page, `404-${theme}-${view.name}`)
+      })
+    }
+  }
+})
