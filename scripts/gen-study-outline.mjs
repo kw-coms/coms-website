@@ -12,7 +12,8 @@ import { STUDIES } from '../src/pages/study/studies.ts'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../src/pages/study')
 export const OUTLINE_PATH = resolve(root, 'studyOutline.ts')
 
-const decode = (text) => text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+// `&amp;` goes last: decoding it first would turn `&amp;lt;` into `&lt;` and then into `<`.
+const decode = (text) => text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
 
 export function renderOutline() {
   const outline = {}
