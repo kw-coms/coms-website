@@ -294,3 +294,22 @@ test.describe('next steps on /about and /projects (item 6)', () => {
     }
   }
 })
+
+test.describe('study hub weight (item 8)', () => {
+  test('the hub shows the counts without downloading the problem statements', async ({ page }) => {
+    const scripts = []
+    page.on('request', (request) => { if (/\/assets\/.*\.js$/.test(request.url())) scripts.push(request.url().split('/').pop()) })
+    await skipIntro(page)
+    await mockOptionalApis(page)
+    await page.goto('/study')
+    await expect(page.getByRole('heading', { name: '스터디 자료' })).toBeVisible()
+    await expect(page.getByText(/연습 문제 \d+개/).first()).toBeVisible()
+    const total = Number(await page.locator('.study-overview-stats div').first().locator('dd').innerText())
+    expect(total).toBeGreaterThan(100)
+    await page.waitForLoadState('networkidle')
+    expect(scripts.filter((name) => /^problems-/.test(name))).toEqual([])
+    // The practice list still loads them.
+    await page.goto('/study/c/practice')
+    await expect.poll(() => scripts.some((name) => /^problems-/.test(name))).toBe(true)
+  })
+})
