@@ -188,9 +188,15 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 
           ],
         },
       }))
-      for (const [path, ready] of [['/gatherings', page.getByRole('list', { name: '모임 목록' })], ['/gatherings/7', page.getByRole('list', { name: '신청한 사람' })]]) {
+      for (const [path, ready] of [['/gatherings', page.getByRole('list', { name: '진행 중인 모임' })], ['/gatherings/7', page.getByRole('list', { name: '신청한 사람' })]]) {
         await page.goto(path)
         await expect(ready).toBeVisible()
+        if (path === '/gatherings') {
+          const pastToggle = page.getByRole('button', { name: '지난 모임 1개' })
+          await expect(pastToggle).toHaveAttribute('aria-expanded', 'false')
+          await pastToggle.click()
+          await expect(page.getByRole('list', { name: '지난 모임' })).toBeVisible()
+        }
         await page.waitForTimeout(500)
         await assertNoSeriousViolations(page)
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)

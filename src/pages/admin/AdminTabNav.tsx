@@ -44,7 +44,7 @@ export default function AdminTabNav({ visibleTabs, activeId, onSelect }: {
     <nav aria-label="운영 패널 메뉴" data-testid="admin-nav" className="space-y-3 lg:sticky lg:top-24 lg:self-start">
       {overview && <div role="tablist" aria-label="요약" className="flex flex-col">{renderTab(overview)}</div>}
 
-      <div role="group" aria-label="분류" className="flex flex-wrap gap-2 lg:hidden">
+      <div role="group" aria-label="운영 메뉴 분류" className="flex flex-wrap gap-2 lg:hidden">
         {groups.map((group) => (
           <button
             key={group.id}

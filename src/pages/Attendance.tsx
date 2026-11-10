@@ -48,8 +48,8 @@ const RECENT_DOTS = 12
 export default function Attendance() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { permissions } = usePermissions()
-  const manager = canManageContent(permissions)
+  const { permissions, settled } = usePermissions()
+  const manager = settled && canManageContent(permissions)
   const sessionsQuery = useQuery({
     queryKey: SESSIONS_KEY,
     queryFn: listAttendanceSessions,

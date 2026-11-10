@@ -25,7 +25,7 @@ export const ADMIN_TABS: { id: string; label: string; group: AdminGroupId | null
   { id: 'sponsors', label: '후원자', group: 'content' },
   { id: 'site-settings', label: '사이트 문구', group: 'site' },
   { id: 'fonts', label: '폰트 관리', group: 'site' },
-  { id: 'screen-check', label: '화면 점검', group: 'site' },
+  { id: 'screen-check', label: '수동 점검', group: 'site' },
   { id: 'analytics', label: '분석', group: 'system' },
   { id: 'logs', label: '로그', group: 'system' },
 ]

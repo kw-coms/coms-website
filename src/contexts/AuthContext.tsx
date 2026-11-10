@@ -8,6 +8,7 @@ import { queryClient } from '../services/queryClient'
 import { showToast } from '../components/common/Toast'
 import { buildAuthLoadError, isLoggedOutAuthError } from './authErrors'
 import { AuthContext } from './useAuth'
+import { forgetDrawStorage } from '../utils/draw'
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState(null)
@@ -37,6 +38,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       // refresh). There is no session to end, and clearing the query cache here would cancel
       // the public queries that are still loading.
       if (!userRef.current) return
+      forgetDrawStorage(userRef.current.id)
       userRef.current = null
       setUser(null)
       setPermissions(null)
@@ -136,6 +138,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const clearSession = useCallback(() => {
     // The session-expired handler reads this ref; clearing it now keeps a request that fails
     // before the next render from announcing an expiry on top of the caller's own message.
+    forgetDrawStorage(userRef.current?.id)
     userRef.current = null
     setUser(null)
     setAuthError(null)

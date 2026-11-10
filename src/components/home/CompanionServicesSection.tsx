@@ -107,15 +107,18 @@ function CompanionServicesSection() {
             <p className="text-sm font-medium text-[color-mix(in_srgb,var(--app-danger)_65%,var(--app-text))]">프로젝트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
             <button type="button" onClick={() => { setLoadState('loading'); setAttempt((value) => value + 1) }} className="apple-action-secondary min-h-11 px-4 text-sm">다시 불러오기</button>
           </div>
+        ) : loadState === 'loading' ? (
+          <p role="status" className="mt-8 text-sm text-[var(--app-muted)]">프로젝트를 불러오는 중...</p>
         ) : groups.length === 0 ? (
           <p className="mt-8 text-sm font-medium text-[var(--app-muted)]">등록된 프로젝트가 아직 없습니다.</p>
         ) : (
           <>
-            <div className="mt-6 max-w-md">
-              <ListSearch value={query} onChange={setQuery} placeholder="이름이나 설명으로 찾기" label="프로젝트 검색" />
-            </div>
+            <div role="group" aria-label="프로젝트 찾기" className="mt-6 flex flex-wrap items-center gap-3">
+              <div className="w-full min-w-0 sm:max-w-xs">
+                <ListSearch value={query} onChange={setQuery} placeholder="이름이나 설명으로 찾기" label="프로젝트 검색" />
+              </div>
             {groups.length > 1 && (
-              <div className="apps-filter" role="group" aria-label="카테고리 필터">
+              <div className="apps-filter !m-0 !border-0 !p-0" role="group" aria-label="카테고리 필터">
                 <button type="button" className="apps-chip" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>
                   전체 <span>{projects.length}</span>
                 </button>
@@ -126,6 +129,8 @@ function CompanionServicesSection() {
                 ))}
               </div>
             )}
+              <span role="status" aria-label="검색 결과" className="text-xs font-semibold text-[var(--app-muted)]">{shown.reduce((count, group) => count + group.projects.length, 0)}개</span>
+            </div>
             {shown.length === 0 && (
               <div className="mt-8 flex flex-wrap items-center gap-3" role="status">
                 <p className="text-sm font-medium text-[var(--app-muted)]">

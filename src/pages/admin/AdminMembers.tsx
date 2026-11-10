@@ -341,7 +341,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
         return (
           <div key={member.id} className="shape-cut-sm border border-[var(--app-hairline)] bg-black/5">
             <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-full sm:basis-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold text-[var(--theme-body-dark)]">{member.name}</span>
                   <span className="text-xs text-[var(--theme-body-muted)]">{displayStudentId(member.studentId)}</span>
@@ -356,13 +356,13 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
                     </span>
                   )}
                 </div>
-                <p className="mt-0.5 text-xs text-[var(--theme-body-muted)]">
+                <p className="mt-0.5 break-words text-xs text-[var(--theme-body-muted)]">
                   {member.email}
                   {member.emailVerified ? ' · 이메일 인증' : ' · 이메일 미인증'}
                   {member.phone && ` · ${member.phone}`}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 {hasExtra && (
                   <button
                     type="button"

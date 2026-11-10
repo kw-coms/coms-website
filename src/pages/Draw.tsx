@@ -7,6 +7,7 @@ import {
   MAX_DRAW_NAMES,
   clampTeamCount,
   cryptoRandom,
+  drawStorageKey,
   orderToText,
   parseNames,
   pickSome,
@@ -22,6 +23,8 @@ import { canManageContent } from '../utils/roleAccess'
 import { getGathering, listGatherings } from '../services/gatheringApi'
 import { getAttendanceSession, listAttendanceSessions } from '../services/attendanceApi'
 import { companionServices } from '../data/homeContent'
+import { useAuth } from '../contexts/useAuth'
+import { forgetStoredValue } from '../utils/themeColors'
 
 /**
  * Draw ("뽑기"): type names, then split them into teams, put them in an order or pick some.
@@ -48,14 +51,14 @@ const TEAM_MATE = companionServices.find((service) => service.eyebrow === 'Team 
 /** How long the names tumble before the result settles. */
 const ROLL_MS = 900
 
-const STORE_KEY = 'coms:draw:v1'
-
 const isNames = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string')
 
 /** The saved names and result; anything missing, unreadable or of another shape comes back empty. */
-function loadSaved(): { text: string; result: Result | null } {
+function loadSaved(key: string | null): { text: string; result: Result | null } {
+  forgetStoredValue('coms:draw:v1')
+  if (!key) return { text: '', result: null }
   try {
-    const saved = JSON.parse(window.localStorage.getItem(STORE_KEY) || 'null')
+    const saved = JSON.parse(window.localStorage.getItem(key) || 'null')
     if (!saved || typeof saved !== 'object') return { text: '', result: null }
     const text = typeof saved.text === 'string' ? saved.text : ''
     const result = saved.result
@@ -70,10 +73,11 @@ function loadSaved(): { text: string; result: Result | null } {
   }
 }
 
-function saveSaved(text: string, result: Result | null) {
+function saveSaved(key: string | null, text: string, result: Result | null) {
+  if (!key) return
   try {
-    if (!text && !result) window.localStorage.removeItem(STORE_KEY)
-    else window.localStorage.setItem(STORE_KEY, JSON.stringify({ text, result }))
+    if (!text && !result) window.localStorage.removeItem(key)
+    else window.localStorage.setItem(key, JSON.stringify({ text, result }))
   } catch {
     // Storage may be blocked or full: the page works without it.
   }
@@ -82,8 +86,14 @@ function saveSaved(text: string, result: Result | null) {
 const prefersReducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export default function Draw() {
+  const { user } = useAuth()
+  return <MemberDraw key={user?.id ?? 'guest'} memberId={user?.id} />
+}
+
+function MemberDraw({ memberId }: { memberId?: number | string }) {
   const navigate = useNavigate()
-  const [saved] = useState(loadSaved)
+  const storageKey = memberId == null ? null : drawStorageKey(memberId)
+  const [saved] = useState(() => loadSaved(storageKey))
   const [text, setText] = useState(saved.text)
   const [mode, setMode] = useState<Mode>('teams')
   const [teamCount, setTeamCount] = useState(2)
@@ -104,7 +114,7 @@ export default function Draw() {
   const enough = names.length >= 2
   const poolEmpty = mode === 'pick' && enough && pool === 0
 
-  useEffect(() => saveSaved(text, result), [text, result])
+  useEffect(() => saveSaved(storageKey, text, result), [storageKey, text, result])
 
   useEffect(() => {
     if (!rolling) return undefined
@@ -177,9 +187,9 @@ export default function Draw() {
                 이름 <span className="text-[var(--app-accent-text)]">{names.length}명</span>
               </label>
               <div className="flex flex-wrap gap-1.5">
-                <button type="button" onClick={() => setImporting((open) => !open)} aria-expanded={importing} className="apple-action-secondary min-h-8 px-3 text-xs">가져오기</button>
+                {memberId != null && <button type="button" onClick={() => setImporting((open) => !open)} aria-expanded={importing} className="apple-action-secondary min-h-8 px-3 text-xs">가져오기</button>}
                 <button type="button" onClick={() => changeText(SAMPLE.join('\n'))} className="apple-action-secondary min-h-8 px-3 text-xs">예시 넣기</button>
-                <button type="button" onClick={() => { changeText(''); setResult(null) }} disabled={text === ''} className="apple-action-secondary min-h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-50">지우기</button>
+                <button type="button" onClick={() => { changeText(''); setResult(null) }} disabled={!text && !result} className="apple-action-secondary min-h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-50">지우기</button>
               </div>
             </div>
             {importing && (
@@ -201,7 +211,7 @@ export default function Draw() {
               aria-describedby="drawNamesHelp"
             />
             <p id="drawNamesHelp" className="mt-2 text-xs text-[var(--app-muted)]">
-              이름과 마지막 결과는 이 브라우저에만 저장되고 서버로 보내지 않습니다. 지우기를 누르면 저장한 내용도 사라집니다.
+              {memberId == null ? '로그인하면 이 브라우저의 내 계정에 이름과 마지막 결과를 저장합니다.' : '이름과 마지막 결과는 이 브라우저의 내 계정에만 저장됩니다. 지우거나 로그아웃하면 사라집니다.'}
             </p>
             {duplicates.length > 0 && (
               <p className="mt-1 text-xs font-semibold text-amber-600 dark:text-amber-300">같은 이름이 여러 번 있습니다: {duplicates.join(', ')}</p>
@@ -337,8 +347,8 @@ function Stepper({ label, unit, value, min, max, onChange }: {
  * may run attendance, from who attended a check (the server shows that list to them only).
  */
 function ImportPanel({ onPick }: { onPick: (names: string[]) => void }) {
-  const { permissions } = usePermissions()
-  const manager = canManageContent(permissions)
+  const { permissions, settled } = usePermissions()
+  const manager = settled && canManageContent(permissions)
   const [busy, setBusy] = useState(false)
   const gatherings = useQuery({ queryKey: ['gatherings'], queryFn: listGatherings })
   const sessions = useQuery({ queryKey: ['attendance', 'sessions'], queryFn: listAttendanceSessions, enabled: manager })

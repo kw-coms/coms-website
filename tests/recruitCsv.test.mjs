@@ -15,5 +15,6 @@ assert.equal(lines[1], '"김지원","2026123000","컴퓨터정보공학부","1�
 // A cell a spreadsheet would run as a formula is forced to text; an unknown status is kept as sent.
 assert.equal(lines[2], '"\'=HYPERLINK(""http://example.com"")","2026123001","\'+cmd","","","\'-1","UNKNOWN","","","\'@x","","메모"')
 assert.equal(recruitApplicationsToCsv([]).slice(1).split('\r\n').length, 1, 'an empty list is just the header')
+assert.equal(recruitApplicationsToCsv([{ motive: '  =1+1' }]).slice(1).split('\r\n')[1], '"","","","","","","알 수 없음","","","\'  =1+1","",""')
 
 console.log('recruit csv contract passed')

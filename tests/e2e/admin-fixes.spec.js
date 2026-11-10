@@ -22,7 +22,7 @@ test.describe('operator panel', () => {
     for (const [group, tabs] of Object.entries({
       사람: ['회원 관리', '명부 인증', '권한 관리', '차단 관리', '모집 관리'],
       콘텐츠: ['활동 관리', '커뮤니티 관리', '삭제 보관함', '파일 관리', 'Apps 관리', '후원자'],
-      사이트: ['사이트 문구', '폰트 관리', '화면 점검'],
+      사이트: ['사이트 문구', '폰트 관리', '수동 점검'],
       시스템: ['분석', '로그'],
     })) {
       const list = nav.getByRole('tablist', { name: group })
@@ -170,7 +170,7 @@ test.describe('operator panel', () => {
   test('the screen check tab says it checks nothing', async ({ page }) => {
     await mockAdminApis(page)
     await page.goto('/admin?tab=screen-check')
-    await expect(page.getByRole('tab', { name: '화면 점검' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: '수동 점검' })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByText('아무것도 자동으로 검사하지 않습니다')).toBeVisible()
     await expect(page.getByText('배포 전 화면 점검')).toHaveCount(0)
   })

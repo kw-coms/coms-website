@@ -38,6 +38,8 @@ type RecruitApplicationItem = {
   interests?: string
 }
 
+type RecruitSaveResult = { application: RecruitApplicationItem; error?: string }
+
 // Mirrors backend/openapi.json → RecruitPromotionLogResponse.
 type RecruitPromotion = {
   id: number
@@ -65,6 +67,8 @@ export default function AdminRecruitApplications({ applications, loading, error,
   const [drafts, setDrafts] = useState({})
   // Per card: the last save's outcome, and what to put back if the admin undoes it.
   const [saveStates, setSaveStates] = useState<Record<string, { kind: 'saving' | 'saved' | 'failed'; message?: string; undo?: { status: string; adminNote: string } }>>({})
+  const pendingSaves = useRef(new Map<string | number, Promise<RecruitSaveResult>>())
+  const draftVersions = useRef<Record<string, number>>({})
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [sortKey, setSortKey] = useState('default')
@@ -108,6 +112,7 @@ export default function AdminRecruitApplications({ applications, loading, error,
   useEffect(loadPromotions, [])
 
   const updateDraft = (id, patch) => {
+    draftVersions.current[id] = (draftVersions.current[id] || 0) + 1
     setDrafts((prev) => ({
       ...prev,
       [id]: { ...(prev[id] || {}), ...patch },
@@ -118,39 +123,55 @@ export default function AdminRecruitApplications({ applications, loading, error,
   // A missing date is "-"; the shared formatter reads a missing value as "no expiry".
   const dateText = (value?: string) => (value ? formatDateTime(value) : '-')
 
-  const persist = async (application, status: string, adminNote: string, isUndo = false) => {
-    const previous = { status: application.status || 'RECEIVED', adminNote: application.adminNote || '' }
+  const persist = (application: RecruitApplicationItem, status: string | undefined, adminNote: string, isUndo = false) => {
+    const earlier = pendingSaves.current.get(application.id)
+    const version = draftVersions.current[application.id] || 0
     setSaveState(application.id, { kind: 'saving' })
     setMessage('')
-    try {
-      const updated = await updateRecruitApplicationStatus(application.id, { status, adminNote })
-      onUpdated(updated)
-      setDrafts((prev) => ({
-        ...prev,
-        [updated.id]: {
-          status: updated.status,
-          adminNote: updated.adminNote || '',
-        },
-      }))
-      if (updated.status === 'ACCEPTED' || updated.status === 'REJECTED') {
-        setMessage(
-          updated.status === 'ACCEPTED'
-            ? `${updated.name} 합격 — 명부에 등록하고 지원서를 정리했습니다.`
-            : `${updated.name} 불합격 — 지원서를 삭제하고 처리 이력을 남겼습니다.`,
-        )
-        loadPromotions()
-        // The parent drops the row optimistically on ACCEPTED/REJECTED. Re-fetch the
-        // list so a backend deletion that did NOT actually happen reappears instead of
-        // silently vanishing from the admin's view.
-        onReload()
-      } else {
-        setSaveState(application.id, { kind: 'saved', undo: isUndo ? undefined : previous })
+    const operation = (async (): Promise<RecruitSaveResult> => {
+      const last: RecruitSaveResult = earlier ? await earlier : { application }
+      const current = last.application
+      const previous = { status: current.status || 'RECEIVED', adminNote: current.adminNote || '' }
+      try {
+        const updated = await updateRecruitApplicationStatus(application.id, { status: status ?? previous.status, adminNote })
+        onUpdated(updated)
+        if (pendingSaves.current.get(application.id) === operation) {
+          const edited = (draftVersions.current[application.id] || 0) !== version
+          setDrafts((prev) => ({ ...prev, [updated.id]: {
+            status: updated.status,
+            adminNote: edited ? prev[updated.id]?.adminNote ?? updated.adminNote ?? '' : updated.adminNote || '',
+          } }))
+        }
+        if (updated.status === 'ACCEPTED' || updated.status === 'REJECTED') {
+          setMessage(
+            updated.status === 'ACCEPTED'
+              ? `${updated.name} 합격 — 명부에 등록하고 지원서를 정리했습니다.`
+              : `${updated.name} 불합격 — 지원서를 삭제하고 처리 이력을 남겼습니다.`,
+          )
+          loadPromotions()
+          // The parent removes a decided row; reload in case the server did not delete it.
+          onReload()
+        } else if (pendingSaves.current.get(application.id) === operation) {
+          setSaveState(application.id, last.error
+            ? { kind: 'failed', message: last.error }
+            : { kind: 'saved', undo: isUndo ? undefined : previous })
+        }
+        return { application: updated, error: last.error }
+      } catch (err) {
+        const error = err.message || '지원서 상태를 저장하지 못했습니다.'
+        // A later queued edit still owns the draft shown on screen.
+        if (pendingSaves.current.get(application.id) === operation) {
+          setDrafts((prev) => ({ ...prev, [application.id]: { ...previous, adminNote: prev[application.id]?.adminNote ?? previous.adminNote } }))
+          setSaveState(application.id, { kind: 'failed', message: error })
+        }
+        return { application: current, error }
       }
-    } catch (err) {
-      // Show what the server still has, not the edit that did not go through.
-      setDrafts((prev) => ({ ...prev, [application.id]: previous }))
-      setSaveState(application.id, { kind: 'failed', message: err.message || '' })
-    }
+    })()
+    pendingSaves.current.set(application.id, operation)
+    void operation.then(() => {
+      if (pendingSaves.current.get(application.id) === operation) pendingSaves.current.delete(application.id)
+    })
+    return operation
   }
 
   const changeStatus = async (application, status: string) => {
@@ -159,7 +180,7 @@ export default function AdminRecruitApplications({ applications, loading, error,
       const confirmed = await confirmDialog({
         message: status === 'ACCEPTED'
           ? '합격 처리하면 명부에 등록되고 지원서는 삭제됩니다. 계속할까요?'
-          : '불합격 처리하면 지원서는 삭제되고 처리 이력만 남습니다. 계속할까요?',
+          : '불합격 처리하면 지원서는 삭제됩니다. 처리 이력만 남습니다. 계속할까요?',
         tone: 'danger',
       })
       if (!confirmed) return
@@ -172,7 +193,7 @@ export default function AdminRecruitApplications({ applications, loading, error,
   const saveNote = (application) => {
     const note = drafts[application.id]?.adminNote
     if (note === undefined || note === (application.adminNote || '')) return
-    persist(application, application.status || 'RECEIVED', note)
+    persist(application, undefined, note)
   }
 
   return (
@@ -204,7 +225,7 @@ export default function AdminRecruitApplications({ applications, loading, error,
         </div>
       </div>
 
-      {message && <p className="shape-cut-sm bg-[var(--app-accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-accent-text)]">{message}</p>}
+      {message && <p role="status" className="shape-cut-sm bg-[var(--app-accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-accent-text)]">{message}</p>}
       {loading && (
         <SkeletonGroup label="지원서를 불러오는 중">
           <div className="space-y-3">
@@ -226,7 +247,7 @@ export default function AdminRecruitApplications({ applications, loading, error,
           </div>
         </SkeletonGroup>
       )}
-      {error && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
+      {error && <p role="alert" className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
       {!loading && !error && applications.length === 0 && (
         <p className="text-sm text-[var(--theme-body-muted)]">아직 접수된 지원서가 없습니다.</p>
       )}
