@@ -343,7 +343,8 @@ test('admin member list and roster can be searched and ordered', async ({ page }
   ] }))
 
   await page.goto('/admin?tab=members')
-  const memberNames = page.locator('span.font-semibold.text-\\[var\\(--theme-body-dark\\)\\]')
+  // Roster chips share the name's text style; only names participate in this ordering check.
+  const memberNames = page.getByRole('tabpanel', { name: '회원 관리' }).locator('span.font-semibold.text-\\[var\\(--theme-body-dark\\)\\]:not([data-testid^="roster-mark-"])')
   await expect(memberNames).toHaveText(['관리자', '홍길동', '김철수', '최가람'])
   const tools = page.getByRole('search', { name: '회원 목록 찾기' })
   await expect(tools.getByRole('status')).toHaveText('4명')
@@ -890,14 +891,14 @@ test('president adds a verified member from member management', async ({ page })
   await expect(page.getByText('new-member@example.com · 이메일 인증')).toBeVisible()
 })
 
-test('admin exposes a pre-deploy screen check panel', async ({ page }) => {
+test('admin exposes manual screen check links', async ({ page }) => {
   await mockAdminApis(page)
 
   await page.goto('/admin')
-  await page.getByRole('tab', { name: '화면 점검' }).click()
+  await page.getByRole('tab', { name: '수동 점검' }).click()
 
-  await expect(page.getByRole('heading', { name: '배포 전 화면 점검' })).toBeVisible()
-  await expect(page.getByText('Smoke 대상 경로')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '수동 점검 바로가기' })).toBeVisible()
+  await expect(page.getByText('직접 열어볼 화면')).toBeVisible()
   const routePanel = page.getByTestId('screen-check-routes')
   for (const path of ['/', '/activities', '/projects', '/notices', '/login', '/signup', '/recruit']) {
     await expect(routePanel.locator(`a[href="${path}"]`)).toBeVisible()
@@ -2242,19 +2243,19 @@ test('admin tracks recruit applications from overview to status update', async (
   await page.goto('/admin')
 
   await expect(page.getByRole('heading', { name: '운영 요약' })).toBeVisible()
-  await expect(page.getByText('처리 대기 지원')).toBeVisible()
-  await expect(page.getByText('1건')).toBeVisible()
+  await expect(page.getByTestId('admin-todo').getByRole('button', { name: /처리 대기 중인 지원서.*1건/ })).toBeVisible()
 
   await page.getByRole('tab', { name: '모집 관리', exact: true }).click()
   await expect(page.getByRole('heading', { name: '모집 지원 관리' })).toBeVisible()
   await expect(page.getByText('김지원')).toBeVisible()
   await expect(page.getByText('같이 만들고 싶습니다.')).toBeVisible()
 
+  // Saved as soon as the status changes, and the memo when its box loses focus.
   await page.getByLabel('김지원 지원 상태').selectOption('REVIEWING')
+  await expect(page.getByRole('status', { name: '김지원 저장 상태' })).toContainText('저장됨')
   await page.getByLabel('김지원 운영 메모').fill('면담 일정 조율 중')
-  await page.getByRole('button', { name: '김지원 저장' }).click()
-
-  await expect(page.getByText('김지원 지원서를 저장했습니다.')).toBeVisible()
+  await page.getByLabel('김지원 운영 메모').blur()
+  await expect.poll(() => savedNote).toBe('면담 일정 조율 중')
   await expect(page.locator('article').filter({ hasText: '김지원' }).locator('span').filter({ hasText: '검토중' })).toBeVisible()
 })
 
@@ -4132,7 +4133,7 @@ test('admin Apps management shows public-card previews with status badges', asyn
   await expect(appPreview.getByLabel('앱 상태').getByText('다운로드')).toBeVisible()
 
   await page.getByLabel('제목').fill('새 앱')
-  await page.getByLabel('분류').selectOption('APP')
+  await page.getByRole('tabpanel', { name: 'Apps 관리' }).getByLabel('분류').selectOption('APP')
   await page.getByLabel('링크 URL (선택)').fill('https://example.com/new-app')
   await page.getByLabel('배포 파일 (apk/zip 등, 여러 개 선택 가능)').setInputFiles([
     { name: 'new-app.apk', mimeType: 'application/vnd.android.package-archive', buffer: Buffer.from('apk') },
@@ -4474,8 +4475,8 @@ test.describe('gatherings', () => {
 
     await page.goto('/gatherings')
     await expect(page.getByRole('heading', { level: 1, name: '모임 신청' })).toBeVisible()
-    const cards = page.getByRole('list', { name: '모임 목록' }).getByRole('listitem')
-    await expect(cards).toHaveCount(3)
+    const cards = page.getByRole('list', { name: '진행 중인 모임' }).getByRole('listitem')
+    await expect(cards).toHaveCount(2)
     await expect(cards.nth(0)).toContainText('가을 MT')
     await expect(cards.nth(0)).toContainText('받는 중')
     await expect(cards.nth(0)).toContainText('신청함')
@@ -4483,8 +4484,13 @@ test.describe('gatherings', () => {
     await expect(cards.nth(0)).toContainText('11월 1일 18:00까지')
     await expect(cards.nth(1)).toContainText('정원 마감')
     await expect(cards.nth(1)).toContainText('4 / 4명')
-    await expect(cards.nth(2)).toContainText('마감')
-    await expect(cards.nth(2)).not.toContainText('신청함')
+    const pastToggle = page.getByRole('button', { name: '지난 모임 1개' })
+    await expect(pastToggle).toHaveAttribute('aria-expanded', 'false')
+    await pastToggle.click()
+    const pastCards = page.getByRole('list', { name: '지난 모임' }).getByRole('listitem')
+    await expect(pastCards).toHaveCount(1)
+    await expect(pastCards.nth(0)).toContainText('마감')
+    await expect(pastCards.nth(0)).not.toContainText('신청함')
 
     await page.getByRole('button', { name: '새 모임 열기' }).click()
     const form = page.getByRole('form', { name: '새 모임 열기' })

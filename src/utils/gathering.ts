@@ -106,3 +106,14 @@ export function gatheringToCsv(detail: GatheringDetail): string {
   ])
   return `${BOM}${[header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`
 }
+
+/** Open gatherings by deadline, the soonest first and those without a deadline last; closed ones apart, in the order given. */
+export function splitGatherings<T extends Pick<Gathering, 'open' | 'closesAt'>>(gatherings: T[]): { active: T[]; past: T[] } {
+  const time = (value?: string | null) => (value ? new Date(value).getTime() : Number.POSITIVE_INFINITY)
+  const active = gatherings
+    .filter((gathering) => gathering.open)
+    .map((gathering, index) => ({ gathering, index }))
+    .sort((a, b) => time(a.gathering.closesAt) - time(b.gathering.closesAt) || a.index - b.index)
+    .map((entry) => entry.gathering)
+  return { active, past: gatherings.filter((gathering) => !gathering.open) }
+}

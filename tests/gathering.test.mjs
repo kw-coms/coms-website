@@ -7,6 +7,7 @@ import {
   gatheringToCsv,
   parseCapacity,
   placesLabel,
+  splitGatherings,
   toApiDateTime,
 } from '../src/utils/gathering.ts'
 
@@ -75,5 +76,11 @@ assert.deepEqual(gatheringToCsv({ gathering: { ...gathering, noteLabel: null }, 
   '"1","홍길동","10월 12일 19:05"',
   '',
 ])
+
+// The list: open ones by deadline (none last), closed ones apart.
+const g = (id, open, closesAt) => ({ id, open, closesAt })
+const split = splitGatherings([g(1, false, '2026-01-01T10:00:00'), g(2, true, null), g(3, true, '2026-12-02T10:00:00'), g(4, true, '2026-12-01T10:00:00'), g(5, false, null)])
+assert.deepEqual(split.active.map((x) => x.id), [4, 3, 2])
+assert.deepEqual(split.past.map((x) => x.id), [1, 5])
 
 console.log('gathering contract passed')

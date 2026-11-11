@@ -17,15 +17,18 @@ for (const payload of [
   '@SUM(A1:A9)',
   '\t=1+1',
   '\r=1+1',
+  '  =1+1',
+  ' \t+1+1',
+  '\n@SUM(A1:A9)',
 ]) {
   assert.equal(csvCell(payload), `"'${payload.replaceAll('"', '""')}"`, `not neutralised: ${JSON.stringify(payload)}`)
 }
 
-// Only the first character decides: the audit detail format ("key=value" lines), ISO
-// timestamps and hyphenated text must come through untouched.
+// A trigger inside ordinary text is safe. Preserve audit detail, timestamps, and names.
 assert.equal(csvCell('title=삭제 대상\ncontent==1+1'), '"title=삭제 대상\ncontent==1+1"')
 assert.equal(csvCell('2026-06-15T03:30:00'), '"2026-06-15T03:30:00"')
 assert.equal(csvCell('a-b@c'), '"a-b@c"')
+assert.equal(csvCell('  safe title'), '"  safe title"')
 
 const csv = auditLogsToCsv([
   {

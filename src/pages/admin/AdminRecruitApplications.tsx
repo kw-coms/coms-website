@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { listRecruitPromotions, updateRecruitApplicationStatus } from '../../services/adminApi'
+import { Download } from 'lucide-react'
+import { downloadRecruitApplicationsCsv } from './recruitCsv'
 import { RECRUIT_PENDING_STATUSES, RECRUIT_STATUS_OPTIONS, recruitStatusLabel, recruitDecisionLabel, recruitDecisionChipVariant } from './recruitStatus'
 import { ListCount, ListSearch, ListSelect, SortDirectionButton } from '../../components/common/ListTools'
 import { compareDate, compareRank, compareText, matchesQuery, sortedBy, type SortDirection } from '../../utils/listTools'
@@ -36,6 +38,8 @@ type RecruitApplicationItem = {
   interests?: string
 }
 
+type RecruitSaveResult = { application: RecruitApplicationItem; error?: string }
+
 // Mirrors backend/openapi.json → RecruitPromotionLogResponse.
 type RecruitPromotion = {
   id: number
@@ -61,7 +65,10 @@ export default function AdminRecruitApplications({ applications, loading, error,
   formatDateTime: (value: string) => string
 }) {
   const [drafts, setDrafts] = useState({})
-  const [savingId, setSavingId] = useState(null)
+  // Per card: the last save's outcome, and what to put back if the admin undoes it.
+  const [saveStates, setSaveStates] = useState<Record<string, { kind: 'saving' | 'saved' | 'failed'; message?: string; undo?: { status: string; adminNote: string } }>>({})
+  const pendingSaves = useRef(new Map<string | number, Promise<RecruitSaveResult>>())
+  const draftVersions = useRef<Record<string, number>>({})
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [sortKey, setSortKey] = useState('default')
@@ -86,7 +93,6 @@ export default function AdminRecruitApplications({ applications, loading, error,
     setDirection(key === 'submittedAt' ? 'desc' : 'asc')
   }
   const [message, setMessage] = useState('')
-  const [saveError, setSaveError] = useState('')
   const [promotions, setPromotions] = useState<RecruitPromotion[]>([])
 
   // The promotion log is fetched on mount, from the 새로고침 button and after every
@@ -106,62 +112,88 @@ export default function AdminRecruitApplications({ applications, loading, error,
   useEffect(loadPromotions, [])
 
   const updateDraft = (id, patch) => {
+    draftVersions.current[id] = (draftVersions.current[id] || 0) + 1
     setDrafts((prev) => ({
       ...prev,
       [id]: { ...(prev[id] || {}), ...patch },
     }))
   }
 
-  const saveApplication = async (application) => {
-    const draft = drafts[application.id] || {}
-    const status = draft.status || application.status
+  const setSaveState = (id, state) => setSaveStates((prev) => ({ ...prev, [id]: state }))
+  // A missing date is "-"; the shared formatter reads a missing value as "no expiry".
+  const dateText = (value?: string) => (value ? formatDateTime(value) : '-')
 
-    if (status === 'REJECTED') {
+  const persist = (application: RecruitApplicationItem, status: string | undefined, adminNote: string, isUndo = false) => {
+    const earlier = pendingSaves.current.get(application.id)
+    const version = draftVersions.current[application.id] || 0
+    setSaveState(application.id, { kind: 'saving' })
+    setMessage('')
+    const operation = (async (): Promise<RecruitSaveResult> => {
+      const last: RecruitSaveResult = earlier ? await earlier : { application }
+      const current = last.application
+      const previous = { status: current.status || 'RECEIVED', adminNote: current.adminNote || '' }
+      try {
+        const updated = await updateRecruitApplicationStatus(application.id, { status: status ?? previous.status, adminNote })
+        onUpdated(updated)
+        if (pendingSaves.current.get(application.id) === operation) {
+          const edited = (draftVersions.current[application.id] || 0) !== version
+          setDrafts((prev) => ({ ...prev, [updated.id]: {
+            status: updated.status,
+            adminNote: edited ? prev[updated.id]?.adminNote ?? updated.adminNote ?? '' : updated.adminNote || '',
+          } }))
+        }
+        if (updated.status === 'ACCEPTED' || updated.status === 'REJECTED') {
+          setMessage(
+            updated.status === 'ACCEPTED'
+              ? `${updated.name} 합격 — 명부에 등록하고 지원서를 정리했습니다.`
+              : `${updated.name} 불합격 — 지원서를 삭제하고 처리 이력을 남겼습니다.`,
+          )
+          loadPromotions()
+          // The parent removes a decided row; reload in case the server did not delete it.
+          onReload()
+        } else if (pendingSaves.current.get(application.id) === operation) {
+          setSaveState(application.id, last.error
+            ? { kind: 'failed', message: last.error }
+            : { kind: 'saved', undo: isUndo ? undefined : previous })
+        }
+        return { application: updated, error: last.error }
+      } catch (err) {
+        const error = err.message || '지원서 상태를 저장하지 못했습니다.'
+        // A later queued edit still owns the draft shown on screen.
+        if (pendingSaves.current.get(application.id) === operation) {
+          setDrafts((prev) => ({ ...prev, [application.id]: { ...previous, adminNote: prev[application.id]?.adminNote ?? previous.adminNote } }))
+          setSaveState(application.id, { kind: 'failed', message: error })
+        }
+        return { application: current, error }
+      }
+    })()
+    pendingSaves.current.set(application.id, operation)
+    void operation.then(() => {
+      if (pendingSaves.current.get(application.id) === operation) pendingSaves.current.delete(application.id)
+    })
+    return operation
+  }
+
+  const changeStatus = async (application, status: string) => {
+    if (status === (application.status || 'RECEIVED')) return
+    if (status === 'ACCEPTED' || status === 'REJECTED') {
       const confirmed = await confirmDialog({
-        message: '불합격 처리하면 지원서는 삭제되고 처리 이력만 남습니다. 계속할까요?',
+        message: status === 'ACCEPTED'
+          ? '합격 처리하면 명부에 등록되고 지원서는 삭제됩니다. 계속할까요?'
+          : '불합격 처리하면 지원서는 삭제됩니다. 처리 이력만 남습니다. 계속할까요?',
         tone: 'danger',
       })
       if (!confirmed) return
     }
+    updateDraft(application.id, { status })
+    // `?? application.adminNote` — only an edit the admin actually made may change the stored 운영 메모.
+    await persist(application, status, drafts[application.id]?.adminNote ?? application.adminNote ?? '')
+  }
 
-    setSavingId(application.id)
-    setMessage('')
-    setSaveError('')
-    try {
-      const updated = await updateRecruitApplicationStatus(application.id, {
-        status,
-        // `?? application.adminNote` — a status-only save has no adminNote key in the
-        // draft, and `draft.adminNote || ''` sent an empty string that WIPED the
-        // stored 운영 메모. Only an edit the admin actually made may clear it.
-        adminNote: draft.adminNote ?? application.adminNote ?? '',
-      })
-      onUpdated(updated)
-      setDrafts((prev) => ({
-        ...prev,
-        [updated.id]: {
-          status: updated.status,
-          adminNote: updated.adminNote || '',
-        },
-      }))
-      if (updated.status === 'ACCEPTED' || updated.status === 'REJECTED') {
-        setMessage(
-          updated.status === 'ACCEPTED'
-            ? `${updated.name} 합격 — 명부에 등록하고 지원서를 정리했습니다.`
-            : `${updated.name} 불합격 — 지원서를 삭제하고 처리 이력을 남겼습니다.`,
-        )
-        loadPromotions()
-        // The parent drops the row optimistically on ACCEPTED/REJECTED. Re-fetch the
-        // list so a backend deletion that did NOT actually happen reappears instead of
-        // silently vanishing from the admin's view.
-        onReload()
-      } else {
-        setMessage(`${updated.name} 지원서를 저장했습니다.`)
-      }
-    } catch (err) {
-      setSaveError(err.message || '지원서 상태를 저장하지 못했습니다.')
-    } finally {
-      setSavingId(null)
-    }
+  const saveNote = (application) => {
+    const note = drafts[application.id]?.adminNote
+    if (note === undefined || (note === (application.adminNote || '') && !pendingSaves.current.has(application.id))) return
+    persist(application, undefined, note)
   }
 
   return (
@@ -173,17 +205,27 @@ export default function AdminRecruitApplications({ applications, loading, error,
             지원서 접수 이후 검토 상태와 운영 메모를 남겨 학기 모집 흐름을 끊기지 않게 관리합니다.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onReload}
-          className="shape-cut-sm border border-[var(--app-hairline)] bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
-        >
-          새로고침
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => downloadRecruitApplicationsCsv(applications)}
+            disabled={applications.length === 0}
+            className="apple-action-secondary inline-flex min-h-10 items-center gap-1.5 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download size={13} aria-hidden="true" />
+            CSV 내보내기
+          </button>
+          <button
+            type="button"
+            onClick={onReload}
+            className="shape-cut-sm border border-[var(--app-hairline)] bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
+          >
+            새로고침
+          </button>
+        </div>
       </div>
 
-      {message && <p className="shape-cut-sm bg-[var(--app-accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-accent-text)]">{message}</p>}
-      {saveError && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{saveError}</p>}
+      {message && <p role="status" className="shape-cut-sm bg-[var(--app-accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-accent-text)]">{message}</p>}
       {loading && (
         <SkeletonGroup label="지원서를 불러오는 중">
           <div className="space-y-3">
@@ -205,7 +247,7 @@ export default function AdminRecruitApplications({ applications, loading, error,
           </div>
         </SkeletonGroup>
       )}
-      {error && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
+      {error && <p role="alert" className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
       {!loading && !error && applications.length === 0 && (
         <p className="text-sm text-[var(--theme-body-muted)]">아직 접수된 지원서가 없습니다.</p>
       )}
@@ -239,7 +281,7 @@ export default function AdminRecruitApplications({ applications, loading, error,
                       <span className="rounded bg-[var(--app-accent-soft)] px-2 py-1 text-xs font-bold text-[var(--app-accent-text)]">{recruitStatusLabel(application.status)}</span>
                     </div>
                     <p className="mt-1 text-xs text-[var(--theme-body-muted)]">
-                      {application.studentId} · {application.department} · {application.grade || '학년 미입력'} · {formatDateTime(application.submittedAt)}
+                      {application.studentId} · {application.department} · {application.grade || '학년 미입력'} · {dateText(application.submittedAt)}
                     </p>
                     <p className="mt-1 text-xs text-[var(--theme-body-muted)]">{application.phone} · {application.email}</p>
                   </div>
@@ -249,23 +291,20 @@ export default function AdminRecruitApplications({ applications, loading, error,
                       <select
                         aria-label={`${application.name} 지원 상태`}
                         value={draft.status}
-                        onChange={(event) => updateDraft(application.id, { status: event.target.value })}
-                        className="shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none"
+                        onChange={(event) => changeStatus(application, event.target.value)}
+                        disabled={saveStates[application.id]?.kind === 'saving'}
+                        className="shape-cut-sm min-h-11 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none"
                       >
                         {RECRUIT_STATUS_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>{option.label}</option>
                         ))}
                       </select>
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => saveApplication(application)}
-                      disabled={savingId === application.id}
-                      aria-label={`${application.name} 저장`}
-                      className="mt-5 shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-xs font-semibold text-[var(--theme-bg)] transition hover:opacity-90 disabled:opacity-50"
-                    >
-                      {savingId === application.id ? '저장 중...' : '저장'}
-                    </button>
+                    <SaveStatus
+                      name={application.name}
+                      state={saveStates[application.id]}
+                      onUndo={(undo) => persist(application, undo.status, undo.adminNote, true)}
+                    />
                   </div>
                 </div>
 
@@ -291,6 +330,7 @@ export default function AdminRecruitApplications({ applications, loading, error,
                         aria-label={`${application.name} 운영 메모`}
                         value={draft.adminNote}
                         onChange={(event) => updateDraft(application.id, { adminNote: event.target.value })}
+                        onBlur={() => saveNote(application)}
                         maxLength={1000}
                         className="mt-1 min-h-24 w-full rounded-lg border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
                         placeholder="면담 일정, 연락 결과, 합격 안내 여부 등을 남깁니다."
@@ -339,7 +379,7 @@ export default function AdminRecruitApplications({ applications, loading, error,
               <tbody className="divide-y divide-black/10">
                 {promotions.map((log) => (
                   <tr key={log.id} className="text-[var(--theme-body-dark)]">
-                    <td className="px-2 py-2 whitespace-nowrap">{formatDateTime(log.promotedAt)}</td>
+                    <td className="px-2 py-2 whitespace-nowrap">{dateText(log.promotedAt)}</td>
                     <td className="px-2 py-2">
                       <Chip variant={recruitDecisionChipVariant(log.decision)}>{recruitDecisionLabel(log.decision)}</Chip>
                     </td>
@@ -358,5 +398,26 @@ export default function AdminRecruitApplications({ applications, loading, error,
         )}
       </div>
     </div>
+  )
+}
+
+function SaveStatus({ name, state, onUndo }: {
+  name: string
+  state?: { kind: 'saving' | 'saved' | 'failed'; message?: string; undo?: { status: string; adminNote: string } }
+  onUndo: (undo: { status: string; adminNote: string }) => void
+}) {
+  return (
+    <p role="status" aria-label={`${name} 저장 상태`} className="mt-5 flex min-h-11 items-center gap-2 text-xs font-semibold text-[var(--theme-body-muted)]">
+      {state?.kind === 'saving' && '저장 중...'}
+      {state?.kind === 'saved' && (
+        <>
+          <span className="text-[var(--app-accent-text)]">저장됨</span>
+          {state.undo && (
+            <button type="button" onClick={() => onUndo(state.undo)} className="min-h-11 px-1 text-blue-500 underline-offset-2 hover:underline">되돌리기</button>
+          )}
+        </>
+      )}
+      {state?.kind === 'failed' && <span className="text-red-700">저장하지 못했습니다. {state.message}</span>}
+    </p>
   )
 }

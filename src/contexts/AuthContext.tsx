@@ -8,6 +8,15 @@ import { queryClient } from '../services/queryClient'
 import { showToast } from '../components/common/Toast'
 import { buildAuthLoadError, isLoggedOutAuthError } from './authErrors'
 import { AuthContext } from './useAuth'
+import { forgetDrawStorage } from '../utils/draw'
+
+const logoutChannel = 'coms:auth:logout'
+const notifyOtherTabs = (memberId?: number | string) => {
+  if (memberId == null || typeof BroadcastChannel === 'undefined') return
+  const channel = new BroadcastChannel(logoutChannel)
+  channel.postMessage(String(memberId))
+  channel.close()
+}
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState(null)
@@ -37,6 +46,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
       // refresh). There is no session to end, and clearing the query cache here would cancel
       // the public queries that are still loading.
       if (!userRef.current) return
+      notifyOtherTabs(userRef.current.id)
+      forgetDrawStorage(userRef.current.id)
       userRef.current = null
       setUser(null)
       setPermissions(null)
@@ -133,9 +144,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   // Forget the session on this device without asking the server. Called on its own when the
   // server has already ended it — a password change revokes every token the member holds.
-  const clearSession = useCallback(() => {
+  const clearSession = useCallback((notify = true) => {
     // The session-expired handler reads this ref; clearing it now keeps a request that fails
     // before the next render from announcing an expiry on top of the caller's own message.
+    if (notify) notifyOtherTabs(userRef.current?.id)
+    forgetDrawStorage(userRef.current?.id)
     userRef.current = null
     setUser(null)
     setAuthError(null)
@@ -144,6 +157,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
     // user's community list, bookmarks, or vote state (query keys aren't scoped per user).
     queryClient.clear()
   }, [])
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return undefined
+    const channel = new BroadcastChannel(logoutChannel)
+    channel.onmessage = (event) => {
+      if (userRef.current && event.data === String(userRef.current.id)) clearSession(false)
+    }
+    return () => channel.close()
+  }, [clearSession])
 
   const logout = useCallback(async () => {
     try {

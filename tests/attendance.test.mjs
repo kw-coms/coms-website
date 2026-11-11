@@ -4,6 +4,7 @@ import {
   cleanAttendanceCode,
   formatAttendanceDay,
   formatAttendanceTime,
+  recentTitles,
   remainingLabel,
   secondsLeft,
 } from '../src/utils/attendance.ts'
@@ -66,5 +67,18 @@ assert.equal(lines[1], '"홍길동","3","O","O","O"')
 assert.equal(lines[2], '"김철수","1","","O",""')
 assert.equal(lines[3], '"\'+82 장난","1","","","O"')
 assert.equal(attendanceSummaryToCsv({ sessions: [], members: [] }), `${String.fromCharCode(0xfeff)}"이름","출석 횟수"\r\n`)
+
+// Recent titles: newest first, each once, blanks dropped, capped.
+const run = (title, openedAt) => ({ title, openedAt })
+assert.deepEqual(
+  recentTitles([
+    run('웹 세미나 1주차', '2026-09-01T18:00:00'),
+    run('웹 세미나 2주차', '2026-09-08T18:00:00'),
+    run(' 웹 세미나 1주차 ', '2026-09-15T18:00:00'),
+    run('  ', '2026-09-16T18:00:00'),
+  ]),
+  ['웹 세미나 1주차', '웹 세미나 2주차'],
+)
+assert.equal(recentTitles(Array.from({ length: 9 }, (_, i) => run(`회차 ${i}`, `2026-09-0${i + 1}T10:00:00`)), 3).length, 3)
 
 console.log('attendance contract passed')

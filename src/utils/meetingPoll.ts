@@ -60,6 +60,20 @@ export function toIsoDate(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
+/** True when every date of the poll is before today (`today` as "YYYY-MM-DD"). */
+export function isPollPast(poll: Pick<MeetingPollSummary, 'dates'>, today: string): boolean {
+  return poll.dates.length > 0 && poll.dates.every((date) => date < today)
+}
+
+/** Polls still to answer first, answered ones next, polls whose dates have all passed last; the order within each is kept. */
+export function sortPollsForList<T extends Pick<MeetingPollSummary, 'dates' | 'answered'>>(polls: T[], today: string): T[] {
+  const rank = (poll: T) => (isPollPast(poll, today) ? 2 : poll.answered ? 1 : 0)
+  return polls
+    .map((poll, index) => ({ poll, index }))
+    .sort((a, b) => rank(a.poll) - rank(b.poll) || a.index - b.index)
+    .map((entry) => entry.poll)
+}
+
 /** "10월 14일 (수)" */
 export function formatPollDate(iso: string): string {
   const date = parseIsoDate(iso)
