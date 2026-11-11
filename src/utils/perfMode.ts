@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { INTRO_SESSION_KEY, SCREEN_ON_EVENT } from './screenOn'
-import { readStoredValue, storeValue } from './themeColors'
+import { getStoredIntroStyle, readStoredValue, storeValue } from './themeColors'
 
 // Render mode. Without hardware graphics acceleration the browser paints and composites on the
 // CPU (SwiftShader, "Microsoft Basic Render Driver", llvmpipe ...), and backdrop blur, big
@@ -168,7 +168,7 @@ const INTRO_FALLBACK_MS = 12000
 
 function introWillPlay() {
   try {
-    return window.location.pathname === '/' && window.sessionStorage.getItem(INTRO_SESSION_KEY) !== '1'
+    return getStoredIntroStyle() !== 'off' && window.location.pathname === '/' && window.sessionStorage.getItem(INTRO_SESSION_KEY) !== '1'
   } catch {
     return false
   }

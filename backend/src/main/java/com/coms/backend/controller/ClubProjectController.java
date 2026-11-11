@@ -4,9 +4,15 @@ import com.coms.backend.domain.ClubProjectFile;
 import com.coms.backend.domain.ClubProjectImage;
 import com.coms.backend.dto.ClubProjectLinkStatusResponse;
 import com.coms.backend.dto.ClubProjectResponse;
+import com.coms.backend.dto.ClubProjectCommentRequest;
+import com.coms.backend.dto.ClubProjectCommentResponse;
+import com.coms.backend.dto.ClubProjectCommentUpdateRequest;
+import com.coms.backend.dto.ClubProjectEngagementResponse;
+import com.coms.backend.dto.ClubProjectLikeRequest;
 import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.ClubProjectLinkStatusService;
 import com.coms.backend.service.ClubProjectService;
+import com.coms.backend.service.ClubProjectSocialService;
 import com.coms.backend.service.PermissionService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
@@ -22,6 +28,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,21 +37,25 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/club-projects")
 public class ClubProjectController {
 
     private final ClubProjectService projectService;
+    private final ClubProjectSocialService socialService;
     private final ClubProjectLinkStatusService linkStatusService;
     private final AuditLogService auditLogService;
     private final PermissionService permissionService;
 
     public ClubProjectController(ClubProjectService projectService,
+                                 ClubProjectSocialService socialService,
                                  ClubProjectLinkStatusService linkStatusService,
                                  AuditLogService auditLogService,
                                  PermissionService permissionService) {
         this.projectService = projectService;
+        this.socialService = socialService;
         this.linkStatusService = linkStatusService;
         this.auditLogService = auditLogService;
         this.permissionService = permissionService;
@@ -54,6 +66,51 @@ public class ClubProjectController {
     public ResponseEntity<List<ClubProjectResponse>> list(Authentication authentication) {
         String viewer = authentication == null ? null : authentication.getName();
         return ResponseEntity.ok(projectService.list(viewer, authentication != null && canManageAll(authentication)));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ClubProjectResponse> detail(@PathVariable Long id, Authentication authentication) {
+        String viewer = authentication == null ? null : authentication.getName();
+        return ResponseEntity.ok(projectService.detail(id, viewer, authentication != null && canManageAll(authentication)));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @PutMapping("/{id}/like")
+    public ResponseEntity<ClubProjectEngagementResponse> setLike(@PathVariable Long id,
+            @Valid @RequestBody ClubProjectLikeRequest request, Authentication authentication) {
+        return ResponseEntity.ok(socialService.setLike(id, authentication.getName(), request.liked()));
+    }
+
+    @GetMapping("/{id}/comments")
+    public ResponseEntity<List<ClubProjectCommentResponse>> listComments(@PathVariable Long id,
+            Authentication authentication) {
+        String viewer = authentication == null ? null : authentication.getName();
+        return ResponseEntity.ok(socialService.listComments(id, viewer,
+                authentication != null && canManageAll(authentication)));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/{id}/comments")
+    public ResponseEntity<ClubProjectCommentResponse> addComment(@PathVariable Long id,
+            @Valid @RequestBody ClubProjectCommentRequest request, Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(socialService.addComment(id, authentication.getName(), request));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @PatchMapping("/{id}/comments/{commentId}")
+    public ResponseEntity<ClubProjectCommentResponse> updateComment(@PathVariable Long id,
+            @PathVariable Long commentId, @Valid @RequestBody ClubProjectCommentUpdateRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(socialService.updateComment(id, commentId, authentication.getName(), request));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @DeleteMapping("/{id}/comments/{commentId}")
+    public ResponseEntity<Void> deleteComment(@PathVariable Long id, @PathVariable Long commentId,
+            Authentication authentication) {
+        socialService.deleteComment(id, commentId, authentication.getName(), canManageAll(authentication));
+        return ResponseEntity.noContent().build();
     }
 
     // Members only (SecurityConfig; guests do not need it): whether each entry's link answered
@@ -78,7 +135,7 @@ public class ClubProjectController {
         boolean manager = canManageAll(authentication);
         ClubProjectResponse response = manager
                 ? projectService.create(category, title, description, eyebrow, madeBy, linkUrl, displayUrl, position)
-                : projectService.createForMember(authentication.getName(), category, title, description, linkUrl);
+                : projectService.createForMember(authentication.getName(), category, title, description, madeBy, linkUrl);
         auditProject(authentication, manager ? "ADMIN_CLUB_PROJECT_CREATE" : "MEMBER_CLUB_PROJECT_CREATE", response);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -99,7 +156,7 @@ public class ClubProjectController {
         boolean manager = canManageAll(authentication);
         ClubProjectResponse response = manager
                 ? projectService.update(id, category, title, description, eyebrow, madeBy, linkUrl, displayUrl, position)
-                : projectService.updateForMember(id, authentication.getName(), category, title, description, linkUrl);
+                : projectService.updateForMember(id, authentication.getName(), category, title, description, madeBy, linkUrl);
         auditProject(authentication, manager ? "ADMIN_CLUB_PROJECT_UPDATE" : "MEMBER_CLUB_PROJECT_UPDATE", response);
         return ResponseEntity.ok(response);
     }

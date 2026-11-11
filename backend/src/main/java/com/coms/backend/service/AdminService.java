@@ -63,6 +63,7 @@ public class AdminService {
     private final MeetingPollService meetingPollService;
     private final AttendanceService attendanceService;
     private final GatheringService gatheringService;
+    private final ClubProjectSocialService clubProjectSocialService;
 
     public AdminService(MemberRepository memberRepository, EligibleMemberService eligibleMemberService,
                         PasswordEncoder passwordEncoder, CommunityService communityService,
@@ -77,7 +78,8 @@ public class AdminService {
                         RefreshSessionService refreshSessionService,
                         MeetingPollService meetingPollService,
                         AttendanceService attendanceService,
-                        GatheringService gatheringService) {
+                        GatheringService gatheringService,
+                        ClubProjectSocialService clubProjectSocialService) {
         this.memberRepository = memberRepository;
         this.eligibleMemberService = eligibleMemberService;
         this.passwordEncoder = passwordEncoder;
@@ -98,6 +100,7 @@ public class AdminService {
         this.meetingPollService = meetingPollService;
         this.attendanceService = attendanceService;
         this.gatheringService = gatheringService;
+        this.clubProjectSocialService = clubProjectSocialService;
     }
 
     @Transactional(readOnly = true)
@@ -195,6 +198,7 @@ public class AdminService {
      */
     private void purgePersonalDataForMember(String studentId) {
         communityService.deleteCommunityDataForMember(studentId);
+        clubProjectSocialService.deleteDataForMember(studentId);
         noticeVoteRepository.deleteByStudentId(studentId);
         clubActivityVoteRepository.deleteByStudentId(studentId);
         clubEventVoteRepository.deleteByStudentId(studentId);

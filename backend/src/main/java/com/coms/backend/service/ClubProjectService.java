@@ -5,6 +5,8 @@ import com.coms.backend.domain.ClubProjectFile;
 import com.coms.backend.domain.ClubProjectImage;
 import com.coms.backend.dto.ClubProjectResponse;
 import com.coms.backend.repository.ClubProjectFileRepository;
+import com.coms.backend.repository.ClubProjectLikeRepository;
+import com.coms.backend.repository.ClubProjectCommentRepository;
 import com.coms.backend.repository.ClubProjectRepository;
 import com.coms.backend.repository.ClubProjectImageRepository;
 import com.coms.backend.repository.MemberRepository;
@@ -48,21 +50,30 @@ public class ClubProjectService {
     private final ClubProjectFileRepository fileRepository;
     private final ClubProjectCategoryService categoryService;
     private final ClubProjectImageRepository imageRepository;
+    private final ClubProjectLikeRepository likeRepository;
+    private final ClubProjectCommentRepository commentRepository;
     private final MemberRepository memberRepository;
     private final StorageService storageService;
+    private final CommunityTextService textService;
 
     public ClubProjectService(ClubProjectRepository repository,
                               ClubProjectFileRepository fileRepository,
                               ClubProjectImageRepository imageRepository,
+                              ClubProjectLikeRepository likeRepository,
+                              ClubProjectCommentRepository commentRepository,
                               MemberRepository memberRepository,
                               ClubProjectCategoryService categoryService,
-                              StorageService storageService) {
+                              StorageService storageService,
+                              CommunityTextService textService) {
         this.repository = repository;
         this.fileRepository = fileRepository;
         this.imageRepository = imageRepository;
+        this.likeRepository = likeRepository;
+        this.commentRepository = commentRepository;
         this.memberRepository = memberRepository;
         this.categoryService = categoryService;
         this.storageService = storageService;
+        this.textService = textService;
     }
 
     @Transactional(readOnly = true)
@@ -74,9 +85,17 @@ public class ClubProjectService {
         Map<String, String> categoryNames = categoryService.keyToNameMap();
         Map<Long, List<ClubProjectFile>> files = filesByProject(projects);
         Map<Long, List<ClubProjectImage>> images = imagesByProject(projects);
+        EngagementCounts engagement = engagement(projects, viewerStudentId);
         return projects.stream()
-                .map(project -> toResponse(project, categoryNames, files, images, viewerStudentId, manager))
+                .map(project -> toResponse(project, categoryNames, files, images, engagement, viewerStudentId, manager))
                 .toList();
+    }
+
+    public ClubProjectResponse detail(Long id, String viewerStudentId, boolean manager) {
+        if (repository.incrementViewCount(id) == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return toResponse(get(id), viewerStudentId, manager);
     }
 
     public ClubProjectResponse create(String category, String title, String description, String eyebrow,
@@ -91,10 +110,11 @@ public class ClubProjectService {
     }
 
     public ClubProjectResponse createForMember(String studentId, String category, String title,
-                                               String description, String linkUrl) {
+                                               String description, String madeBy, String linkUrl) {
         String name = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN)).getName();
-        ClubProjectResponse response = create(category, title, description, null, name, linkUrl, null, null);
+        ClubProjectResponse response = create(category, title, description, null,
+                madeBy == null ? name : madeBy, linkUrl, null, null);
         ClubProject project = get(response.id());
         project.setOwnerStudentId(studentId);
         return toResponse(repository.save(project), studentId, false);
@@ -108,9 +128,9 @@ public class ClubProjectService {
     }
 
     public ClubProjectResponse updateForMember(Long id, String studentId, String category,
-                                               String title, String description, String linkUrl) {
+                                               String title, String description, String madeBy, String linkUrl) {
         requireEditor(id, studentId, false);
-        update(id, category, title, description, null, null, linkUrl, null, null);
+        update(id, category, title, description, null, madeBy, linkUrl, null, null);
         return toResponse(get(id), studentId, false);
     }
 
@@ -133,7 +153,7 @@ public class ClubProjectService {
             project.setEyebrow(eyebrow.isBlank() ? null : bounded(eyebrow, MAX_EYEBROW_LENGTH, "분류 문구"));
         }
         if (madeBy != null) {
-            project.setMadeBy(madeBy.isBlank() ? null : bounded(madeBy, MAX_MADE_BY_LENGTH, "제작자"));
+            project.setMadeBy(cleanMadeBy(madeBy));
         }
         if (linkUrl != null) {
             project.setLinkUrl(cleanProjectUrl(linkUrl, true));
@@ -151,6 +171,8 @@ public class ClubProjectService {
 
     public void delete(Long id) {
         ClubProject project = get(id);
+        commentRepository.deleteByClubProjectId(id);
+        likeRepository.deleteByClubProjectId(id);
         for (ClubProjectImage image : imageRepository.findByClubProjectIdOrderByPositionAsc(id)) {
             storageService.delete(image.getStoredName());
         }
@@ -294,7 +316,7 @@ public class ClubProjectService {
         project.setTitle(bounded(title, MAX_TITLE_LENGTH, "프로젝트 제목"));
         project.setDescription(description != null && !description.isBlank() ? description.trim() : null);
         project.setEyebrow(eyebrow != null && !eyebrow.isBlank() ? bounded(eyebrow, MAX_EYEBROW_LENGTH, "분류 문구") : null);
-        project.setMadeBy(madeBy != null && !madeBy.isBlank() ? bounded(madeBy, MAX_MADE_BY_LENGTH, "제작자") : null);
+        project.setMadeBy(cleanMadeBy(madeBy));
         project.setLinkUrl(cleanProjectUrl(linkUrl, true));
         project.setDisplayUrl(cleanProjectUrl(displayUrl, false));
     }
@@ -305,6 +327,16 @@ public class ClubProjectService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + "은(는) " + maxLength + "자 이하로 입력하세요.");
         }
         return trimmed;
+    }
+
+    private String cleanMadeBy(String value) {
+        if (value == null || value.isBlank()) return null;
+        String cleaned = textService.normalizeBounded(value, "제작자", MAX_MADE_BY_LENGTH);
+        textService.rejectUnsafeText(cleaned);
+        if (cleaned.chars().anyMatch(Character::isISOControl)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "제작자는 한 줄로 입력하세요.");
+        }
+        return cleaned;
     }
 
     private String resolveCategory(String value) {
@@ -407,13 +439,30 @@ public class ClubProjectService {
 
     private ClubProjectResponse toResponse(ClubProject project, String viewerStudentId, boolean manager) {
         return toResponse(project, categoryService.keyToNameMap(), filesByProject(List.of(project)),
-                imagesByProject(List.of(project)), viewerStudentId, manager);
+                imagesByProject(List.of(project)), engagement(List.of(project), viewerStudentId), viewerStudentId, manager);
+    }
+
+    private record EngagementCounts(Map<Long, Long> likes, Map<Long, Long> comments, Set<Long> likedByViewer) {}
+
+    private EngagementCounts engagement(List<ClubProject> projects, String viewerStudentId) {
+        List<Long> ids = projects.stream().map(ClubProject::getId).filter(Objects::nonNull).toList();
+        if (ids.isEmpty()) return new EngagementCounts(Map.of(), Map.of(), Set.of());
+        Map<Long, Long> likes = likeRepository.countByProjectIds(ids).stream()
+                .collect(Collectors.toMap(ClubProjectLikeRepository.LikeCount::getProjectId,
+                        ClubProjectLikeRepository.LikeCount::getTotal));
+        Map<Long, Long> comments = commentRepository.countByProjectIds(ids).stream()
+                .collect(Collectors.toMap(ClubProjectCommentRepository.CommentCount::getProjectId,
+                        ClubProjectCommentRepository.CommentCount::getTotal));
+        Set<Long> liked = viewerStudentId == null ? Set.of()
+                : Set.copyOf(likeRepository.findLikedProjectIds(ids, viewerStudentId));
+        return new EngagementCounts(likes, comments, liked);
     }
 
     private ClubProjectResponse toResponse(ClubProject project,
                                            Map<String, String> categoryNames,
                                            Map<Long, List<ClubProjectFile>> filesByProject,
                                            Map<Long, List<ClubProjectImage>> imagesByProject,
+                                           EngagementCounts engagement,
                                            String viewerStudentId, boolean manager) {
         List<ClubProjectFile> files = filesByProject.getOrDefault(project.getId(), List.of());
         List<ClubProjectResponse.FileInfo> fileInfos = files.stream()
@@ -442,7 +491,11 @@ public class ClubProjectService {
                                 "/api/club-projects/" + project.getId() + "/images/" + image.getId()))
                         .toList(),
                 project.getCreatedAt(),
-                project.getUpdatedAt()
+                project.getUpdatedAt(),
+                project.getViewCount(),
+                engagement.likes().getOrDefault(project.getId(), 0L),
+                engagement.comments().getOrDefault(project.getId(), 0L),
+                engagement.likedByViewer().contains(project.getId())
         );
     }
 }

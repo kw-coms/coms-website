@@ -116,6 +116,7 @@ export default function AppProjectCard({
             지금 응답 없음
           </span>
         )}
+        {typeof project.madeBy === 'string' && project.madeBy.trim() && <span className="min-w-0 max-w-[60%] truncate" title={project.madeBy.trim()}>제작자 {project.madeBy.trim()}</span>}
         {host && <span className="app-card-host">{host}</span>}
       </div>
       {project.images?.length ? <div className="app-card-images" aria-label="작품 사진">

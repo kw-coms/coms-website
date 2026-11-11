@@ -76,7 +76,8 @@ class AdminServiceTest {
             mock(RefreshSessionService.class),
             mock(MeetingPollService.class),
             mock(AttendanceService.class),
-            mock(GatheringService.class)
+            mock(GatheringService.class),
+            mock(ClubProjectSocialService.class)
     );
 
     @Autowired

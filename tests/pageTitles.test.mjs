@@ -15,6 +15,7 @@ assert.equal(documentTitleFor('/community/bookmarks'), "내 스크랩 | KW COM's
 assert.equal(documentTitleFor('/community/members/2026123456'), "회원 프로필 | KW COM's")
 assert.equal(documentTitleFor('/resources/12'), "자료실 | KW COM's")
 assert.equal(documentTitleFor('/login'), "로그인 | KW COM's")
+assert.equal(documentTitleFor('/apps/7', '두 사람이 만든 앱'), "두 사람이 만든 앱 | 작품 | KW COM's")
 
 // An opened item's own title leads, so the tab says what is being read.
 assert.equal(documentTitleFor('/notices/3', '  정기 총회   안내 '), "정기 총회 안내 | 공지사항 | KW COM's")

@@ -572,6 +572,109 @@ test('apps page surfaces companion service links away from the home dashboard', 
   }
 })
 
+test('works show their creator and a readable detail discussion without requiring login', async ({ page }) => {
+  await mockOptionalApis(page)
+  const work = {
+    id: 72, category: 'WEBSITE', categoryName: '웹사이트', title: '함께 만든 앱',
+    description: '전체 작품 설명입니다.', madeBy: '김개발 · 이디자인',
+    linkUrl: 'https://example.com/work', files: [], images: [],
+    viewCount: 12, likeCount: 3, commentCount: 1, likedByMe: false,
+  }
+  let detailReads = 0
+  await page.route('**/api/club-projects/categories', route => route.fulfill({ json: [{ key: 'WEBSITE', name: '웹사이트' }] }))
+  await page.route('**/api/club-projects', route => route.fulfill({ json: [work] }))
+  await page.route('**/api/club-projects/72', route => {
+    detailReads++
+    return route.fulfill({ json: { ...work, viewCount: 13 } })
+  })
+  await page.route('**/api/club-projects/72/comments', route => route.fulfill({ json: [
+    { id: 4, parentCommentId: null, authorName: '방문자', content: '<script>unsafe()</script> 좋은 작품', createdAt: '2026-11-11T12:00:00', updatedAt: '2026-11-11T12:00:00', editable: false, deletable: false },
+  ] }))
+
+  await page.goto('/apps')
+  const card = page.locator('.app-card').filter({ hasText: '함께 만든 앱' })
+  await expect(card).toContainText('제작자 김개발 · 이디자인')
+  await expect(card).toHaveAttribute('href', 'https://example.com/work')
+  await page.getByRole('link', { name: '함께 만든 앱 상세·댓글' }).click()
+  await expect(page).toHaveURL(/\/apps\/72$/)
+  await expect(page.getByRole('heading', { name: '함께 만든 앱' })).toBeVisible()
+  await expect(page.getByText('조회 13')).toBeVisible()
+  await expect(page.getByText('<script>unsafe()</script> 좋은 작품')).toBeVisible()
+  await expect(page.locator('script').filter({ hasText: 'unsafe()' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '추천하려면 로그인' })).toHaveAttribute('href', '/login')
+  await expect(page.getByRole('button', { name: '추천하기' })).toHaveCount(0)
+  await expect(page.getByRole('form', { name: '새 댓글' })).toHaveCount(0)
+  expect(detailReads).toBe(1)
+
+  const longByline = 'A'.repeat(100)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.route('**/api/club-projects/72', route => route.fulfill({ json: { ...work, madeBy: longByline } }))
+  await page.reload()
+  await expect(page.getByText(`제작자 ${longByline}`)).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1)
+})
+
+test('members can recommend, comment, reply and remove a thread without losing a rejected draft', async ({ page }) => {
+  await mockOptionalApis(page)
+  await asMember(page)
+  let work = { id: 72, title: '회원 작품', description: '소개', madeBy: '홍길동', linkUrl: 'https://example.com/work', images: [], files: [], viewCount: 2, likeCount: 0, commentCount: 0, likedByMe: false }
+  let comments = []
+  let rejectOnce = true
+  await page.route('**/api/club-projects/72', route => route.fulfill({ json: work }))
+  await page.route('**/api/club-projects/72/like', route => {
+    const liked = route.request().postDataJSON().liked
+    work = { ...work, likeCount: liked ? 1 : 0, likedByMe: liked }
+    return route.fulfill({ json: { viewCount: work.viewCount, likeCount: work.likeCount, commentCount: comments.length, likedByMe: liked } })
+  })
+  await page.route('**/api/club-projects/72/comments', route => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: comments })
+    if (rejectOnce) { rejectOnce = false; return route.fulfill({ status: 400, json: { message: '내용을 다시 확인해 주세요.' } }) }
+    const body = route.request().postDataJSON()
+    const comment = { id: comments.length + 1, parentCommentId: body.parentCommentId ?? null, authorName: '홍길동', content: body.content, createdAt: '2026-11-11T12:00:00', updatedAt: '2026-11-11T12:00:00', editable: true, deletable: true }
+    comments.push(comment)
+    return route.fulfill({ status: 201, json: comment })
+  })
+  await page.route('**/api/club-projects/72/comments/*', route => {
+    const id = Number(route.request().url().split('/').pop())
+    if (route.request().method() === 'PATCH') {
+      const updated = { ...comments.find((comment) => comment.id === id), content: route.request().postDataJSON().content }
+      comments = comments.map((comment) => comment.id === id ? updated : comment)
+      return route.fulfill({ json: updated })
+    }
+    comments = comments.filter((comment) => comment.id !== id && comment.parentCommentId !== id)
+    return route.fulfill({ status: 204 })
+  })
+
+  await page.goto('/apps/72')
+  await page.getByRole('button', { name: '추천하기' }).click()
+  await expect(page.getByRole('button', { name: '추천 취소' })).toHaveAttribute('aria-pressed', 'true')
+  const form = page.getByRole('form', { name: '새 댓글' })
+  await form.getByRole('textbox', { name: '댓글 작성' }).fill('첫 댓글')
+  await form.getByRole('button', { name: '댓글 등록' }).click()
+  await expect(page.getByRole('alert')).toContainText('내용을 다시 확인해 주세요.')
+  await expect(form.getByRole('textbox', { name: '댓글 작성' })).toHaveValue('첫 댓글')
+  await form.getByRole('button', { name: '댓글 등록' }).click()
+  await expect(page.getByText('첫 댓글', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '댓글 1' })).toBeVisible()
+  await page.locator('article').filter({ hasText: '첫 댓글' }).getByRole('button', { name: '답글' }).click()
+  const reply = page.getByRole('form', { name: '홍길동에게 답글' })
+  await reply.getByRole('textbox', { name: '답글 내용' }).fill('첫 답글')
+  await reply.getByRole('button', { name: '답글 등록' }).click()
+  await expect(page.getByText('첫 답글', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '댓글 2' })).toBeVisible()
+  await page.locator('article').filter({ hasText: '첫 댓글' }).getByRole('button', { name: '수정' }).click()
+  const edit = page.getByRole('form', { name: '댓글 수정' })
+  await edit.getByRole('textbox', { name: '댓글 수정 내용' }).fill('수정한 댓글')
+  await edit.getByRole('button', { name: '저장' }).click()
+  await expect(page.getByText('수정한 댓글', { exact: true })).toBeVisible()
+  await page.locator('article').filter({ hasText: '수정한 댓글' }).getByRole('button', { name: '삭제' }).click()
+  const confirm = page.getByRole('dialog', { name: '댓글을 삭제할까요?' })
+  await expect(confirm).toContainText('모든 답글이 함께 삭제됩니다')
+  await confirm.getByRole('button', { name: '삭제' }).click()
+  await expect(page.getByRole('heading', { name: '댓글 0' })).toBeVisible()
+  await expect(page.getByText('첫 답글', { exact: true })).toHaveCount(0)
+})
+
 // The server looks at the catalogue's links every ten minutes; the Apps page marks the ones
 // that did not answer, so a visitor does not find out from an error page.
 test('apps page marks an app whose link did not answer', async ({ page }) => {
@@ -593,12 +696,12 @@ test('apps page marks an app whose link did not answer', async ({ page }) => {
 
   await page.goto('/apps')
   await expect(page.getByRole('heading', { name: "COM's 작품" })).toBeVisible()
-  const dead = page.getByRole('link', { name: /죽은 앱/ })
+  const dead = page.getByRole('link', { name: /죽은 앱.*열기/ })
   await expect(dead).toContainText('지금 응답 없음')
   // It still opens: the look can be minutes old.
   await expect(dead).toHaveAttribute('href', 'https://down.example/')
   await expect(page.getByText('지금 응답 없음')).toHaveCount(1)
-  for (const name of [/열리는 앱/, /주소를 바꾼 앱/, /아직 안 본 앱/]) {
+  for (const name of [/열리는 앱.*열기/, /주소를 바꾼 앱.*열기/, /아직 안 본 앱.*열기/]) {
     await expect(page.getByRole('link', { name })).not.toContainText('응답 없음')
   }
 })
@@ -612,7 +715,7 @@ test('apps page does without the link check when it cannot be read', async ({ pa
   await page.route('**/api/club-projects/link-status', route => route.fulfill({ status: 500, json: { message: 'boom' } }))
 
   await page.goto('/apps')
-  await expect(page.getByRole('link', { name: /열리는 앱/ })).toHaveAttribute('href', 'https://up.example/')
+  await expect(page.getByRole('link', { name: /열리는 앱.*열기/ })).toHaveAttribute('href', 'https://up.example/')
   await expect(page.getByText('프로젝트를 불러오지 못했습니다')).toHaveCount(0)
   await expect(page.getByText('응답 없음')).toHaveCount(0)
 })
@@ -630,7 +733,7 @@ test('apps page does not ask guests for link status, members get it', async ({ p
 
   // Guest (the default mock answers /api/auth/me with 401): no call, no dots, no error.
   await page.goto('/apps')
-  await expect(page.getByRole('link', { name: /죽은 앱/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: /죽은 앱.*열기/ })).toBeVisible()
   await page.waitForLoadState('networkidle')
   expect(calls).toHaveLength(0)
   await expect(page.getByText('응답 없음')).toHaveCount(0)
@@ -638,7 +741,7 @@ test('apps page does not ask guests for link status, members get it', async ({ p
   // Member: the call is made and the dot shows.
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   await page.goto('/apps')
-  await expect(page.getByRole('link', { name: /죽은 앱/ })).toContainText('지금 응답 없음')
+  await expect(page.getByRole('link', { name: /죽은 앱.*열기/ })).toContainText('지금 응답 없음')
   expect(calls).toHaveLength(1)
 })
 
@@ -2478,31 +2581,40 @@ for (const siteFont of ['arriving', 'blocked']) {
   })
 }
 
-// Layout shift while the site font arrives late (held 1.5 s, so it is still pending when a loaded CI machine shows the page): the
-// fallback face is metric-matched to Pretendard, so the swap must not reflow the page. Shifts caused by the reader's own input
-// are excluded by the API (hadRecentInput).
+// The font stays held until the page's own async content is ready. Release it only after recording
+// the baseline, so the measured window includes the actual fallback-to-Pretendard swap.
 for (const path of ['/', '/study/arduino']) {
   test(`the site font swapping in late shifts nothing on ${path}`, async ({ page }) => {
     await page.addInitScript(() => {
       try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
       window.__shifts = []
       new PerformanceObserver((list) => {
-        for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shifts.push({ value: e.value, at: Math.round(e.startTime), sources: e.sources.map((s) => `${s.node?.nodeName}.${s.node?.className?.toString().slice(0, 30)}`) })
+        for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shifts.push({ value: e.value, at: e.startTime, sources: e.sources.map((s) => `${s.node?.nodeName}.${s.node?.className?.toString().slice(0, 30)}`) })
       }).observe({ type: 'layout-shift', buffered: true })
     })
     await mockAdminApis(page)
-    await holdSiteFont(page)
-    await page.goto(path)
-    // Shifts while the page itself is still arriving (lazy chunks, the footer) are not the font's; count from the first heading on,
-    // and make sure a Pretendard FontFace is declared and not yet loaded then, or there would be no swap to measure.
-    await page.locator('h1').first().waitFor()
-    const at = await page.evaluate(() => performance.now())
-    await expectSiteFontPending(page)
-    await siteFontLoaded(page)
-    await page.waitForTimeout(1000)
-    const shifts = (await page.evaluate(() => window.__shifts)).filter((s) => s.at >= at)
-    const cls = shifts.reduce((sum, s) => sum + s.value, 0)
-    expect(cls, `layout shift: ${JSON.stringify(shifts)}`).toBeLessThan(0.02)
+    let releaseFont
+    const fontReleased = new Promise((resolve) => { releaseFont = resolve })
+    await page.route(/pretendard.*\.woff2/i, async (route) => {
+      await fontReleased
+      await route.continue()
+    })
+    try {
+      await page.goto(path, { waitUntil: 'domcontentloaded' })
+      await page.locator('h1').first().waitFor()
+      if (path === '/study/arduino') await page.locator('.study-page .hero .ex-cta').waitFor({ state: 'attached' })
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      await expectSiteFontPending(page)
+      const at = await page.evaluate(() => performance.now())
+      releaseFont()
+      await siteFontLoaded(page)
+      await page.waitForTimeout(1000)
+      const shifts = (await page.evaluate(() => window.__shifts)).filter((s) => s.at >= at)
+      const cls = shifts.reduce((sum, s) => sum + s.value, 0)
+      expect(cls, `layout shift: ${JSON.stringify(shifts)}`).toBeLessThan(0.02)
+    } finally {
+      releaseFont()
+    }
   })
 }
 
@@ -3967,7 +4079,7 @@ test('apps page cards keep one size whatever the text length or section count', 
   const longDesc = '아주 긴 설명이 들어가도 카드 크기는 변하지 않아야 합니다. '.repeat(12)
   const project = (id, category, title, description, extra = {}) => ({
     id, category, categoryName: category === 'WEBSITE' ? '웹사이트' : '앱',
-    title, description, eyebrow: 'Web', madeBy: '홍길동',
+    title, description, eyebrow: 'Web', madeBy: 'A'.repeat(100),
     linkUrl: 'https://example.com/', displayUrl: 'a-very-long-domain-name.example.com/path', files: [], ...extra,
   })
   const longFile = (id, name) => ({ id, url: `/api/club-projects/4/files/${id}`, originalName: name })
@@ -5653,7 +5765,7 @@ test('member can publish a work with photos and edit only their own card', async
   })
   await page.route('**/api/club-projects', route => {
     if (route.request().method() === 'POST') {
-      works.push({ id: 2, category: 'WEBSITE', categoryName: '웹사이트', title: multipartField(route.request().postData(), 'title'), description: '소개', canEdit: true, images: [{ id: 8, url: '/api/club-projects/2/images/8' }], files: [] })
+      works.push({ id: 2, category: 'WEBSITE', categoryName: '웹사이트', title: multipartField(route.request().postData(), 'title'), description: '소개', madeBy: multipartField(route.request().postData(), 'madeBy'), canEdit: true, images: [{ id: 8, url: '/api/club-projects/2/images/8' }], files: [] })
       return route.fulfill({ status: 201, json: works[1] })
     }
     if (works.length === 2 && failFirstReload) {
@@ -5666,12 +5778,14 @@ test('member can publish a work with photos and edit only their own card', async
   await page.getByRole('button', { name: '작품 올리기' }).click()
   const form = page.getByRole('form', { name: '작품 올리기' })
   await form.getByRole('textbox', { name: '작품 이름' }).fill('내 작품')
+  await form.getByRole('textbox', { name: '제작자 (선택)' }).fill('홍길동 · 이디자인')
   await form.getByRole('textbox', { name: '소개글' }).fill('소개')
   await form.locator('input[type=file]').setInputFiles({ name: 'cover.png', mimeType: 'image/png', buffer: Buffer.from('89504e470d0a1a0a', 'hex') })
   await form.getByRole('button', { name: '저장하기' }).click()
   await expect(form.getByRole('alert')).toBeVisible()
   await form.getByRole('button', { name: '저장하기' }).click()
   await expect(page.getByRole('heading', { name: '내 작품', exact: true })).toBeVisible()
+  await expect(page.locator('.app-card').filter({ hasText: '내 작품' })).toContainText('제작자 홍길동 · 이디자인')
   expect(imageUploads).toBe(1)
   await expect(page.getByRole('button', { name: '작품 수정' })).toHaveCount(1)
   await page.getByRole('button', { name: '작품 수정' }).click()

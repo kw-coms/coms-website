@@ -52,6 +52,7 @@ class PostgresMigrationExecutionTest {
         assertThat(columnExists(jdbc, "eligible_members", "initial_role")).isTrue();
         assertThat(columnExists(jdbc, "rich_body_media", "attached_at")).isTrue();
         assertThat(columnExists(jdbc, "rich_body_media", "uploader_id")).isTrue();
+        assertThat(columnExists(jdbc, "club_projects", "view_count")).isTrue();
         // Hibernate validates the schema on boot, so the entity defaults and the migration
         // defaults must agree — a mismatch here is exactly the kind of drift this test exists for.
         assertThat(jdbc.queryForObject(

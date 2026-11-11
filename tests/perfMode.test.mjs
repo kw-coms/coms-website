@@ -240,6 +240,17 @@ assert.equal(getPerfState().noticeDismissed, true, 'remembered across visits')
   drive(100, 6000)
   assert.equal(rootEl.dataset.perf, 'lite', 'frames after the intro are')
 
+  // Disabling the intro must not leave the performance watchdog waiting for a hand-over that never comes.
+  resetPerfModeForTests()
+  window.sessionStorage.clear()
+  window.localStorage.clear()
+  window.localStorage.setItem('kwcoms-intro-style:v1', 'off')
+  initPerfMode()
+  window.dispatchEvent(new window.Event('load'))
+  drive(100, 6000)
+  assert.equal(rootEl.dataset.perf, 'lite', 'an off intro is sampled after load without waiting for screen-on')
+  window.localStorage.removeItem('kwcoms-intro-style:v1')
+
   // A sample discarded because the tab was hidden is retried, a bounded number of times.
   resetPerfModeForTests()
   window.sessionStorage.setItem('coms.intro.played:v1', '1')

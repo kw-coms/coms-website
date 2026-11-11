@@ -142,6 +142,7 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.GET, "/api/club-projects", "/api/club-projects/**").permitAll();
                 // project.write — 컨트롤러의 @perm.has 가 실제 게이트.
                 auth.requestMatchers(HttpMethod.POST, "/api/club-projects", "/api/club-projects/**").authenticated();
+                auth.requestMatchers(HttpMethod.PUT, "/api/club-projects/**").authenticated();
                 auth.requestMatchers(HttpMethod.PATCH, "/api/club-projects/**").authenticated();
                 auth.requestMatchers(HttpMethod.DELETE, "/api/club-projects/**").authenticated();
                 auth.requestMatchers(HttpMethod.GET, "/api/apps", "/api/apps/**").authenticated();

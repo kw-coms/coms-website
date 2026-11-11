@@ -18,7 +18,11 @@ public record ClubProjectResponse(
         boolean canEdit,
         List<ImageInfo> images,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        long viewCount,
+        long likeCount,
+        long commentCount,
+        boolean likedByMe
 ) {
     public record ImageInfo(Long id, String url) {}
     public record FileInfo(Long id, String url, String originalName, long size) {}

@@ -16,11 +16,11 @@ window.setTimeout = (callback, delay) => { const id = ++nextTimer; timers.set(id
 window.clearTimeout = (id) => timers.delete(id)
 let nextModule = 0
 
-async function mount(Intro) {
+async function mount(Intro, props = {}) {
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
-  await act(async () => { root.render(h(StrictMode, null, h(Intro))) })
+  await act(async () => { root.render(h(StrictMode, null, h(Intro, props))) })
   return { host, unmount: async () => { await act(async () => root.unmount()); host.remove() } }
 }
 async function freshIntro() {
@@ -79,6 +79,41 @@ for (const input of ['timeout', 'button', 'keyboard', 'wheel', 'touch', 'card', 
   assert.equal(returned.host.querySelector('[data-coms-intro]'), null, 'SPA returns do not replay')
   await returned.unmount()
 }
+
+window.sessionStorage.clear()
+const disabled = await mount(await freshIntro(), { introStyle: 'off' })
+assert.equal(Boolean(disabled.host.querySelector('[data-coms-intro]')), false, 'off skips the overlay')
+assert.equal(timers.size, 0)
+await disabled.unmount()
+
+for (const alreadyPlayed of [false, true]) {
+  window.sessionStorage.clear()
+  if (alreadyPlayed) window.sessionStorage.setItem('coms.intro.played:v1', '1')
+  let completed = 0
+  const preview = await mount(await freshIntro(), { preview: true, onComplete: () => completed++ })
+  assert.ok(preview.host.querySelector('[data-coms-intro]'), 'preview can replay a previously viewed intro')
+  assert.equal(window.sessionStorage.getItem('coms.intro.played:v1'), alreadyPlayed ? '1' : null, 'preview does not consume a normal visit')
+  await act(async () => { preview.host.querySelector('button').click() })
+  assert.equal(completed, 1, 'preview completion is handed to the parent exactly once')
+  assert.equal(preview.host.querySelector('[data-coms-intro]'), null)
+  await preview.unmount()
+}
+
+// A cached renderer can mount its effect before the controller's passive effects.
+const realGetContext = window.HTMLCanvasElement.prototype.getContext
+window.HTMLCanvasElement.prototype.getContext = () => null
+await import('../src/components/common/LegacyIntroCanvas.tsx')
+const LegacyIntro = await freshIntro()
+for (let replay = 0; replay < 2; replay++) {
+  let completed = 0
+  const legacy = await mount(LegacyIntro, { introStyle: 'legacy', preview: true, onComplete: () => completed++ })
+  await act(async () => { await new Promise((resolve) => setImmediate(resolve)) })
+  assert.equal(Boolean(legacy.host.querySelector('[data-coms-intro]')), false, 'a missing canvas never leaves an overlay, including cached previews')
+  assert.equal(completed, 1)
+  assert.equal(timers.size, 0)
+  await legacy.unmount()
+}
+window.HTMLCanvasElement.prototype.getContext = realGetContext
 
 // A blocked session store still has the module flag for returns within the SPA.
 Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, get() { throw new Error('blocked') } })

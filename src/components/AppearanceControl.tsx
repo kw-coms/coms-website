@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore }
 import { Link, useLocation } from 'react-router-dom'
 import { Check, ChevronUp, Compass, Moon, Sun, X } from 'lucide-react'
 import { accentSwatches, navGroups } from '../data/homeContent'
-import { DEFAULT_ACCENT, normalizeHex, scrollToTopInstant } from '../utils/themeColors'
+import { DEFAULT_ACCENT, normalizeHex, scrollToTopInstant, type IntroStyle, type AccentStrength } from '../utils/themeColors'
 import { isFullPageLink } from '../utils/fullPageLink'
 import { useAuth } from '../contexts/useAuth'
 import MemberLock from './MemberLock'
@@ -14,6 +14,15 @@ const PERF_CHOICES: { value: PerfPreference; label: string }[] = [
   { value: 'lite', label: '가볍게' },
   { value: 'full', label: '화려하게' },
 ]
+const INTRO_CHOICES: { value: IntroStyle; label: string }[] = [
+  { value: 'cinematic', label: '현재 인트로' },
+  { value: 'legacy', label: '예전 인트로' },
+  { value: 'off', label: '끄기' },
+]
+const ACCENT_CHOICES: { value: AccentStrength; label: string }[] = [
+  { value: 'standard', label: '기본' },
+  { value: 'vivid', label: '선명하게' },
+]
 
 const SHEET_QUERY = '(max-width: 639px)'
 const subscribeSheet = (notify: () => void) => {
@@ -22,6 +31,13 @@ const subscribeSheet = (notify: () => void) => {
   return () => mq.removeEventListener('change', notify)
 }
 const isSheet = () => window.matchMedia(SHEET_QUERY).matches
+const REDUCED_QUERY = '(prefers-reduced-motion: reduce)'
+const subscribeReduced = (notify: () => void) => {
+  const mq = window.matchMedia(REDUCED_QUERY)
+  mq.addEventListener('change', notify)
+  return () => mq.removeEventListener('change', notify)
+}
+const isReduced = () => window.matchMedia(REDUCED_QUERY).matches
 
 export const OPEN_APPEARANCE_EVENT = 'coms:open-appearance'
 
@@ -30,6 +46,11 @@ export default function AppearanceControl({
   setAccentColor,
   themeMode,
   setThemeMode,
+  introStyle = 'cinematic',
+  setIntroStyle,
+  onPreviewIntro,
+  accentStrength = 'standard',
+  setAccentStrength,
   activeFonts = [],
   selectedFontId = null,
   onFontChange,
@@ -40,6 +61,11 @@ export default function AppearanceControl({
   setAccentColor: (value: string) => void
   themeMode?: string
   setThemeMode: (value: string) => void
+  introStyle?: IntroStyle
+  setIntroStyle: (value: IntroStyle) => void
+  onPreviewIntro: () => void
+  accentStrength?: AccentStrength
+  setAccentStrength: (value: AccentStrength) => void
   activeFonts?: { id: string | number; name: string }[]
   selectedFontId?: string | number | null
   onFontChange?: (value: string) => void
@@ -57,6 +83,8 @@ export default function AppearanceControl({
   const dialogRef = useRef<HTMLDivElement>(null)
   const focusPerfRef = useRef(false)
   const sheet = useSyncExternalStore(subscribeSheet, isSheet, () => false)
+  const reducedMotion = useSyncExternalStore(subscribeReduced, isReduced, () => false)
+  const cannotPreview = introStyle === 'off' || perf.mode === 'lite' || reducedMotion
   const { pathname } = useLocation()
   // The footer outlives route changes: remembering the page it was opened on closes it when the page changes.
   const [openAt, setOpenAt] = useState<string | null>(null)
@@ -141,7 +169,7 @@ export default function AppearanceControl({
   const groupLabel = 'text-xs font-semibold text-[var(--app-text)]'
   const chip = 'inline-flex min-h-11 items-center justify-center rounded-full px-3.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 sm:min-h-9'
   const segment = 'inline-flex items-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] p-1'
-  const segmentOn = 'bg-[var(--app-text)] text-[var(--app-surface)]'
+  const segmentOn = 'appearance-choice-active'
   const segmentOff = 'text-[var(--app-muted)] hover:text-[var(--app-text)]'
 
   return (
@@ -229,6 +257,59 @@ export default function AppearanceControl({
 
                     <div className="py-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span id={`${dialogId}-intro`} className={groupLabel}>인트로</span>
+                        <div
+                          role="radiogroup"
+                          aria-labelledby={`${dialogId}-intro`}
+                          className={segment}
+                          onKeyDown={(event) => {
+                            const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
+                            if (!step) return
+                            event.preventDefault()
+                            const index = INTRO_CHOICES.findIndex((choice) => choice.value === introStyle)
+                            const next = INTRO_CHOICES[(index + step + INTRO_CHOICES.length) % INTRO_CHOICES.length]
+                            setIntroStyle(next.value)
+                            event.currentTarget.querySelector<HTMLElement>(`[data-intro-choice="${next.value}"]`)?.focus()
+                          }}
+                        >
+                          {INTRO_CHOICES.map((choice) => {
+                            const active = introStyle === choice.value
+                            return (
+                              <button
+                                key={choice.value}
+                                type="button"
+                                role="radio"
+                                aria-checked={active}
+                                tabIndex={active ? 0 : -1}
+                                data-intro-choice={choice.value}
+                                onClick={() => setIntroStyle(choice.value)}
+                                className={`${chip} ${active ? segmentOn : segmentOff}`}
+                              >
+                                {choice.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                      <p className="mt-1.5 text-[11px] leading-4 text-[var(--app-muted)]">
+                        {introStyle === 'legacy' ? '예전 인트로: 지구에서 한반도와 광운대를 거쳐 COM’S 로고로 이어집니다.' : introStyle === 'off' ? '홈 화면으로 바로 들어갑니다.' : '새 탭에서 홈을 열면 지금의 짧은 인트로가 나옵니다.'}
+                      </p>
+                      <button
+                        type="button"
+                        aria-label="선택한 인트로 보기"
+                        disabled={cannotPreview}
+                        onClick={() => { close(true); onPreviewIntro() }}
+                        className="mt-2 min-h-11 rounded-full border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:border-[var(--app-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9"
+                      >
+                        선택한 인트로 보기
+                      </button>
+                      {cannotPreview && (
+                        <p className="mt-1.5 text-[11px] leading-4 text-[var(--app-muted)]">{introStyle === 'off' ? '인트로를 켜면 미리 볼 수 있어요.' : reducedMotion ? '동작 줄이기 설정에서는 인트로를 재생하지 않아요.' : '가벼운 화면에서는 인트로를 재생하지 않아요.'}</p>
+                      )}
+                    </div>
+
+                    <div className="py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <span id="perf-choice-label" className={groupLabel}>화면 효과</span>
                         <div
                           role="radiogroup"
@@ -266,6 +347,7 @@ export default function AppearanceControl({
                       {perf.preference === 'auto' && (
                         <p className="mt-1.5 text-[11px] text-[var(--app-subtle)]">{perf.mode === 'lite' ? '지금은 가벼운 화면' : '지금은 화려한 화면'}</p>
                       )}
+                      <p className="mt-1.5 text-[11px] leading-4 text-[var(--app-muted)]">자동은 기기에 맞추고, 가볍게는 배경 움직임과 흐림을 줄여요. 화려하게는 전체 효과를 보여줘요.</p>
                     </div>
 
                     {activeFonts.length > 0 && (
@@ -302,6 +384,45 @@ export default function AppearanceControl({
 
                     <div role="group" aria-labelledby={`${dialogId}-color`} className="appearance-color-row pt-3">
                       <span id={`${dialogId}-color`} className={groupLabel}>강조 색상</span>
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                        <span id={`${dialogId}-strength`} className="text-[11px] text-[var(--app-muted)]">강조 정도</span>
+                        <div
+                          role="radiogroup"
+                          aria-labelledby={`${dialogId}-strength`}
+                          className={segment}
+                          onKeyDown={(event) => {
+                            const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
+                            if (!step) return
+                            event.preventDefault()
+                            const index = ACCENT_CHOICES.findIndex((choice) => choice.value === accentStrength)
+                            const next = ACCENT_CHOICES[(index + step + ACCENT_CHOICES.length) % ACCENT_CHOICES.length]
+                            setAccentStrength(next.value)
+                            event.currentTarget.querySelector<HTMLElement>(`[data-accent-strength-choice="${next.value}"]`)?.focus()
+                          }}
+                        >
+                          {ACCENT_CHOICES.map((choice) => {
+                            const active = accentStrength === choice.value
+                            return (
+                              <button
+                                key={choice.value}
+                                type="button"
+                                role="radio"
+                                aria-checked={active}
+                                tabIndex={active ? 0 : -1}
+                                data-accent-strength-choice={choice.value}
+                                onClick={() => setAccentStrength(choice.value)}
+                                className={`${chip} ${active ? segmentOn : segmentOff}`}
+                              >
+                                {choice.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                      <div className="appearance-accent-preview mt-2 flex items-center gap-2 rounded-xl border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-[11px] text-[var(--app-muted)]">
+                        <span className="rounded-full border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] px-2.5 py-1 font-semibold text-[var(--app-text)]">선택한 메뉴</span>
+                        <span>현재 강조색</span>
+                      </div>
                       <div className="appearance-swatches mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-2">
                         {accentSwatches.map((swatch) => {
                           const active = accent === swatch.value

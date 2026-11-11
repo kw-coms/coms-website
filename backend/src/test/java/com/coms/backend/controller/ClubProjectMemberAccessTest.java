@@ -52,7 +52,7 @@ class ClubProjectMemberAccessTest {
                 .cookie(owner).header("Origin", ORIGIN).param("category", "APP").param("title", "내 작품")
                 .param("madeBy", "남의 이름").param("position", "-999"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.madeBy").value("회원 2099000011"))
+                .andExpect(jsonPath("$.madeBy").value("남의 이름"))
                 .andExpect(jsonPath("$.canEdit").value(true))
                 .andReturn().getResponse().getContentAsString(), "$.id")).longValue();
 
@@ -62,6 +62,11 @@ class ClubProjectMemberAccessTest {
                 .andExpect(jsonPath("$[?(@.id == " + id + ")].canEdit").value(false));
         mvc.perform(patch("/api/club-projects/{id}", id).cookie(other).header("Origin", ORIGIN).param("title", "탈취"))
                 .andExpect(status().isForbidden());
+        mvc.perform(patch("/api/club-projects/{id}", id).cookie(other).header("Origin", ORIGIN).param("madeBy", "명의 변경"))
+                .andExpect(status().isForbidden());
+        mvc.perform(patch("/api/club-projects/{id}", id).cookie(owner).header("Origin", ORIGIN).param("madeBy", "공동 제작자"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.madeBy").value("공동 제작자"));
         mvc.perform(delete("/api/club-projects/{id}", id).cookie(other).header("Origin", ORIGIN))
                 .andExpect(status().isForbidden());
 

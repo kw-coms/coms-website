@@ -42,6 +42,9 @@ public class ClubProject {
     @Column(name = "owner_student_id", length = 30)
     private String ownerStudentId;
 
+    @Column(name = "view_count", nullable = false, updatable = false)
+    private long viewCount = 0;
+
     @Column(nullable = false)
     private int position = 0;
 
@@ -73,6 +76,7 @@ public class ClubProject {
     public void setDisplayUrl(String displayUrl) { this.displayUrl = displayUrl; }
     public String getOwnerStudentId() { return ownerStudentId; }
     public void setOwnerStudentId(String ownerStudentId) { this.ownerStudentId = ownerStudentId; }
+    public long getViewCount() { return viewCount; }
     public int getPosition() { return position; }
     public void setPosition(int position) { this.position = position; }
     public LocalDateTime getCreatedAt() { return createdAt; }
