@@ -14,12 +14,12 @@ const ROUTES = [
   ['동아리', '활동', '/activities'],
   ['배움', '스터디 자료', '/study'],
   ['동아리', '프로젝트', '/projects'],
-  ['동아리', '지원', '/recruit'],
+  ['동아리', '지원하기', '/recruit'],
   ['멤버', '공지', '/notices'],
   ['동아리', '후원', '/sponsors'],
   ['멤버', '자료실', '/resources'],
   ['멤버', '커뮤니티', '/community'],
-  ['도구', '앱', '/apps'],
+  ['도구', '작품', '/apps'],
   ['멤버', '활동 기록', '/activity-log'],
   ['멤버', '월별 일정', '/monthly-calendar'],
   ['멤버', '회지·인기투표', '/activity-events'],
@@ -196,7 +196,7 @@ test.describe('frequent places', () => {
     await group(page, '배움').click()
     const row = panel(page).locator('.nav-frequent')
     await expect(row.getByText('자주 가는 곳')).toBeVisible()
-    await expect(row.getByRole('button')).toHaveText([/스터디 자료/, /프로젝트/, /앱/])
+    await expect(row.getByRole('button')).toHaveText([/스터디 자료/, /프로젝트/, /작품/])
     await row.getByRole('button', { name: /프로젝트/ }).click()
     await expect(page).toHaveURL(/\/projects$/)
   })
@@ -222,7 +222,7 @@ test.describe('frequent places', () => {
     await page.goto('/about')
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('kwcoms-nav-visits:v1')))).toEqual({ '/study': 5, '/apps': 3, '/about': 1 })
     await page.getByRole('button', { name: '메뉴 열기' }).click()
-    await expect(page.getByRole('region', { name: '자주 가는 곳' }).getByRole('button')).toHaveText([/스터디 자료/, /앱/, /소개/])
+    await expect(page.getByRole('region', { name: '자주 가는 곳' }).getByRole('button')).toHaveText([/스터디 자료/, /작품/, /소개/])
   })
 })
 
