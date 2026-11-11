@@ -17,7 +17,7 @@ test.describe('/activities timeline, guest', () => {
     await mockOptionalApis(page)
     await page.goto('/activities')
     const timeline = page.locator('#timeline')
-    await expect(timeline.getByText('로그인하면 활동 사진을 볼 수 있어요')).toHaveCount(PHOTO_COUNT)
+    await expect(timeline.getByText('로그인하면 활동 사진을 볼 수 있어요')).toHaveCount(1)
     await expect(timeline.getByText('로그인하면 활동 사진을 볼 수 있어요').first()).toBeVisible()
     await expect(page.locator('img[src*="member-media"]')).toHaveCount(0)
     await expect(page.locator('[srcset*="member-media"]')).toHaveCount(0)
@@ -31,7 +31,7 @@ test.describe('/activities timeline, guest', () => {
   test('the placeholder links to /login', async ({ page }) => {
     await mockOptionalApis(page)
     await page.goto('/activities')
-    const link = page.locator('#timeline .act-photo-locked').first().getByRole('link', { name: '로그인' })
+    const link = page.getByTestId('act-photo-notice').getByRole('link', { name: '로그인' })
     await link.scrollIntoViewIfNeeded()
     await link.click()
     await expect(page).toHaveURL(/\/login$/)

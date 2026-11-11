@@ -13,6 +13,7 @@ import {
   timelinePhotos,
 } from '../../data/activityTimeline'
 import type { TimelineEvent, TimelinePhoto, TimelineStatus } from '../../data/activityTimeline'
+import { RECRUIT_FACTS, recruitSummary } from '../../data/recruitFacts'
 import { useAuth } from '../../contexts/useAuth'
 import './activities.css'
 
@@ -41,20 +42,11 @@ function StatusBadge({ status }: { status: TimelineStatus }) {
 
 function PhotoButton({ photo, onOpen, sizes, className = '' }: { photo: TimelinePhoto; onOpen: OpenPhoto; sizes: string; className?: string }) {
   const { user, loading } = useAuth()
-  const location = useLocation()
   // The photos show members' faces and nginx only serves them to a signed-in session. A guest gets no
-  // <img> at all, so no photo URL is requested (nothing 401s); the slot keeps its ratio.
+  // <img> at all, so no photo URL is requested (nothing 401s); the slot is a quiet placeholder that keeps its
+  // ratio. The one login notice sits above the timeline.
   if (!user) {
-    return (
-      <div className={`act-photo act-photo-locked ${className}`} aria-busy={loading || undefined}>
-        {!loading && (
-          <>
-            <p>로그인하면 활동 사진을 볼 수 있어요</p>
-            <Link to="/login" state={{ from: location }}>로그인</Link>
-          </>
-        )}
-      </div>
-    )
+    return <div className={`act-photo act-photo-locked ${className}`} aria-hidden="true" aria-busy={loading || undefined} />
   }
   const { src, srcSet } = photoSrc(photo)
   return (
@@ -75,6 +67,18 @@ function PhotoButton({ photo, onOpen, sizes, className = '' }: { photo: Timeline
   )
 }
 
+/** Public facts for everyone; internal agenda lines only for a signed-in member. */
+function Facts({ event }: { event: TimelineEvent }) {
+  const { user } = useAuth()
+  const facts = [...(event.facts ?? []), ...(user ? event.memberFacts ?? [] : [])]
+  if (facts.length === 0) return null
+  return (
+    <ul className="act-facts">
+      {facts.map((fact) => <li key={fact}>{fact}</li>)}
+    </ul>
+  )
+}
+
 function EventBody({ event, status, children }: { event: TimelineEvent; status: TimelineStatus; children?: ReactNode }) {
   return (
     <div className="act-body">
@@ -84,11 +88,7 @@ function EventBody({ event, status, children }: { event: TimelineEvent; status: 
       </div>
       <h4 className="act-card-title">{event.title}</h4>
       <p className="act-card-text">{event.summary}</p>
-      {event.facts && (
-        <ul className="act-facts">
-          {event.facts.map((fact) => <li key={fact}>{fact}</li>)}
-        </ul>
-      )}
+      <Facts event={event} />
       {children}
     </div>
   )
@@ -164,11 +164,7 @@ function Founding({ event, onOpen }: { event: TimelineEvent; onOpen: OpenPhoto }
         </div>
         <h4 className="act-founding-title">{event.title}</h4>
         <p className="act-card-text">{event.summary}</p>
-        {event.facts && (
-          <ul className="act-facts">
-            {event.facts.map((fact) => <li key={fact}>{fact}</li>)}
-          </ul>
-        )}
+        <Facts event={event} />
         <p className="act-subhead" id="act-program-title">진행 순서</p>
         <ol className="act-program" aria-labelledby="act-program-title">
           {foundingProgram.map((step) => (
@@ -276,6 +272,8 @@ function Lightbox({ dialogRef, openId, setOpenId }: { dialogRef: React.RefObject
 }
 
 export default function ActivityTimeline() {
+  const { user, loading } = useAuth()
+  const location = useLocation()
   const now = useNow(HACKATHON_TICK_MS)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [openId, setOpenIdState] = useState<string | null>(null)
@@ -311,6 +309,12 @@ export default function ActivityTimeline() {
             <a href="#act-upcoming"><b>{upcoming.length}</b><span>예정</span></a>
           </nav>
         </header>
+
+        {!user && !loading && (
+          <p className="act-guest-note" data-testid="act-photo-notice">
+            로그인하면 활동 사진을 볼 수 있어요. <Link to="/login" state={{ from: location }}>로그인</Link>
+          </p>
+        )}
 
         <section className="act-term" id="act-spring" aria-labelledby="act-spring-title">
           <div className="act-term-head">
@@ -350,12 +354,12 @@ export default function ActivityTimeline() {
               </li>
             ))}
           </ul>
-          <p className="act-note">예정 항목은 2026.11.07 창립제 자료와 해커톤 개회식 자료를 기준으로 하며, 날짜는 아직 정해지지 않았습니다.</p>
+          <p className="act-note">예정 항목의 날짜는 미정입니다.</p>
 
           <aside className="act-recruit" aria-labelledby="act-recruit-title">
             <div>
-              <h4 id="act-recruit-title" className="act-recruit-title">지금 60기 상시 모집 중</h4>
-              <p className="act-card-text">마감 없이 받고 있고, 코딩이 처음이어도 괜찮습니다. 회비는 2만원, 동아리방은 복지관 403호입니다.</p>
+              <h4 id="act-recruit-title" className="act-recruit-title">{RECRUIT_FACTS.headline}</h4>
+              <p className="act-card-text">{recruitSummary}</p>
             </div>
             <Link to="/recruit" className="act-recruit-link">지원 안내 보기 <ArrowRight size={16} aria-hidden="true" /></Link>
           </aside>

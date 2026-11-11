@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarClock, Compass, CornerDownLeft, FolderOpen, Megaphone, MessagesSquare, Search, type LucideIcon } from 'lucide-react'
+import { BookOpen, CalendarClock, Compass, CornerDownLeft, FolderOpen, Megaphone, MessagesSquare, Search, type LucideIcon } from 'lucide-react'
 import { navGroups } from '../data/homeContent'
+import { studyQuickItems } from '../data/studyQuickItems'
 import { routeLabel } from '../routes/pageTitles'
 import { listNotices } from '../services/noticeApi'
 import { listCommunityPosts } from '../services/communityApi'
@@ -35,6 +36,7 @@ const TOUR_COMMAND_ID = 'command:tour'
 
 const GROUP_ICONS: Record<QuickGroup, LucideIcon> = {
   page: Compass,
+  study: BookOpen,
   notice: Megaphone,
   post: MessagesSquare,
   file: FolderOpen,
@@ -99,6 +101,7 @@ export default function QuickSearchDialog({ onClose }: { onClose: () => void }) 
   const pages = useMemo(() => buildPages(signedIn, operations), [signedIn, operations])
   const items = useMemo<QuickItem[]>(() => [
     ...pages,
+    ...studyQuickItems,
     ...(noticesQuery.data ?? []).map((notice): QuickItem => ({ id: `notice:${notice.id}`, group: 'notice', title: String(notice.title ?? ''), hint: quickDate(notice.createdAt), path: `/notices/${notice.id}` })),
     ...(postsQuery.data ?? []).map((post): QuickItem => ({ id: `post:${post.id}`, group: 'post', title: String(post.title ?? ''), hint: quickDate(post.createdAt), path: `/community/${post.id}` })),
     ...(filesQuery.data ?? []).map((file): QuickItem => ({ id: `file:${file.id}`, group: 'file', title: String(file.title || file.originalName || ''), hint: quickDate(file.createdAt), path: `/resources/${file.id}`, keywords: String(file.originalName ?? '') })),

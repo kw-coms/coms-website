@@ -1,6 +1,7 @@
 import PageHeading from '../components/PageHeading'
 import { ArrowLeft, CalendarDays, CheckCircle2, Mail, PenLine, Rocket, Users, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
+import RecruitFacts from '../components/RecruitFacts'
 import { getPublicSiteSettings } from '../services/siteSettingsApi'
 
 const recruitDetails = [
@@ -33,7 +34,7 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
     queryFn: getPublicSiteSettings,
   })
   const siteSettings = siteSettingsQuery.data
-  const contactLinks = siteSettings?.contactLinks || [{ label: 'Mail', href: 'mailto:kwcoms69@gmail.com' }]
+  const contactLinks = siteSettings?.contactLinks || [{ label: '메일로 문의', href: 'mailto:kwcoms69@gmail.com' }]
 
   return (
     <div className="w-full min-w-0 space-y-4">
@@ -82,6 +83,8 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
               </p>
             </div>
 
+            <RecruitFacts />
+
             <div className="grid gap-3 md:grid-cols-3">
               {recruitDetails.map(({ title, icon: Icon, body }) => (
                 <div key={title} className="apple-soft-panel bg-[#f5f5f7] p-4">
@@ -126,7 +129,7 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
                 </div>
                 {contactLinks.map((link) => (
                   <a key={`${link.label}-${link.href}`} href={link.href} className="mt-2 block break-all text-sm text-[var(--app-accent-text)] hover:text-[var(--app-accent-hover)]">
-                    {link.label}
+                    {/^mail$/i.test(link.label) ? '메일로 문의' : link.label}
                   </a>
                 ))}
               </div>
