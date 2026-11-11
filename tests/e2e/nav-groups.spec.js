@@ -131,6 +131,24 @@ test.describe('desktop panel', () => {
     await expect(panel(page)).toHaveCount(0)
   })
 
+  test('clicking a group the open panel has already followed the pointer to keeps it open', async ({ page }) => {
+    await page.goto('/about')
+    await group(page, '멤버').click()
+    await expect(panel(page).getByRole('region', { name: '멤버' })).toHaveAttribute('data-open', 'true')
+    // With the panel open, moving on to another group switches the emphasis at once.
+    await group(page, '도구').hover()
+    await expect(panel(page).getByRole('region', { name: '도구' })).toHaveAttribute('data-open', 'true')
+    // Clicking it now chooses it: the panel must not close.
+    await group(page, '도구').click()
+    await expect(panel(page).getByRole('region', { name: '도구' })).toHaveAttribute('data-open', 'true')
+    // It still stays when the pointer leaves, and the second click on it closes the panel.
+    await page.mouse.move(700, 880)
+    await page.waitForTimeout(500)
+    await expect(panel(page)).toBeVisible()
+    await group(page, '도구').click()
+    await expect(panel(page)).toHaveCount(0)
+  })
+
   test('the panel rises in about 250ms, and does not animate under reduced motion', async ({ page }) => {
     await page.goto('/about')
     await group(page, '동아리').click()
