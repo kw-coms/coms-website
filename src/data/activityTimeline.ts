@@ -34,6 +34,8 @@ export interface TimelineEvent {
   kind: string
   summary: string
   facts?: string[]
+  /** Internal agenda lines, shown to signed-in members only. */
+  memberFacts?: string[]
   photoId?: string
 }
 
@@ -156,9 +158,9 @@ export const timelineEvents: TimelineEvent[] = [
     summary: '개강총회 자료는 이번 학기 임원진, 지난 학기 활동, 이번 학기 운영 방향, 스터디 운영 안내, 소모임 안내를 차례로 다룹니다.',
     facts: [
       '80주년기념관 202호',
-      '안건: 동아리방 이용 규칙 개정안, 준회원제 도입',
       'COM’s 문제 공모전: 제출 마감 9월 10일',
     ],
+    memberFacts: ['안건: 동아리방 이용 규칙 개정안, 준회원제 도입'],
     photoId: 'fall-opening',
   },
   {
@@ -168,7 +170,7 @@ export const timelineEvents: TimelineEvent[] = [
     dateLabel: '2026 2학기',
     status: 'done',
     kind: '행사',
-    summary: '2학기 친목 활동으로 꼽힌 MT입니다. 날짜는 확인하지 못했습니다.',
+    summary: '2학기 친목 활동으로 다녀온 MT입니다.',
     photoId: 'fall-mt',
   },
   {

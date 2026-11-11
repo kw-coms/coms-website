@@ -1,15 +1,16 @@
 import { Link } from 'react-router-dom'
 import { ListChecks, Play } from 'lucide-react'
 import { STUDIES } from '../studies'
-import { exercisesFor } from './problems'
+import { problemIndex } from './problemIndex'
 import { labMissions } from './labMissions'
 import { useProgress } from './progress'
 import './exercises.css'
 
+// Reads problemIndex.ts (ids and titles), never the problem bodies: see scripts/gen-problem-index.mjs.
 /** Practice block inside a study card on the hub: one quiet link to the problems, progress only once something is solved, and the way back to the last problem. */
 export default function StudyPracticeSummary({ studyId, reserveResume }: { studyId: string; reserveResume: boolean }) {
   const progress = useProgress()
-  const problems = exercisesFor(studyId)
+  const problems = problemIndex.filter((p) => p.study === studyId)
   const solved = problems.filter((p) => progress[p.id]?.solved).length
   const latest = problems.filter((p) => progress[p.id]?.lastAt).sort((a, b) => progress[b.id].lastAt - progress[a.id].lastAt)[0]
   const counted = studyId !== 'arduino'
@@ -32,7 +33,8 @@ export function StudyHubOverview({ reserveResume }: { reserveResume: boolean }) 
   let solved = 0
   let last: { studyId: string; studyTitle: string; id: string; title: string; at: number } | null = null
   for (const study of STUDIES) {
-    for (const p of exercisesFor(study.id)) {
+    for (const p of problemIndex) {
+      if (p.study !== study.id) continue
       total += 1
       const entry = progress[p.id]
       if (entry?.solved) solved += 1
