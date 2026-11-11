@@ -510,7 +510,7 @@ export const navGroups: NavGroup[] = [
       { id: 'activities', label: '활동', sub: 'Activities', path: '/activities', icon: Sparkles, keywords: '세미나·스터디' },
       { id: 'projects', label: '프로젝트', sub: 'Projects', path: '/projects', icon: CircuitBoard, keywords: '실전 제작' },
       { id: 'sponsors', label: '후원', sub: 'Sponsors', path: '/sponsors', icon: HeartHandshake },
-      { id: 'recruit', label: '지원', sub: 'Recruit', path: '/recruit', icon: Rocket, keywords: '지원 안내' },
+      { id: 'recruit', label: '지원하기', sub: 'Recruit', path: '/recruit', icon: Rocket, keywords: '지원 안내' },
     ],
   },
   {
@@ -544,7 +544,7 @@ export const navGroups: NavGroup[] = [
       fromActivityItem('meet'),
       fromActivityItem('attendance'),
       fromActivityItem('draw'),
-      { id: 'apps', label: '앱', sub: 'Apps', path: '/apps', icon: Grid3x3, keywords: '앱 미니앱' },
+      { id: 'apps', label: '작품', sub: 'Works', path: '/apps', icon: Grid3x3, keywords: '작품 앱 미니앱' },
     ],
   },
 ]

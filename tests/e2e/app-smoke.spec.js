@@ -2526,7 +2526,7 @@ test('top navigation shows four groups and one panel with the whole sitemap', as
   await expect(page).toHaveURL(/\/monthly-calendar$/)
   await page.goto('/')
   await group('도구').click()
-  await panel.getByRole('button', { name: /^앱/ }).click()
+  await panel.getByRole('button', { name: /^작품/ }).click()
   await expect(page).toHaveURL(/\/apps$/)
   await page.goto('/')
 
