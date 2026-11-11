@@ -86,6 +86,7 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
   const onCloseRef = useRef(onClose)
   const onShownRef = useRef(onShown)
   const shownRef = useRef(false)
+  const focusedRef = useRef(false)
   const step = steps[index]
   const prepared = preparedStep === step
   const last = index === steps.length - 1
@@ -222,8 +223,9 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
     const card = cardRef.current
     const active = document.activeElement
     if (prepared && card && (!card.contains(active) || active?.matches(':disabled'))) {
-      if (index === 0) card.focus({ preventScroll: true })
-      else (primaryRef.current ?? card).focus({ preventScroll: true })
+      const target = focusedRef.current ? primaryRef.current ?? card : card
+      target.focus({ preventScroll: true })
+      focusedRef.current = true
     }
   }, [index, prepared])
 
