@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { displayStudentId } from '../../utils/roleAccess'
-import { importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember } from '../../services/adminApi'
+import { importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, applyEligibleMemberSuggestion } from '../../services/adminApi'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
@@ -9,6 +9,7 @@ import { useAdminMembers } from './useAdminMembers'
 import { compareNumber, compareText, matchesQuery, nextColumnSort, sortedBy, type SortDirection } from '../../utils/listTools'
 import { Download } from 'lucide-react'
 import { downloadRosterCsv } from './rosterCsv'
+import '../../styles/admin-roster.css'
 
 type RosterSortKey = 'studentId' | 'name' | 'generation'
 
@@ -30,13 +31,16 @@ export default function AdminRoster() {
   const [roster, setRoster] = useState([])
   const [loadingRoster, setLoadingRoster] = useState(true)
   const [rosterError, setRosterError] = useState('')
-  const [addForm, setAddForm] = useState({ mode: 'current', studentId: '', name: '', admissionYear: '', generation: '', phone: '', department: '' })
+  const [addForm, setAddForm] = useState({ mode: 'current', studentId: '', name: '', admissionYear: '', generation: '', phone: '', email: '', department: '' })
   const [adding, setAdding] = useState(false)
   const [addResult, setAddResult] = useState('')
   const [addError, setAddError] = useState('')
   const [editingId, setEditingId] = useState(null)
-  const [editForm, setEditForm] = useState({ studentId: '', name: '', phone: '', generation: '', department: '' })
+  const [editForm, setEditForm] = useState({ studentId: '', name: '', phone: '', email: '', generation: '', department: '' })
   const [editSaving, setEditSaving] = useState(false)
+  const [applyingId, setApplyingId] = useState<number | null>(null)
+  const [applyError, setApplyError] = useState<{ id: number; message: string } | null>(null)
+  const editOriginalRef = useRef(null)
   const [rosterQuery, setRosterQuery] = useState('')
   const [rosterSort, setRosterSort] = useState<{ key: RosterSortKey; direction: SortDirection } | null>(null)
   const [signupFilter, setSignupFilter] = useState('ALL')
@@ -68,7 +72,7 @@ export default function AdminRoster() {
     const narrowed = roster.filter((member) => {
       if (member.id === editingId) return true
       if (signupKnown && signupFilter !== 'ALL' && hasAccount(member) !== (signupFilter === 'JOINED')) return false
-      return matchesQuery(rosterQuery, [member.name, member.studentId, member.department, member.phone, member.generation && `${member.generation}기`])
+      return matchesQuery(rosterQuery, [member.name, member.studentId, member.department, member.phone, member.email, member.generation && `${member.generation}기`])
     })
     if (!rosterSort) return narrowed
     const { key, direction } = rosterSort
@@ -129,7 +133,7 @@ export default function AdminRoster() {
     setAddResult('')
     setAddError('')
     try {
-      const payload: { name: string; studentId?: string; admissionYear?: string; generation?: string; phone?: string; department?: string } = { name: addForm.name.trim() }
+      const payload: { name: string; studentId?: string; admissionYear?: string; generation?: string; phone?: string; email?: string; department?: string } = { name: addForm.name.trim() }
       if (!isGraduate) {
         // 학번 미상이면 이름+기수(+전화)만으로 임시 등록되고, 학번은 나중에 편집으로 채운다.
         if (addForm.studentId.trim()) payload.studentId = addForm.studentId.trim()
@@ -140,6 +144,7 @@ export default function AdminRoster() {
         payload.generation = addForm.generation.trim()
       }
       if (addForm.phone.trim()) payload.phone = addForm.phone.trim()
+      if (addForm.email.trim()) payload.email = addForm.email.trim()
       if (addForm.department.trim()) payload.department = addForm.department.trim()
       await addEligibleMember(payload)
       const label = !isGraduate
@@ -148,7 +153,7 @@ export default function AdminRoster() {
           ? `${addForm.name} (${addForm.admissionYear}학번)`
           : `${addForm.name} (${addForm.generation}기)`
       setAddResult(`${label} 명부에 추가됐습니다.`)
-      setAddForm((p) => ({ ...p, studentId: '', name: '', admissionYear: '', generation: '', phone: '', department: '' }))
+      setAddForm((p) => ({ ...p, studentId: '', name: '', admissionYear: '', generation: '', phone: '', email: '', department: '' }))
       await loadRoster()
     } catch (err) {
       setAddError(err.message || '추가 중 오류가 발생했습니다.')
@@ -162,7 +167,7 @@ export default function AdminRoster() {
   const handleExport = async () => {
     if (visibleRoster.length === 0) return
     const ok = await confirmDialog({
-      message: `화면에 보이는 명부 ${visibleRoster.length}명의 이름, 학번, 전화번호를 CSV 파일로 내려받습니다.\n개인정보이니 필요한 곳에만 쓰고, 쓴 뒤에는 지워 주세요.`,
+      message: `화면에 보이는 명부 ${visibleRoster.length}명의 이름, 학번, 전화번호, 이메일을 CSV 파일로 내려받습니다.\n개인정보이니 필요한 곳에만 쓰고, 쓴 뒤에는 지워 주세요.`,
     })
     if (!ok) return
     downloadRosterCsv(visibleRoster.map((member) => ({
@@ -173,6 +178,7 @@ export default function AdminRoster() {
   }
 
   const startEdit = (member) => {
+    editOriginalRef.current = member
     setEditingId(member.id)
     // A graduate's synthetic account id is an internal key, not a 학번: sent back as studentId,
     // the server re-derives the row from it and drops the admission year. Leave the field empty
@@ -182,6 +188,7 @@ export default function AdminRoster() {
       studentId,
       name: member.name,
       phone: member.phone || '',
+      email: member.email || '',
       generation: member.generation == null ? '' : String(member.generation),
       department: member.department || '',
     })
@@ -191,14 +198,16 @@ export default function AdminRoster() {
     if (!editForm.name.trim()) return
     setEditSaving(true)
     try {
+      const original = editOriginalRef.current
       await updateEligibleMember(
         id,
-        editForm.studentId.trim() || null,
+        original?.studentIdFromAccount && editForm.studentId.trim() === original.studentId ? null : editForm.studentId.trim() || null,
         editForm.name.trim(),
-        editForm.phone.trim(),
+        original?.phoneFromAccount && editForm.phone.trim() === original.phone ? null : editForm.phone.trim(),
         editForm.generation.trim(),
         // Empty string explicitly clears the department; null would keep the stored value.
         editForm.department.trim(),
+        original?.emailFromAccount && editForm.email.trim() === original.email ? null : editForm.email.trim(),
       )
       setEditingId(null)
       await loadRoster()
@@ -217,6 +226,20 @@ export default function AdminRoster() {
       setRoster((prev) => prev.filter((m) => m.id !== member.id))
     } catch (err) {
       showToast({ message: err.message || '삭제 중 오류가 발생했습니다.', tone: 'error' })
+    }
+  }
+
+  const handleApplySuggestion = async (member) => {
+    if (member.suggestedMemberId == null) return
+    setApplyingId(member.id)
+    setApplyError(null)
+    try {
+      await applyEligibleMemberSuggestion(member.id, member.suggestedMemberId)
+      await loadRoster()
+    } catch (err) {
+      setApplyError({ id: member.id, message: err.message || '추정 정보를 적용하지 못했습니다.' })
+    } finally {
+      setApplyingId(null)
     }
   }
 
@@ -339,6 +362,17 @@ export default function AdminRoster() {
               className="shape-cut-sm w-48 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
             />
           </label>
+          <label className="flex flex-col gap-0.5 text-[10px] text-[var(--theme-body-muted)]">
+            이메일
+            <input
+              type="email"
+              value={addForm.email}
+              onChange={(e) => setAddForm((p) => ({ ...p, email: e.target.value }))}
+              placeholder="test@example.com"
+              maxLength={255}
+              className="shape-cut-sm w-56 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+            />
+          </label>
           <input
             value={addForm.name}
             onChange={(e) => setAddForm((p) => ({ ...p, name: e.target.value }))}
@@ -398,7 +432,7 @@ export default function AdminRoster() {
         )}
         {!loadingRoster && !rosterError && roster.length > 0 && (
           <div className="mt-4 flex flex-wrap items-center gap-2" role="search" aria-label="명부 찾기">
-            <ListSearch value={rosterQuery} onChange={setRosterQuery} placeholder="이름, 학번, 학부/학과, 기수, 전화번호" label="명부 검색" />
+            <ListSearch value={rosterQuery} onChange={setRosterQuery} placeholder="이름, 학번, 학부/학과, 기수, 전화번호, 이메일" label="명부 검색" />
             {signupKnown && <ListSelect value={signupFilter} onChange={setSignupFilter} options={SIGNUP_FILTER_OPTIONS} label="가입 여부로 거르기" />}
             <ListCount shown={visibleRoster.length} total={roster.length} />
             <button
@@ -413,60 +447,66 @@ export default function AdminRoster() {
           </div>
         )}
         {!loadingRoster && !rosterError && roster.length > 0 && (
-          <div className="mt-3 max-h-96 overflow-auto rounded-lg border border-[var(--app-hairline)]">
-            <table className="w-max min-w-full table-fixed divide-y divide-black/10 text-left text-sm">
+          <div className="coms-roster-scroll mt-3 max-h-96 overflow-auto rounded-lg border border-[var(--app-hairline)]">
+            <table role="table" aria-label="가입 허용 명부" className="coms-roster-table w-max min-w-full table-fixed divide-y divide-black/10 text-left text-sm">
               <colgroup>
                 <col style={{ width: '136px' }} />
                 <col style={{ width: '88px' }} />
                 <col style={{ width: '160px' }} />
                 <col style={{ width: '64px' }} />
                 <col style={{ width: '124px' }} />
-                <col style={{ width: '88px' }} />
+                <col style={{ width: '220px' }} />
+                <col style={{ width: '280px' }} />
               </colgroup>
-              <thead className="sticky top-0 bg-[var(--app-surface)] text-xs font-semibold text-[var(--theme-body-muted)]">
-                <tr>
+              <thead role="rowgroup" className="sticky top-0 bg-[var(--app-surface)] text-xs font-semibold text-[var(--theme-body-muted)]">
+                <tr role="row">
                   <SortableTh label="학번" className="px-3 py-3" active={rosterSort?.key === 'studentId'} direction={rosterSort?.direction ?? 'asc'} onSort={() => sortRosterBy('studentId')} />
                   <SortableTh label="이름" className="px-3 py-3" active={rosterSort?.key === 'name'} direction={rosterSort?.direction ?? 'asc'} onSort={() => sortRosterBy('name')} />
                   <th className="px-3 py-3 whitespace-nowrap">학부/학과</th>
                   <SortableTh label="기수" className="px-3 py-3" active={rosterSort?.key === 'generation'} direction={rosterSort?.direction ?? 'asc'} onSort={() => sortRosterBy('generation')} />
                   <th className="px-3 py-3 whitespace-nowrap">전화번호</th>
-                  <th className="px-3 py-3"></th>
+                  <th className="px-3 py-3 whitespace-nowrap">이메일</th>
+                  <th className="px-3 py-3"><span className="sr-only">관리</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/10 bg-white/50">
+              <tbody role="rowgroup" className="divide-y divide-black/10 bg-white/50">
                 {visibleRoster.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-6 text-center text-sm text-[var(--theme-body-muted)]">조건에 맞는 명부가 없습니다.</td>
+                  <tr role="row">
+                    <td role="cell" colSpan={7} className="px-3 py-6 text-center text-sm text-[var(--theme-body-muted)]">조건에 맞는 명부가 없습니다.</td>
                   </tr>
                 )}
                 {visibleRoster.map((member) => (
-                  <tr key={member.id}>
+                  <tr role="row" key={member.id}>
                     {editingId === member.id ? (
-                      <td colSpan={6} className="px-3 py-3">
+                      <td role="cell" colSpan={7} className="coms-roster-edit px-3 py-3">
                         <div className="flex flex-wrap items-center gap-2">
                           {/* Always rendered. Showing it only while the draft had a value hid it for
                               학번 미입력 rows (which are completed right here) and unmounted it the
                               moment an existing 학번 was cleared to retype it. */}
-                          <div className="flex flex-col gap-0.5">
+                          <label className="flex flex-col gap-0.5">
                             <span className="text-[10px] text-[var(--theme-body-muted)]">학번</span>
                             <input value={editForm.studentId} onChange={(e) => setEditForm((p) => ({ ...p, studentId: e.target.value }))} maxLength={10} placeholder="학번 없음" className={`${inputCls} w-36`} />
-                          </div>
-                          <div className="flex flex-col gap-0.5">
+                          </label>
+                          <label className="flex flex-col gap-0.5">
                             <span className="text-[10px] text-[var(--theme-body-muted)]">이름</span>
                             <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} maxLength={20} className={`${inputCls} w-28`} />
-                          </div>
+                          </label>
                           <label className="flex flex-col gap-0.5">
                             <span className="text-[10px] text-[var(--theme-body-muted)]">학부/학과</span>
                             <input value={editForm.department} onChange={(e) => setEditForm((p) => ({ ...p, department: e.target.value }))} maxLength={100} placeholder="컴퓨터정보공학부" className={`${inputCls} w-48`} />
                           </label>
-                          <div className="flex flex-col gap-0.5">
+                          <label className="flex flex-col gap-0.5">
                             <span className="text-[10px] text-[var(--theme-body-muted)]">기수</span>
                             <input value={editForm.generation} onChange={(e) => setEditForm((p) => ({ ...p, generation: e.target.value.replace(/[^0-9]/g, '') }))} maxLength={3} placeholder="60" className={`${inputCls} w-16`} />
-                          </div>
-                          <div className="flex flex-col gap-0.5">
+                          </label>
+                          <label className="flex flex-col gap-0.5">
                             <span className="text-[10px] text-[var(--theme-body-muted)]">전화번호</span>
                             <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} maxLength={11} placeholder="01012345678" className={`${inputCls} w-36`} />
-                          </div>
+                          </label>
+                          <label className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-[var(--theme-body-muted)]">이메일</span>
+                            <input type="email" value={editForm.email} onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))} maxLength={255} placeholder="test@example.com" className={`${inputCls} w-56`} />
+                          </label>
                           <div className="flex items-end gap-2 self-end pb-px">
                             <button type="button" onClick={() => handleEditSave(member.id)} disabled={editSaving} className="shape-cut-sm bg-[var(--app-accent)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--app-accent-hover)] disabled:opacity-50">저장</button>
                             <button type="button" onClick={() => setEditingId(null)} className="text-xs font-semibold text-[var(--theme-body-muted)] hover:underline">취소</button>
@@ -475,8 +515,8 @@ export default function AdminRoster() {
                       </td>
                     ) : (
                       <>
-                        <td className="px-3 py-3 font-mono text-xs text-[var(--theme-body-dark)]">{displayStudentId(member.studentId) || '-'}</td>
-                        <td className="px-3 py-3 font-semibold text-[var(--theme-body-dark)]">
+                        <td role="cell" data-label="학번" className="px-3 py-3 font-mono text-xs text-[var(--theme-body-dark)]"><span>{displayStudentId(member.studentId) || '-'} {member.studentIdFromAccount && <span className="coms-roster-account" role="note" aria-label="계정에서 채운 학번">계정</span>}</span></td>
+                        <td role="cell" data-label="이름" className="px-3 py-3 font-semibold text-[var(--theme-body-dark)]">
                           <span className="inline-flex items-center gap-1.5">
                             {member.name}
                             {signupKnown && hasAccount(member) && (
@@ -497,10 +537,22 @@ export default function AdminRoster() {
                             )}
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{member.department || '-'}</td>
-                        <td className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{member.generation ? `${member.generation}기` : '-'}</td>
-                        <td className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{member.phone || '-'}</td>
-                        <td className="px-3 py-3">
+                        <td role="cell" data-label="학부/학과" className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{member.department || '-'}</td>
+                        <td role="cell" data-label="기수" className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{member.generation ? `${member.generation}기` : '-'}</td>
+                        <td role="cell" data-label="전화번호" className="px-3 py-3 text-xs text-[var(--theme-body-muted)]"><span>{member.phone || '-'} {member.phoneFromAccount && <span className="coms-roster-account" role="note" aria-label="계정에서 채운 전화번호">계정</span>}</span></td>
+                        <td role="cell" data-label="이메일" className="px-3 py-3 text-xs text-[var(--theme-body-muted)]"><span>{member.email || '-'} {member.emailFromAccount && <span className="coms-roster-account" role="note" aria-label="계정에서 채운 이메일">계정</span>}</span></td>
+                        <td role="cell" data-label="관리" className="px-3 py-3">
+                          {member.suggestedMemberId != null && (
+                            <div className="mb-2 border-l-2 border-amber-500 pl-2 text-xs text-[var(--theme-body-dark)]" role="note" aria-label="추정 · 확인 필요">
+                              <strong>추정 · 확인 필요</strong>
+                              <p>학번 {displayStudentId(member.suggestedStudentId) || '-'} · 이메일 {member.suggestedEmail || '-'}</p>
+                              <p className="text-[var(--theme-body-muted)]">계정에 입력된 이름과 전화번호가 일치합니다. 본인 확인 후 적용하세요.</p>
+                              <button type="button" disabled={applyingId !== null} onClick={() => handleApplySuggestion(member)} className="mt-1 min-h-11 rounded border border-[var(--app-hairline-strong)] bg-[var(--app-surface-soft)] px-2 font-semibold text-[var(--app-text)] disabled:opacity-50">
+                                {applyingId === member.id ? '적용 중...' : '적용'}
+                              </button>
+                            </div>
+                          )}
+                          {applyError?.id === member.id && <p role="alert" className="mb-2 text-xs text-red-600">{applyError.message}</p>}
                           <div className="flex gap-3">
                             <button type="button" onClick={() => startEdit(member)} className="text-xs font-semibold text-blue-500 hover:underline">편집</button>
                             <button type="button" onClick={() => handleDelete(member)} className="text-xs font-semibold text-red-500 hover:underline">삭제</button>
@@ -520,7 +572,7 @@ export default function AdminRoster() {
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">명부 일괄 업로드</p>
         <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
           엑셀(.xlsx) 또는 구글 폼 CSV를 업로드하면 회원가입 시 학번·이름을 대조합니다.
-          전화번호 열이 있으면 저장해 관리자가 확인할 수 있습니다. 기수는 직접 입력한 값이 우선이며, 미입력 시 학번에서 자동 계산됩니다.
+          전화번호와 이메일 열이 있으면 저장해 관리자가 확인할 수 있습니다. 기수는 직접 입력한 값이 우선이며, 미입력 시 학번에서 자동 계산됩니다.
         </p>
 
         <input

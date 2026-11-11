@@ -76,6 +76,7 @@ class SecurityConfigSourceTest {
         String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
 
         assertThat(source).contains("auth.requestMatchers(HttpMethod.GET, \"/api/site-settings\").permitAll()");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/ask\").permitAll()");
         assertThat(source).contains("auth.requestMatchers(\"/api/admin/site-settings\", \"/api/admin/club-room\", \"/api/admin/club-activity-categories/**\",");
         // 동아리방 비밀번호: club_room.view 권한 게이트. URL 은 로그인 경계까지만 낮추고
         // 판정은 SiteSettingsController 가 한다 — 익명 요청은 여전히 통과 못 한다.
