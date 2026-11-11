@@ -2632,7 +2632,7 @@ test('study hub has no Circuit Lab card and the Arduino page has no banner', asy
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/study')
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
-    await expect(page.locator('a[href="/lab/"]')).toHaveCount(0)
+    await expect(page.locator('main a[href="/lab/"]')).toHaveCount(0)
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
     await page.goto('/study/arduino')
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
@@ -2641,7 +2641,7 @@ test('study hub has no Circuit Lab card and the Arduino page has no banner', asy
   }
 })
 
-test('only the nav Lab button and the Arduino code-block buttons lead to /lab/', async ({ page }) => {
+test('Lab is in navigation and footer, with code-block buttons only on Arduino', async ({ page }) => {
   await mockAdminApis(page)
   await page.setViewportSize({ width: 1440, height: 900 })
   for (const path of ['/', '/study', '/study/arduino']) {
@@ -2649,7 +2649,8 @@ test('only the nav Lab button and the Arduino code-block buttons lead to /lab/',
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
     // Playground buttons are injected imperatively after render: wait for them before counting.
     if (path === '/study/arduino') await expect(page.getByRole('button', { name: 'Circuit Lab에서 열기' }).first()).toBeVisible()
-    await expect(page.locator('a[href*="/lab"]')).toHaveCount(0)
+    await expect(page.locator('main a[href*="/lab"]')).toHaveCount(0)
+    await expect(page.getByRole('navigation', { name: '사이트맵' }).getByRole('link', { name: '회로 Lab' })).toHaveAttribute('href', '/lab/')
     // The nav entry lives in the panel: open it.
     await page.getByRole('button', { name: '배움', exact: true }).click()
     await expect(page.locator('#nav-panel')).toBeVisible()
