@@ -108,8 +108,14 @@ jobs:
         run: REQUIRE_DIST=1 node --import tsx tests/backdropFilterBuild.test.mjs
 
       - name: Install Playwright browser
-        # The pinned runner already has Chromium's native libraries; launch still validates them.
-        run: npx playwright install chromium
+        run: |
+          # Keep the metric-matched CJK fallback fonts while avoiding the failing runner mirror.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            echo 'https://mirrors.edge.kernel.org/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          fi
+          fc-match :lang=ko
+          npx playwright install --with-deps chromium
+          fc-match :lang=ko
 
       - name: Smoke test
         run: npm run smoke
@@ -486,7 +492,11 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser for the stack e2e
-        run: npx playwright install chromium
+        run: |
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            echo 'https://mirrors.edge.kernel.org/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          fi
+          npx playwright install --with-deps chromium
 
       # "직접 해보기" in a real browser against the real frontend container, backend and runner (nothing mocked).
       # The runner allows a member ten runs a minute and the step above used them up: start a fresh minute.
@@ -586,7 +596,11 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: npx playwright install chromium
+        run: |
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            echo 'https://mirrors.edge.kernel.org/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          fi
+          npx playwright install --with-deps chromium
 
       - name: Backend-auth e2e
         run: npm run test:e2e:backend

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { asMember, mockAdminApis, mockOptionalApis } from './visualSupport.js'
+import { asMember, expectMembersGate, mockAdminApis, mockOptionalApis } from './visualSupport.js'
 
 const day = (offset) => {
   const date = new Date(Date.now() + offset * 86400000)
@@ -932,12 +932,33 @@ test.describe('review regressions', () => {
 
       const otherTab = await context.newPage()
       await mockAdminApis(otherTab)
-      await otherTab.route('**/api/auth/logout', (route) => route.fulfill({ status: 204 }))
+      let loggedOut = false
+      let markLogoutStarted
+      const logoutStarted = new Promise((resolve) => { markLogoutStarted = resolve })
+      let releaseLogout
+      const logoutRelease = new Promise((resolve) => { releaseLogout = resolve })
+      await otherTab.route('**/api/auth/me', (route) => loggedOut
+        ? route.fulfill({ status: 401, json: { message: 'Unauthorized' } })
+        : route.fallback())
+      await otherTab.route('**/api/auth/logout', async (route) => {
+        markLogoutStarted()
+        await logoutRelease
+        loggedOut = true
+        await route.fulfill({ status: 204 })
+      })
       await otherTab.goto('/settings')
-      await otherTab.getByRole('button', { name: 'Logout' }).click()
-      await expect(page.getByRole('alert').filter({ hasText: '다른 탭에서 로그인 상태가 변경되었습니다' })).toBeVisible()
-      await expect(page.locator('.coms-confirm-card')).toHaveCount(0)
-      await expect(page.getByPlaceholder('제목', { exact: true })).toBeDisabled()
+      const logoutClick = otherTab.getByRole('button', { name: 'Logout' }).click()
+      await logoutStarted
+      try {
+        await expect(page.getByRole('alert').filter({ hasText: '다른 탭에서 로그인 상태가 변경되었습니다' })).toBeVisible()
+        await expect(page.locator('.coms-confirm-card')).toHaveCount(0)
+        await expect(page.getByPlaceholder('제목', { exact: true })).toBeDisabled()
+      } finally {
+        releaseLogout()
+        await logoutClick
+      }
+      await expectMembersGate(page, editor === 'post' ? '/community' : '/notices')
+      await expect(page.getByPlaceholder('제목', { exact: true })).toHaveCount(0)
       await expect.poll(() => memberKeys(page, '2020123456')).toEqual([])
       await page.waitForTimeout(3300)
       await page.evaluate(() => {

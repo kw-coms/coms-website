@@ -2581,31 +2581,40 @@ for (const siteFont of ['arriving', 'blocked']) {
   })
 }
 
-// Layout shift while the site font arrives late (held 1.5 s, so it is still pending when a loaded CI machine shows the page): the
-// fallback face is metric-matched to Pretendard, so the swap must not reflow the page. Shifts caused by the reader's own input
-// are excluded by the API (hadRecentInput).
+// The font stays held until the page's own async content is ready. Release it only after recording
+// the baseline, so the measured window includes the actual fallback-to-Pretendard swap.
 for (const path of ['/', '/study/arduino']) {
   test(`the site font swapping in late shifts nothing on ${path}`, async ({ page }) => {
     await page.addInitScript(() => {
       try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
       window.__shifts = []
       new PerformanceObserver((list) => {
-        for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shifts.push({ value: e.value, at: Math.round(e.startTime), sources: e.sources.map((s) => `${s.node?.nodeName}.${s.node?.className?.toString().slice(0, 30)}`) })
+        for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shifts.push({ value: e.value, at: e.startTime, sources: e.sources.map((s) => `${s.node?.nodeName}.${s.node?.className?.toString().slice(0, 30)}`) })
       }).observe({ type: 'layout-shift', buffered: true })
     })
     await mockAdminApis(page)
-    await holdSiteFont(page)
-    await page.goto(path)
-    // Shifts while the page itself is still arriving (lazy chunks, the footer) are not the font's; count from the first heading on,
-    // and make sure a Pretendard FontFace is declared and not yet loaded then, or there would be no swap to measure.
-    await page.locator('h1').first().waitFor()
-    const at = await page.evaluate(() => performance.now())
-    await expectSiteFontPending(page)
-    await siteFontLoaded(page)
-    await page.waitForTimeout(1000)
-    const shifts = (await page.evaluate(() => window.__shifts)).filter((s) => s.at >= at)
-    const cls = shifts.reduce((sum, s) => sum + s.value, 0)
-    expect(cls, `layout shift: ${JSON.stringify(shifts)}`).toBeLessThan(0.02)
+    let releaseFont
+    const fontReleased = new Promise((resolve) => { releaseFont = resolve })
+    await page.route(/pretendard.*\.woff2/i, async (route) => {
+      await fontReleased
+      await route.continue()
+    })
+    try {
+      await page.goto(path, { waitUntil: 'domcontentloaded' })
+      await page.locator('h1').first().waitFor()
+      if (path === '/study/arduino') await page.locator('.study-page .hero .ex-cta').waitFor({ state: 'attached' })
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      await expectSiteFontPending(page)
+      const at = await page.evaluate(() => performance.now())
+      releaseFont()
+      await siteFontLoaded(page)
+      await page.waitForTimeout(1000)
+      const shifts = (await page.evaluate(() => window.__shifts)).filter((s) => s.at >= at)
+      const cls = shifts.reduce((sum, s) => sum + s.value, 0)
+      expect(cls, `layout shift: ${JSON.stringify(shifts)}`).toBeLessThan(0.02)
+    } finally {
+      releaseFont()
+    }
   })
 }
 
