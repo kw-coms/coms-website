@@ -61,3 +61,18 @@ export function attendanceSummaryToCsv(summary: { sessions: SummarySession[]; me
   })
   return `${BOM}${[header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`
 }
+
+/** The latest distinct titles of the checks already run, newest first, for the organiser to reuse. */
+export function recentTitles(sessions: { title: string; openedAt: string }[], limit = 5): string[] {
+  const seen = new Set<string>()
+  const titles: string[] = []
+  const newestFirst = [...sessions].sort((a, b) => new Date(b.openedAt).getTime() - new Date(a.openedAt).getTime())
+  for (const session of newestFirst) {
+    const title = session.title.trim()
+    if (!title || seen.has(title)) continue
+    seen.add(title)
+    titles.push(title)
+    if (titles.length === limit) break
+  }
+  return titles
+}
