@@ -30,18 +30,37 @@ import {
   textContentForSearch,
 } from './postEditorUtils'
 import { usePermissions } from '../../contexts/usePermissions'
+import DraftNotice, { DraftConflictNotice } from '../../components/common/DraftNotice'
+import { confirmEditorLeave, useEditorDraft } from '../../hooks/useEditorDraft'
+import { draftIsStale, draftRevision, draftStorageKey, readDraft } from '../../utils/editorDraft'
 
-export default function PostEditor({ initialPost, onCancel, onSave, user }: {
+type PostEditorProps = {
   initialPost?: { id?: number; title?: string; category?: string; anonymousName?: string; imageUrl?: string; [key: string]: unknown } | null
   onCancel: () => void
   onSave: (saved: unknown) => void
   user?: { role?: string; [key: string]: unknown } | null
-}) {
+}
+
+export default function PostEditor(props: PostEditorProps) {
+  const owner = props.user?.studentId
+  if (typeof owner !== 'string' || !owner) return null
+  return <PostEditorForm key={owner} {...props} />
+}
+
+function PostEditorForm({ initialPost, onCancel, onSave, user }: PostEditorProps) {
   const isEditing = Boolean(initialPost)
   const { permissions } = usePermissions()
-  const [title, setTitle] = useState(initialPost?.title || '')
-  const [category, setCategory] = useState(initialPost?.category || 'GENERAL')
-  const [anonymousName, setAnonymousName] = useState(initialPost?.anonymousName || '')
+  // A draft saved earlier for this same target (new post, or editing post N) is restored once.
+  const storageKey = draftStorageKey(typeof user?.studentId === 'string' ? user.studentId : null, 'post', initialPost?.id)
+  const [stored] = useState(() => readDraft(storageKey))
+  const [baseRevision] = useState(() => isEditing ? draftRevision(initialPost) : undefined)
+  const conflict = draftIsStale(stored, baseRevision)
+  const [restored, setRestored] = useState(conflict ? null : stored)
+  const [pendingDraft, setPendingDraft] = useState(conflict ? stored : null)
+  const [title, setTitle] = useState(restored?.title ?? (initialPost?.title || ''))
+  const [category, setCategory] = useState(restored?.category || initialPost?.category || 'GENERAL')
+  const [anonymousName, setAnonymousName] = useState(restored?.anonymousName ?? (initialPost?.anonymousName || ''))
+  const [editorKey, setEditorKey] = useState(0)
   const [saving, setSaving] = useState(false)
   const [savingStep, setSavingStep] = useState('')
   const [error, setError] = useState('')
@@ -49,8 +68,13 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
   // A new post that exists on the server but is not complete yet: its media upload failed
   // part-way. Kept so the next attempt finishes this post instead of creating another one.
   const [pendingPost, setPendingPost] = useState<{ id: number; category: string } | null>(null)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const initialBlocks = useMemo(() => isEditing ? parsePostBlocks(initialPost) : [], [])
+  const savedBlocks = () => (isEditing ? parsePostBlocks(initialPost) : [])
+  const [initialBlocks, setInitialBlocks] = useState(() => (
+    restored ? parsePostBlocks({ ...(initialPost || {}), content: restored.content }) : savedBlocks()
+  ))
+  // What the editor held when the post was opened: the draft only counts as unsaved changes
+  // when it differs from this.
+  const [originalBlocks] = useState(savedBlocks)
   const postedCategory = isEditing ? (initialPost?.category || 'GENERAL') : pendingPost?.category
   const categoryOptions = useMemo(
     () => categoryOptionsForPost(categoryOptionsForUser(user, permissions), postedCategory),
@@ -60,7 +84,49 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
     ? category
     : (categoryOptions[0]?.value || 'GENERAL')
 
+  const draft = useEditorDraft({
+    storageKey,
+    baseRevision,
+    baseline: () => ({
+      title: initialPost?.title || '',
+      category: categoryOptions.some((item) => item.value === (initialPost?.category || 'GENERAL')) ? (initialPost?.category || 'GENERAL') : (categoryOptions[0]?.value || 'GENERAL'),
+      anonymousName: initialPost?.anonymousName || '',
+      content: isEditing ? serializePostBlocks(originalBlocks) : '',
+    }),
+    current: () => {
+      const blocks = editorApiRef.current?.getBlocks()
+      return { title, category: effectiveCategory, anonymousName, content: serializePostBlocks(blocks ?? initialBlocks) }
+    },
+    hasPending: () => (editorApiRef.current?.getBlocks() || []).some(needsUpload),
+    paused: Boolean(pendingDraft),
+  })
+
+  const applyDraft = (picked) => {
+    setTitle(picked.title)
+    setCategory(picked.category || initialPost?.category || 'GENERAL')
+    setAnonymousName(picked.anonymousName)
+    setInitialBlocks(parsePostBlocks({ ...(initialPost || {}), content: picked.content }))
+    setEditorKey((key) => key + 1)
+    setRestored(picked)
+    setPendingDraft(null)
+  }
+  const keepCurrent = () => {
+    draft.reset()
+    setPendingDraft(null)
+  }
+
+  const discardDraft = () => {
+    draft.reset()
+    setRestored(null)
+    setTitle(initialPost?.title || '')
+    setCategory(initialPost?.category || 'GENERAL')
+    setAnonymousName(initialPost?.anonymousName || '')
+    setInitialBlocks(savedBlocks())
+    setEditorKey((key) => key + 1)
+  }
+
   const cancel = async () => {
+    if (!(await confirmEditorLeave())) return
     // Nothing was meant to be published: take back the half-made post rather than leave it on
     // the board with a stand-in body.
     if (pendingPost && !saving) {
@@ -94,7 +160,9 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
         // Nothing to upload, so the post is created whole in one request: no stand-in body, no
         // follow-up save for the server to mistake for an edit.
         setSavingStep('글 등록 중...')
-        onSave(await createCommunityPost({ ...fields, content: serializePostBlocks(blocks) }))
+        const created = await createCommunityPost({ ...fields, content: serializePostBlocks(blocks) })
+        draft.clear()
+        onSave(created)
         return
       }
       if (!postId) {
@@ -156,6 +224,7 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
           removedSavedMedia(initialBlocks, uploadedBlocks).map((media) => deleteById[media.type](postId, media.id)),
         )
       }
+      draft.clear()
       onSave(saved)
     } catch (err) {
       setError(err.message || '저장 중 오류가 발생했습니다.')
@@ -166,7 +235,13 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
   }
 
   return (
-    <form onSubmit={submit} className="community-compose-form grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+    <>
+      {pendingDraft && <DraftConflictNotice savedAt={pendingDraft.savedAt} updatedAt={typeof initialPost?.updatedAt === 'string' ? initialPost.updatedAt : null} onApply={() => applyDraft(pendingDraft)} onKeep={keepCurrent} className="mx-4 mt-4 sm:mx-5" />}
+      {draft.saveFailed && <p role="alert" className="mx-4 mt-4 text-xs font-semibold text-red-500 sm:mx-5">임시 저장하지 못했어요. 저장 공간이 부족하거나 막혀 있습니다. 이 페이지를 떠나면 작성한 내용이 사라질 수 있어요.</p>}
+      {draft.sessionEnded && <p role="alert" className="mx-4 mt-4 text-sm font-semibold">다른 탭에서 로그인 상태가 변경되었습니다. 다시 로그인해주세요.</p>}
+      {restored && <DraftNotice onDiscard={discardDraft} className="mx-4 mt-4 sm:mx-5" />}
+    <form onSubmit={submit} className="community-compose-form min-w-0">
+      <fieldset className="grid min-w-0 grid-cols-1 gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start" disabled={Boolean(pendingDraft) || draft.sessionEnded} inert={Boolean(pendingDraft) || draft.sessionEnded}>
       <div className="community-compose-meta order-2 flex flex-wrap gap-2 lg:col-start-2 lg:row-start-1">
         <select value={effectiveCategory} onChange={(e) => setCategory(e.target.value)}
           aria-label="게시판 분류"
@@ -197,6 +272,7 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
 
       <div className="order-4 lg:col-start-1 lg:row-start-2 lg:row-span-5">
         <RichBodyEditor
+          key={editorKey}
           initialBlocks={initialBlocks}
           apiRef={editorApiRef}
           features={FULL_RICH_FEATURES}
@@ -225,6 +301,8 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
           <X size={14} />취소
         </button>
       </div>
+      </fieldset>
     </form>
+    </>
   )
 }

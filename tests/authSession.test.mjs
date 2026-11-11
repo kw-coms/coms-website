@@ -106,6 +106,26 @@ for (const [label, answer] of [
   assert.equal(toastCount('로그아웃하지 못했습니다'), failures, `${label}: the member is told`)
 }
 
+// Concurrent clicks share one pending logout, so one failure cannot unlock another request.
+{
+  let releaseLogout
+  answerLogout = () => new Promise((resolve) => { releaseLogout = resolve })
+  const logoutCount = () => calls.filter((call) => call === 'POST /api/auth/logout').length
+  const before = logoutCount()
+  const pending = auth.logout()
+  await settle(() => Boolean(releaseLogout), 'the pending logout request')
+  const duplicate = await auth.logout()
+  assert.equal(duplicate, false)
+  assert.equal(logoutCount(), before + 1, 'two logout clicks send only one request')
+  await act(async () => {
+    releaseLogout(json(503, { message: 'try again' }))
+    assert.equal(await pending, false)
+  })
+  failures += 1
+  assert.equal(auth.user?.studentId, USER.studentId)
+  assert.equal(toastCount('로그아웃하지 못했습니다'), failures)
+}
+
 // ─── 2. A logout the server confirmed ends the session locally ───────────────
 
 {

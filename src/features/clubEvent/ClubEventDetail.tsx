@@ -1,14 +1,18 @@
-import { ArrowLeft, Sparkles } from 'lucide-react'
+import { ArrowLeft, Link2, Sparkles } from 'lucide-react'
+import { showToast } from '../../components/common/Toast'
 import { RichTextContent } from '../../shared/RichText'
 import ClubEventEntryCard from './ClubEventEntryCard'
 import ClubEventEntryForm from './ClubEventEntryForm'
 import ClubEventRsvpPanel from './ClubEventRsvpPanel'
-import { formatEventWindow } from './clubEventUtils'
+import { formatEventWindow, isContestEvent } from './clubEventUtils'
 
 export default function ClubEventDetail({
+  notFound,
+  onRetry,
   selectedEvent,
   notice,
   error,
+  detailError,
   rsvpPending,
   onRsvp,
   isAdmin,
@@ -33,8 +37,44 @@ export default function ClubEventDetail({
   onDeleteEntry,
   onBack,
 }) {
+  if (notFound) {
+    return (
+      <div className="activity-empty-state m-4 sm:m-8" role="alert">
+        <Sparkles size={22} aria-hidden="true" />
+        <div>
+          <h3>이벤트를 찾을 수 없습니다.</h3>
+          <p>삭제되었거나 주소가 잘못되었을 수 있습니다.</p>
+          <button type="button" onClick={onBack} className="apple-action-primary mt-3 inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">이벤트 목록으로</button>
+        </div>
+      </div>
+    )
+  }
+  if (detailError || (!selectedEvent && error)) {
+    return (
+      <div className="activity-empty-state m-4 sm:m-8" role="alert" data-event-error>
+        <Sparkles size={22} aria-hidden="true" />
+        <div>
+          <h3>이벤트를 불러오지 못했습니다.</h3>
+          <p>{detailError || error}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={onRetry} className="apple-action-primary inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">다시 시도</button>
+            <button type="button" onClick={onBack} className="apple-action-secondary inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">이벤트 목록으로</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
   if (!selectedEvent) return <p className="px-4 py-16 text-center text-sm text-[var(--app-muted)]">이벤트를 여는 중...</p>
   const entries = Array.isArray(selectedEvent.entries) ? selectedEvent.entries : []
+  const contest = isContestEvent(selectedEvent)
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      showToast({ message: '링크를 복사했습니다.', tone: 'success' })
+    } catch {
+      showToast({ message: '복사하지 못했습니다. 주소창의 주소를 복사해 주세요.', tone: 'error' })
+    }
+  }
   return (
     <>
       <div className="club-event-detail-head">
@@ -43,14 +83,22 @@ export default function ClubEventDetail({
           목록
         </button>
         <div className="club-event-detail-title">
-          <p className="apple-eyebrow">Event contest</p>
+          <p className="apple-eyebrow">{contest ? 'Event contest' : 'Event'}</p>
           <h2>{selectedEvent.title}</h2>
           {selectedEvent.description && <RichTextContent value={selectedEvent.description} className="club-event-detail-description" />}
         </div>
         <div className="club-event-status-card">
-          <span className={selectedEvent.votingOpen ? 'club-event-status-open' : 'club-event-status-closed'}>{selectedEvent.votingOpen ? '투표 진행 중' : '투표 종료'}</span>
-          <strong>{selectedEvent.totalVotes ?? 0}표</strong>
+          {contest ? (
+            <>
+              <span className={selectedEvent.votingOpen ? 'club-event-status-open' : 'club-event-status-closed'}>{selectedEvent.votingOpen ? '투표 진행 중' : '투표 종료'}</span>
+              <strong>{selectedEvent.totalVotes ?? 0}표</strong>
+            </>
+          ) : null}
           <small>{formatEventWindow(selectedEvent)}</small>
+          <button type="button" onClick={copyLink} className="apple-action-secondary inline-flex min-h-10 items-center justify-center gap-1.5 px-3 text-sm">
+            <Link2 size={14} aria-hidden="true" />
+            링크 복사
+          </button>
         </div>
       </div>
       <ClubEventRsvpPanel selectedEvent={selectedEvent} rsvpPending={rsvpPending} onRsvp={onRsvp} />
@@ -74,7 +122,7 @@ export default function ClubEventDetail({
         replaceEntryFileGroup={replaceEntryFileGroup}
         handleEntryDrop={handleEntryDrop}
       />
-      {entries.length > 0 ? (
+      {!contest ? null : entries.length > 0 ? (
         <div className="club-event-ranking-list">
           {entries.map((entry) => (
             <ClubEventEntryCard
@@ -93,8 +141,8 @@ export default function ClubEventDetail({
         <div className="activity-empty-state m-4 sm:m-8">
           <Sparkles size={22} aria-hidden="true" />
           <div>
-            <h3>아직 업로드된 작품이 없습니다.</h3>
-            <p>관리자가 회지나 작품 파일을 추가하면 랭킹이 이곳에 표시됩니다.</p>
+            <h3>아직 등록된 작품이 없습니다.</h3>
+            <p>운영진이 작품을 등록하면 랭킹이 이곳에 표시됩니다.</p>
           </div>
         </div>
       )}

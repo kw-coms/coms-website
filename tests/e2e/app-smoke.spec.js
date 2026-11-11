@@ -2160,20 +2160,20 @@ test('community detail supports comment add, reply, edit, and delete', async ({ 
 
   await page.getByPlaceholder('댓글을 입력하세요').fill('새 댓글입니다.')
   await page.getByRole('button', { name: '등록' }).click()
-  expect(createdCommentPayloads[0]).toMatchObject({ content: '새 댓글입니다.', parentCommentId: null })
+  await expect.poll(() => createdCommentPayloads[0]).toMatchObject({ content: '새 댓글입니다.', parentCommentId: null })
   await expect(page.getByText('새 댓글입니다.')).toBeVisible()
 
   const firstComment = page.locator('#comment-1')
   await firstComment.getByRole('button', { name: '댓글 달기' }).click()
   await firstComment.locator('textarea[placeholder="댓글을 입력하세요"]').fill('답글 내용')
   await firstComment.getByRole('button', { name: '등록' }).click()
-  expect(createdCommentPayloads[1]).toMatchObject({ content: '@댓글러 답글 내용', parentCommentId: 1 })
+  await expect.poll(() => createdCommentPayloads[1]).toMatchObject({ content: '@댓글러 답글 내용', parentCommentId: 1 })
   await expect(page.getByText('@댓글러 답글 내용')).toBeVisible()
 
   await firstComment.getByRole('button', { name: '수정' }).click()
   await firstComment.locator('textarea').fill('수정된 댓글입니다.')
   await firstComment.getByRole('button', { name: '저장' }).click()
-  expect(updatedCommentPayload).toMatchObject({ content: '수정된 댓글입니다.' })
+  await expect.poll(() => updatedCommentPayload).toMatchObject({ content: '수정된 댓글입니다.' })
   await expect(page.getByText('수정된 댓글입니다.')).toBeVisible()
 
   await firstComment.getByRole('button', { name: '삭제' }).click()
@@ -2779,7 +2779,7 @@ test('community list stays dense but readable on mobile', async ({ page }) => {
   await page.goto('/community')
 
   await expect(page.locator('.community-post-card-mobile').first()).toBeVisible()
-  await expect(page.locator('.community-pagination-pages').first()).toBeVisible()
+  await expect(page.locator('.community-pagination-pages').last()).toBeVisible()
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   const firstCardBox = await page.locator('.community-post-card-mobile').first().boundingBox()
   expect(firstCardBox.width).toBeLessThanOrEqual(360)
@@ -5496,19 +5496,35 @@ test.describe('arduino study circuits', () => {
     await expect(fig).toHaveClass(/is-live/)
     await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
     await expect(fig).toHaveAttribute('data-led', 'on')
-    await expect(fig).toHaveAttribute('data-led', 'off') // just flipped: about 500 ms of this phase are left
-    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    // Scroll in the mutation callback: Playwright polling can discover the flip near the end of its 500 ms phase.
+    await fig.evaluate((el) => new Promise((resolve) => {
+      let sawOn = el.getAttribute('data-led') === 'on'
+      const observer = new MutationObserver(() => {
+        if (el.getAttribute('data-led') === 'on') sawOn = true
+        else if (sawOn) {
+          observer.disconnect()
+          window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })
+          resolve()
+        }
+      })
+      observer.observe(el, { attributes: true, attributeFilter: ['data-led'] })
+    }))
     await expect(fig).toHaveAttribute('data-offscreen', '')
     await page.waitForTimeout(1500) // three blink periods pass while it is off screen
-    const wait = page.evaluate(() => new Promise((resolve) => {
-      const el = document.querySelector('figure.circuit[data-circuit="led-blink"]')
-      const t0 = performance.now()
+    const after = await fig.evaluate((el) => new Promise((resolve) => {
+      let resumedAt
       const start = el.getAttribute('data-led')
-      const mo = new MutationObserver(() => { if (el.getAttribute('data-led') !== start) { mo.disconnect(); resolve(performance.now() - t0) } })
-      mo.observe(el, { attributes: true, attributeFilter: ['data-led'] })
+      const observer = new MutationObserver(() => {
+        // Measure the running phase, excluding scroll/actionability latency before the figure resumes.
+        if (resumedAt === undefined && !el.hasAttribute('data-offscreen')) resumedAt = performance.now()
+        if (resumedAt !== undefined && el.getAttribute('data-led') !== start) {
+          observer.disconnect()
+          resolve(performance.now() - resumedAt)
+        }
+      })
+      observer.observe(el, { attributes: true, attributeFilter: ['data-led', 'data-offscreen'] })
+      el.scrollIntoView({ block: 'center', behavior: 'instant' })
     }))
-    await fig.scrollIntoViewIfNeeded()
-    const after = await wait
     expect(after, 'the next flip is the rest of the interrupted half period').toBeGreaterThan(100)
     expect(after).toBeLessThan(750)
   })

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useScrollReveal } from '../hooks/useScrollReveal'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { confirmEditorLeave } from '../hooks/useEditorDraft'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -532,7 +533,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
         {mode === 'write' && (
           <>
             <BoardComposeBar title="글쓰기">
-              <button type="button" onClick={backToList} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
+              <button type="button" onClick={async () => { if (await confirmEditorLeave()) backToList() }} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
                 <ArrowLeft size={14} />
                 목록
               </button>
@@ -546,7 +547,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
         {mode === 'edit' && currentPost && (
           <>
             <BoardComposeBar title="글 수정">
-              <button type="button" onClick={() => setMode('detail')} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
+              <button type="button" onClick={async () => { if (await confirmEditorLeave()) setMode('detail') }} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
                 <ArrowLeft size={14} />
                 본문
               </button>

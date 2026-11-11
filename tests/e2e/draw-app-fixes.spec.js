@@ -41,22 +41,26 @@ for (const path of ['/draw', '/attendance']) {
   })
 }
 
-test('draw names and results belong to one member and logout forgets them', async ({ page }) => {
-  await mockAdminApis(page)
+test('draw names and results belong to one member and logout forgets them', async ({ page, context }) => {
+  await mockAdminApis(context)
   let memberId = 1
-  await page.route('**/api/auth/me', (route) => route.fulfill({ json: {
+  await context.route('**/api/auth/me', (route) => route.fulfill({ json: {
     id: memberId, name: '테스트 회원', studentId: `202600000${memberId}`, role: 'ADMIN', emailVerified: true,
   } }))
-  await page.route('**/api/auth/logout', (route) => route.fulfill({ status: 204 }))
+  await context.route('**/api/auth/logout', (route) => route.fulfill({ status: 204 }))
   await page.goto('/draw')
-  const names = page.getByRole('textbox', { name: /^이름/ })
+  let names = page.getByRole('textbox', { name: /^이름/ })
   await names.fill('첫 계정 이름\n첫 계정 친구')
   await page.getByRole('button', { name: '섞어서 나누기' }).click()
   await expect(page.getByRole('list', { name: '조 편성 결과' })).toBeVisible()
   await expect.poll(() => page.evaluate(() => localStorage.getItem('coms:draw:v2:1'))).toContain('첫 계정 이름')
 
   memberId = 2
-  await page.reload()
+  // Account fixtures start a fresh tab session; reloading an old account is intentionally fenced by memberSession.
+  await page.close()
+  page = await context.newPage()
+  await page.goto('/draw')
+  names = page.getByRole('textbox', { name: /^이름/ })
   await expect(names).toHaveValue('')
   await expect(page.getByRole('list', { name: '조 편성 결과' })).toHaveCount(0)
   await names.fill('둘째 계정 이름\n둘째 계정 친구')
@@ -66,7 +70,10 @@ test('draw names and results belong to one member and logout forgets them', asyn
   expect(await page.evaluate(() => localStorage.getItem('coms:draw:v2:1'))).toContain('첫 계정 이름')
 
   memberId = 1
+  await page.close()
+  page = await context.newPage()
   await page.goto('/draw')
+  names = page.getByRole('textbox', { name: /^이름/ })
   await expect(names).toHaveValue('첫 계정 이름\n첫 계정 친구')
   await names.fill('')
   await expect(page.getByRole('list', { name: '조 편성 결과' })).toBeVisible()

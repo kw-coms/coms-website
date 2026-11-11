@@ -24,7 +24,15 @@ import { PASSWORD_PATTERN, PASSWORD_MESSAGE, PASSWORD_TOO_LONG_MESSAGE, isPasswo
 import { getClubRoom } from '../services/siteSettingsApi'
 import { canSeeClubRoom } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
+import SettingsSection from '../components/common/SettingsSection'
 const OTHER_INTEREST = '기타'
+const SETTINGS_LINKS = [
+  ['settings-profile', '프로필'],
+  ['settings-notifications', '알림'],
+  ['settings-email', '이메일'],
+  ['settings-password', '비밀번호'],
+  ['settings-miniapps', '미니앱 저장공간'],
+]
 // Same list as the signup form. This one had fallen behind it, so an interest picked at signup
 // (알고리즘, 아두이노, 디자인) came back here as free-text 기타.
 const INTEREST_OPTIONS = ['웹', '앱', '보안', '알고리즘', '아두이노', '디자인']
@@ -256,7 +264,7 @@ function ClubRoomSection({ cardClass, helperTextClass }: { cardClass: string; he
   }, [])
 
   return (
-    <div className={`${cardClass} mt-4`}>
+    <div className={`${cardClass}`}>
       <h3 className="text-base font-bold">동아리방</h3>
       <p className={helperTextClass}>동아리방 출입 비밀번호는 회원에게만 표시됩니다. 외부에 공유하지 마세요.</p>
       {error && <p className="mt-2 text-sm font-semibold text-red-500">{error}</p>}
@@ -318,7 +326,7 @@ function NotificationPreferencesSection({ cardClass, helperTextClass, primaryBtn
   }
 
   return (
-    <form onSubmit={handleSubmit} className={`${cardClass} mt-4 space-y-4`}>
+    <form onSubmit={handleSubmit} className={`${cardClass} space-y-4`}>
       <div>
         <h3 className="text-base font-bold">알림 설정</h3>
         <p className={helperTextClass}>받고 싶은 알림 종류를 선택할 수 있습니다. 끈 항목은 더 이상 받지 않습니다.</p>
@@ -586,10 +594,17 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
             </div>
           </div>
 
+          <nav aria-label="설정 바로가기" className="mb-2 hidden flex-wrap gap-2 lg:flex">
+            {SETTINGS_LINKS.map(([id, label]) => (
+              <a key={id} href={`#${id}`} className="apple-chip px-3 py-1.5 text-sm font-semibold">{label}</a>
+            ))}
+          </nav>
+
+          <SettingsSection id="settings-profile" title="프로필">
           <form onSubmit={handleProfileSubmit} className={`${cardClass} space-y-4`}>
             <div>
               <h3 className="text-base font-bold">회원 정보</h3>
-              <p className={helperTextClass}>연락처, 관심 분야, 사이트 표시 설정을 따로 관리합니다.</p>
+              <p className={helperTextClass}>연락처와 관심 분야, 사이트 글꼴을 바꿀 수 있습니다.</p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -679,62 +694,21 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
               {loadingAction === 'profile' ? '저장 중...' : '회원 정보 저장'}
             </button>
           </form>
-
-          <div className={`${cardClass} mt-4`}>
-            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h3 className="text-base font-bold">미니앱 저장함</h3>
-                <p className={helperTextClass}>월드컵과 티어표에서 저장한 템플릿·결과를 COMS 계정 기준으로 모아봅니다.</p>
-              </div>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {miniAppProfiles.map((profile) => {
-                const sharedCount = profile.documents.filter((document) => document.shared).length
-                return (
-                  <a
-                    key={profile.key}
-                    href={profile.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-lg border border-black/10 bg-white/72 p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:bg-white"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-bold text-[var(--app-accent-text)]">{profile.label}</p>
-                        <p className="mt-1 text-xs font-semibold leading-5 text-[var(--app-subtle)]">{profile.description}</p>
-                      </div>
-                      <span className="rounded-full bg-[var(--app-accent-soft)] px-2.5 py-1 text-xs font-bold text-[var(--app-accent-text)]">
-                        {profile.documents.length}개
-                      </span>
-                    </div>
-                    <p className="mt-3 text-xs font-semibold text-[var(--app-muted)]">공유 중 {sharedCount}개</p>
-                    <div className="mt-3 space-y-1">
-                      {profile.documents.slice(0, 2).map((document) => (
-                        <p key={`${document.contentType}-${document.contentId}`} className="truncate text-sm font-semibold text-[var(--app-text)]">
-                          {document.contentType === 'result' ? '결과' : '템플릿'} · {document.title}
-                        </p>
-                      ))}
-                      {profile.documents.length === 0 && (
-                        <p className="text-sm font-semibold text-[var(--app-subtle)]">아직 저장한 항목이 없습니다.</p>
-                      )}
-                    </div>
-                  </a>
-                )
-              })}
-            </div>
-          </div>
-
           {canSeeClubRoom(permissions) && (
             <ClubRoomSection cardClass={cardClass} helperTextClass={helperTextClass} />
           )}
+          </SettingsSection>
 
+          <SettingsSection id="settings-notifications" title="알림">
           <NotificationPreferencesSection
             cardClass={cardClass}
             helperTextClass={helperTextClass}
             primaryBtnClass={primaryBtnClass}
           />
+          </SettingsSection>
 
-          <div className={`${cardClass} mt-4`}>
+          <SettingsSection id="settings-email" title="이메일" needsAction={user && !user.emailVerified ? '미인증' : ''}>
+          <div className={cardClass}>
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="font-semibold">이메일 인증</h3>
@@ -770,11 +744,12 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
             {emailMessage && <div className="mt-3 text-sm text-[var(--app-accent-text)]">{emailMessage}</div>}
             {emailError && <div role="alert" className="mt-3 text-sm text-red-500">{emailError}</div>}
           </div>
+          </SettingsSection>
 
-          <form onSubmit={handlePasswordSubmit} className={`${cardClass} mt-4 space-y-4`}>
+          <SettingsSection id="settings-password" title="비밀번호">
+          <form onSubmit={handlePasswordSubmit} className={`${cardClass} space-y-4`}>
             <div>
               <h3 className="font-semibold">비밀번호 변경</h3>
-              <p className={helperTextClass}>현재 비밀번호와 새 비밀번호 입력 영역을 분리했습니다.</p>
               <p className={helperTextClass}>변경하면 이 기기를 포함한 모든 기기에서 로그아웃되며, 새 비밀번호로 다시 로그인해야 합니다.</p>
             </div>
             <div className={fieldCardClass}>
@@ -846,6 +821,54 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
               비밀번호는 8자 이상, 영문·숫자·특수문자를 모두 포함해야 하며 공백은 사용할 수 없습니다.
             </p>
           </form>
+          </SettingsSection>
+          <SettingsSection id="settings-miniapps" title="미니앱 저장공간">
+          <div className={cardClass}>
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="text-base font-bold">미니앱 저장함</h3>
+                <p className={helperTextClass}>월드컵과 티어표에서 저장한 템플릿·결과를 COMS 계정 기준으로 모아봅니다.</p>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {miniAppProfiles.map((profile) => {
+                const sharedCount = profile.documents.filter((document) => document.shared).length
+                return (
+                  <a
+                    key={profile.key}
+                    href={profile.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg border border-black/10 bg-white/72 p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:bg-white"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-[var(--app-accent-text)]">{profile.label}</p>
+                        <p className="mt-1 text-xs font-semibold leading-5 text-[var(--app-subtle)]">{profile.description}</p>
+                      </div>
+                      <span className="rounded-full bg-[var(--app-accent-soft)] px-2.5 py-1 text-xs font-bold text-[var(--app-accent-text)]">
+                        {profile.documents.length}개
+                      </span>
+                    </div>
+                    <p className="mt-3 text-xs font-semibold text-[var(--app-muted)]">공유 중 {sharedCount}개</p>
+                    <div className="mt-3 space-y-1">
+                      {profile.documents.slice(0, 2).map((document) => (
+                        <p key={`${document.contentType}-${document.contentId}`} className="truncate text-sm font-semibold text-[var(--app-text)]">
+                          {document.contentType === 'result' ? '결과' : '템플릿'} · {document.title}
+                        </p>
+                      ))}
+                      {profile.documents.length === 0 && (
+                        <p className="text-sm font-semibold text-[var(--app-subtle)]">아직 저장한 항목이 없습니다.</p>
+                      )}
+                    </div>
+                  </a>
+                )
+              })}
+            </div>
+          </div>
+
+          </SettingsSection>
+
         </section>
       </div>
     </div>
