@@ -42,7 +42,8 @@ class CompanionControllerIntegrationTest {
                 .andExpect(jsonPath("$.sourceId").value(row.getId().toString()))
                 .andExpect(jsonPath("$.name").value("테스트회원"))
                 .andExpect(jsonPath("$.studentId").doesNotExist())
-                .andExpect(jsonPath("$.phone").doesNotExist());
+                .andExpect(jsonPath("$.phone").doesNotExist())
+                .andExpect(jsonPath("$.email").doesNotExist());
     }
 
     @Test

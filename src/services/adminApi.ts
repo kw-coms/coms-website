@@ -103,7 +103,7 @@ export async function addEligibleMember(payload) {
   })
 }
 
-export async function updateEligibleMember(id, studentId, name, phone, generation, department: string) {
+export async function updateEligibleMember(id, studentId, name, phone, generation, department: string, email: string | null) {
   return requestNoContent(`/api/admin/eligible-members/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({
@@ -112,7 +112,15 @@ export async function updateEligibleMember(id, studentId, name, phone, generatio
       phone: phone || null,
       generation: generation || null,
       department: department ?? '',
+      email,
     }),
+  })
+}
+
+export async function applyEligibleMemberSuggestion(id: number, memberId: number) {
+  return requestNoContent(`/api/admin/roster/${id}/apply-suggestion`, {
+    method: 'POST',
+    body: JSON.stringify({ memberId }),
   })
 }
 

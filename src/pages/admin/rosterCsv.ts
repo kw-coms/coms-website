@@ -13,12 +13,13 @@ type RosterRow = {
   generation?: string | number | null
   admissionYear?: number | null
   phone?: string | null
+  email?: string | null
   initialRole?: string | null
   /** Whether an account has signed up against this row; undefined when the member list failed to load. */
   joined?: boolean
 }
 
-const HEADER = ['이름', '학번', '학부/학과', '입학연도', '기수', '구분', '전화번호', '가입 여부', '가입 시 등급']
+const HEADER = ['이름', '학번', '학부/학과', '입학연도', '기수', '구분', '전화번호', '이메일', '가입 여부', '가입 시 등급']
 
 // Byte-order mark, spelled as a code point so no invisible character sits in this file.
 const BOM = String.fromCharCode(0xfeff)
@@ -64,6 +65,7 @@ export function rosterToCsv(roster: RosterRow[], now = new Date()): string {
       member.generation ? `${member.generation}기` : '',
       graduate === null ? '' : graduate ? '졸업생' : '재학생',
       formatPhoneForSheet(member.phone),
+      member.email,
       member.joined === undefined ? '' : member.joined ? '가입' : '미가입',
       member.initialRole === 'ASSOCIATE' ? '준회원' : '회원',
     ].map(csvCell).join(',')

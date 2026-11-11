@@ -21,6 +21,9 @@ public class EligibleMember {
 
     private String phone;
 
+    @Column(length = 255)
+    private String email;
+
     private String generation;
 
     private Integer admissionYear;
@@ -61,6 +64,8 @@ public class EligibleMember {
     public void setDepartment(String department) { this.department = department; }
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
     public String getGeneration() { return generation; }
     public void setGeneration(String generation) { this.generation = generation; }
     public Integer getAdmissionYear() { return admissionYear; }

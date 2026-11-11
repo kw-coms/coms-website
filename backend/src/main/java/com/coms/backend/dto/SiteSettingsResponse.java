@@ -12,7 +12,8 @@ public record SiteSettingsResponse(
         String homeHeroCopy,
         List<ContactLink> contactLinks,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        boolean askEnabled
 ) {
     public record ContactLink(String label, String href) {
     }

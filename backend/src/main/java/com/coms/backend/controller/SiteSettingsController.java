@@ -2,6 +2,7 @@ package com.coms.backend.controller;
 
 import com.coms.backend.dto.ClubRoomResponse;
 import com.coms.backend.dto.ClubRoomUpdateRequest;
+import com.coms.backend.dto.AdminSiteSettingsResponse;
 import com.coms.backend.dto.SiteSettingsRequest;
 import com.coms.backend.dto.SiteSettingsResponse;
 import com.coms.backend.service.AuditLogService;
@@ -54,15 +55,15 @@ public class SiteSettingsController {
 
     @GetMapping("/admin/site-settings")
     @PreAuthorize("@perm.has(authentication,'SITE_SETTINGS_EDIT')")
-    public ResponseEntity<SiteSettingsResponse> adminCurrent() {
-        return ResponseEntity.ok(siteSettingsService.current());
+    public ResponseEntity<AdminSiteSettingsResponse> adminCurrent() {
+        return ResponseEntity.ok(siteSettingsService.adminCurrent());
     }
 
     @PutMapping("/admin/site-settings")
     @PreAuthorize("@perm.has(authentication,'SITE_SETTINGS_EDIT')")
-    public ResponseEntity<SiteSettingsResponse> publish(@Valid @RequestBody SiteSettingsRequest request,
+    public ResponseEntity<AdminSiteSettingsResponse> publish(@Valid @RequestBody SiteSettingsRequest request,
                                                         Authentication authentication) {
-        SiteSettingsResponse response = siteSettingsService.publish(request);
+        AdminSiteSettingsResponse response = siteSettingsService.publish(request);
         auditLogService.record(
                 authentication == null ? null : authentication.getName(),
                 "ADMIN_SITE_SETTINGS_PUBLISH",

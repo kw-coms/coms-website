@@ -43,6 +43,7 @@ import {
 import GlobalNavigation from './components/GlobalNavigation'
 import QuickSearch from './components/QuickSearch'
 import SiteTour from './components/tour/SiteTour'
+import AskWidget from './components/ask/AskWidget'
 import AppearanceControl from './components/AppearanceControl'
 import PerfNotice from './components/PerfNotice'
 import NotFoundPage from './components/NotFoundPage'
@@ -226,6 +227,7 @@ function App() {
     {/* Outside the page's Suspense: its shortcut answers while a page is still loading. */}
     <QuickSearch />
     <SiteTour />
+    <AskWidget />
     </>
   )
 }

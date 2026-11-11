@@ -1,0 +1,1 @@
+ALTER TABLE eligible_members ADD COLUMN IF NOT EXISTS email VARCHAR(255);
