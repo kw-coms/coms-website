@@ -45,7 +45,7 @@ export const PUBLIC_PAGE_META: PublicPageMeta[] = [
   })),
   {
     path: '/apps',
-    title: "Apps | KW COM's",
+    title: "작품 | KW COM's",
     description: '부원들이 직접 만든 웹사이트·앱·게임 프로젝트를 한곳에서 열어 보세요.',
   },
   {

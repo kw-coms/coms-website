@@ -91,7 +91,7 @@ class RolePermissionMatrixTest {
                 new Case(Permission.ACTIVITY_WRITE, 200, 403,
                         () -> get("/api/admin/recurring-schedules")),
                 new Case(Permission.PROJECT_WRITE, 404, 403,
-                        () -> origin(delete("/api/club-projects/999999"))),
+                        () -> origin(delete("/api/admin/club-project-categories/999999"))),
                 new Case(Permission.ARCHIVE_MANAGE, 404, 403,
                         () -> origin(delete("/api/files/999999"))),
                 new Case(Permission.SITE_SETTINGS_EDIT, 200, 403,

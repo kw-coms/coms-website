@@ -7,7 +7,7 @@ const routeExpectations = [
   ['/activities', /배움이 매주 쌓이고,\s*서로에게 남습니다\./],
   ['/activity-events', /회지 인기투표|로그인/],
   ['/projects', /아이디어를 실제 서비스와 제작물로\./],
-  ['/apps', /COM's Apps/],
+  ['/apps', /COM's 작품/],
   ['/login', /로그인|아이디/],
 ]
 
@@ -553,12 +553,12 @@ test('appearance panel explains guest font persistence scope', async ({ page }) 
 test('apps page surfaces companion service links away from the home dashboard', async ({ page }) => {
   await page.goto('/')
 
-  await expect(page.getByRole('heading', { name: "COM's Apps" })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: "COM's 작품" })).toHaveCount(0)
   // A guest's home has no calendar (it moves to the signed-in "오늘의 COM's" scene).
   await expect(page.getByRole('heading', { name: '동아리 일정 캘린더' })).toHaveCount(0)
 
   await page.goto('/apps')
-  await expect(page.getByRole('heading', { name: "COM's Apps" })).toBeVisible()
+  await expect(page.getByRole('heading', { name: "COM's 작품" })).toBeVisible()
 
   for (const [name, href] of [
     ['Food Club', 'https://coms.kw.ac.kr/foodclub/'],
@@ -592,7 +592,7 @@ test('apps page marks an app whose link did not answer', async ({ page }) => {
   }))
 
   await page.goto('/apps')
-  await expect(page.getByRole('heading', { name: "COM's Apps" })).toBeVisible()
+  await expect(page.getByRole('heading', { name: "COM's 작품" })).toBeVisible()
   const dead = page.getByRole('link', { name: /죽은 앱/ })
   await expect(dead).toContainText('지금 응답 없음')
   // It still opens: the look can be minutes old.
@@ -3944,7 +3944,7 @@ test('apps page renders DB-driven club projects grouped by category', async ({ p
 
   await page.goto('/apps')
 
-  await expect(page.getByRole('heading', { name: "COM's Apps" })).toBeVisible()
+  await expect(page.getByRole('heading', { name: "COM's 작품" })).toBeVisible()
   await expect(page.getByRole('heading', { name: '웹사이트', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: '앱', exact: true })).toBeVisible()
 
@@ -4041,7 +4041,7 @@ test('apps page cards keep one size whatever the text length or section count', 
   }
 })
 
-test('admin Apps management shows public-card previews with status badges', async ({ page }) => {
+test('admin works management shows public-card previews with status badges', async ({ page }) => {
   await mockAdminApis(page)
   await page.route('**/api/club-projects/categories', (route) => route.fulfill({
     status: 200,
@@ -4122,7 +4122,7 @@ test('admin Apps management shows public-card previews with status badges', asyn
   })
 
   await page.goto('/admin')
-  await page.getByRole('tab', { name: 'Apps 관리' }).click()
+  await page.getByRole('tab', { name: '작품 관리' }).click()
 
   const portalPreview = page.getByTestId('admin-app-preview-11')
   await expect(portalPreview.getByText("COM's 포털")).toBeVisible()
@@ -4131,10 +4131,10 @@ test('admin Apps management shows public-card previews with status badges', asyn
 
   const appPreview = page.getByTestId('admin-app-preview-12')
   await expect(appPreview.getByText('출석 체크 앱')).toBeVisible()
-  await expect(appPreview.getByLabel('앱 상태').getByText('다운로드')).toBeVisible()
+  await expect(appPreview.getByLabel('작품 상태').getByText('다운로드')).toBeVisible()
 
   await page.getByLabel('제목').fill('새 앱')
-  await page.getByRole('tabpanel', { name: 'Apps 관리' }).getByLabel('분류').selectOption('APP')
+  await page.getByRole('tabpanel', { name: '작품 관리' }).getByLabel('분류').selectOption('APP')
   await page.getByLabel('링크 URL (선택)').fill('https://example.com/new-app')
   await page.getByLabel('배포 파일 (apk/zip 등, 여러 개 선택 가능)').setInputFiles([
     { name: 'new-app.apk', mimeType: 'application/vnd.android.package-archive', buffer: Buffer.from('apk') },
@@ -4146,7 +4146,7 @@ test('admin Apps management shows public-card previews with status badges', asyn
   await expect(draftPreview.getByText('new-app.apk')).toBeVisible()
   await expect(page.getByText('선택한 파일 2개')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Apps 항목 등록' }).click()
+  await page.getByRole('button', { name: '작품 등록' }).click()
   await expect.poll(() => createdProjectPayload).toMatchObject({
     title: '새 앱',
     category: 'APP',
@@ -5631,4 +5631,51 @@ test.describe('arduino study circuits', () => {
     await fig.getByRole('button', { name: '전체 보기' }).click()
     await expect(fig.locator('.circuit-stepper')).toBeHidden()
   })
+})
+
+test('member can publish a work with photos and edit only their own card', async ({ page }) => {
+  await mockOptionalApis(page)
+  await asMember(page)
+  await page.route('**/api/club-projects/categories', route => route.fulfill({ json: [{ key: 'WEBSITE', name: '웹사이트' }] }))
+  let works = [{ id: 1, category: 'WEBSITE', categoryName: '웹사이트', title: '기존 작품', description: '관리자 작품', canEdit: false, images: [], files: [] }]
+  let imageUploads = 0
+  let failFirstReload = true
+  await page.route('**/api/club-projects/2/images/8', route => route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLttAAAAABJRU5ErkJggg==', 'base64') }))
+  await page.route('**/api/club-projects/2/images', route => {
+    imageUploads += 1
+    expect(route.request().method()).toBe('POST')
+    return route.fulfill({ status: 201, json: [8] })
+  })
+  await page.route('**/api/club-projects/2', route => {
+    expect(route.request().method()).toBe('PATCH')
+    works[1] = { ...works[1], title: multipartField(route.request().postData(), 'title') }
+    return route.fulfill({ json: works[1] })
+  })
+  await page.route('**/api/club-projects', route => {
+    if (route.request().method() === 'POST') {
+      works.push({ id: 2, category: 'WEBSITE', categoryName: '웹사이트', title: multipartField(route.request().postData(), 'title'), description: '소개', canEdit: true, images: [{ id: 8, url: '/api/club-projects/2/images/8' }], files: [] })
+      return route.fulfill({ status: 201, json: works[1] })
+    }
+    if (works.length === 2 && failFirstReload) {
+      failFirstReload = false
+      return route.fulfill({ status: 500, json: { message: '일시적인 조회 오류' } })
+    }
+    return route.fulfill({ json: works })
+  })
+  await page.goto('/apps')
+  await page.getByRole('button', { name: '작품 올리기' }).click()
+  const form = page.getByRole('form', { name: '작품 올리기' })
+  await form.getByRole('textbox', { name: '작품 이름' }).fill('내 작품')
+  await form.getByRole('textbox', { name: '소개글' }).fill('소개')
+  await form.locator('input[type=file]').setInputFiles({ name: 'cover.png', mimeType: 'image/png', buffer: Buffer.from('89504e470d0a1a0a', 'hex') })
+  await form.getByRole('button', { name: '저장하기' }).click()
+  await expect(form.getByRole('alert')).toBeVisible()
+  await form.getByRole('button', { name: '저장하기' }).click()
+  await expect(page.getByRole('heading', { name: '내 작품', exact: true })).toBeVisible()
+  expect(imageUploads).toBe(1)
+  await expect(page.getByRole('button', { name: '작품 수정' })).toHaveCount(1)
+  await page.getByRole('button', { name: '작품 수정' }).click()
+  await page.getByRole('form', { name: '작품 수정' }).getByRole('textbox', { name: '작품 이름' }).fill('수정한 작품')
+  await page.getByRole('form', { name: '작품 수정' }).getByRole('button', { name: '저장하기' }).click()
+  await expect(page.getByRole('heading', { name: '수정한 작품' })).toBeVisible()
 })

@@ -2,13 +2,18 @@ package com.coms.backend.service;
 
 import com.coms.backend.domain.ClubProject;
 import com.coms.backend.domain.ClubProjectFile;
+import com.coms.backend.domain.ClubProjectImage;
 import com.coms.backend.dto.ClubProjectResponse;
 import com.coms.backend.repository.ClubProjectFileRepository;
 import com.coms.backend.repository.ClubProjectRepository;
+import com.coms.backend.repository.ClubProjectImageRepository;
+import com.coms.backend.repository.MemberRepository;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -31,6 +36,8 @@ public class ClubProjectService {
     // Distributables (apk/zip and similar). Generous limit so app/game builds fit.
     private static final long MAX_FILE_BYTES = 200L * 1024 * 1024;
     private static final int MAX_FILES_PER_PROJECT = 10;
+    private static final int MAX_IMAGES_PER_PROJECT = 6;
+    private static final long MAX_IMAGE_BYTES = 10L * 1024 * 1024;
     // Column widths of club_projects (V54).
     private static final int MAX_TITLE_LENGTH = 120;
     private static final int MAX_EYEBROW_LENGTH = 60;
@@ -40,25 +47,35 @@ public class ClubProjectService {
     private final ClubProjectRepository repository;
     private final ClubProjectFileRepository fileRepository;
     private final ClubProjectCategoryService categoryService;
+    private final ClubProjectImageRepository imageRepository;
+    private final MemberRepository memberRepository;
     private final StorageService storageService;
 
     public ClubProjectService(ClubProjectRepository repository,
                               ClubProjectFileRepository fileRepository,
+                              ClubProjectImageRepository imageRepository,
+                              MemberRepository memberRepository,
                               ClubProjectCategoryService categoryService,
                               StorageService storageService) {
         this.repository = repository;
         this.fileRepository = fileRepository;
+        this.imageRepository = imageRepository;
+        this.memberRepository = memberRepository;
         this.categoryService = categoryService;
         this.storageService = storageService;
     }
 
     @Transactional(readOnly = true)
-    public List<ClubProjectResponse> list() {
+    public List<ClubProjectResponse> list() { return list(null, false); }
+
+    @Transactional(readOnly = true)
+    public List<ClubProjectResponse> list(String viewerStudentId, boolean manager) {
         List<ClubProject> projects = repository.findAllByOrderByPositionAscIdAsc();
         Map<String, String> categoryNames = categoryService.keyToNameMap();
         Map<Long, List<ClubProjectFile>> files = filesByProject(projects);
+        Map<Long, List<ClubProjectImage>> images = imagesByProject(projects);
         return projects.stream()
-                .map(project -> toResponse(project, categoryNames, files))
+                .map(project -> toResponse(project, categoryNames, files, images, viewerStudentId, manager))
                 .toList();
     }
 
@@ -71,6 +88,30 @@ public class ClubProjectService {
         project.setUpdatedAt(LocalDateTime.now());
         ClubProject saved = repository.save(project);
         return toResponse(saved);
+    }
+
+    public ClubProjectResponse createForMember(String studentId, String category, String title,
+                                               String description, String linkUrl) {
+        String name = memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN)).getName();
+        ClubProjectResponse response = create(category, title, description, null, name, linkUrl, null, null);
+        ClubProject project = get(response.id());
+        project.setOwnerStudentId(studentId);
+        return toResponse(repository.save(project), studentId, false);
+    }
+
+    public void requireEditor(Long id, String studentId, boolean manager) {
+        ClubProject project = get(id);
+        if (!manager && (studentId == null || !studentId.equals(project.getOwnerStudentId()))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인 작품만 수정할 수 있습니다.");
+        }
+    }
+
+    public ClubProjectResponse updateForMember(Long id, String studentId, String category,
+                                               String title, String description, String linkUrl) {
+        requireEditor(id, studentId, false);
+        update(id, category, title, description, null, null, linkUrl, null, null);
+        return toResponse(get(id), studentId, false);
     }
 
     public ClubProjectResponse update(Long id, String category, String title, String description, String eyebrow,
@@ -110,6 +151,10 @@ public class ClubProjectService {
 
     public void delete(Long id) {
         ClubProject project = get(id);
+        for (ClubProjectImage image : imageRepository.findByClubProjectIdOrderByPositionAsc(id)) {
+            storageService.delete(image.getStoredName());
+        }
+        imageRepository.deleteByClubProjectId(id);
         for (ClubProjectFile file : fileRepository.findByClubProjectIdOrderByPositionAsc(id)) {
             storageService.delete(file.getStoredName());
         }
@@ -165,6 +210,73 @@ public class ClubProjectService {
     @Transactional(readOnly = true)
     public Resource loadFileResource(Long id, Long fileId) {
         return storageService.load(loadFileMeta(id, fileId).getStoredName());
+    }
+
+    public List<Long> addImages(Long id, List<MultipartFile> images) {
+        get(id);
+        if (images == null || images.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "사진을 선택하세요.");
+        }
+        List<ClubProjectImage> existing = imageRepository.findByClubProjectIdOrderByPositionAsc(id);
+        if (existing.size() + images.size() > MAX_IMAGES_PER_PROJECT) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "사진은 최대 6장까지 올릴 수 있습니다.");
+        }
+        for (MultipartFile image : images) validateImage(image);
+        List<Long> ids = new java.util.ArrayList<>();
+        List<String> storedNames = new java.util.ArrayList<>();
+        int position = existing.stream().mapToInt(ClubProjectImage::getPosition).max().orElse(-1) + 1;
+        try {
+            for (MultipartFile image : images) {
+                String stored = storageService.storeImage(image, image.getContentType());
+                storedNames.add(stored);
+                ids.add(imageRepository.save(new ClubProjectImage(id, stored, image.getContentType(), position++)).getId());
+            }
+        } catch (IOException | RuntimeException e) {
+            storedNames.forEach(storageService::delete);
+            if (e instanceof IOException) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "사진 저장에 실패했습니다.", e);
+            }
+            throw (RuntimeException) e;
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCompletion(int status) {
+                    if (status != STATUS_COMMITTED) storedNames.forEach(storageService::delete);
+                }
+            });
+        }
+        return ids;
+    }
+
+    private void validateImage(MultipartFile image) {
+        if (image == null || image.isEmpty() || image.getSize() > MAX_IMAGE_BYTES ||
+                !("image/jpeg".equals(image.getContentType()) || "image/png".equals(image.getContentType()))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "10MB 이하 JPEG 또는 PNG 사진만 올릴 수 있습니다.");
+        }
+        byte[] header = UploadSniffer.header(image);
+        if (UploadSniffer.imageType(header) == null ||
+                !image.getContentType().equals(UploadSniffer.imageType(header).mimeType())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "사진 형식이 파일 내용과 일치하지 않습니다.");
+        }
+    }
+
+    public void deleteImage(Long id, Long imageId) {
+        ClubProjectImage image = loadImageMeta(id, imageId);
+        storageService.delete(image.getStoredName());
+        imageRepository.delete(image);
+    }
+
+    @Transactional(readOnly = true)
+    public ClubProjectImage loadImageMeta(Long id, Long imageId) {
+        ClubProjectImage image = imageRepository.findById(imageId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!image.getClubProjectId().equals(id)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return image;
+    }
+
+    @Transactional(readOnly = true)
+    public Resource loadImageResource(Long id, Long imageId) {
+        return storageService.load(loadImageMeta(id, imageId).getStoredName());
     }
 
     @Transactional(readOnly = true)
@@ -282,13 +394,27 @@ public class ClubProjectService {
                 .collect(Collectors.groupingBy(ClubProjectFile::getClubProjectId));
     }
 
+    private Map<Long, List<ClubProjectImage>> imagesByProject(List<ClubProject> projects) {
+        List<Long> ids = projects.stream().map(ClubProject::getId).filter(Objects::nonNull).toList();
+        if (ids.isEmpty()) return Map.of();
+        return imageRepository.findByClubProjectIdInOrderByPositionAsc(ids).stream()
+                .collect(Collectors.groupingBy(ClubProjectImage::getClubProjectId));
+    }
+
     private ClubProjectResponse toResponse(ClubProject project) {
-        return toResponse(project, categoryService.keyToNameMap(), filesByProject(List.of(project)));
+        return toResponse(project, null, false);
+    }
+
+    private ClubProjectResponse toResponse(ClubProject project, String viewerStudentId, boolean manager) {
+        return toResponse(project, categoryService.keyToNameMap(), filesByProject(List.of(project)),
+                imagesByProject(List.of(project)), viewerStudentId, manager);
     }
 
     private ClubProjectResponse toResponse(ClubProject project,
                                            Map<String, String> categoryNames,
-                                           Map<Long, List<ClubProjectFile>> filesByProject) {
+                                           Map<Long, List<ClubProjectFile>> filesByProject,
+                                           Map<Long, List<ClubProjectImage>> imagesByProject,
+                                           String viewerStudentId, boolean manager) {
         List<ClubProjectFile> files = filesByProject.getOrDefault(project.getId(), List.of());
         List<ClubProjectResponse.FileInfo> fileInfos = files.stream()
                 .map(file -> new ClubProjectResponse.FileInfo(
@@ -310,6 +436,11 @@ public class ClubProjectService {
                 project.getDisplayUrl(),
                 project.getPosition(),
                 fileInfos,
+                manager || (viewerStudentId != null && viewerStudentId.equals(project.getOwnerStudentId())),
+                imagesByProject.getOrDefault(project.getId(), List.of()).stream()
+                        .map(image -> new ClubProjectResponse.ImageInfo(image.getId(),
+                                "/api/club-projects/" + project.getId() + "/images/" + image.getId()))
+                        .toList(),
                 project.getCreatedAt(),
                 project.getUpdatedAt()
         );

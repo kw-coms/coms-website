@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { MessageCircle, X } from 'lucide-react'
 import { useAuth } from '../../contexts/useAuth'
@@ -24,6 +24,10 @@ function AskDialog({ onClose, user }: { onClose: () => void; user: { email?: str
   const errorRef = useRef<HTMLDivElement>(null)
   const dialogRef = useModalFocus(true, onClose, { initialFocusRef: questionRef })
   const replyEmail = emailEdited ? email : (user?.email || '')
+
+  useLayoutEffect(() => {
+    if (stage === 'email') emailRef.current?.focus()
+  }, [stage])
 
   useEffect(() => {
     const viewport = window.visualViewport
@@ -59,7 +63,6 @@ function AskDialog({ onClose, user }: { onClose: () => void; user: { email?: str
     setQuestion(trimmed)
     setError('')
     setStage('email')
-    window.requestAnimationFrame(() => emailRef.current?.focus())
   }
 
   async function send(event?: React.FormEvent) {

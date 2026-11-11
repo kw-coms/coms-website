@@ -49,7 +49,7 @@ export default function AdminAppCatalog() {
     setError('')
     listClubProjects()
       .then((data) => setItems(Array.isArray(data) ? data : []))
-      .catch((err) => setError(err.message || 'Apps 항목을 불러오지 못했습니다.'))
+      .catch((err) => setError(err.message || '작품을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }
 
@@ -73,7 +73,7 @@ export default function AdminAppCatalog() {
         setCategories(list)
         setForm((prev) => (prev.category || list.length === 0 ? prev : { ...prev, category: list[0].key }))
       })
-      .catch((err) => { if (mounted) setError(err.message || 'Apps 항목을 불러오지 못했습니다.') })
+      .catch((err) => { if (mounted) setError(err.message || '작품을 불러오지 못했습니다.') })
       .finally(() => { if (mounted) setLoading(false) })
     listClubProjectLinkStatuses()
       .then((statuses) => { if (mounted) setLinkStatuses(statuses) })
@@ -114,26 +114,26 @@ export default function AdminAppCatalog() {
         if (Array.isArray(refreshed)) setItems(refreshed)
       }
       if (fileError) {
-        setError(`Apps 항목은 등록됐지만 배포 파일 업로드를 마치지 못했습니다. (${fileError}) 아래 목록에서 '수정'을 눌러 파일을 다시 추가해주세요.`)
+        setError(`작품은 등록됐지만 배포 파일 업로드를 마치지 못했습니다. (${fileError}) 아래 목록에서 '수정'을 눌러 파일을 다시 추가해주세요.`)
       } else {
-        setNotice('Apps 항목을 등록했습니다.')
+        setNotice('작품을 등록했습니다.')
       }
       if (fileInputRef.current) fileInputRef.current.value = ''
       setForm((prev) => ({ ...prev, title: '', eyebrow: '', description: '', linkUrl: '', displayUrl: '', files: [] }))
     } catch (err) {
-      setError(err.message || 'Apps 항목 등록 중 오류가 발생했습니다.')
+      setError(err.message || '작품 등록 중 오류가 발생했습니다.')
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (item) => {
-    if (!(await confirmDialog({ message: `${item.title} Apps 항목을 삭제하시겠습니까?`, tone: 'danger' }))) return
+    if (!(await confirmDialog({ message: `${item.title} 작품을 삭제하시겠습니까?`, tone: 'danger' }))) return
     try {
       await deleteClubProject(item.id)
       setItems((prev) => prev.filter((entry) => entry.id !== item.id))
     } catch (err) {
-      showToast({ message: err.message || 'Apps 항목을 삭제하지 못했습니다.', tone: 'error' })
+      showToast({ message: err.message || '작품을 삭제하지 못했습니다.', tone: 'error' })
     }
   }
 
@@ -168,8 +168,8 @@ export default function AdminAppCatalog() {
       />
 
       <form onSubmit={submit} className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
-        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">Apps 항목 등록</p>
-        <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">COM&apos;s Apps에 노출할 웹사이트·앱·게임을 등록합니다. 외부 링크와 배포 파일(apk/zip)을 함께 또는 따로 추가할 수 있습니다.</p>
+        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">작품 등록</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">COM&apos;s 작품에 노출할 웹사이트·앱·게임을 등록합니다. 외부 링크와 배포 파일(apk/zip)을 함께 또는 따로 추가할 수 있습니다.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
             제목
@@ -265,7 +265,7 @@ export default function AdminAppCatalog() {
             />
           </div>
           {form.files.length > 0 && (
-            <div className="rounded-lg border border-[var(--app-hairline)] bg-white/60 p-3 md:col-span-2" aria-label="선택한 Apps 배포 파일">
+            <div className="rounded-lg border border-[var(--app-hairline)] bg-white/60 p-3 md:col-span-2" aria-label="선택한 작품 배포 파일">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-bold text-[var(--theme-body-dark)]">선택한 파일 {form.files.length}개</p>
                 <button
@@ -292,7 +292,7 @@ export default function AdminAppCatalog() {
         </div>
         <div className="mt-4 rounded-lg border border-[var(--app-hairline)] bg-white/60 p-3">
           <p className="text-xs font-bold text-[var(--theme-body-dark)]">공개 카드 미리보기</p>
-          <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">Apps 페이지와 같은 카드 형태로 노출 상태를 확인합니다.</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">작품 페이지와 같은 카드 형태로 노출 상태를 확인합니다.</p>
           <AppProjectCard
             project={draftProject}
             showStatusBadges
@@ -307,7 +307,7 @@ export default function AdminAppCatalog() {
             disabled={saving || !form.title.trim() || !form.category}
             className="shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50"
           >
-            {saving ? '등록 중...' : 'Apps 항목 등록'}
+            {saving ? '등록 중...' : '작품 등록'}
           </button>
           <button
             type="button"
@@ -322,7 +322,7 @@ export default function AdminAppCatalog() {
       </form>
 
       {loading ? (
-        <SkeletonGroup label="Apps 항목을 불러오는 중">
+        <SkeletonGroup label="작품을 불러오는 중">
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="shape-cut-sm flex items-center justify-between gap-3 border border-[var(--app-hairline)] bg-black/5 px-4 py-3">
@@ -336,7 +336,7 @@ export default function AdminAppCatalog() {
           </div>
         </SkeletonGroup>
       ) : items.length === 0 ? (
-        <p className="text-sm text-[var(--theme-body-muted)]">등록된 Apps 항목이 없습니다.</p>
+        <p className="text-sm text-[var(--theme-body-muted)]">등록된 작품이 없습니다.</p>
       ) : (
         <div className="space-y-2">
           {items.map((item) => (

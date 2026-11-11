@@ -39,6 +39,9 @@ public class ClubProject {
     @Column(name = "display_url", length = 255)
     private String displayUrl;
 
+    @Column(name = "owner_student_id", length = 30)
+    private String ownerStudentId;
+
     @Column(nullable = false)
     private int position = 0;
 
@@ -68,6 +71,8 @@ public class ClubProject {
     public void setLinkUrl(String linkUrl) { this.linkUrl = linkUrl; }
     public String getDisplayUrl() { return displayUrl; }
     public void setDisplayUrl(String displayUrl) { this.displayUrl = displayUrl; }
+    public String getOwnerStudentId() { return ownerStudentId; }
+    public void setOwnerStudentId(String ownerStudentId) { this.ownerStudentId = ownerStudentId; }
     public int getPosition() { return position; }
     public void setPosition(int position) { this.position = position; }
     public LocalDateTime getCreatedAt() { return createdAt; }

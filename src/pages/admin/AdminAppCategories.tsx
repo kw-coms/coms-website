@@ -65,8 +65,8 @@ export default function AdminAppCategories({ categories, onChanged }: {
 
   return (
     <div className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
-      <p className="text-sm font-semibold text-[var(--theme-body-dark)]">Apps 분류 관리</p>
-      <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">COM&apos;s Apps 분류를 추가, 이름 변경, 삭제할 수 있습니다. 사용 중인 분류는 삭제할 수 없습니다.</p>
+      <p className="text-sm font-semibold text-[var(--theme-body-dark)]">작품 분류 관리</p>
+      <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">COM&apos;s 작품 분류를 추가, 이름 변경, 삭제할 수 있습니다. 사용 중인 분류는 삭제할 수 없습니다.</p>
 
       <form onSubmit={addCategory} className="mt-3 flex flex-wrap items-center gap-2">
         <input

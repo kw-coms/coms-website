@@ -32,6 +32,9 @@ class ClubProjectServiceTest {
     @Autowired
     private ClubProjectRepository clubProjectRepository;
 
+    @Autowired
+    private com.coms.backend.repository.MemberRepository memberRepository;
+
     @Test
     void seedsDefaultProjectsWithMadeByChoiJunhyuk() {
         var projects = clubProjectService.list();
@@ -61,6 +64,55 @@ class ClubProjectServiceTest {
                     assertThat(p.linkUrl()).isEqualTo("https://coms.kw.ac.kr/PRDoctor");
                     assertThat(p.displayUrl()).isEqualTo("coms.kw.ac.kr/PRDoctor");
                 });
+    }
+
+    @Test
+    void memberOwnsOnlyTheirOwnProjectAndCannotClaimLegacyEntry() {
+        var member = new com.coms.backend.domain.Member();
+        member.setStudentId("2099000001");
+        member.setName("작품 회원");
+        member.setEmail("works-test@example.invalid");
+        member.setPassword("unused");
+        memberRepository.save(member);
+
+        var created = clubProjectService.createForMember("2099000001", "APP", "회원 작품", "소개", "https://example.com");
+        assertThat(created.madeBy()).isEqualTo("작품 회원");
+        assertThat(created.canEdit()).isTrue();
+        assertThat(clubProjectService.list("2099000001", false)).filteredOn(p -> p.id().equals(created.id()))
+                .singleElement().satisfies(p -> assertThat(p.canEdit()).isTrue());
+        assertThat(clubProjectService.list("2099000002", false)).filteredOn(p -> p.id().equals(created.id()))
+                .singleElement().satisfies(p -> assertThat(p.canEdit()).isFalse());
+        assertThatThrownBy(() -> clubProjectService.requireEditor(created.id(), "2099000002", false))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value()).isEqualTo(403));
+        Long legacyId = clubProjectService.list().stream().filter(p -> !p.id().equals(created.id())).findFirst().orElseThrow().id();
+        assertThatThrownBy(() -> clubProjectService.requireEditor(legacyId, "2099000001", false))
+                .isInstanceOf(ResponseStatusException.class);
+        clubProjectService.requireEditor(legacyId, "2099000001", true);
+        var changed = clubProjectService.updateForMember(created.id(), "2099000001", null, "새 제목", "새 소개", "");
+        assertThat(changed.title()).isEqualTo("새 제목");
+        assertThat(changed.description()).isEqualTo("새 소개");
+        assertThat(changed.madeBy()).isEqualTo("작품 회원");
+    }
+
+    @Test
+    void imageUploadChecksActualBytesAndCountsCoverFirst() {
+        var project = clubProjectService.create("APP", "사진 작품", null, null, "제작자", null, null, null);
+        var fake = new MockMultipartFile("images", "fake.png", "image/png", "not an image".getBytes());
+        assertThatThrownBy(() -> clubProjectService.addImages(project.id(), java.util.List.of(fake)))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value()).isEqualTo(400));
+        byte[] png = java.util.Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lWQAAAAASUVORK5CYII=");
+        var image = new MockMultipartFile("images", "cover.png", "image/png", png);
+        Long imageId = clubProjectService.addImages(project.id(), java.util.List.of(image)).getFirst();
+        assertThat(clubProjectService.list().stream().filter(p -> p.id().equals(project.id())).findFirst().orElseThrow().images())
+                .singleElement().satisfies(info -> assertThat(info.url()).endsWith("/images/" + imageId));
+        assertThat(clubProjectService.loadImageResource(project.id(), imageId).exists()).isTrue();
+        assertThatThrownBy(() -> clubProjectService.addImages(project.id(), java.util.Collections.nCopies(6, image)))
+                .isInstanceOf(ResponseStatusException.class);
+        clubProjectService.deleteImage(project.id(), imageId);
+        assertThat(clubProjectService.list().stream().filter(p -> p.id().equals(project.id())).findFirst().orElseThrow().images()).isEmpty();
     }
 
     @Test
