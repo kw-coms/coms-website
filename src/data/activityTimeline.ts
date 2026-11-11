@@ -176,11 +176,11 @@ export const timelineEvents: TimelineEvent[] = [
   {
     id: 'fall-study',
     term: 'fall',
-    title: '고급 C 프로그래밍 · 블록체인 스터디',
+    title: '고급 C 프로그래밍 스터디',
     dateLabel: '2026 2학기',
     status: 'confirmed',
     kind: '스터디',
-    summary: '이번 학기 스터디로 확정된 두 스터디입니다.',
+    summary: '고급 C 프로그래밍을 공부하는 2학기 스터디입니다.',
   },
   {
     id: 'fall-founding',
