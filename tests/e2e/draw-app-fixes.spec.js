@@ -75,6 +75,23 @@ test('draw names and results belong to one member and logout forgets them', asyn
   await expect.poll(() => page.evaluate(() => localStorage.getItem('coms:draw:v2:1'))).toBeNull()
 })
 
+test('logout clears draw names in another open tab before they can be saved again', async ({ page, context }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/auth/logout', (route) => route.fulfill({ status: 204 }))
+  const other = await context.newPage()
+  await mockAdminApis(other)
+  await page.goto('/draw')
+  await other.goto('/draw')
+  const names = other.getByRole('textbox', { name: /^이름/ })
+  await names.fill('비밀 이름\n친구')
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms:draw:v2:1'))).toContain('비밀 이름')
+  await page.getByTitle('로그아웃', { exact: true }).click()
+  await expect(names).toHaveValue('')
+  await names.fill('다시 입력')
+  expect(await other.evaluate(() => localStorage.getItem('coms:draw:v2:1'))).toBeNull()
+  await other.close()
+})
+
 test('draw discards the shared legacy list and tolerates malformed or blocked storage', async ({ page }) => {
   await mockAdminApis(page)
   await page.addInitScript(() => {

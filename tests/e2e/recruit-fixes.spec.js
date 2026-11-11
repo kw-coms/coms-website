@@ -74,6 +74,35 @@ test('a queued memo save does not hide a failed status change', async ({ page })
   await expect(page.getByLabel('김지원 운영 메모')).toHaveValue('이어 저장한 메모')
 })
 
+test('reverting a memo while its save is pending stores the reverted value', async ({ page }) => {
+  await mockAdminApis(page)
+  let saved = application({ adminNote: 'a' })
+  let release
+  const pending = new Promise((resolve) => { release = resolve })
+  const payloads = []
+  await page.route('**/api/admin/recruit-applications', (route) => route.fulfill({ json: [saved] }))
+  await page.route('**/api/admin/recruit-applications/7/status', async (route) => {
+    const payload = route.request().postDataJSON()
+    payloads.push(payload)
+    if (payloads.length === 1) await pending
+    saved = { ...saved, ...payload }
+    await route.fulfill({ json: saved })
+  })
+  await page.goto('/admin?tab=recruit')
+  const memo = page.getByLabel('김지원 운영 메모')
+  await memo.fill('b')
+  await memo.blur()
+  await expect.poll(() => payloads.length).toBe(1)
+  await memo.fill('a')
+  await memo.blur()
+  release()
+  await expect.poll(() => payloads.length).toBe(2)
+  await expect(page.getByRole('status', { name: '김지원 저장 상태' })).toContainText('저장됨')
+  expect(saved.adminNote).toBe('a')
+  await page.reload()
+  await expect(page.getByLabel('김지원 운영 메모')).toHaveValue('a')
+})
+
 test('status change and memo blur save in order without losing either field', async ({ page }) => {
   await mockAdminApis(page)
   let saved = application()

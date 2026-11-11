@@ -192,7 +192,7 @@ export default function AdminRecruitApplications({ applications, loading, error,
 
   const saveNote = (application) => {
     const note = drafts[application.id]?.adminNote
-    if (note === undefined || note === (application.adminNote || '')) return
+    if (note === undefined || (note === (application.adminNote || '') && !pendingSaves.current.has(application.id))) return
     persist(application, undefined, note)
   }
 
