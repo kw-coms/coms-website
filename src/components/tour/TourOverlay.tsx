@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom'
 import { Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { MOBILE_TOUR_STEPS, TOUR_STEPS, type TourStep } from '../../data/tourSteps'
-import type { TourKind } from './tourState'
+import { setTourSurface, type TourKind } from './tourState'
 import { placeTourCard, type Box, type Layout, type Viewport } from './tourLayout'
 import '../../styles/tour.css'
 
@@ -10,22 +10,35 @@ const EDGE = 12
 // Fixed header (44px) plus air: a target above this line is under the bar.
 const HEADER_CLEARANCE = 60
 
-const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-
-function boxOf(el: Element): Box | null {
+function boxOf(el: Element, clipped = true): Box | null {
   const rect = el.getBoundingClientRect()
-  if (rect.width <= 0 || rect.height <= 0 || getComputedStyle(el).visibility === 'hidden') return null
-  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+  if (rect.width <= 0 || rect.height <= 0) return null
+  let { left, top, right, bottom } = rect
+  for (let node: Element | null = el; node; node = node.parentElement) {
+    const style = getComputedStyle(node)
+    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return null
+    if (!clipped || node === el) continue
+    const bounds = node.getBoundingClientRect()
+    if (/auto|scroll|hidden|clip/.test(style.overflowX)) {
+      left = Math.max(left, bounds.left)
+      right = Math.min(right, bounds.right)
+    }
+    if (/auto|scroll|hidden|clip/.test(style.overflowY)) {
+      top = Math.max(top, bounds.top)
+      bottom = Math.min(bottom, bounds.bottom)
+    }
+  }
+  return right > left && bottom > top ? { left, top, width: right - left, height: bottom - top } : null
 }
 
 /** The first element of each selector that is really on screen (not collapsed, not hidden), and the box around them all. */
 function findTargets(selectors: string[] = []) {
   const els: Element[] = []
   for (const selector of selectors) {
-    const el = [...document.querySelectorAll(selector)].find((candidate) => boxOf(candidate))
+    const el = [...document.querySelectorAll(selector)].find((candidate) => boxOf(candidate, false))
     if (el) els.push(el)
   }
-  const boxes = els.map((el) => boxOf(el) as Box)
+  const boxes = els.map((el) => boxOf(el)).filter((box): box is Box => box !== null)
   if (boxes.length === 0) return { els, box: null }
   const left = Math.min(...boxes.map((b) => b.left))
   const top = Math.min(...boxes.map((b) => b.top))
@@ -59,6 +72,7 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
   const [index, setIndex] = useState(0)
   const [layout, setLayout] = useState<Layout | null>(null)
   const [ready, setReady] = useState(false)
+  const [preparedStep, setPreparedStep] = useState<TourStep | null>(null)
   const [nudged, setNudged] = useState(false)
   const titleId = useId()
   const bodyId = useId()
@@ -71,7 +85,9 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
   const nudgeTimerRef = useRef(0)
   const onCloseRef = useRef(onClose)
   const onShownRef = useRef(onShown)
+  const shownRef = useRef(false)
   const step = steps[index]
+  const prepared = preparedStep === step
   const last = index === steps.length - 1
 
   useEffect(() => {
@@ -80,7 +96,13 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
     onShownRef.current = onShown
   })
 
-  useEffect(() => { onShownRef.current?.() }, [])
+  useEffect(() => {
+    if (!prepared || shownRef.current) return
+    shownRef.current = true
+    onShownRef.current?.()
+  }, [prepared])
+
+  useEffect(() => () => setTourSurface(null), [])
 
   // Skip, 완료 and Esc: the tour scrolled to a target (the footer), so leave the page where the
   // visitor was. Not done in the unmount cleanup: after a navigation that would scroll the new page.
@@ -95,7 +117,7 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
     if (!card) return
     const current = selected ?? steps[indexRef.current]
     const next = placeTourCard(findTargets(current.targets).box, card.offsetWidth,
-      Math.max(card.offsetHeight, card.scrollHeight), visibleViewport(), current.id === 'questions')
+        Math.max(card.offsetHeight, card.scrollHeight), visibleViewport(), true)
     setLayout((prev) => (sameLayout(prev, next) ? prev : next))
   }, [steps])
 
@@ -107,19 +129,53 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
     })
   }, [measure])
 
-  // A new step: bring its target into view if it is off screen, then place spotlight and card.
+  // Open real UI first; React commits it before the two frames that scroll and measure it.
   useLayoutEffect(() => {
-    const { els, box } = findTargets(step.targets)
-    const el = els[0]
-    const view = visibleViewport()
-    // Anything in the fixed header is always on screen; scrolling for it would only jolt the page.
-    if (el && box && !el.closest('header') && (box.top < Math.max(HEADER_CLEARANCE, view.top + EDGE) || box.top + box.height > view.top + view.height - EDGE)) {
-      // Glide when the target is near; a long page jumps (an 8000px glide to the footer drags).
-      const near = Math.abs(box.top - (view.top + view.height / 2)) < view.height * 2
-      el.scrollIntoView({ block: 'center', behavior: near && !prefersReducedMotion() ? 'smooth' : 'auto' })
-      scrolledRef.current = true
+    let disposed = false
+    let revealFrame = 0
+    let measureFrame = 0
+    const prepare = () => {
+      if (disposed || revealFrame || measureFrame) return
+      setPreparedStep(null)
+      revealFrame = window.requestAnimationFrame(() => {
+        revealFrame = 0
+        if (disposed) return
+        const { els } = findTargets(step.targets)
+        const view = visibleViewport()
+        for (const el of els) {
+          const box = el.getBoundingClientRect()
+          // Header triggers are fixed, but rows inside the menu have their own scrollport.
+          if (el.closest('#mobile-menu, #nav-panel') || !el.closest('header') &&
+            (box.top < Math.max(HEADER_CLEARANCE, view.top + EDGE) || box.bottom > view.top + view.height - EDGE)) {
+            el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' })
+            scrolledRef.current = true
+          }
+        }
+        measureFrame = window.requestAnimationFrame(() => {
+          measureFrame = 0
+          if (disposed) return
+          measure(step)
+          setPreparedStep(step)
+        })
+      })
     }
-    measure(step)
+    const reconcile = () => {
+      setTourSurface(step.surface ?? null)
+      prepare()
+    }
+    const mutation = new MutationObserver((records) => {
+      if (records.some((record) => !(record.target instanceof Element && record.target.closest('.coms-tour')))) prepare()
+    })
+    mutation.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden'] })
+    window.addEventListener('resize', reconcile)
+    reconcile()
+    return () => {
+      disposed = true
+      mutation.disconnect()
+      window.removeEventListener('resize', reconcile)
+      window.cancelAnimationFrame(revealFrame)
+      window.cancelAnimationFrame(measureFrame)
+    }
   }, [step, measure])
 
   // Glide between steps only after the first placement, so the opening is not a slide from the corner.
@@ -154,7 +210,6 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
     startYRef.current = window.scrollY
     const root = document.getElementById('root')
     root?.setAttribute('inert', '')
-    cardRef.current?.focus({ preventScroll: true })
     return () => {
       root?.removeAttribute('inert')
       if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true })
@@ -166,10 +221,11 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
   useEffect(() => {
     const card = cardRef.current
     const active = document.activeElement
-    if (card && (!card.contains(active) || active?.matches(':disabled'))) {
-      ;(primaryRef.current ?? card).focus({ preventScroll: true })
+    if (prepared && card && (!card.contains(active) || active?.matches(':disabled'))) {
+      if (index === 0) card.focus({ preventScroll: true })
+      else (primaryRef.current ?? card).focus({ preventScroll: true })
     }
-  }, [index])
+  }, [index, prepared])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -209,7 +265,7 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
   const Icon = step.icon
   const spot = layout?.spot ?? null
   return createPortal(
-    <div className="coms-tour" data-site-tour data-tour-profile={mobile ? 'mobile' : 'desktop'} data-tour-step={step.id}>
+      <div className="coms-tour" data-site-tour data-tour-profile={mobile ? 'mobile' : 'desktop'} data-tour-step={step.id} data-tour-ready={prepared}>
       <div className="coms-tour-shield" onPointerDown={nudge} aria-hidden="true" />
       <div
         className={`coms-tour-spot ${ready ? 'is-ready' : ''} ${spot ? '' : 'is-none'}`}

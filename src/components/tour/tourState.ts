@@ -5,6 +5,14 @@ export type TourKind = 'guest' | 'member'
 
 export const START_TOUR_EVENT = 'coms:start-tour'
 
+export type TourSurface = 'menu' | 'club' | 'learn' | 'members' | 'tools' | 'account' | 'ask' | null
+export const TOUR_SURFACE_EVENT = 'coms:tour-surface'
+
+/** Show real controls during guidance; null releases any surface the tour opened. */
+export function setTourSurface(surface: TourSurface) {
+  window.dispatchEvent(new CustomEvent<TourSurface>(TOUR_SURFACE_EVENT, { detail: surface }))
+}
+
 /** Opens the tour from anywhere (footer, quick jump, mobile menu). */
 export function startSiteTour() {
   window.dispatchEvent(new Event(START_TOUR_EVENT))

@@ -7,10 +7,11 @@ import { useAuth } from '../../contexts/useAuth'
 import { useModalFocus } from '../../hooks/useModalFocus'
 import { getPublicSiteSettings } from '../../services/siteSettingsApi'
 import { sendAsk } from '../../services/askApi'
+import { TOUR_SURFACE_EVENT, type TourSurface } from '../tour/tourState'
 
 type Stage = 'faq' | 'answer' | 'question' | 'email' | 'done'
 
-function AskDialog({ onClose, user, askEnabled }: { onClose: () => void; user: { email?: string } | null; askEnabled: boolean }) {
+function AskDialog({ onClose, user, askEnabled, preview = false }: { onClose: () => void; user: { email?: string } | null; askEnabled: boolean; preview?: boolean }) {
   const [stage, setStage] = useState<Stage>('faq')
   const [selectedFaq, setSelectedFaq] = useState<AskFaq | null>(null)
   const [question, setQuestion] = useState('')
@@ -27,15 +28,16 @@ function AskDialog({ onClose, user, askEnabled }: { onClose: () => void; user: {
   const emailRef = useRef<HTMLInputElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const errorRef = useRef<HTMLDivElement>(null)
-  const dialogRef = useModalFocus(true, onClose, { initialFocusRef: firstFaqRef })
+  const dialogRef = useModalFocus(!preview, onClose, { initialFocusRef: firstFaqRef })
   const replyEmail = emailEdited ? email : (user?.email || '')
 
   useEffect(() => {
+    if (preview) return
     if (stage === 'email') emailRef.current?.focus()
     else if (stage === 'question') questionRef.current?.focus()
     else if (stage === 'faq') firstFaqRef.current?.focus()
     else if (stage === 'answer') answerRef.current?.focus()
-  }, [stage])
+  }, [stage, preview])
 
   const backToFaq = () => {
     if (stage === 'done') {
@@ -51,6 +53,7 @@ function AskDialog({ onClose, user, askEnabled }: { onClose: () => void; user: {
   }
 
   useEffect(() => {
+    if (preview) return
     const viewport = window.visualViewport
     if (!viewport) return
     const update = () => {
@@ -64,7 +67,7 @@ function AskDialog({ onClose, user, askEnabled }: { onClose: () => void; user: {
       viewport.removeEventListener('resize', update)
       viewport.removeEventListener('scroll', update)
     }
-  }, [])
+  }, [preview])
 
   useEffect(() => {
     if (error) errorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'auto' })
@@ -88,7 +91,7 @@ function AskDialog({ onClose, user, askEnabled }: { onClose: () => void; user: {
 
   async function send(event?: React.FormEvent) {
     event?.preventDefault()
-    if (sending || !askEnabled) return
+    if (preview || sending || !askEnabled) return
     const trimmedEmail = replyEmail.trim()
     if (!/^[^\s@\r\n]+@[^\s@\r\n]+\.[^\s@\r\n]+$/.test(trimmedEmail)) {
       setError('답장받을 이메일 주소를 확인해 주세요.')
@@ -115,8 +118,8 @@ function AskDialog({ onClose, user, askEnabled }: { onClose: () => void; user: {
   }
 
   return (
-    <div className="coms-ask-backdrop" onPointerDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <section id="coms-ask-panel" ref={dialogRef} className="coms-ask-panel" role="dialog" aria-modal="true" aria-labelledby="coms-ask-title" style={keyboardInset || undefined}>
+    <div className="coms-ask-backdrop" data-tour-preview={preview ? 'true' : undefined} inert={preview} onPointerDown={(event) => { if (!preview && event.target === event.currentTarget) onClose() }}>
+      <section id="coms-ask-panel" ref={dialogRef} className="coms-ask-panel" role={preview ? 'region' : 'dialog'} aria-modal={preview ? undefined : true} aria-labelledby="coms-ask-title" style={keyboardInset || undefined}>
         <div className="coms-ask-header">
           <div>
             <p className="coms-ask-eyebrow">COM&apos;s</p>
@@ -141,9 +144,9 @@ function AskDialog({ onClose, user, askEnabled }: { onClose: () => void; user: {
           </div>
           {stage === 'faq' && <div className="coms-ask-choices">
             <div className="coms-ask-faq" role="group" aria-label="자주 묻는 질문">
-              {ASK_FAQS.map((faq, index) => <button key={faq.id} ref={index === 0 ? firstFaqRef : undefined} type="button" onClick={() => { setSelectedFaq(faq); setStage('answer') }}>{faq.question}</button>)}
+              {ASK_FAQS.map((faq, index) => <button key={faq.id} ref={index === 0 ? firstFaqRef : undefined} type="button" onClick={() => { if (preview) return; setSelectedFaq(faq); setStage('answer') }}>{faq.question}</button>)}
             </div>
-            <button type="button" className="coms-ask-other" disabled={!askEnabled} onClick={() => setStage('question')}>다른 질문 보내기</button>
+            <button type="button" className="coms-ask-other" disabled={preview || !askEnabled} onClick={() => setStage('question')}>다른 질문 보내기</button>
             {!askEnabled && <p className="coms-ask-unavailable">지금은 이메일 문의를 받지 않고 있어요. 위 답변은 계속 확인할 수 있습니다.</p>}
           </div>}
           {stage === 'answer' && <div className="coms-ask-choices">
@@ -180,8 +183,14 @@ function AskDialog({ onClose, user, askEnabled }: { onClose: () => void; user: {
 export default function AskWidget() {
   const { user, loading } = useAuth()
   const [open, setOpen] = useState(false)
+  const [tourPreview, setTourPreview] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const { data: settings } = useQuery({ queryKey: ['site-settings', 'public'], queryFn: getPublicSiteSettings })
+  useEffect(() => {
+    const onTourSurface = (event: Event) => setTourPreview((event as CustomEvent<TourSurface>).detail === 'ask')
+    window.addEventListener(TOUR_SURFACE_EVENT, onTourSurface)
+    return () => window.removeEventListener(TOUR_SURFACE_EVENT, onTourSurface)
+  }, [])
   useEffect(() => {
     const viewport = window.visualViewport
     const measure = () => {
@@ -242,6 +251,7 @@ export default function AskWidget() {
     <div className="coms-ask-root">
       <button ref={triggerRef} type="button" className="coms-ask-trigger" data-tour="ask" data-open={open} aria-hidden={open} tabIndex={open ? -1 : 0} aria-expanded={open} aria-controls="coms-ask-panel" onClick={() => { if (!loading && !document.querySelector('[role="dialog"], [role="alertdialog"], .appearance-popover, #mobile-menu, [data-coms-intro], .coms-tour')) setOpen(true) }} aria-label="질문하기"><MessageCircle size={22} aria-hidden="true" /><span>질문하기</span></button>
       {open && <AskDialog key={user ? `member:${user.studentId || user.id || 'unknown'}` : 'guest'} onClose={() => setOpen(false)} user={user} askEnabled={Boolean(settings?.askEnabled)} />}
+      {!open && tourPreview && <AskDialog key="tour-preview" preview onClose={() => setTourPreview(false)} user={user} askEnabled={Boolean(settings?.askEnabled)} />}
     </div>
   )
 }
