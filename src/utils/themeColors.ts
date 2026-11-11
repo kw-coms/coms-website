@@ -4,6 +4,10 @@ export const DEFAULT_ACCENT = '#0071e3'
 export const THEME_MODE_KEY = 'kwcoms-theme-mode:v2'
 export const ACCENT_COLOR_KEY = 'kwcoms-accent-color'
 export const FONT_SELECTION_KEY = 'kwcoms-font-id'
+export const INTRO_STYLE_KEY = 'kwcoms-intro-style:v1'
+export const ACCENT_STRENGTH_KEY = 'kwcoms-accent-strength:v1'
+export type IntroStyle = 'cinematic' | 'legacy' | 'off'
+export type AccentStrength = 'standard' | 'vivid'
 
 // localStorage throws (not just returns null) when site data is blocked or storage is full.
 // Preferences are conveniences: on any failure fall back to the defaults instead of letting the
@@ -91,6 +95,28 @@ export function getStoredThemeMode() {
 export function getStoredAccentColor() {
   if (typeof window === 'undefined') return DEFAULT_ACCENT
   return normalizeHex(readStoredValue(ACCENT_COLOR_KEY) || DEFAULT_ACCENT)
+}
+
+export function getStoredIntroStyle(): IntroStyle {
+  const value = readStoredValue(INTRO_STYLE_KEY)
+  return value === 'legacy' || value === 'off' ? value : 'cinematic'
+}
+
+export function getStoredAccentStrength(): AccentStrength {
+  return readStoredValue(ACCENT_STRENGTH_KEY) === 'vivid' ? 'vivid' : 'standard'
+}
+
+export function getAccentTokens(color: string, themeMode: string, strength: AccentStrength = 'standard'): Record<string, string> {
+  const accent = normalizeHex(color)
+  const dark = themeMode === 'dark'
+  const vivid = strength === 'vivid'
+  return {
+    '--app-accent': accent,
+    '--app-accent-hover': mixHex(accent, dark ? '#ffffff' : '#000000', dark ? 0.14 : 0.08),
+    '--app-accent-soft': mixHex(accent, dark ? '#17191f' : '#ffffff', vivid ? (dark ? 0.62 : 0.78) : (dark ? 0.8 : 0.88)),
+    '--app-accent-text': mixHex(accent, dark ? '#ffffff' : '#000000', vivid ? (dark ? 0.52 : 0.62) : (dark ? 0.28 : 0.08)),
+    '--app-accent-border': `color-mix(in srgb, ${accent} ${vivid ? 74 : 42}%, transparent)`,
+  }
 }
 
 export function scrollToTopInstant() {

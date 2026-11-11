@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listFonts } from './services/fontApi'
@@ -10,13 +10,17 @@ import { ConfirmHost } from './components/common/ConfirmDialog'
 import RouteErrorBoundary from './components/common/RouteErrorBoundary'
 import {
   ACCENT_COLOR_KEY,
+  ACCENT_STRENGTH_KEY,
   FONT_SELECTION_KEY,
+  INTRO_STYLE_KEY,
   THEME_MODE_KEY,
   forgetStoredValue,
   getStoredAccentColor,
+  getStoredAccentStrength,
   getStoredFontId,
+  getStoredIntroStyle,
   getStoredThemeMode,
-  mixHex,
+  getAccentTokens,
   normalizeHex,
   storeValue,
 } from './utils/themeColors'
@@ -64,7 +68,7 @@ const PracticeListPage = lazy(() => import('./pages/study/exercises/PracticeList
 const ProblemPage = lazy(() => import('./pages/study/exercises/ProblemPage'))
 const ProjectsDetailPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.ProjectsDetailPage })))
 
-const ComsIntro = lazy(() => import('./components/common/ComsIntro'))
+const IntroPlayback = lazy(() => import('./components/common/ComsIntro').then(({ IntroPlayback }) => ({ default: IntroPlayback })))
 
 const FONTS_QUERY_KEY = ['app-shell', 'fonts']
 
@@ -74,6 +78,22 @@ function App() {
   const location = useLocation()
   const [themeMode, setThemeMode] = useState(getStoredThemeMode)
   const [accentColor, setAccentColor] = useState(getStoredAccentColor)
+  const [accentStrength, setAccentStrength] = useState(getStoredAccentStrength)
+  const [introStyle, setIntroStyle] = useState(getStoredIntroStyle)
+  const [introPreview, setIntroPreview] = useState(false)
+  const introFocusRef = useRef<HTMLElement | null>(null)
+  const introFocusFrame = useRef(0)
+  const previewIntro = useCallback(() => {
+    introFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    setIntroPreview(true)
+  }, [])
+  const finishIntroPreview = useCallback(() => {
+    const target = introFocusRef.current
+    introFocusRef.current = null
+    setIntroPreview(false)
+    if (target) introFocusFrame.current = window.requestAnimationFrame(() => { if (target.isConnected) target.focus() })
+  }, [])
+  useEffect(() => () => window.cancelAnimationFrame(introFocusFrame.current), [])
   const [guestFontId, setGuestFontId] = useState(getStoredFontId)
   const routeAnnouncement = useRouteDocumentTitle()
   useSpotlight()
@@ -94,16 +114,15 @@ function App() {
     const accent = normalizeHex(accentColor)
 
     root.dataset.themeMode = mode
+    root.dataset.accentStrength = accentStrength
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', mode === 'dark' ? '#0f1115' : '#ffffff')
-    root.style.setProperty('--app-accent', accent)
-    root.style.setProperty('--app-accent-hover', mixHex(accent, mode === 'dark' ? '#ffffff' : '#000000', mode === 'dark' ? 0.14 : 0.08))
-    root.style.setProperty('--app-accent-soft', mixHex(accent, mode === 'dark' ? '#17191f' : '#ffffff', mode === 'dark' ? 0.8 : 0.88))
-    root.style.setProperty('--app-accent-text', mode === 'dark' ? mixHex(accent, '#ffffff', 0.28) : mixHex(accent, '#000000', 0.08))
-    root.style.setProperty('--app-accent-border', `color-mix(in srgb, ${accent} 42%, transparent)`)
+    for (const [property, value] of Object.entries(getAccentTokens(accent, mode, accentStrength))) root.style.setProperty(property, value)
 
     storeValue(THEME_MODE_KEY, mode)
     storeValue(ACCENT_COLOR_KEY, accent)
-  }, [accentColor, themeMode])
+    storeValue(ACCENT_STRENGTH_KEY, accentStrength)
+    storeValue(INTRO_STYLE_KEY, introStyle)
+  }, [accentColor, themeMode, accentStrength, introStyle])
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined
@@ -163,7 +182,7 @@ function App() {
     <>
     <Suspense fallback={<PageFallback />}>
       <a href="#main-content" className="coms-skip-link">본문으로 건너뛰기</a>
-      {location.pathname === '/' && <ComsIntro />}
+      {(location.pathname === '/' || introPreview) && <IntroPlayback home={location.pathname === '/'} introStyle={introStyle} preview={introPreview} onComplete={finishIntroPreview} />}
       <ScrollToTop />
       <GlobalNavigation />
       <div key={location.pathname} id="main-content" tabIndex={-1} className={`coms-page-enter${location.pathname === '/' ? '' : ' coms-inner-page'}`}>
@@ -212,6 +231,11 @@ function App() {
         setAccentColor={setAccentColor}
         themeMode={themeMode}
         setThemeMode={setThemeMode}
+        introStyle={introStyle}
+        setIntroStyle={setIntroStyle}
+        onPreviewIntro={previewIntro}
+        accentStrength={accentStrength}
+        setAccentStrength={setAccentStrength}
         activeFonts={combinedFonts}
         selectedFontId={effectiveFontId}
         onFontChange={handleGuestFontChange}

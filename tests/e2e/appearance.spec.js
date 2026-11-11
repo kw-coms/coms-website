@@ -57,6 +57,51 @@ test('footer sitemap includes the Lab as a full-page link', async ({ page }) => 
 })
 
 test.describe('desktop popover', () => {
+  test('remembers the selected intro and previews it without navigating', async ({ page }) => {
+    await page.goto('/activities')
+    await openFromFooter(page)
+    await dialog(page).getByRole('radio', { name: '예전 인트로' }).click()
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('kwcoms-intro-style:v1'))).toBe('legacy')
+    await dialog(page).getByRole('button', { name: '선택한 인트로 보기' }).click()
+    await expect(dialog(page)).toHaveCount(0)
+    await expect(page.locator('[data-coms-intro]')).toBeVisible()
+    await expect(page).toHaveURL(/\/activities$/)
+    await page.locator('.coms-intro-skip').click()
+    await expect(page.locator('[data-coms-intro]')).toHaveCount(0)
+    await expect(trigger(page)).toBeFocused()
+    await page.reload()
+    await openFromFooter(page)
+    await expect(dialog(page).getByRole('radio', { name: '예전 인트로' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  test('accent strength visibly changes and survives a reload', async ({ page }) => {
+    await page.goto('/activities')
+    await openFromFooter(page)
+    const sample = dialog(page).locator('.appearance-accent-preview span').first()
+    const before = await sample.evaluate((element) => getComputedStyle(element).backgroundColor)
+    await dialog(page).getByRole('radio', { name: '선명하게' }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-accent-strength', 'vivid')
+    await expect.poll(() => sample.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(before)
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('kwcoms-accent-strength:v1'))).toBe('vivid')
+    await page.reload()
+    await openFromFooter(page)
+    await expect(dialog(page).getByRole('radio', { name: '선명하게' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  test('preview respects reduced motion and the light screen-effects mode', async ({ page }) => {
+    await page.goto('/activities')
+    await openFromFooter(page)
+    const preview = dialog(page).getByRole('button', { name: '선택한 인트로 보기' })
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await expect(preview).toBeDisabled()
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await expect(preview).toBeEnabled()
+    await dialog(page).getByRole('radio', { name: '가볍게' }).click()
+    await expect(preview).toBeDisabled()
+    await dialog(page).getByRole('radio', { name: '끄기' }).click()
+    await expect(preview).toBeDisabled()
+  })
+
   test('opens with focus inside; Esc closes it and returns focus to the button', async ({ page }) => {
     await page.goto('/activities')
     await openFromFooter(page)
@@ -114,6 +159,16 @@ test.describe('desktop popover', () => {
 
 test.describe('phone bottom sheet', () => {
   test.use({ viewport: { width: 390, height: 844 } })
+
+  test('new preferences remain reachable without horizontal overflow', async ({ page }) => {
+    await page.goto('/activities')
+    await openFromFooter(page)
+    await dialog(page).getByRole('radio', { name: '예전 인트로' }).scrollIntoViewIfNeeded()
+    await expect(dialog(page).getByRole('radio', { name: '예전 인트로' })).toBeVisible()
+    await dialog(page).getByRole('radio', { name: '선명하게' }).scrollIntoViewIfNeeded()
+    await expect(dialog(page).getByRole('radio', { name: '선명하게' })).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1)
+  })
 
   test('sits above the header and tab bar, traps Tab, and is modal', async ({ page }) => {
     await page.goto('/activities')

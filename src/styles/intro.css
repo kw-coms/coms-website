@@ -15,6 +15,17 @@
 	border-block: 1px solid var(--app-hairline-strong);
 	text-align: center;
 }
+.coms-intro[data-intro-style='legacy'] {
+	display: block;
+	animation: none;
+}
+.coms-intro-loading {
+	display: grid;
+	height: 100%;
+	place-items: center;
+	color: var(--app-accent-text);
+	font: 700 clamp(2rem, 12vw, 5rem) var(--cine-mono);
+}
 .coms-intro-leader {
 	position: relative;
 	display: grid;

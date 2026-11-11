@@ -105,6 +105,7 @@ const pwaPlugin = VitePWA({
     // the admin console, highlight.js and Sentry. Those are only fetched when someone opens
     // them; the runtime cache below keeps them for offline use after that first visit.
     globIgnores: [
+      '**/LegacyIntroCanvas-*.js', // Optional historic intro: fetched only when selected or previewed.
       '**/TiptapTextEditor-*.js',
       '**/RichBodyEditor-*.js',
       '**/Admin-*.js',
