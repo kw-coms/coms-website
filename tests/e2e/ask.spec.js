@@ -384,6 +384,7 @@ for (const width of [1440, 390]) for (const theme of ['light', 'dark']) {
         expect(panel.y).toBeGreaterThanOrEqual(0)
         expect(panel.y + panel.height).toBeLessThanOrEqual(width === 390 ? 844 : 900)
         if (width === 390) {
+          await dialog.getByRole('button', { name: '다른 질문 보내기' }).click()
           await dialog.getByRole('textbox', { name: '질문' }).fill('참여 방법을 알려 주세요.')
           await dialog.getByRole('button', { name: '다음' }).click()
           await page.evaluate(() => {

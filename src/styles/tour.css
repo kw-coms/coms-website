@@ -241,6 +241,9 @@
 
 @media (max-width: 1023px) {
 	.coms-tour-btn { min-height: 2.75rem; }
+	/* Phone steps change card height and spotlight target together; intermediate positions can cover the target or exit the viewport. */
+	.coms-tour-card.is-ready,
+	.coms-tour-spot.is-ready { transition: none; }
 }
 
 @keyframes coms-tour-pop {
