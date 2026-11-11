@@ -2077,20 +2077,20 @@ test('community detail supports comment add, reply, edit, and delete', async ({ 
 
   await page.getByPlaceholder('댓글을 입력하세요').fill('새 댓글입니다.')
   await page.getByRole('button', { name: '등록' }).click()
-  expect(createdCommentPayloads[0]).toMatchObject({ content: '새 댓글입니다.', parentCommentId: null })
+  await expect.poll(() => createdCommentPayloads[0]).toMatchObject({ content: '새 댓글입니다.', parentCommentId: null })
   await expect(page.getByText('새 댓글입니다.')).toBeVisible()
 
   const firstComment = page.locator('#comment-1')
   await firstComment.getByRole('button', { name: '댓글 달기' }).click()
   await firstComment.locator('textarea[placeholder="댓글을 입력하세요"]').fill('답글 내용')
   await firstComment.getByRole('button', { name: '등록' }).click()
-  expect(createdCommentPayloads[1]).toMatchObject({ content: '@댓글러 답글 내용', parentCommentId: 1 })
+  await expect.poll(() => createdCommentPayloads[1]).toMatchObject({ content: '@댓글러 답글 내용', parentCommentId: 1 })
   await expect(page.getByText('@댓글러 답글 내용')).toBeVisible()
 
   await firstComment.getByRole('button', { name: '수정' }).click()
   await firstComment.locator('textarea').fill('수정된 댓글입니다.')
   await firstComment.getByRole('button', { name: '저장' }).click()
-  expect(updatedCommentPayload).toMatchObject({ content: '수정된 댓글입니다.' })
+  await expect.poll(() => updatedCommentPayload).toMatchObject({ content: '수정된 댓글입니다.' })
   await expect(page.getByText('수정된 댓글입니다.')).toBeVisible()
 
   await firstComment.getByRole('button', { name: '삭제' }).click()
