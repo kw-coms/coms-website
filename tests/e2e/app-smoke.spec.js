@@ -439,6 +439,52 @@ test('admin roster marks who has signed up and the member list exports as CSV', 
   expect(lines[2]).toContain('"2019 (졸업생)"')
 })
 
+test('roster suggestion stays separate until an operator applies it', async ({ page }) => {
+  await mockAdminApis(page)
+  let roster = [{
+    id: 17, name: 'Fictional Member', studentId: '', phone: '00000000000', email: '',
+    suggestedMemberId: 27, suggestedStudentId: '2026999999', suggestedEmail: 'suggested@example.invalid',
+  }]
+  let applyPayload = null
+  let applyCalls = 0
+  await page.route('**/api/admin/eligible-members', route => route.fulfill({ json: roster }))
+  await page.route('**/api/admin/roster/17/apply-suggestion', route => {
+    applyCalls += 1
+    applyPayload = route.request().postDataJSON()
+    if (applyCalls === 1) return route.fulfill({ status: 409, json: { message: '명부와 계정 정보를 다시 확인해주세요.' } })
+    roster = [{ ...roster[0], studentId: '2026999999', email: 'suggested@example.invalid', suggestedMemberId: null, suggestedStudentId: null, suggestedEmail: null }]
+    return route.fulfill({ status: 204 })
+  })
+  await page.goto('/admin?tab=roster')
+  const row = page.getByRole('row').filter({ hasText: 'Fictional Member' })
+  await expect(row.getByRole('cell').nth(0)).not.toContainText('2026999999')
+  await expect(row.getByRole('note', { name: /추정 · 확인 필요/ })).toContainText('2026999999')
+  await expect(row.getByRole('note', { name: /추정 · 확인 필요/ })).toContainText('suggested@example.invalid')
+  await expect(row).toContainText('계정에 입력된 이름과 전화번호가 일치합니다. 본인 확인 후 적용하세요.')
+  await page.getByLabel('명부 검색').fill('2026999999')
+  await expect(page.getByText('조건에 맞는 명부가 없습니다.')).toBeVisible()
+  await page.getByLabel('명부 검색').fill('suggested@example.invalid')
+  await expect(page.getByText('조건에 맞는 명부가 없습니다.')).toBeVisible()
+  await page.getByLabel('명부 검색').fill('')
+  const downloading = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'CSV 내보내기' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '확인' }).click()
+  const chunks = []
+  for await (const chunk of await (await downloading).createReadStream()) chunks.push(chunk)
+  const csv = Buffer.concat(chunks).toString('utf8')
+  expect(csv).not.toContain('2026999999')
+  expect(csv).not.toContain('suggested@example.invalid')
+
+  await row.getByRole('button', { name: '적용' }).click()
+  await expect(row.getByRole('alert')).toContainText('명부와 계정 정보를 다시 확인해주세요.')
+  await expect(row.getByRole('button', { name: '적용' })).toBeEnabled()
+  await row.getByRole('button', { name: '적용' }).click()
+  expect(applyPayload).toEqual({ memberId: 27 })
+  await expect(row.getByRole('cell').nth(0)).toContainText('2026999999')
+  await expect(row.getByRole('cell').nth(5)).toContainText('suggested@example.invalid')
+  await expect(row.getByRole('note', { name: /추정 · 확인 필요/ })).toHaveCount(0)
+})
+
 test('notices can be ordered by date, views and upvotes', async ({ page }) => {
   await mockAdminApis(page)
   const notice = (id, title, createdAt, viewCount, upvotes, pinned = false) => ({ id, title, content: '본문', category: 'GENERAL', author: '운영진', authorStudentId: 'a', pinned, createdAt, viewCount, upvotes, myVote: 0 })
@@ -940,7 +986,9 @@ test('admin password reset accepts simple temporary passwords without complexity
   await expect.poll(() => resetPayload).toEqual({ password: 'temp1' })
 })
 
-test('admin roster tab can add edit and delete eligible members', async ({ page }) => {
+for (const width of [1440, 390]) {
+test(`admin roster tab can add edit and delete eligible members at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 })
   await mockAdminApis(page)
   let roster = [
     {
@@ -948,7 +996,11 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
       studentId: '2025123456',
       name: '기존회원',
       generation: 59,
-      phone: '01011112222',
+      phone: '01000000000',
+      email: 'account@example.com',
+      studentIdFromAccount: true,
+      phoneFromAccount: true,
+      emailFromAccount: true,
     },
   ]
   let addPayload = null
@@ -970,6 +1022,7 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
           name: addPayload.name,
           generation: 60,
           phone: '',
+          email: addPayload.email,
         },
       ]
       return route.fulfill({ status: 201, json: roster.at(-1) })
@@ -982,7 +1035,7 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
       updatePayload = route.request().postDataJSON()
       roster = roster.map((member) => (
         member.id === id
-          ? { ...member, ...updatePayload }
+          ? { ...member, ...Object.fromEntries(Object.entries(updatePayload).filter(([, value]) => value !== null)) }
           : member
       ))
       return route.fulfill({ status: 204 })
@@ -999,44 +1052,74 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
   await page.getByRole('tab', { name: '명부 인증' }).click()
 
   await expect(page.getByText('명부 확인 · 편집')).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: '관리', exact: true })).toHaveCount(1)
+  const accountRow = page.getByRole('row').filter({ hasText: '기존회원' })
+  await expect(accountRow.getByLabel('계정에서 채운 학번')).toHaveText('계정')
+  await expect(accountRow.getByLabel('계정에서 채운 전화번호')).toHaveText('계정')
+  await expect(accountRow.getByLabel('계정에서 채운 이메일')).toHaveText('계정')
+  await accountRow.getByRole('button', { name: '편집' }).click()
+  roster = roster.map((member) => ({ ...member, studentId: '2025000001', phone: '01000000002', email: 'refreshed@example.com' }))
+  const refreshed = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/admin/eligible-members' && response.request().method() === 'GET')
+  await page.getByRole('button', { name: '새로고침', exact: true }).click()
+  await refreshed
+  await expect(page.locator('.coms-roster-edit').getByLabel('이메일', { exact: true })).toHaveValue('account@example.com')
+  await page.getByRole('button', { name: '저장', exact: true }).click()
+  await expect.poll(() => updatePayload).toMatchObject({ studentId: null, phone: null, email: null })
+  await expect(accountRow).toContainText('refreshed@example.com')
+  await accountRow.getByRole('button', { name: '편집' }).click()
+  await page.locator('.coms-roster-edit').getByLabel('이메일', { exact: true }).fill('changed@example.com')
+  await page.getByRole('button', { name: '저장', exact: true }).click()
+  await expect.poll(() => updatePayload.email).toBe('changed@example.com')
+  await expect(accountRow).toContainText('changed@example.com')
   await page.getByPlaceholder('학번 (10자리)').fill('2026123456')
   // exact: the roster search box below also mentions 이름 in its placeholder.
   await page.getByPlaceholder('이름', { exact: true }).fill('신규회원')
+  await page.getByPlaceholder('test@example.com', { exact: true }).fill('new@example.com')
   await page.getByRole('button', { name: '추가' }).click()
 
   await expect.poll(() => addPayload).toEqual({
     studentId: '2026123456',
     name: '신규회원',
+    email: 'new@example.com',
   })
   // 기수/전화번호 입력칸은 비워 뒀으므로 payload에 실리지 않아야 한다.
   await expect(page.getByText('신규회원 (2026123456) 명부에 추가됐습니다.')).toBeVisible()
   await expect(page.getByRole('row').filter({ hasText: '신규회원' })).toBeVisible()
 
   await page.getByRole('row').filter({ hasText: '신규회원' }).getByRole('button', { name: '편집' }).click()
-  // 편집 인라인 폼: 학번 / 이름 / 학부·학과 / 기수 / 전화번호 순.
-  const editInputs = page.locator('td[colspan="6"]').locator('input')
-  await editInputs.nth(1).fill('수정회원')
-  await editInputs.nth(0).fill('2026123999')
-  await editInputs.nth(2).fill('컴퓨터정보공학부')
-  await editInputs.nth(3).fill('60')
-  await editInputs.nth(4).fill('01099998888')
+  const editRow = page.getByRole('row').filter({ has: page.getByLabel('학번', { exact: true }) })
+  await editRow.getByLabel('이름', { exact: true }).fill('수정회원')
+  await editRow.getByLabel('학번', { exact: true }).fill('2026123999')
+  await editRow.getByLabel('학부/학과', { exact: true }).fill('컴퓨터정보공학부')
+  await editRow.getByLabel('기수', { exact: true }).fill('60')
+  await editRow.getByLabel('전화번호', { exact: true }).fill('01000000001')
+  await editRow.getByLabel('이메일', { exact: true }).fill('edited@example.com')
   await page.getByRole('button', { name: '저장' }).click()
 
   await expect.poll(() => updatePayload).toEqual({
     studentId: '2026123999',
     name: '수정회원',
     generation: '60',
-    phone: '01099998888',
+    phone: '01000000001',
+    email: 'edited@example.com',
     department: '컴퓨터정보공학부',
   })
   await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toBeVisible()
   await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toContainText('컴퓨터정보공학부')
 
+  await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toContainText('edited@example.com')
+  if (width === 390) {
+    const table = page.getByRole('table')
+    expect(await table.evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0)
+    expect(await table.locator('..').evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0)
+  }
   await page.getByRole('row').filter({ hasText: '수정회원' }).getByRole('button', { name: '삭제' }).click()
 
   await expect.poll(() => deletedId).toBe(2)
   await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toHaveCount(0)
 })
+
+}
 
 test('admin ban tab can ban and unban student ids', async ({ page }) => {
   await mockAdminApis(page)

@@ -1,0 +1,1 @@
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS ask_inbox_email VARCHAR(254) NOT NULL DEFAULT '';

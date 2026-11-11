@@ -2,11 +2,13 @@ package com.coms.backend.controller;
 
 import com.coms.backend.dto.SiteSettingsRequest;
 import com.coms.backend.dto.SiteSettingsResponse;
+import com.coms.backend.dto.AdminSiteSettingsResponse;
 import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.SiteSettingsService;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.TestingAuthenticationToken;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
@@ -32,6 +34,8 @@ class SiteSettingsControllerTest {
         when(siteSettingsService.current()).thenReturn(response);
 
         assertThat(controller.current().getBody()).isEqualTo(response);
+        String json = JsonMapper.builder().build().writeValueAsString(controller.current().getBody());
+        assertThat(json).contains("\"askEnabled\":false").doesNotContain("askInboxEmail", "inbox@example.com");
     }
 
     @Test
@@ -52,9 +56,10 @@ class SiteSettingsControllerTest {
                 "8월 25일 - 9월 5일",
                 "COM's 모집",
                 "새 학기 모집 안내입니다.",
-                List.of(new SiteSettingsRequest.ContactLinkRequest("Mail", "mailto:kwcoms69@gmail.com"))
+                List.of(new SiteSettingsRequest.ContactLinkRequest("Mail", "mailto:test@example.com")),
+                "inbox@example.com"
         );
-        when(siteSettingsService.publish(request)).thenReturn(response("2026-2 모집"));
+        when(siteSettingsService.publish(request)).thenReturn(adminResponse("2026-2 모집"));
 
         controller.publish(request, new TestingAuthenticationToken("2026000001", "password"));
 
@@ -79,9 +84,30 @@ class SiteSettingsControllerTest {
                 "상세 일정은 COM's 공식 채널과 학내 공지를 통해 안내됩니다.",
                 "COM's",
                 "배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.",
-                List.of(new SiteSettingsResponse.ContactLink("Mail", "mailto:kwcoms69@gmail.com")),
+                List.of(new SiteSettingsResponse.ContactLink("Mail", "mailto:test@example.com")),
                 LocalDateTime.now(),
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                false
         );
+    }
+
+    private AdminSiteSettingsResponse adminResponse(String semesterLabel) {
+        SiteSettingsResponse publicFields = response(semesterLabel);
+        return new AdminSiteSettingsResponse(
+                publicFields.id(), publicFields.semesterLabel(), publicFields.recruitmentStatus(),
+                publicFields.recruitmentPeriod(), publicFields.homeHeroTitle(), publicFields.homeHeroCopy(),
+                publicFields.contactLinks(), publicFields.createdAt(), publicFields.updatedAt(), true,
+                "inbox@example.com"
+        );
+    }
+
+    @Test
+    void adminSettingsReadsArePermissionGuardedAndIncludeInbox() throws Exception {
+        Method method = SiteSettingsController.class.getMethod("adminCurrent");
+        assertThat(method.getAnnotation(PreAuthorize.class).value())
+                .isEqualTo("@perm.has(authentication,'SITE_SETTINGS_EDIT')");
+        when(siteSettingsService.adminCurrent()).thenReturn(adminResponse("Semester"));
+        String json = JsonMapper.builder().build().writeValueAsString(controller.adminCurrent().getBody());
+        assertThat(json).contains("\"askInboxEmail\":\"inbox@example.com\"");
     }
 }

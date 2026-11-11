@@ -12,7 +12,8 @@ public record SiteSettingsRequest(
         @NotBlank @Size(max = 240) String recruitmentPeriod,
         @NotBlank @Size(max = 120) String homeHeroTitle,
         @NotBlank @Size(max = 500) String homeHeroCopy,
-        @Valid @Size(max = 5) List<ContactLinkRequest> contactLinks
+        @Valid @Size(max = 5) List<ContactLinkRequest> contactLinks,
+        @Size(max = 254) String askInboxEmail
 ) {
     public record ContactLinkRequest(
             @NotBlank @Size(max = 80) String label,

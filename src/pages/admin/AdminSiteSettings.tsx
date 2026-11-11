@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
 import {
   defaultSiteSettings,
+  defaultAdminSiteSettings,
   getAdminSiteSettings,
   getClubRoom,
   publishSiteSettings,
   updateClubRoom,
   type SiteSettings,
+  type AdminSiteSettings,
 } from '../../services/siteSettingsApi'
 import { showToast } from '../../components/common/Toast'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 import ErrorState from '../../components/common/ErrorState'
+import { queryClient } from '../../services/queryClient'
 
 function linksToText(settings: SiteSettings) {
   return settings.contactLinks.map((link) => `${link.label} | ${link.href}`).join('\n')
@@ -132,8 +135,8 @@ function ClubRoomAdminCard() {
 }
 
 export default function AdminSiteSettings() {
-  const [current, setCurrent] = useState<SiteSettings | null>(null)
-  const [form, setForm] = useState<SiteSettings>(defaultSiteSettings)
+  const [current, setCurrent] = useState<AdminSiteSettings | null>(null)
+  const [form, setForm] = useState<AdminSiteSettings>(defaultAdminSiteSettings)
   const [contactText, setContactText] = useState(linksToText(defaultSiteSettings))
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -169,7 +172,7 @@ export default function AdminSiteSettings() {
     }
   }
 
-  const update = (field: keyof SiteSettings, value: string) => {
+  const update = (field: keyof AdminSiteSettings, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
@@ -182,6 +185,7 @@ export default function AdminSiteSettings() {
       setCurrent(published)
       setForm(published)
       setContactText(linksToText(published))
+      void queryClient.invalidateQueries({ queryKey: ['site-settings', 'public'] })
       showToast({ message: '사이트 문구를 게시했습니다.', tone: 'success' })
     } catch (err) {
       setError(err.message || '사이트 문구를 저장하지 못했습니다.')
@@ -283,6 +287,11 @@ export default function AdminSiteSettings() {
             문의 링크
             <textarea value={contactText} onChange={(e) => setContactText(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-[var(--app-hairline)] bg-white px-3 py-2 text-sm outline-none" />
             <span className="mt-1 block text-xs font-medium text-[var(--theme-body-muted)]">한 줄에 하나씩 `라벨 | 링크` 형식으로 입력합니다.</span>
+          </label>
+          <label className="text-sm font-semibold text-[var(--theme-body-dark)] sm:col-span-2">
+            질문 받을 메일 주소
+            <input type="email" value={form.askInboxEmail} onChange={(e) => update('askInboxEmail', e.target.value)} maxLength={254} placeholder="test@example.com" className="mt-1 w-full rounded-lg border border-[var(--app-hairline)] bg-white px-3 py-2 text-sm outline-none" />
+            <span className="mt-1 block text-xs font-medium text-[var(--theme-body-muted)]">비워 두면 방문자 질문 위젯이 표시되지 않습니다. 입력한 주소는 관리자에게만 보입니다.</span>
           </label>
         </div>
 

@@ -1,11 +1,13 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.SiteSettings;
+import com.coms.backend.dto.AdminSiteSettingsResponse;
 import com.coms.backend.dto.SiteSettingsRequest;
 import com.coms.backend.dto.SiteSettingsResponse;
 import com.coms.backend.repository.SiteSettingsRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,14 +28,25 @@ public class SiteSettingsService {
     );
 
     private final SiteSettingsRepository siteSettingsRepository;
+    private final boolean mailEnabled;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public SiteSettingsService(SiteSettingsRepository siteSettingsRepository) {
+    public SiteSettingsService(SiteSettingsRepository siteSettingsRepository,
+                               @Value("${mail.enabled:false}") boolean mailEnabled) {
         this.siteSettingsRepository = siteSettingsRepository;
+        this.mailEnabled = mailEnabled;
     }
 
     public SiteSettingsResponse current() {
         return toResponse(siteSettingsRepository.findById(SINGLETON_ID).orElseGet(this::createDefaults));
+    }
+
+    public AdminSiteSettingsResponse adminCurrent() {
+        return toAdminResponse(siteSettingsRepository.findById(SINGLETON_ID).orElseGet(this::createDefaults));
+    }
+
+    public String askInboxEmail() {
+        return siteSettingsRepository.findById(SINGLETON_ID).orElseGet(this::createDefaults).getAskInboxEmail();
     }
 
     public String clubRoomCode() {
@@ -46,7 +59,7 @@ public class SiteSettingsService {
         return siteSettingsRepository.save(settings).getClubRoomCode();
     }
 
-    public SiteSettingsResponse publish(SiteSettingsRequest request) {
+    public AdminSiteSettingsResponse publish(SiteSettingsRequest request) {
         SiteSettings settings = siteSettingsRepository.findById(SINGLETON_ID).orElseGet(this::createDefaults);
         settings.setSemesterLabel(required(request.semesterLabel(), "Semester label is required."));
         settings.setRecruitmentStatus(required(request.recruitmentStatus(), "Recruitment status is required."));
@@ -54,7 +67,16 @@ public class SiteSettingsService {
         settings.setHomeHeroTitle(required(request.homeHeroTitle(), "Home hero title is required."));
         settings.setHomeHeroCopy(required(request.homeHeroCopy(), "Home hero copy is required."));
         settings.setContactLinksJson(writeContactLinks(normalizeContactLinks(request.contactLinks())));
-        return toResponse(siteSettingsRepository.save(settings));
+        if (request.askInboxEmail() != null) {
+            String rawInbox = request.askInboxEmail();
+            String inbox = rawInbox.trim();
+            if (rawInbox.chars().anyMatch(Character::isISOControl)
+                    || (!inbox.isEmpty() && !AskEmailAddress.isValid(inbox))) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "질문 수신 주소를 확인해주세요.");
+            }
+            settings.setAskInboxEmail(inbox);
+        }
+        return toAdminResponse(siteSettingsRepository.save(settings));
     }
 
     private SiteSettings createDefaults() {
@@ -79,7 +101,18 @@ public class SiteSettingsService {
                 settings.getHomeHeroCopy(),
                 readContactLinks(settings.getContactLinksJson()),
                 settings.getCreatedAt(),
-                settings.getUpdatedAt()
+                settings.getUpdatedAt(),
+                mailEnabled && !settings.getAskInboxEmail().isBlank()
+        );
+    }
+
+    private AdminSiteSettingsResponse toAdminResponse(SiteSettings settings) {
+        SiteSettingsResponse publicFields = toResponse(settings);
+        return new AdminSiteSettingsResponse(
+                publicFields.id(), publicFields.semesterLabel(), publicFields.recruitmentStatus(),
+                publicFields.recruitmentPeriod(), publicFields.homeHeroTitle(), publicFields.homeHeroCopy(),
+                publicFields.contactLinks(), publicFields.createdAt(), publicFields.updatedAt(),
+                publicFields.askEnabled(), settings.getAskInboxEmail()
         );
     }
 
