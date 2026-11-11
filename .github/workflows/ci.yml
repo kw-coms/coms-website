@@ -108,7 +108,12 @@ jobs:
         run: REQUIRE_DIST=1 node --import tsx tests/backdropFilterBuild.test.mjs
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: |
+          # Avoid intermittent DNS failures of the runner's Azure mirror; package signatures stay Ubuntu's.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i 's/azure\.archive\.ubuntu\.com/archive.ubuntu.com/g' /etc/apt/apt-mirrors.txt
+          fi
+          npx playwright install --with-deps chromium
 
       - name: Smoke test
         run: npm run smoke
@@ -485,7 +490,11 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser for the stack e2e
-        run: npx playwright install --with-deps chromium
+        run: |
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i 's/azure\.archive\.ubuntu\.com/archive.ubuntu.com/g' /etc/apt/apt-mirrors.txt
+          fi
+          npx playwright install --with-deps chromium
 
       # "직접 해보기" in a real browser against the real frontend container, backend and runner (nothing mocked).
       # The runner allows a member ten runs a minute and the step above used them up: start a fresh minute.
@@ -585,7 +594,11 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: |
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i 's/azure\.archive\.ubuntu\.com/archive.ubuntu.com/g' /etc/apt/apt-mirrors.txt
+          fi
+          npx playwright install --with-deps chromium
 
       - name: Backend-auth e2e
         run: npm run test:e2e:backend
