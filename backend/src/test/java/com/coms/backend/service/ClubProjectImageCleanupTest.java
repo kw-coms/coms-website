@@ -35,7 +35,10 @@ class ClubProjectImageCleanupTest {
         when(storage.storeImage(any(), any())).thenReturn("first-blob")
                 .thenThrow(new IOException("disk full"));
         ClubProjectService service = new ClubProjectService(projects, mock(ClubProjectFileRepository.class),
-                images, mock(MemberRepository.class), mock(ClubProjectCategoryService.class), storage);
+                images, mock(com.coms.backend.repository.ClubProjectLikeRepository.class),
+                mock(com.coms.backend.repository.ClubProjectCommentRepository.class),
+                mock(MemberRepository.class), mock(ClubProjectCategoryService.class), storage,
+                mock(CommunityTextService.class));
         byte[] png = java.util.Base64.getDecoder().decode(
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lWQAAAAASUVORK5CYII=");
         var upload = new MockMultipartFile("images", "image.png", "image/png", png);

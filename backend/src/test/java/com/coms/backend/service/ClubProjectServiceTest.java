@@ -75,7 +75,7 @@ class ClubProjectServiceTest {
         member.setPassword("unused");
         memberRepository.save(member);
 
-        var created = clubProjectService.createForMember("2099000001", "APP", "회원 작품", "소개", "https://example.com");
+        var created = clubProjectService.createForMember("2099000001", "APP", "회원 작품", "소개", null, "https://example.com");
         assertThat(created.madeBy()).isEqualTo("작품 회원");
         assertThat(created.canEdit()).isTrue();
         assertThat(clubProjectService.list("2099000001", false)).filteredOn(p -> p.id().equals(created.id()))
@@ -89,7 +89,7 @@ class ClubProjectServiceTest {
         assertThatThrownBy(() -> clubProjectService.requireEditor(legacyId, "2099000001", false))
                 .isInstanceOf(ResponseStatusException.class);
         clubProjectService.requireEditor(legacyId, "2099000001", true);
-        var changed = clubProjectService.updateForMember(created.id(), "2099000001", null, "새 제목", "새 소개", "");
+        var changed = clubProjectService.updateForMember(created.id(), "2099000001", null, "새 제목", "새 소개", null, "");
         assertThat(changed.title()).isEqualTo("새 제목");
         assertThat(changed.description()).isEqualTo("새 소개");
         assertThat(changed.madeBy()).isEqualTo("작품 회원");
@@ -144,6 +144,20 @@ class ClubProjectServiceTest {
         var created = clubProjectService.create("WEBSITE", "기본 제작자", null, null,
                 "  ", null, null, null);
         assertThat(created.madeBy()).isNull();
+    }
+
+    @Test
+    void bylineIsPlainBoundedText() {
+        assertThatThrownBy(() -> clubProjectService.create("APP", "작품", null, null,
+                "<script>alert(1)</script>", null, null, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value()).isEqualTo(400));
+        assertThatThrownBy(() -> clubProjectService.create("APP", "작품", null, null,
+                "A\nB", null, null, null))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> clubProjectService.create("APP", "작품", null, null,
+                "a".repeat(101), null, null, null))
+                .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test

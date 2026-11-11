@@ -3,7 +3,7 @@ import { createClubProject, deleteClubProject, deleteClubProjectImage, updateClu
 import { confirmDialog } from '../common/ConfirmDialog'
 
 type Image = { id: number; url: string }
-type Work = { id: number; category: string; title: string; description?: string; linkUrl?: string; images?: Image[] }
+type Work = { id: number; category: string; title: string; description?: string; madeBy?: string; linkUrl?: string; images?: Image[] }
 type Category = { key: string; name: string }
 
 export default function WorkEditor({ work, categories, onSaved, onCancel }: {
@@ -14,6 +14,7 @@ export default function WorkEditor({ work, categories, onSaved, onCancel }: {
 }) {
   const [category, setCategory] = useState(work?.category || categories[0]?.key || '')
   const [title, setTitle] = useState(work?.title || '')
+  const [madeBy, setMadeBy] = useState(work?.madeBy || '')
   const [description, setDescription] = useState(work?.description || '')
   const [linkUrl, setLinkUrl] = useState(work?.linkUrl || '')
   const [images, setImages] = useState<File[]>([])
@@ -28,7 +29,10 @@ export default function WorkEditor({ work, categories, onSaved, onCancel }: {
     setBusy(true)
     setError('')
     try {
-      const fields = { category, title: title.trim(), description: description.trim(), linkUrl: linkUrl.trim() }
+      const fields = {
+        category, title: title.trim(), description: description.trim(), linkUrl: linkUrl.trim(),
+        ...(work || createdId || madeBy.trim() ? { madeBy: madeBy.trim() } : {}),
+      }
       const saved = work || createdId ? await updateClubProject(work?.id || createdId, fields) : await createClubProject(fields)
       if (!work) setCreatedId(saved.id)
       if (images.length) {
@@ -59,7 +63,7 @@ export default function WorkEditor({ work, categories, onSaved, onCancel }: {
   }
 
   const removeWork = async () => {
-    if (!work || !await confirmDialog({ title: '작품을 삭제할까요?', message: '작품과 사진이 삭제됩니다.', confirmText: '삭제', tone: 'danger' })) return
+    if (!work || !await confirmDialog({ title: '작품을 삭제할까요?', message: '작품과 사진·댓글·답글·추천 기록이 함께 삭제됩니다.', confirmText: '삭제', tone: 'danger' })) return
     setBusy(true)
     setError('')
     try {
@@ -83,6 +87,11 @@ export default function WorkEditor({ work, categories, onSaved, onCancel }: {
       <label className="grid gap-1 text-sm font-medium">작품 이름
         <input required maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-bg)] p-2" />
       </label>
+      <div className="grid gap-1">
+        <label htmlFor="work-made-by" className="text-sm font-medium">제작자 (선택)</label>
+        <input id="work-made-by" maxLength={100} value={madeBy} onChange={(event) => setMadeBy(event.target.value)} aria-describedby="work-made-by-help" placeholder={work || createdId ? '비우면 제작자 표시를 지워요' : '작품에 표시할 이름'} className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-bg)] p-2" />
+        <p id="work-made-by-help" className="text-xs text-[var(--app-muted)]">{work || createdId ? '비우고 저장하면 제작자 표시가 지워집니다.' : '작품에 공개할 이름입니다. 함께 만든 사람도 적을 수 있어요.'}</p>
+      </div>
       <label className="grid gap-1 text-sm font-medium">소개글
         <textarea maxLength={5000} rows={5} value={description} onChange={(event) => setDescription(event.target.value)} className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-bg)] p-2" />
       </label>

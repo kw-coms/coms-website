@@ -6,6 +6,36 @@ export async function listClubProjects() {
   return request('/api/club-projects')
 }
 
+export async function getClubProject(id) {
+  return request(`/api/club-projects/${id}`)
+}
+
+export async function setClubProjectLike(id, liked: boolean) {
+  return request(`/api/club-projects/${id}/like`, {
+    method: 'PUT', body: JSON.stringify({ liked }),
+  })
+}
+
+export async function listClubProjectComments(id) {
+  return request(`/api/club-projects/${id}/comments`)
+}
+
+export async function createClubProjectComment(id, body: { content: string; parentCommentId?: number | null }) {
+  return request(`/api/club-projects/${id}/comments`, {
+    method: 'POST', body: JSON.stringify(body),
+  })
+}
+
+export async function updateClubProjectComment(id, commentId, body: { content: string }) {
+  return request(`/api/club-projects/${id}/comments/${commentId}`, {
+    method: 'PATCH', body: JSON.stringify(body),
+  })
+}
+
+export async function deleteClubProjectComment(id, commentId) {
+  return requestNoContent(`/api/club-projects/${id}/comments/${commentId}`, { method: 'DELETE' })
+}
+
 export async function listClubProjectCategories() {
   return request('/api/club-projects/categories')
 }

@@ -1,11 +1,13 @@
 import PageHeading from '../PageHeading'
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { listClubProjects, listClubProjectCategories, listClubProjectLinkStatuses } from '../../services/clubProjectApi'
 import { linkStateOf } from '../../utils/appProjectStatus'
 import { useAuth } from '../../contexts/useAuth'
 import AppProjectCard from '../apps/AppProjectCard'
 import { ListSearch } from '../common/ListTools'
 import { matchesQuery } from '../../utils/listTools'
+import { workViewerKey } from '../../utils/workViewerKey'
 import WorkEditor from './WorkEditor'
 import '../../styles/site-pages.css'
 
@@ -35,6 +37,10 @@ function groupByCategory(projects, categories) {
 
 function CompanionServicesSection() {
   const { user } = useAuth()
+  return <ViewerProjects key={workViewerKey(user)} user={user} />
+}
+
+function ViewerProjects({ user }) {
   const [projects, setProjects] = useState([])
   const [categories, setCategories] = useState([])
   const [loadState, setLoadState] = useState('loading')
@@ -163,6 +169,10 @@ function CompanionServicesSection() {
                     {group.projects.map((project) => (
                       <div key={project.id} className="flex flex-col">
                         <AppProjectCard project={project} linkState={linkStateOf(project, user ? linkStatuses : [])} className="flex-1" />
+                        <div className="mt-2 flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs font-semibold text-[var(--app-muted)]">
+                          <span>조회 {Number(project.viewCount || 0).toLocaleString('ko-KR')} · 추천 {Number(project.likeCount || 0).toLocaleString('ko-KR')} · 댓글 {Number(project.commentCount || 0).toLocaleString('ko-KR')}</span>
+                          <Link to={`/apps/${project.id}`} aria-label={`${project.title} 상세·댓글`} className="inline-flex min-h-11 items-center text-[var(--app-accent-text)] underline">상세·댓글</Link>
+                        </div>
                         {user && project.canEdit && (
                           <button type="button" className="mt-2 text-sm font-semibold text-[var(--app-accent-text)] underline" onClick={() => { setEditing(project); setShowEditor(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>
                             작품 수정
