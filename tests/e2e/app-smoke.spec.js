@@ -4040,7 +4040,7 @@ test('apps page cards keep one size whatever the text length or section count', 
   }
 })
 
-test('admin Apps management shows public-card previews with status badges', async ({ page }) => {
+test('admin works management shows public-card previews with status badges', async ({ page }) => {
   await mockAdminApis(page)
   await page.route('**/api/club-projects/categories', (route) => route.fulfill({
     status: 200,
@@ -4121,7 +4121,7 @@ test('admin Apps management shows public-card previews with status badges', asyn
   })
 
   await page.goto('/admin')
-  await page.getByRole('tab', { name: 'Apps 관리' }).click()
+  await page.getByRole('tab', { name: '작품 관리' }).click()
 
   const portalPreview = page.getByTestId('admin-app-preview-11')
   await expect(portalPreview.getByText("COM's 포털")).toBeVisible()
@@ -4130,10 +4130,10 @@ test('admin Apps management shows public-card previews with status badges', asyn
 
   const appPreview = page.getByTestId('admin-app-preview-12')
   await expect(appPreview.getByText('출석 체크 앱')).toBeVisible()
-  await expect(appPreview.getByLabel('앱 상태').getByText('다운로드')).toBeVisible()
+  await expect(appPreview.getByLabel('작품 상태').getByText('다운로드')).toBeVisible()
 
   await page.getByLabel('제목').fill('새 앱')
-  await page.getByRole('tabpanel', { name: 'Apps 관리' }).getByLabel('분류').selectOption('APP')
+  await page.getByRole('tabpanel', { name: '작품 관리' }).getByLabel('분류').selectOption('APP')
   await page.getByLabel('링크 URL (선택)').fill('https://example.com/new-app')
   await page.getByLabel('배포 파일 (apk/zip 등, 여러 개 선택 가능)').setInputFiles([
     { name: 'new-app.apk', mimeType: 'application/vnd.android.package-archive', buffer: Buffer.from('apk') },
@@ -4145,7 +4145,7 @@ test('admin Apps management shows public-card previews with status badges', asyn
   await expect(draftPreview.getByText('new-app.apk')).toBeVisible()
   await expect(page.getByText('선택한 파일 2개')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Apps 항목 등록' }).click()
+  await page.getByRole('button', { name: '작품 등록' }).click()
   await expect.poll(() => createdProjectPayload).toMatchObject({
     title: '새 앱',
     category: 'APP',
