@@ -17,6 +17,7 @@ import ActivityLogSection from '../../features/activityLog/ActivityLogSection'
 import ClubEventSection from '../../features/clubEvent/ClubEventSection'
 import ActivityTimeline from '../../components/activities/ActivityTimeline'
 import ClubCalendarSection from '../../features/clubCalendar/ClubCalendarSection'
+import NextSteps, { type NextStep } from '../../components/NextSteps'
 import { useScrollReveal } from '../../hooks/useScrollReveal'
 import '../../styles/site-pages.css'
 import { ClubOsVisual, LearningStackVisual, ProjectLabVisual } from './HomeVisuals'
@@ -34,6 +35,7 @@ export function AboutPage() {
       outputsTitle="COM's가 오래 가져가는 태도."
       outputsBody="잘하는 사람만 모이는 곳보다, 함께 성장하는 방식을 계속 만드는 곳을 지향합니다."
       outputs={aboutDetailPrinciples}
+      nextSteps={[{ label: '지원하기', to: '/recruit' }, { label: '스터디 보기', to: '/study' }]}
     />
   )
 }
@@ -50,6 +52,7 @@ export function DetailStoryPage({
   outputsBody,
   outputs,
   lead,
+  nextSteps,
   className = '',
 }: {
   title?: React.ReactNode
@@ -65,6 +68,8 @@ export function DetailStoryPage({
   outputs: string[]
   /** Shown straight after the hero, ahead of the cards. */
   lead?: React.ReactNode
+  /** Links drawn after the last section. */
+  nextSteps?: NextStep[]
   className?: string
 }) {
   const navigate = useNavigate()
@@ -207,6 +212,8 @@ export function DetailStoryPage({
             </div>
           </div>
         </section>
+
+        {nextSteps && <NextSteps steps={nextSteps} />}
       </main>
     </div>
   )
@@ -264,6 +271,7 @@ export function ProjectsDetailPage() {
       flow={projectsDetailFlow}
       outputsTitle="프로젝트가 남기는 결과물."
       outputs={projectsDetailOutputs}
+      nextSteps={[{ label: '부원들이 만든 프로젝트 보기', to: '/apps' }, { label: '지원하기', to: '/recruit' }, { label: '스터디 보기', to: '/study' }]}
     />
   )
 }

@@ -39,6 +39,37 @@ function StudyBody({ id }: { id: string }) {
 
   useEffect(() => (html && layoutRef.current ? initStudyPage(layoutRef.current, study.progressKey) : undefined), [html, study.progressKey])
 
+  // A link from quick search (/study/c#pointer) arrives before the lesson markup exists, so the browser cannot scroll to it.
+  useEffect(() => {
+    if (!html || !location.hash || /^#(code-\d+|pg=)/.test(location.hash)) return
+    // A hand-typed hash such as "#%E0%A4%A" is not valid percent-encoding: decodeURIComponent throws. Look the id up as written then.
+    let anchor = location.hash.slice(1)
+    try {
+      anchor = decodeURIComponent(anchor)
+    } catch {
+      // Not decodable.
+    }
+    const go = () => document.getElementById(anchor)?.scrollIntoView()
+    // A frame later: the route's scroll-to-top effect runs after this one when the lesson is already cached.
+    const frame = requestAnimationFrame(go)
+    // The playgrounds and code blocks above the chapter are built after the markup lands and push it down.
+    // Keep the chapter in place while the page settles, and stop the moment the reader takes over.
+    const layout = layoutRef.current
+    const settle = typeof ResizeObserver === 'undefined' || !layout ? null : new ResizeObserver(go)
+    const stop = () => {
+      settle?.disconnect()
+      window.clearTimeout(limit)
+      for (const type of ['wheel', 'touchstart', 'keydown', 'pointerdown']) window.removeEventListener(type, stop)
+    }
+    const limit = window.setTimeout(stop, 3000)
+    if (layout) settle?.observe(layout)
+    for (const type of ['wheel', 'touchstart', 'keydown', 'pointerdown']) window.addEventListener(type, stop, { passive: true })
+    return () => {
+      cancelAnimationFrame(frame)
+      stop()
+    }
+  }, [html, location.hash])
+
   // The playground calls the latest login handler without being re-created when the router state changes.
   const goLogin = useRef<(hash: string) => void>(() => {})
   useEffect(() => {

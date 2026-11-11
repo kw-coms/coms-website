@@ -2300,7 +2300,7 @@ test('quick jump is offered beside the menu button on a phone', async ({ page })
   await page.getByRole('button', { name: '빠른 이동 열기' }).click()
   const dialog = page.getByRole('dialog', { name: '빠른 이동' })
   await dialog.getByRole('combobox', { name: '어디로 갈까요?' }).fill('ㅎㄷ')
-  await expect(dialog.getByRole('option')).toHaveText([/활동/, /활동 기록/])
+  await expect(dialog.getByRole('option')).toHaveText([/활동/, /활동 기록/, /순서 지키는 신호등/])
   // A tap goes there. The page is for members, so a guest lands on its guide screen (not a redirect).
   await dialog.getByRole('option', { name: /활동 기록/ }).click()
   await expectMembersGate(page, '/activity-log')
@@ -2544,11 +2544,13 @@ test('top navigation shows four groups and one panel with the whole sitemap', as
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByLabel('메뉴 열기').click()
   const mobileMenu = page.getByRole('navigation', { name: '모바일 메뉴' })
-  // Every group is open at once: nothing hides behind a second tap.
-  for (const name of [/^공지/, /^활동 기록/, /^월별 일정/, /^모임 신청/, /^출석 체크/, /^회로 Lab/, /^소개/]) await expect(mobileMenu.getByRole('button', { name })).toBeVisible()
+  // Every group is open at once: nothing hides behind a second tap. Look inside the four group
+  // sections: once enough visits are counted the "자주 가는 곳" row repeats some of these entries.
+  const groupSections = mobileMenu.getByRole('region', { name: /동아리|배움|멤버|도구/ })
+  for (const name of [/^공지/, /^활동 기록/, /^월별 일정/, /^모임 신청/, /^출석 체크/, /^회로 Lab/, /^소개/]) await expect(groupSections.getByRole('button', { name })).toBeVisible()
   await expect(mobileMenu.getByRole('button', { name: /Circuit Lab/ })).toHaveCount(0)
   for (const name of ['동아리', '배움', '멤버', '도구']) await expect(mobileMenu.getByRole('region', { name })).toBeVisible()
-  const mobileRowBox = await mobileMenu.getByRole('button', { name: /^활동 기록/ }).boundingBox()
+  const mobileRowBox = await groupSections.getByRole('button', { name: /^활동 기록/ }).boundingBox()
   expect(mobileRowBox.height).toBeGreaterThanOrEqual(44)
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
 })
