@@ -127,7 +127,7 @@ class EligibleMemberServiceTest {
     }
 
     @Test
-    void rosterWithoutStudentIdUsesUniqueNormalizedNameAndPhoneAtReadTime() {
+    void copiedNameAndPhoneOnlySuggestsAccountUntilOperatorAppliesIt() {
         EligibleMember roster = new EligibleMember();
         roster.setName(" 가상회원 ");
         roster.setPhone("010-0000-0001");
@@ -144,10 +144,13 @@ class EligibleMemberServiceTest {
 
         assertThat(eligibleMemberService.listRoster()).filteredOn(row -> row.id().equals(rosterId))
                 .singleElement().satisfies(row -> {
-                    assertThat(row.studentId()).isEqualTo("2026991001");
-                    assertThat(row.studentIdFromAccount()).isTrue();
-                    assertThat(row.email()).isEqualTo("test@example.com");
-                    assertThat(row.emailFromAccount()).isTrue();
+                    assertThat(row.studentId()).isNull();
+                    assertThat(row.studentIdFromAccount()).isFalse();
+                    assertThat(row.email()).isNull();
+                    assertThat(row.emailFromAccount()).isFalse();
+                    assertThat(row.suggestedMemberId()).isEqualTo(account.getId());
+                    assertThat(row.suggestedStudentId()).isEqualTo("2026991001");
+                    assertThat(row.suggestedEmail()).isEqualTo("test@example.com");
                     assertThat(row.phone()).isEqualTo("010-0000-0001");
                     assertThat(row.phoneFromAccount()).isFalse();
                 });
@@ -156,7 +159,10 @@ class EligibleMemberServiceTest {
         account.setEmail("changed@example.com");
         memberRepository.saveAndFlush(account);
         assertThat(eligibleMemberService.listRoster()).filteredOn(row -> row.id().equals(rosterId))
-                .singleElement().satisfies(row -> assertThat(row.email()).isEqualTo("changed@example.com"));
+                .singleElement().satisfies(row -> {
+                    assertThat(row.email()).isNull();
+                    assertThat(row.suggestedEmail()).isEqualTo("changed@example.com");
+                });
 
         roster.setEmail("stored@example.com");
         eligibleMemberRepository.saveAndFlush(roster);
@@ -164,8 +170,13 @@ class EligibleMemberServiceTest {
                 .singleElement().satisfies(row -> {
                     assertThat(row.email()).isEqualTo("stored@example.com");
                     assertThat(row.emailFromAccount()).isFalse();
-                    assertThat(row.studentIdFromAccount()).isTrue();
+                    assertThat(row.studentIdFromAccount()).isFalse();
+                    assertThat(row.suggestedMemberId()).isNull();
                 });
+
+        assertThatThrownBy(() -> eligibleMemberService.applyRosterSuggestion(rosterId, account.getId()))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("빈 칸");
     }
 
     @Test
@@ -212,6 +223,90 @@ class EligibleMemberServiceTest {
                         assertThat(row.emailFromAccount()).isFalse();
                     });
         }
+    }
+
+    @Test
+    void applySuggestionRechecksUniquenessAndBlankFields() {
+        EligibleMember row = new EligibleMember();
+        row.setName("가상회원");
+        row.setPhone("010-0000-0001");
+        row = eligibleMemberRepository.saveAndFlush(row);
+        Long rowId = row.getId();
+
+        Member account = new Member();
+        account.setStudentId("2026991001");
+        account.setName("가상회원");
+        account.setPhone("01000000001");
+        account.setEmail("test@example.com");
+        account.setPassword("unused");
+        account = memberRepository.saveAndFlush(account);
+        Long accountId = account.getId();
+
+        account.setEmail("");
+        memberRepository.saveAndFlush(account);
+        assertThat(eligibleMemberService.listRoster()).filteredOn(candidate -> candidate.id().equals(rowId))
+                .singleElement().satisfies(candidate -> assertThat(candidate.suggestedMemberId()).isNull());
+        assertThatThrownBy(() -> eligibleMemberService.applyRosterSuggestion(rowId, accountId))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("계정 학번과 이메일");
+        account.setEmail("test@example.com");
+        memberRepository.saveAndFlush(account);
+
+        account.setStudentId("");
+        memberRepository.saveAndFlush(account);
+        assertThat(eligibleMemberService.listRoster()).filteredOn(candidate -> candidate.id().equals(rowId))
+                .singleElement().satisfies(candidate -> assertThat(candidate.suggestedMemberId()).isNull());
+        assertThatThrownBy(() -> eligibleMemberService.applyRosterSuggestion(rowId, accountId))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("계정 학번과 이메일");
+        account.setStudentId("2026991001");
+        memberRepository.saveAndFlush(account);
+
+        EligibleMember duplicate = new EligibleMember();
+        duplicate.setName("가상회원");
+        duplicate.setPhone("01000000001");
+        duplicate = eligibleMemberRepository.saveAndFlush(duplicate);
+        assertThatThrownBy(() -> eligibleMemberService.applyRosterSuggestion(rowId, accountId))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("중복");
+        eligibleMemberRepository.delete(duplicate);
+        eligibleMemberRepository.flush();
+
+        EligibleMember numberedDuplicate = new EligibleMember();
+        numberedDuplicate.setStudentId("2026991003");
+        numberedDuplicate.setName("가상회원");
+        numberedDuplicate.setPhone("01000000001");
+        numberedDuplicate = eligibleMemberRepository.saveAndFlush(numberedDuplicate);
+        assertThat(eligibleMemberService.listRoster()).filteredOn(candidate -> candidate.id().equals(rowId))
+                .singleElement().satisfies(candidate -> assertThat(candidate.suggestedMemberId()).isNull());
+        assertThatThrownBy(() -> eligibleMemberService.applyRosterSuggestion(rowId, accountId))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("중복");
+        eligibleMemberRepository.delete(numberedDuplicate);
+        eligibleMemberRepository.flush();
+
+        Member second = new Member();
+        second.setStudentId("2026991002");
+        second.setName("가상회원");
+        second.setPhone("01000000001");
+        second.setEmail("second@example.com");
+        second.setPassword("unused");
+        second = memberRepository.saveAndFlush(second);
+        assertThatThrownBy(() -> eligibleMemberService.applyRosterSuggestion(rowId, accountId))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("중복");
+        memberRepository.delete(second);
+        memberRepository.flush();
+
+        account.setPhone("01000000002");
+        memberRepository.saveAndFlush(account);
+        assertThatThrownBy(() -> eligibleMemberService.applyRosterSuggestion(rowId, accountId))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("일치하지 않습니다");
+        account.setPhone("01000000001");
+        memberRepository.saveAndFlush(account);
+
+        assertThat(eligibleMemberService.applyRosterSuggestion(rowId, accountId)).isTrue();
+        assertThat(eligibleMemberService.applyRosterSuggestion(rowId, accountId)).isFalse();
+        assertThat(eligibleMemberRepository.findById(rowId).orElseThrow())
+                .satisfies(saved -> {
+                    assertThat(saved.getStudentId()).isEqualTo("2026991001");
+                    assertThat(saved.getEmail()).isEqualTo("test@example.com");
+                });
     }
 
     @Test

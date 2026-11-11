@@ -73,9 +73,11 @@ body:has(.coms-tour, .coms-quick, .appearance-popover, #mobile-menu, [data-coms-
   .coms-ask-panel { left: 1rem; right: 1rem; width: auto; }
 }
 
-/* The ask button takes the bottom-right corner, where a chat box is expected: the back-to-top button
-   stacks above it, and the home opening's corner label makes room. */
-:root:has(.coms-ask-trigger) .coms-to-top { bottom: calc(1.1rem + 3.6rem + env(safe-area-inset-bottom)); }
+/* Keep both buttons together when footer controls or notices move the launcher. */
+:root:has(.coms-ask-trigger) .coms-to-top {
+  bottom: calc(var(--coms-ask-bottom, max(1rem, env(safe-area-inset-bottom))) + 56px);
+  visibility: var(--coms-ask-top-visibility, visible);
+}
 :root:has(.coms-ask-trigger) .scene-opening__br { margin-right: 7.5rem; }
 @media (max-width: 639px) {
   :root:has(.coms-ask-trigger) .scene-opening__br { margin-right: 0; visibility: hidden; }

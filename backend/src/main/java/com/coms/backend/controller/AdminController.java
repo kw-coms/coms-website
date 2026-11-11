@@ -3,6 +3,7 @@ package com.coms.backend.controller;
 import com.coms.backend.domain.DeletedCommunityPostImage;
 import com.coms.backend.domain.DeletedCommunityPostMedia;
 import com.coms.backend.dto.AddEligibleMemberRequest;
+import com.coms.backend.dto.ApplyRosterSuggestionRequest;
 import com.coms.backend.dto.AdminAnalyticsResponse;
 import com.coms.backend.dto.AdminMemberCreateRequest;
 import com.coms.backend.dto.AuditLogResponse;
@@ -141,6 +142,16 @@ public class AdminController {
     @GetMapping("/eligible-members")
     public ResponseEntity<List<EligibleMemberResponse>> eligibleMembers() {
         return ResponseEntity.ok(eligibleMemberService.listRoster());
+    }
+
+    @PostMapping("/roster/{id}/apply-suggestion")
+    public ResponseEntity<Void> applyRosterSuggestion(Authentication authentication, @PathVariable Long id,
+                                                      @Valid @RequestBody ApplyRosterSuggestionRequest request) {
+        if (eligibleMemberService.applyRosterSuggestion(id, request.memberId())) {
+            auditLogService.record(authentication.getName(), "ADMIN_ELIGIBLE_MEMBER_UPDATE", "ELIGIBLE_MEMBER",
+                    String.valueOf(id), "appliedAccountId=" + request.memberId(), null);
+        }
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/eligible-members/{id}")

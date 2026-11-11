@@ -117,6 +117,13 @@ export async function updateEligibleMember(id, studentId, name, phone, generatio
   })
 }
 
+export async function applyEligibleMemberSuggestion(id: number, memberId: number) {
+  return requestNoContent(`/api/admin/roster/${id}/apply-suggestion`, {
+    method: 'POST',
+    body: JSON.stringify({ memberId }),
+  })
+}
+
 export async function deleteEligibleMember(id) {
   return requestNoContent(`/api/admin/eligible-members/${id}`, {
     method: 'DELETE',

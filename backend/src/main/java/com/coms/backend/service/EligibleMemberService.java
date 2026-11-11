@@ -428,16 +428,16 @@ public class EligibleMemberService {
             memberRepository.findByStudentIdIn(studentIds)
                     .forEach(account -> accounts.put(account.getStudentId(), account));
         }
-        Map<NamePhone, Long> blankPairCounts = new HashMap<>();
+        Map<NamePhone, Long> pairCounts = new HashMap<>();
         for (EligibleMember member : roster) {
-            if (blank(member.getStudentId()) && !blank(member.getName()) && !phoneDigits(member.getPhone()).isEmpty()) {
-                blankPairCounts.merge(namePhone(member.getName(), member.getPhone()), 1L, Long::sum);
+            if (!blank(member.getName()) && !phoneDigits(member.getPhone()).isEmpty()) {
+                pairCounts.merge(namePhone(member.getName(), member.getPhone()), 1L, Long::sum);
             }
         }
         Map<NamePhone, List<Member>> accountsByPair = new HashMap<>();
-        if (!blankPairCounts.isEmpty()) {
+        if (!pairCounts.isEmpty()) {
             Set<String> names = new HashSet<>();
-            blankPairCounts.keySet().forEach(pair -> names.add(pair.name()));
+            pairCounts.keySet().forEach(pair -> names.add(pair.name()));
             for (Member account : memberRepository.findByNormalizedNameIn(names)) {
                 if (!phoneDigits(account.getPhone()).isEmpty()) {
                     accountsByPair.computeIfAbsent(namePhone(account.getName(), account.getPhone()), ignored -> new ArrayList<>())
@@ -449,27 +449,70 @@ public class EligibleMemberService {
                 .stream()
                 .map(member -> {
                     Member account = accounts.get(member.getStudentId());
-                    boolean studentIdFromAccount = false;
-                    if (account == null && blank(member.getStudentId()) && !blank(member.getName())
+                    Member suggestedAccount = null;
+                    if (account == null && blank(member.getStudentId()) && blank(member.getEmail()) && !blank(member.getName())
                             && !phoneDigits(member.getPhone()).isEmpty()) {
                         NamePhone pair = namePhone(member.getName(), member.getPhone());
                         List<Member> matches = accountsByPair.getOrDefault(pair, List.of());
-                        if (blankPairCounts.getOrDefault(pair, 0L) == 1 && matches.size() == 1) {
-                            account = matches.getFirst();
-                            studentIdFromAccount = !blank(account.getStudentId());
+                        if (pairCounts.getOrDefault(pair, 0L) == 1 && matches.size() == 1
+                                && !blank(matches.getFirst().getStudentId()) && !blank(matches.getFirst().getEmail())) {
+                            suggestedAccount = matches.getFirst();
                         }
                     }
                     boolean phoneFromAccount = blank(member.getPhone()) && account != null && !blank(account.getPhone());
                     boolean emailFromAccount = blank(member.getEmail()) && account != null && !blank(account.getEmail());
                     return new EligibleMemberResponse(
-                            member.getId(), studentIdFromAccount ? account.getStudentId() : member.getStudentId(),
+                            member.getId(), member.getStudentId(),
                             member.getName(), member.getDepartment(),
                             member.getGeneration(), member.getAdmissionYear(),
                             phoneFromAccount ? account.getPhone() : member.getPhone(),
                             emailFromAccount ? account.getEmail() : member.getEmail(),
-                            phoneFromAccount, emailFromAccount, studentIdFromAccount, member.getInitialRole().name());
+                            phoneFromAccount, emailFromAccount, false,
+                            suggestedAccount == null ? null : suggestedAccount.getId(),
+                            suggestedAccount == null ? null : suggestedAccount.getStudentId(),
+                            suggestedAccount == null ? null : suggestedAccount.getEmail(),
+                            member.getInitialRole().name());
                 })
                 .toList();
+    }
+
+    public boolean applyRosterSuggestion(Long rosterId, Long accountId) {
+        EligibleMember row = eligibleMemberRepository.findByIdForUpdate(rosterId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "명부에서 해당 항목을 찾을 수 없습니다."));
+        Member account = memberRepository.findWithLockById(accountId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "추정 계정을 찾을 수 없습니다."));
+        if (blank(account.getStudentId()) || blank(account.getEmail())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "계정 학번과 이메일이 비어 있어 적용할 수 없습니다.");
+        }
+        if (normalize(row.getStudentId()).equals(normalize(account.getStudentId()))
+                && normalize(row.getEmail()).equals(normalize(account.getEmail()))
+                && !blank(row.getStudentId()) && !blank(row.getEmail())) {
+            return false;
+        }
+        if (!blank(row.getStudentId()) || !blank(row.getEmail())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "명부 학번과 이메일이 빈 칸일 때만 적용할 수 있습니다.");
+        }
+        if (blank(row.getName()) || phoneDigits(row.getPhone()).isEmpty()
+                || !namePhone(row.getName(), row.getPhone()).equals(namePhone(account.getName(), account.getPhone()))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이름과 전화번호가 더 이상 일치하지 않습니다.");
+        }
+        NamePhone pair = namePhone(row.getName(), row.getPhone());
+        long rows = eligibleMemberRepository.findAll().stream()
+                .filter(other -> pair.equals(namePhone(other.getName(), other.getPhone())))
+                .count();
+        long accounts = memberRepository.findByNormalizedNameIn(List.of(pair.name())).stream()
+                .filter(other -> pair.equals(namePhone(other.getName(), other.getPhone())))
+                .count();
+        if (rows != 1 || accounts != 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이름과 전화번호가 중복되어 적용할 수 없습니다.");
+        }
+        if (eligibleMemberRepository.findByStudentId(account.getStudentId()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "해당 학번은 이미 다른 명부에 있습니다.");
+        }
+        row.setStudentId(account.getStudentId());
+        row.setEmail(account.getEmail());
+        eligibleMemberRepository.save(row);
+        return true;
     }
 
     private record NamePhone(String name, String phone) {}

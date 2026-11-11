@@ -438,6 +438,52 @@ test('admin roster marks who has signed up and the member list exports as CSV', 
   expect(lines[2]).toContain('"2019 (졸업생)"')
 })
 
+test('roster suggestion stays separate until an operator applies it', async ({ page }) => {
+  await mockAdminApis(page)
+  let roster = [{
+    id: 17, name: 'Fictional Member', studentId: '', phone: '00000000000', email: '',
+    suggestedMemberId: 27, suggestedStudentId: '2026999999', suggestedEmail: 'suggested@example.invalid',
+  }]
+  let applyPayload = null
+  let applyCalls = 0
+  await page.route('**/api/admin/eligible-members', route => route.fulfill({ json: roster }))
+  await page.route('**/api/admin/roster/17/apply-suggestion', route => {
+    applyCalls += 1
+    applyPayload = route.request().postDataJSON()
+    if (applyCalls === 1) return route.fulfill({ status: 409, json: { message: '명부와 계정 정보를 다시 확인해주세요.' } })
+    roster = [{ ...roster[0], studentId: '2026999999', email: 'suggested@example.invalid', suggestedMemberId: null, suggestedStudentId: null, suggestedEmail: null }]
+    return route.fulfill({ status: 204 })
+  })
+  await page.goto('/admin?tab=roster')
+  const row = page.getByRole('row').filter({ hasText: 'Fictional Member' })
+  await expect(row.getByRole('cell').nth(0)).not.toContainText('2026999999')
+  await expect(row.getByRole('note', { name: /추정 · 확인 필요/ })).toContainText('2026999999')
+  await expect(row.getByRole('note', { name: /추정 · 확인 필요/ })).toContainText('suggested@example.invalid')
+  await expect(row).toContainText('계정에 입력된 이름과 전화번호가 일치합니다. 본인 확인 후 적용하세요.')
+  await page.getByLabel('명부 검색').fill('2026999999')
+  await expect(page.getByText('조건에 맞는 명부가 없습니다.')).toBeVisible()
+  await page.getByLabel('명부 검색').fill('suggested@example.invalid')
+  await expect(page.getByText('조건에 맞는 명부가 없습니다.')).toBeVisible()
+  await page.getByLabel('명부 검색').fill('')
+  const downloading = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'CSV 내보내기' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '확인' }).click()
+  const chunks = []
+  for await (const chunk of await (await downloading).createReadStream()) chunks.push(chunk)
+  const csv = Buffer.concat(chunks).toString('utf8')
+  expect(csv).not.toContain('2026999999')
+  expect(csv).not.toContain('suggested@example.invalid')
+
+  await row.getByRole('button', { name: '적용' }).click()
+  await expect(row.getByRole('alert')).toContainText('명부와 계정 정보를 다시 확인해주세요.')
+  await expect(row.getByRole('button', { name: '적용' })).toBeEnabled()
+  await row.getByRole('button', { name: '적용' }).click()
+  expect(applyPayload).toEqual({ memberId: 27 })
+  await expect(row.getByRole('cell').nth(0)).toContainText('2026999999')
+  await expect(row.getByRole('cell').nth(5)).toContainText('suggested@example.invalid')
+  await expect(row.getByRole('note', { name: /추정 · 확인 필요/ })).toHaveCount(0)
+})
+
 test('notices can be ordered by date, views and upvotes', async ({ page }) => {
   await mockAdminApis(page)
   const notice = (id, title, createdAt, viewCount, upvotes, pinned = false) => ({ id, title, content: '본문', category: 'GENERAL', author: '운영진', authorStudentId: 'a', pinned, createdAt, viewCount, upvotes, myVote: 0 })

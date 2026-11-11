@@ -280,3 +280,155 @@ test('phone launcher stays above a keyboard opened in another form', async ({ pa
   await opener.click()
   await expect(page.getByRole('dialog', { name: '사람에게 질문하기' })).toBeVisible()
 })
+
+async function expectClearRightCorner(page, width) {
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  const trigger = page.locator('.coms-ask-trigger')
+  await expect(trigger).toBeVisible()
+  await expect.poll(() => trigger.evaluate((element) => {
+    const box = element.getBoundingClientRect()
+    return innerWidth - box.right
+  })).toBeLessThanOrEqual(24)
+  const overlaps = () => trigger.evaluate((element) => {
+    const box = element.getBoundingClientRect()
+    return [...document.querySelectorAll('.coms-to-top.is-visible, .scene-rail, .scene-opening__br, .scene-opening__ticker, .apple-mobile-tabs, .appearance-actions, .coms-toast, .coms-perf-notice')].filter((other) => {
+      const style = getComputedStyle(other)
+      const rect = other.getBoundingClientRect()
+      return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0
+        && box.left < rect.right && box.right > rect.left && box.top < rect.bottom && box.bottom > rect.top
+    }).map((other) => other.className)
+  })
+  await expect.poll(overlaps).toEqual([])
+  const box = await trigger.boundingBox()
+  expect(box.x + box.width).toBeLessThanOrEqual(width)
+  expect(box.y).toBeGreaterThanOrEqual(0)
+}
+
+for (const width of [1440, 390]) for (const theme of ['light', 'dark']) {
+  test.describe(`${width} ${theme} layout`, () => {
+    test.use({ isMobile: width === 390, hasTouch: width === 390 })
+    test(`right corner clears page controls at ${width} in ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+      await page.addInitScript(({ theme, width }) => {
+        localStorage.setItem('kwcoms-theme-mode:v2', theme)
+        localStorage.setItem('coms.tour.guest.seen:v1', '1')
+        localStorage.setItem('coms.tour.member.seen:v1', '1')
+        sessionStorage.setItem('coms.intro.played:v1', '1')
+        if (width === 390) Object.defineProperty(window, 'visualViewport', {
+          configurable: true,
+          value: Object.assign(new EventTarget(), { height: 844, offsetTop: 0 }),
+        })
+      }, { theme, width })
+      await page.route('**/api/**', (route) => route.fulfill({ json: [] }))
+      await mockOptionalApis(page)
+      await page.route('**/api/club-projects', (route) => route.fulfill({ json: [] }))
+      await page.route('**/api/site-settings', (route) => route.fulfill({ json: { askEnabled: true } }))
+      for (const path of ['/', '/activities', '/community', '/admin']) {
+        const role = path === '/admin' ? 'ADMIN' : 'USER'
+        await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 71, studentId: '2026000071', name: 'Test Account', role, emailVerified: true } }))
+        await page.route('**/api/permissions/me', (route) => route.fulfill({ json: { role, permissions: role === 'ADMIN' ? ['operations.panel'] : [] } }))
+        await page.goto(path)
+        await expect(page.locator('html')).toHaveAttribute('data-theme-mode', theme)
+        await expectClearRightCorner(page, width)
+        for (const fraction of [0.5, 1]) {
+          await page.evaluate((fraction) => window.scrollTo({ top: (document.documentElement.scrollHeight - innerHeight) * fraction, behavior: 'instant' }), fraction)
+          await expectClearRightCorner(page, width)
+        }
+        await page.locator('.appearance-actions').scrollIntoViewIfNeeded()
+        await expectClearRightCorner(page, width)
+        const trigger = page.locator('.coms-ask-trigger')
+        await trigger.click()
+        const dialog = page.getByRole('dialog', { name: '사람에게 질문하기' })
+        await expect(dialog).toBeVisible()
+        const panel = await dialog.boundingBox()
+        expect(width - panel.x - panel.width).toBeGreaterThanOrEqual(0)
+        expect(width - panel.x - panel.width).toBeLessThanOrEqual(24)
+        expect(panel.x).toBeGreaterThanOrEqual(0)
+        expect(panel.y).toBeGreaterThanOrEqual(0)
+        expect(panel.y + panel.height).toBeLessThanOrEqual(width === 390 ? 844 : 900)
+        if (width === 390) {
+          await dialog.getByRole('textbox', { name: '질문' }).fill('참여 방법을 알려 주세요.')
+          await dialog.getByRole('button', { name: '다음' }).click()
+          await page.evaluate(() => {
+            window.visualViewport.height = 420
+            window.visualViewport.dispatchEvent(new Event('resize'))
+          })
+          await expect.poll(async () => {
+            const box = await dialog.boundingBox()
+            return box.y + box.height
+          }).toBeLessThanOrEqual(420)
+          const box = await dialog.boundingBox()
+          expect(box.y).toBeGreaterThanOrEqual(104)
+          const email = await dialog.getByRole('textbox', { name: '답장받을 이메일' }).boundingBox()
+          expect(email.y).toBeGreaterThanOrEqual(box.y)
+          expect(email.y + email.height).toBeLessThanOrEqual(420)
+          await dialog.getByRole('button', { name: '질문 보내기' }).scrollIntoViewIfNeeded()
+          await expect(dialog.getByRole('button', { name: '질문 보내기' })).toBeInViewport()
+          await page.evaluate(() => {
+            window.visualViewport.height = 844
+            window.visualViewport.dispatchEvent(new Event('resize'))
+          })
+        }
+        await page.keyboard.press('Escape')
+      }
+      await page.evaluate(() => {
+        localStorage.setItem('kwcoms-perf-mode:v1', 'auto')
+        localStorage.removeItem('kwcoms-perf-notice:v1')
+        sessionStorage.setItem('kwcoms-perf-probe:v1', JSON.stringify({ accelerated: false, renderer: '' }))
+      })
+      await page.reload()
+      await expect(page.locator('.coms-perf-notice')).toBeVisible()
+      await expectClearRightCorner(page, width)
+      // Use the production toast styles without an auto-dismiss timer.
+      await page.evaluate(() => {
+        const host = document.createElement('div')
+        host.className = 'coms-toast-host'
+        const toast = document.createElement('div')
+        toast.className = 'coms-toast'
+        toast.setAttribute('role', 'status')
+        toast.textContent = '확인했습니다.'
+        host.append(toast)
+        document.body.append(host)
+      })
+      await expect(page.locator('.coms-toast')).toBeVisible()
+      await expectClearRightCorner(page, width)
+    })
+  })
+}
+
+test('crowded phone keyboard keeps the launcher below the header and clears stacked toasts', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.addInitScript(() => Object.defineProperty(window, 'visualViewport', {
+    configurable: true,
+    value: Object.assign(new EventTarget(), { height: 844, offsetTop: 0 }),
+  }))
+  await mockOptionalApis(page)
+  await page.route('**/api/site-settings', (route) => route.fulfill({ json: { askEnabled: true } }))
+  await page.goto('/activities')
+  await expect(page.locator('.coms-ask-trigger')).toBeVisible()
+  await page.locator('.appearance-actions').scrollIntoViewIfNeeded()
+  await page.evaluate(() => {
+    document.body.style.paddingBottom = '500px'
+    const controls = document.querySelector('.appearance-actions')
+    window.scrollBy({ top: controls.getBoundingClientRect().top - 369, behavior: 'instant' })
+    const host = document.createElement('div')
+    host.className = 'coms-toast-host'
+    for (let index = 0; index < 4; index += 1) {
+      const toast = document.createElement('div')
+      toast.className = 'coms-toast'
+      toast.setAttribute('role', 'status')
+      toast.textContent = '확인했습니다.'
+      host.append(toast)
+    }
+    document.body.append(host)
+    window.visualViewport.height = 420
+    window.visualViewport.dispatchEvent(new Event('resize'))
+  })
+  await expectClearRightCorner(page, 390)
+  const box = await page.locator('.coms-ask-trigger').boundingBox()
+  expect(box.y).toBeGreaterThanOrEqual(104)
+  expect(box.y + box.height).toBeLessThanOrEqual(420)
+  await expect(page.getByRole('button', { name: '맨 위로' })).toBeHidden()
+  await page.locator('.coms-ask-trigger').click()
+  await expect(page.getByRole('dialog', { name: '사람에게 질문하기' })).toBeVisible()
+})

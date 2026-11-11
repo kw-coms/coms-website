@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { displayStudentId } from '../../utils/roleAccess'
-import { importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember } from '../../services/adminApi'
+import { importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, applyEligibleMemberSuggestion } from '../../services/adminApi'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
@@ -38,6 +38,8 @@ export default function AdminRoster() {
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({ studentId: '', name: '', phone: '', email: '', generation: '', department: '' })
   const [editSaving, setEditSaving] = useState(false)
+  const [applyingId, setApplyingId] = useState<number | null>(null)
+  const [applyError, setApplyError] = useState<{ id: number; message: string } | null>(null)
   const editOriginalRef = useRef(null)
   const [rosterQuery, setRosterQuery] = useState('')
   const [rosterSort, setRosterSort] = useState<{ key: RosterSortKey; direction: SortDirection } | null>(null)
@@ -224,6 +226,20 @@ export default function AdminRoster() {
       setRoster((prev) => prev.filter((m) => m.id !== member.id))
     } catch (err) {
       showToast({ message: err.message || '삭제 중 오류가 발생했습니다.', tone: 'error' })
+    }
+  }
+
+  const handleApplySuggestion = async (member) => {
+    if (member.suggestedMemberId == null) return
+    setApplyingId(member.id)
+    setApplyError(null)
+    try {
+      await applyEligibleMemberSuggestion(member.id, member.suggestedMemberId)
+      await loadRoster()
+    } catch (err) {
+      setApplyError({ id: member.id, message: err.message || '추정 정보를 적용하지 못했습니다.' })
+    } finally {
+      setApplyingId(null)
     }
   }
 
@@ -440,7 +456,7 @@ export default function AdminRoster() {
                 <col style={{ width: '64px' }} />
                 <col style={{ width: '124px' }} />
                 <col style={{ width: '220px' }} />
-                <col style={{ width: '88px' }} />
+                <col style={{ width: '280px' }} />
               </colgroup>
               <thead role="rowgroup" className="sticky top-0 bg-[var(--app-surface)] text-xs font-semibold text-[var(--theme-body-muted)]">
                 <tr role="row">
@@ -526,6 +542,17 @@ export default function AdminRoster() {
                         <td role="cell" data-label="전화번호" className="px-3 py-3 text-xs text-[var(--theme-body-muted)]"><span>{member.phone || '-'} {member.phoneFromAccount && <span className="coms-roster-account" role="note" aria-label="계정에서 채운 전화번호">계정</span>}</span></td>
                         <td role="cell" data-label="이메일" className="px-3 py-3 text-xs text-[var(--theme-body-muted)]"><span>{member.email || '-'} {member.emailFromAccount && <span className="coms-roster-account" role="note" aria-label="계정에서 채운 이메일">계정</span>}</span></td>
                         <td role="cell" data-label="관리" className="px-3 py-3">
+                          {member.suggestedMemberId != null && (
+                            <div className="mb-2 border-l-2 border-amber-500 pl-2 text-xs text-[var(--theme-body-dark)]" role="note" aria-label="추정 · 확인 필요">
+                              <strong>추정 · 확인 필요</strong>
+                              <p>학번 {displayStudentId(member.suggestedStudentId) || '-'} · 이메일 {member.suggestedEmail || '-'}</p>
+                              <p className="text-[var(--theme-body-muted)]">계정에 입력된 이름과 전화번호가 일치합니다. 본인 확인 후 적용하세요.</p>
+                              <button type="button" disabled={applyingId !== null} onClick={() => handleApplySuggestion(member)} className="mt-1 min-h-11 rounded border border-[var(--app-hairline-strong)] bg-[var(--app-surface-soft)] px-2 font-semibold text-[var(--app-text)] disabled:opacity-50">
+                                {applyingId === member.id ? '적용 중...' : '적용'}
+                              </button>
+                            </div>
+                          )}
+                          {applyError?.id === member.id && <p role="alert" className="mb-2 text-xs text-red-600">{applyError.message}</p>}
                           <div className="flex gap-3">
                             <button type="button" onClick={() => startEdit(member)} className="text-xs font-semibold text-blue-500 hover:underline">편집</button>
                             <button type="button" onClick={() => handleDelete(member)} className="text-xs font-semibold text-red-500 hover:underline">삭제</button>

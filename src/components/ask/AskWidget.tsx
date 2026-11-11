@@ -43,7 +43,11 @@ function AskDialog({ onClose, user }: { onClose: () => void; user: { email?: str
 
   useEffect(() => {
     if (error) errorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'auto' })
-  }, [error])
+    else if (keyboardInset) {
+      const focused = document.activeElement
+      if (focused instanceof HTMLElement && dialogRef.current?.contains(focused)) focused.scrollIntoView({ block: 'nearest', behavior: 'auto' })
+    }
+  }, [error, keyboardInset, dialogRef])
 
   function next(event?: React.FormEvent) {
     event?.preventDefault()
@@ -139,14 +143,29 @@ export default function AskWidget() {
       trigger.style.removeProperty('bottom')
       const keyboardInset = viewport ? window.innerHeight - viewport.height - viewport.offsetTop : 0
       if (keyboardInset > 120) trigger.style.bottom = `${keyboardInset + 8}px`
-      const controls = document.querySelector('.appearance-actions')?.getBoundingClientRect()
-      if (!controls) return
       const button = trigger.getBoundingClientRect()
-      if (button.left >= controls.right || button.right <= controls.left || button.top >= controls.bottom || button.bottom <= controls.top) return
+      const topButton = document.querySelector('.coms-to-top.is-visible')
+      const keyboardOpen = keyboardInset > 120
+      const stackHeight = topButton && !keyboardOpen ? topButton.getBoundingClientRect().height + 12 : 0
+      const obstacles = [...document.querySelectorAll('.appearance-actions, .scene-opening__br, .scene-opening__ticker, .scene-rail, .apple-mobile-tabs, .coms-toast, .coms-perf-notice')]
+        .filter((element) => {
+          const style = getComputedStyle(element)
+          return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0
+        })
+        .map((element) => element.getBoundingClientRect())
+        .filter((box) => box.width > 0 && box.height > 0 && box.bottom > 0 && box.top < window.innerHeight && button.left < box.right && button.right > box.left)
+        .sort((a, b) => b.bottom - a.bottom)
+      let top = button.top
+      for (const obstacle of obstacles) {
+        if (top + button.height > obstacle.top && top - stackHeight < obstacle.bottom) top = obstacle.top - button.height - 8
+      }
       const minTop = window.innerWidth < 640 ? 104 : 64
-      const above = controls.top - button.height - 8
-      const top = above >= minTop ? above : Math.max(minTop, controls.bottom + 8)
-      trigger.style.bottom = `${Math.max(8, window.innerHeight - top - button.height)}px`
+      const fits = top - stackHeight >= minTop
+      trigger.style.visibility = fits ? '' : 'hidden'
+      document.documentElement.style.setProperty('--coms-ask-top-visibility', fits && !keyboardOpen ? 'visible' : 'hidden')
+      const bottom = `${Math.max(8, window.innerHeight - Math.max(top, minTop + stackHeight) - button.height)}px`
+      trigger.style.bottom = bottom
+      document.documentElement.style.setProperty('--coms-ask-bottom', bottom)
     }
     // At most one measurement per frame: this is called on every scroll and every DOM change in the page.
     let frame = 0
@@ -155,7 +174,7 @@ export default function AskWidget() {
       frame = requestAnimationFrame(() => { frame = 0; measure() })
     }
     const mutation = new MutationObserver(positionTrigger)
-    mutation.observe(document.body, { childList: true, subtree: true })
+    mutation.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
     window.addEventListener('scroll', positionTrigger, { passive: true })
     window.addEventListener('resize', positionTrigger)
     viewport?.addEventListener('resize', positionTrigger)
@@ -164,6 +183,8 @@ export default function AskWidget() {
     return () => {
       if (frame) cancelAnimationFrame(frame)
       mutation.disconnect()
+      document.documentElement.style.removeProperty('--coms-ask-bottom')
+      document.documentElement.style.removeProperty('--coms-ask-top-visibility')
       window.removeEventListener('scroll', positionTrigger)
       window.removeEventListener('resize', positionTrigger)
       viewport?.removeEventListener('resize', positionTrigger)

@@ -49,4 +49,9 @@ const accountCsv = rosterToCsv([{ name: 'Test Member', studentId: '2026000001', 
 assert.ok(accountCsv.includes('"2026000001"'), 'export includes the displayed account student number')
 assert.ok(accountCsv.includes('"010-0000-0000","account@example.com"'), 'export includes displayed account contact values')
 
+const suggestedCsv = rosterToCsv([{ name: 'Fictional Member', studentId: '', email: '', suggestedMemberId: 17, suggestedStudentId: '2026999999', suggestedEmail: 'suggested@example.invalid' }], NOW)
+assert.ok(suggestedCsv.includes('"Fictional Member",""'), 'the unverified student number stays blank')
+assert.ok(!suggestedCsv.includes('2026999999'), 'suggested student number is excluded')
+assert.ok(!suggestedCsv.includes('suggested@example.invalid'), 'suggested email is excluded')
+
 console.log('roster CSV contract passed')
