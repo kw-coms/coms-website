@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import {
+  isPollPast,
+  sortPollsForList,
   bestRanges,
   countsPerSlot,
   emptySlots,
@@ -99,6 +101,21 @@ assert.deepEqual(
     { day: 0, date: '2026-10-14', startMinute: 690, endMinute: 720, count: 1 },
     { day: 1, date: '2026-10-15', startMinute: 600, endMinute: 630, count: 1 },
   ],
+)
+
+// The list: polls waiting for an answer first, answered next, polls whose dates passed last.
+const poll = (id, dates, answered) => ({ id, dates, answered })
+assert.equal(isPollPast(poll(1, ['2026-10-01', '2026-10-02'], false), '2026-10-03'), true)
+assert.equal(isPollPast(poll(1, ['2026-10-01', '2026-10-03'], false), '2026-10-03'), false, 'a poll on today is not past')
+assert.deepEqual(
+  sortPollsForList([
+    poll(1, ['2026-10-20'], true),
+    poll(2, ['2026-09-01'], false),
+    poll(3, ['2026-10-21'], false),
+    poll(4, ['2026-10-22'], true),
+    poll(5, ['2026-10-23'], false),
+  ], '2026-10-10').map((entry) => entry.id),
+  [3, 5, 1, 4, 2],
 )
 
 console.log('meeting poll contract passed')

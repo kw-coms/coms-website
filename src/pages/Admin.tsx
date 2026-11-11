@@ -16,8 +16,10 @@ import AdminMembers from './admin/AdminMembers'
 import AdminPermissions from './admin/AdminPermissions'
 import AdminRoster from './admin/AdminRoster'
 import AdminRecruitApplications from './admin/AdminRecruitApplications'
-import { recruitPendingCount, recruitStatusLabel } from './admin/recruitStatus'
 import AdminScreenCheck from './admin/AdminScreenCheck'
+import AdminOverview from './admin/AdminOverview'
+import AdminTabNav from './admin/AdminTabNav'
+import { ADMIN_TABS } from './admin/adminTabs'
 import AdminSiteSettings from './admin/AdminSiteSettings'
 import AdminSponsors from './admin/AdminSponsors'
 import {
@@ -34,33 +36,6 @@ import {
 } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
 
-const ADMIN_TAB_IDS = new Set([
-  'overview', 'analytics', 'members', 'recruit', 'roster', 'activities', 'projects', 'files',
-  'site-settings', 'sponsors', 'fonts', 'community', 'deleted-posts', 'screen-check', 'ban', 'permissions', 'logs',
-])
-
-const ADMIN_TABS = [
-  { id: 'overview', label: '운영 요약' },
-  { id: 'analytics', label: '분석' },
-  { id: 'members', label: '회원 관리' },
-  { id: 'recruit', label: '모집 관리' },
-  { id: 'roster', label: '명부 인증' },
-  { id: 'activities', label: '활동 관리' },
-  { id: 'projects', label: 'Apps 관리' },
-  { id: 'files', label: '파일 관리' },
-  { id: 'site-settings', label: '사이트 문구' },
-  // 'sponsors' 는 roleAccess 의 임원/부회장 허용 목록에 없다 — 회장 전용 탭.
-  { id: 'sponsors', label: '후원자' },
-  { id: 'fonts', label: '폰트 관리' },
-  { id: 'community', label: '커뮤니티 관리' },
-  { id: 'deleted-posts', label: '삭제 보관함' },
-  { id: 'screen-check', label: '화면 점검' },
-  { id: 'ban', label: '차단 관리' },
-  // 'permissions' 는 회장 전용 — 직급별 권한 매트릭스를 조정한다.
-  { id: 'permissions', label: '권한 관리' },
-  { id: 'logs', label: '로그' },
-]
-
 type RecruitApplication = {
   id: string | number
   name: string
@@ -71,17 +46,23 @@ type RecruitApplication = {
 
 export default function Admin({ onBack }: { onBack: () => void }) {
   const { user } = useAuth()
-  const { permissions } = usePermissions()
-  const [searchParams] = useSearchParams()
-  const [activeTab, setActiveTab] = useState(() => {
-    const requested = searchParams.get('tab')
-    return requested && ADMIN_TAB_IDS.has(requested) ? requested : 'overview'
-  })
+  const { permissions, settled } = usePermissions()
+  const [searchParams, setSearchParams] = useSearchParams()
   const isSensitiveAdmin = canManageSensitiveAdmin(user?.role)
   const visibleTabs = adminTabsForRole(user?.role, permissions, ADMIN_TABS)
-  const resolvedActiveTab = visibleTabs.some((tab) => tab.id === activeTab)
-    ? activeTab
-    : defaultOperationsTab(user?.role, permissions, searchParams.get('tab'))
+  // The address holds the tab. An unknown or forbidden value falls back to the first tab the
+  // operator may open.
+  const requestedTab = searchParams.get('tab')
+  const resolvedActiveTab = visibleTabs.some((tab) => tab.id === requestedTab)
+    ? requestedTab
+    : defaultOperationsTab(user?.role, permissions, null)
+  const selectTab = (id: string) => setSearchParams({ tab: id })
+  useEffect(() => {
+    // Wait for the real permissions so a tab they allow is not replaced by the default one.
+    if (settled && resolvedActiveTab && requestedTab !== resolvedActiveTab) {
+      setSearchParams({ tab: resolvedActiveTab }, { replace: true })
+    }
+  }, [settled, resolvedActiveTab, requestedTab, setSearchParams])
   const activeTabLabel = visibleTabs.find((tab) => tab.id === resolvedActiveTab)?.label || '운영 탭'
   const [recruitApplications, setRecruitApplications] = useState<RecruitApplication[]>([])
   const [recruitLoading, setRecruitLoading] = useState(true)
@@ -154,41 +135,35 @@ export default function Admin({ onBack }: { onBack: () => void }) {
           </p>
           <PageHeading className="mt-2 mb-6 text-2xl font-bold sm:text-3xl">운영 패널</PageHeading>
 
-          <div className="-mx-1 mb-6 overflow-x-auto touch-pan-x pb-1">
-            <div className="flex min-w-max gap-2 px-1" role="tablist" aria-label="관리자 패널 섹션">
-              {visibleTabs.map((tab) => (
-                <button
-                  id={`admin-tab-${tab.id}`}
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={resolvedActiveTab === tab.id}
-                  aria-controls={`admin-panel-${tab.id}`}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`shape-cut-sm shrink-0 px-4 py-2 text-sm font-semibold transition ${
-                    resolvedActiveTab === tab.id
-                      ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
-                      : 'border border-[var(--app-hairline)] bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
+          <div className="lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-8">
+            <AdminTabNav visibleTabs={visibleTabs} activeId={resolvedActiveTab ?? ''} onSelect={selectTab} />
+            <div className="mt-6 min-w-0 lg:mt-0">
           <div
             id={`admin-panel-${resolvedActiveTab}`}
             role="tabpanel"
             aria-labelledby={`admin-tab-${resolvedActiveTab}`}
             aria-label={activeTabLabel}
           >
+            {isSensitiveAdmin && (resolvedActiveTab === 'members' || resolvedActiveTab === 'roster') && (
+              <p className="mb-4 text-xs text-[var(--theme-body-muted)]">
+                {resolvedActiveTab === 'members' ? '가입 전 명단은 ' : '가입한 회원 목록은 '}
+                <button
+                  type="button"
+                  onClick={() => selectTab(resolvedActiveTab === 'members' ? 'roster' : 'members')}
+                  className="font-semibold text-blue-500 underline-offset-2 hover:underline"
+                >
+                  {resolvedActiveTab === 'members' ? '명부 인증 탭' : '회원 관리 탭'}
+                </button>
+                에서 봅니다.
+              </p>
+            )}
             {isSensitiveAdmin && resolvedActiveTab === 'overview' && (
-              <OverviewTab
+              <AdminOverview
                 recruitApplications={recruitApplications}
                 recruitLoading={recruitLoading}
                 recruitError={recruitError}
-                onOpenRecruit={() => setActiveTab('recruit')}
+                onReloadRecruit={loadRecruitApplications}
+                onOpenTab={selectTab}
               />
             )}
             {isSensitiveAdmin && resolvedActiveTab === 'analytics' && <AdminAnalytics />}
@@ -226,80 +201,9 @@ export default function Admin({ onBack }: { onBack: () => void }) {
             {isSensitiveAdmin && resolvedActiveTab === 'permissions' && <AdminPermissions />}
             {isSensitiveAdmin && resolvedActiveTab === 'logs' && <AdminAuditLogs formatDateTime={formatDateTime} />}
           </div>
-        </section>
-      </div>
-    </div>
-  )
-}
-
-function OverviewTab({ recruitApplications, recruitLoading, recruitError, onOpenRecruit }: {
-  recruitApplications: RecruitApplication[]
-  recruitLoading: boolean
-  recruitError: string
-  onOpenRecruit: () => void
-}) {
-  const pendingCount = recruitPendingCount(recruitApplications)
-  const latestApplication = recruitApplications[0]
-  const cards = [
-    {
-      label: '처리 대기 지원',
-      value: recruitLoading ? '확인 중' : `${pendingCount.toLocaleString('ko-KR')}건`,
-      detail: recruitError || '접수·검토·보류 상태의 지원서',
-    },
-    {
-      label: '최근 지원자',
-      value: latestApplication ? latestApplication.name : '없음',
-      detail: latestApplication ? `${latestApplication.department} · ${recruitStatusLabel(latestApplication.status)}` : '새 지원서가 들어오면 여기에 표시됩니다.',
-    },
-    {
-      label: '운영 체크',
-      value: 'Admin OS',
-      detail: '모집, 명부, 자료실, 로그를 한 흐름에서 점검합니다.',
-    },
-  ]
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-[var(--theme-body-dark)]">운영 요약</h2>
-          <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
-            운영진이 매주 확인해야 할 모집, 회원, 자료, 로그 흐름을 한 화면에서 시작합니다.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onOpenRecruit}
-          className="shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] transition hover:opacity-90"
-        >
-          모집 관리 열기
-        </button>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-3">
-        {cards.map((card) => (
-          <div key={card.label} className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
-            <p className="text-xs font-semibold text-[var(--theme-body-muted)]">{card.label}</p>
-            <p className="mt-2 text-2xl font-bold text-[var(--theme-body-dark)]">{card.value}</p>
-            <p className="mt-2 text-xs leading-5 text-[var(--theme-body-muted)]">{card.detail}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="rounded-lg border border-[var(--app-hairline)] bg-white/60 p-4">
-        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">다음 운영 액션</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          {[
-            ['모집', '지원 상태와 운영 메모를 정리합니다.'],
-            ['커뮤니티', '공지와 활동 글 흐름을 확인합니다.'],
-            ['자료실', '최근 세미나·프로젝트 자료를 올립니다.'],
-          ].map(([title, body]) => (
-            <div key={title} className="shape-cut-sm border border-[var(--app-hairline)] bg-black/5 px-3 py-3">
-              <p className="text-sm font-bold text-[var(--theme-body-dark)]">{title}</p>
-              <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">{body}</p>
             </div>
-          ))}
-        </div>
+          </div>
+        </section>
       </div>
     </div>
   )

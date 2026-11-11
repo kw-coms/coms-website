@@ -23,6 +23,8 @@ globalThis.setTimeout = (...args) => {
 
 const USER = { id: 7, studentId: '2026000001', name: '홍길동', role: 'USER', emailVerified: true }
 const CACHE_KEY = ['community', 'posts']
+const DRAW_KEY = 'coms:draw:v2:7'
+window.localStorage.setItem(DRAW_KEY, 'names')
 
 const json = (status, body) => new Response(JSON.stringify(body), {
   status,
@@ -100,6 +102,7 @@ for (const [label, answer] of [
   assert.equal(auth.user?.studentId, USER.studentId, `${label}: still signed in on screen, as on the server`)
   assert.deepEqual(auth.permissions, ['community.read'], `${label}: permissions untouched`)
   assert.deepEqual(queryClient.getQueryData(CACHE_KEY), [{ id: 1 }], `${label}: cached data untouched`)
+  assert.equal(window.localStorage.getItem(DRAW_KEY), 'names', `${label}: saved names untouched`)
   assert.equal(toastCount('로그아웃하지 못했습니다'), failures, `${label}: the member is told`)
 }
 
@@ -134,6 +137,7 @@ for (const [label, answer] of [
   assert.equal(auth.user, null)
   assert.equal(auth.permissions, null)
   assert.equal(queryClient.getQueryData(CACHE_KEY), undefined, 'the next account must not see cached data')
+  assert.equal(window.localStorage.getItem(DRAW_KEY), null, 'logout removes saved names')
   assert.equal(toastCount('로그아웃하지 못했습니다'), failures, 'no failure toast on success')
 }
 
@@ -143,6 +147,7 @@ for (const [label, answer] of [
 
 {
   await signIn()
+  window.localStorage.setItem(DRAW_KEY, 'names')
   await act(async () => {
     auth.clearSession()
     sessionDead = true
@@ -152,6 +157,7 @@ for (const [label, answer] of [
   assert.equal(auth.user, null)
   assert.equal(auth.permissions, null)
   assert.equal(queryClient.getQueryData(CACHE_KEY), undefined)
+  assert.equal(window.localStorage.getItem(DRAW_KEY), null, 'password change removes saved names')
   assert.ok(!calls.includes('POST /api/auth/logout'), 'clearSession does not ask the server')
   assert.equal(toastCount('로그인이 만료되었습니다'), 0, 'no expiry toast over the caller\'s own message')
 }
@@ -161,10 +167,12 @@ for (const [label, answer] of [
 
 {
   await signIn()
+  window.localStorage.setItem(DRAW_KEY, 'names')
   sessionDead = true
   await act(async () => { await request('/api/notices').catch(() => {}) })
 
   assert.equal(auth.user, null)
+  assert.equal(window.localStorage.getItem(DRAW_KEY), null, 'session expiry removes saved names')
   assert.equal(toastCount('로그인이 만료되었습니다'), 1)
 }
 

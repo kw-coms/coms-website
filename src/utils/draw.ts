@@ -1,6 +1,14 @@
 // The draw page ("뽑기"): splitting names into teams, putting them in an order, picking some.
 // Pure functions that take their randomness as an argument, so tests/draw.test.mjs can pin
 // the results; the page passes one backed by the browser's crypto.
+import { forgetStoredValue } from './themeColors'
+
+export const drawStorageKey = (memberId: number | string) => `coms:draw:v2:${memberId}`
+
+export function forgetDrawStorage(memberId?: number | string) {
+  if (memberId != null) forgetStoredValue(drawStorageKey(memberId))
+  forgetStoredValue('coms:draw:v1')
+}
 
 /** A number in [0, 1), like Math.random. */
 export type Random = () => number

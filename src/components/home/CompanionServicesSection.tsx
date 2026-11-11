@@ -1,9 +1,11 @@
 import PageHeading from '../PageHeading'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { listClubProjects, listClubProjectCategories, listClubProjectLinkStatuses } from '../../services/clubProjectApi'
 import { linkStateOf } from '../../utils/appProjectStatus'
 import { useAuth } from '../../contexts/useAuth'
 import AppProjectCard from '../apps/AppProjectCard'
+import { ListSearch } from '../common/ListTools'
+import { matchesQuery } from '../../utils/listTools'
 import '../../styles/site-pages.css'
 
 function groupByCategory(projects, categories) {
@@ -37,6 +39,9 @@ function CompanionServicesSection() {
   const [loadState, setLoadState] = useState('loading')
   const [linkStatuses, setLinkStatuses] = useState([])
   const [filter, setFilter] = useState('all')
+  const [query, setQuery] = useState('')
+  // Bumped by the retry button to run the load again.
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let mounted = true
@@ -56,7 +61,7 @@ function CompanionServicesSection() {
         setLoadState('error')
       })
     return () => { mounted = false }
-  }, [])
+  }, [attempt])
 
   // Which links answered the server's last look. Members only: guests are not asked and see no
   // status dots. The page does not wait for it and does without it: a failure here only means
@@ -70,8 +75,14 @@ function CompanionServicesSection() {
     return () => { mounted = false }
   }, [user])
 
+  // The chips list every category; the cards are what the search leaves.
   const groups = groupByCategory(projects, categories)
-  const shown = filter === 'all' ? groups : groups.filter((group) => group.key === filter)
+  const found = useMemo(
+    () => projects.filter((project) => matchesQuery(query, [project.title, project.description])),
+    [projects, query],
+  )
+  const foundGroups = groupByCategory(found, categories)
+  const shown = filter === 'all' ? foundGroups : foundGroups.filter((group) => group.key === filter)
 
   return (
     <div className="site-page">
@@ -92,13 +103,22 @@ function CompanionServicesSection() {
         </div>
 
         {loadState === 'error' ? (
-          <p className="mt-8 text-sm font-medium text-[color-mix(in_srgb,var(--app-danger)_65%,var(--app-text))]">프로젝트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
+          <div className="mt-8 flex flex-wrap items-center gap-3" role="alert">
+            <p className="text-sm font-medium text-[color-mix(in_srgb,var(--app-danger)_65%,var(--app-text))]">프로젝트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
+            <button type="button" onClick={() => { setLoadState('loading'); setAttempt((value) => value + 1) }} className="apple-action-secondary min-h-11 px-4 text-sm">다시 불러오기</button>
+          </div>
+        ) : loadState === 'loading' ? (
+          <p role="status" className="mt-8 text-sm text-[var(--app-muted)]">프로젝트를 불러오는 중...</p>
         ) : groups.length === 0 ? (
           <p className="mt-8 text-sm font-medium text-[var(--app-muted)]">등록된 프로젝트가 아직 없습니다.</p>
         ) : (
           <>
+            <div role="group" aria-label="프로젝트 찾기" className="mt-6 flex flex-wrap items-center gap-3">
+              <div className="w-full min-w-0 sm:max-w-xs">
+                <ListSearch value={query} onChange={setQuery} placeholder="이름이나 설명으로 찾기" label="프로젝트 검색" />
+              </div>
             {groups.length > 1 && (
-              <div className="apps-filter" role="group" aria-label="카테고리 필터">
+              <div className="apps-filter !m-0 !border-0 !p-0" role="group" aria-label="카테고리 필터">
                 <button type="button" className="apps-chip" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>
                   전체 <span>{projects.length}</span>
                 </button>
@@ -107,6 +127,16 @@ function CompanionServicesSection() {
                     {group.name} <span>{group.projects.length}</span>
                   </button>
                 ))}
+              </div>
+            )}
+              <span role="status" aria-label="검색 결과" className="text-xs font-semibold text-[var(--app-muted)]">{shown.reduce((count, group) => count + group.projects.length, 0)}개</span>
+            </div>
+            {shown.length === 0 && (
+              <div className="mt-8 flex flex-wrap items-center gap-3" role="status">
+                <p className="text-sm font-medium text-[var(--app-muted)]">
+                  {query.trim() ? `"${query.trim()}"에 맞는 프로젝트가 없습니다.` : '이 카테고리에는 프로젝트가 없습니다.'}
+                </p>
+                <button type="button" onClick={() => { setQuery(''); setFilter('all') }} className="apple-action-secondary min-h-11 px-4 text-sm">검색 지우기</button>
               </div>
             )}
             <div className={`mt-8${projects.some((project) => project.files?.length) ? ' apps-has-files' : ''}`}>
