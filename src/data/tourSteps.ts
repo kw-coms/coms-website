@@ -123,3 +123,59 @@ const MEMBER_STEPS: TourStep[] = [
 ]
 
 export const TOUR_STEPS: Record<TourKind, TourStep[]> = { guest: GUEST_STEPS, member: MEMBER_STEPS }
+
+const mobileSteps = (kind: TourKind): TourStep[] => [
+  {
+    id: 'menu-search',
+    icon: Binary,
+    title: '메뉴와 빠른 이동',
+    body: '오른쪽 위 메뉴에서 동아리·배움·멤버·도구를 찾아요. 옆 돋보기를 누르면 원하는 페이지를 바로 검색할 수 있어요.',
+    targets: ['[data-tour="mobile-menu"]', '[data-tour="quick-search"]'],
+  },
+  {
+    id: 'study-lab',
+    icon: BookOpen,
+    title: '스터디 자료와 회로 Lab',
+    body: kind === 'guest'
+      ? '메뉴 > 배움 > 스터디 자료에서 과목과 장 제목을 볼 수 있어요. 강의 본문과 실습은 동아리원 로그인 후 열려요. 회로 Lab은 누구나 둘러볼 수 있고 코드 컴파일은 로그인한 동아리원에게 열려요.'
+      : '메뉴 > 배움 > 스터디 자료에서 강의 본문을 읽고 문제를 풀어요. 같은 배움 메뉴의 회로 Lab에서는 아두이노 회로를 만들고 코드를 실행할 수 있어요.',
+    targets: ['[data-tour="mobile-menu"]'],
+  },
+  {
+    id: 'works',
+    icon: CircuitBoard,
+    title: '부원들의 작품',
+    body: kind === 'guest'
+      ? '메뉴 > 도구 > 작품에서 부원들이 만든 앱과 서비스를 둘러봐요. 작품 상세에서 조회수, 추천, 댓글과 답글을 볼 수 있어요. 로그인한 부원은 작품을 올릴 수 있어요.'
+      : '메뉴 > 도구 > 작품에서 다른 부원의 결과물을 보고 추천과 댓글·답글을 남겨요. 내 작품도 올리고 수정할 수 있어요.',
+    targets: ['[data-tour="mobile-menu"]'],
+  },
+  {
+    id: 'appearance',
+    icon: Palette,
+    title: '내 화면 꾸미기',
+    body: '화면 맨 아래 화면 설정에서 인트로를 고르고 미리 보거나 화면 효과와 강조 색상을 바꿔요. 옆의 튜토리얼 시작으로 이 안내를 다시 볼 수 있어요.',
+    targets: ['[data-tour="appearance"]'],
+  },
+  {
+    id: 'questions',
+    icon: MessagesSquare,
+    title: '질문하기',
+    body: '오른쪽 아래 질문하기에서 세 가지 자주 묻는 질문의 답을 바로 확인해요. 해결되지 않으면 다른 질문 보내기에서 이메일 문의를 남길 수 있어요.',
+    targets: ['[data-tour="ask"]'],
+  },
+  {
+    id: 'account',
+    icon: kind === 'guest' ? LogIn : UserRound,
+    title: kind === 'guest' ? '동아리원으로 시작하기' : '내 계정 확인하기',
+    body: kind === 'guest'
+      ? '오른쪽 위 메뉴 > 로그인에서 동아리원 계정으로 들어가요. 화면 맨 아래 튜토리얼 시작을 누르면 언제든 다시 둘러볼 수 있어요.'
+      : '오른쪽 위 메뉴 > 계정 설정에서 비밀번호와 알림을 관리해요. 화면 맨 아래 튜토리얼 시작을 누르면 언제든 다시 볼 수 있어요.',
+    targets: ['[data-tour="mobile-menu"]'],
+  },
+]
+
+export const MOBILE_TOUR_STEPS: Record<TourKind, TourStep[]> = {
+  guest: mobileSteps('guest'),
+  member: mobileSteps('member'),
+}

@@ -51,6 +51,9 @@
 	position: absolute;
 	box-sizing: border-box;
 	width: min(23rem, calc(100vw - 24px));
+	max-height: calc(100dvh - 24px);
+	overflow-y: auto;
+	overscroll-behavior: contain;
 	padding: 1rem 1.1rem 0.95rem;
 	border-radius: 20px;
 	border: 1px solid color-mix(in srgb, var(--app-accent) 38%, var(--app-hairline));
@@ -132,10 +135,12 @@
 
 .coms-tour-body {
 	margin: 0.7rem 0 0;
+	min-height: 0;
 	color: var(--app-muted);
 	font-size: 0.9rem;
 	line-height: 1.65;
 	word-break: keep-all;
+	overflow-wrap: anywhere;
 }
 
 .coms-tour-actions {
@@ -232,6 +237,10 @@
 	.coms-tour-btn {
 		min-height: 2.75rem;
 	}
+}
+
+@media (max-width: 1023px) {
+	.coms-tour-btn { min-height: 2.75rem; }
 }
 
 @keyframes coms-tour-pop {

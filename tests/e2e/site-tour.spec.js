@@ -354,7 +354,7 @@ test.describe('member tour', () => {
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
-  test('opens from the mobile menu, falls back to centred cards and never overflows', async ({ page }) => {
+  test('opens from the mobile menu and follows visible phone controls without overflow', async ({ page }) => {
     await mockOptionalApis(page)
     await skipIntro(page)
     await page.goto('/about')
@@ -363,16 +363,25 @@ test.describe('phone', () => {
     await expect(page.locator('#mobile-menu')).toHaveCount(0)
     const card = tour(page)
     await expect(card).toBeVisible()
-    // The nav is collapsed at this width: no spotlight, a centred card.
-    await expect(page.locator('.coms-tour-spot')).toHaveClass(/is-none/)
+    await expect(page.locator('.coms-tour')).toHaveAttribute('data-tour-profile', 'mobile')
+    await expect(card).toContainText('메뉴와 빠른 이동')
+    await expect(page.locator('.coms-tour-spot')).not.toHaveClass(/is-none/)
+    const titles = []
     for (let i = 0; i < 6; i += 1) {
+      titles.push(await card.locator('.coms-tour-title').innerText())
       expect(await noHorizontalOverflow(page)).toBeLessThanOrEqual(1)
       const box = await card.boundingBox()
       expect(box.x).toBeGreaterThanOrEqual(0)
       expect(box.x + box.width).toBeLessThanOrEqual(390)
       expect(box.y + box.height).toBeLessThanOrEqual(844)
-      if (i < 5) await page.getByRole('button', { name: '다음' }).click()
+      if (i === 4) {
+        await expect(page.locator('.coms-tour')).toHaveAttribute('data-tour-step', 'questions')
+        await expect(page.locator('[data-tour="ask"]')).toBeVisible()
+        await expect(page.locator('.coms-tour-spot')).not.toHaveClass(/is-none/)
+      }
+      if (i < 5) await card.getByRole('button', { name: '다음' }).click()
     }
+    expect(titles).toEqual(['메뉴와 빠른 이동', '스터디 자료와 회로 Lab', '부원들의 작품', '내 화면 꾸미기', '질문하기', '동아리원으로 시작하기'])
     await page.getByRole('button', { name: '완료' }).click()
     await expect(card).toHaveCount(0)
   })
@@ -384,12 +393,64 @@ test.describe('phone', () => {
     await footerStart(page).scrollIntoViewIfNeeded()
     await footerStart(page).click()
     const card = tour(page)
-    for (let i = 0; i < 6; i += 1) await page.getByRole('button', { name: '다음' }).click()
-    await expect(card).toContainText('화면 설정')
+    for (let i = 0; i < 3; i += 1) await page.getByRole('button', { name: '다음' }).click()
+    await expect(card).toContainText('내 화면 꾸미기')
     await expect(page.getByRole('button', { name: '화면 설정', exact: true })).toBeInViewport()
     const box = await card.boundingBox()
     expect(box.x).toBeGreaterThanOrEqual(0)
     expect(box.x + box.width).toBeLessThanOrEqual(390)
     expect(await noHorizontalOverflow(page)).toBeLessThanOrEqual(1)
+  })
+
+  for (const viewport of [{ width: 320, height: 568 }, { width: 640, height: 320 }]) {
+    test(`keeps all six phone steps and controls reachable at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+      await page.setViewportSize(viewport)
+      await mockOptionalApis(page)
+      await skipIntro(page)
+      await page.goto('/about')
+      await footerStart(page).click()
+      const card = tour(page)
+      for (let i = 0; i < 6; i += 1) {
+        await expect(card).toContainText(`${i + 1} / 6`)
+        const box = await card.boundingBox()
+        const view = await page.evaluate(() => {
+          const vv = window.visualViewport
+          return { left: vv?.offsetLeft ?? 0, top: vv?.offsetTop ?? 0,
+            width: vv?.width ?? innerWidth, height: vv?.height ?? innerHeight }
+        })
+        expect(box.x).toBeGreaterThanOrEqual(view.left - 1)
+        expect(box.x + box.width).toBeLessThanOrEqual(view.left + view.width + 1)
+        expect(box.y).toBeGreaterThanOrEqual(view.top - 1)
+        expect(box.y + box.height).toBeLessThanOrEqual(view.top + view.height + 1)
+        expect(await noHorizontalOverflow(page)).toBeLessThanOrEqual(1)
+        if (i === 4) {
+          const spot = await page.locator('.coms-tour-spot').boundingBox()
+          const separated = box.y + box.height <= spot.y - 13 || box.y >= spot.y + spot.height + 13
+            || box.x + box.width <= spot.x - 13 || box.x >= spot.x + spot.width + 13
+          expect(separated, 'the question launcher remains visible beside the card').toBe(true)
+        }
+        const action = card.getByRole('button', { name: i === 5 ? '완료' : '다음' })
+        await action.scrollIntoViewIfNeeded()
+        await expect(action).toBeInViewport()
+        await action.click()
+      }
+      await expect(card).toHaveCount(0)
+    })
+  }
+
+  test('keeps one six-step profile after resizing across the hamburger breakpoint', async ({ page }) => {
+    await mockOptionalApis(page)
+    await skipIntro(page)
+    await page.goto('/about')
+    await footerStart(page).click()
+    const card = tour(page)
+    await expect(card).toContainText('1 / 6')
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await expect(page.locator('.coms-tour')).toHaveAttribute('data-tour-profile', 'mobile')
+    await expect(card).toHaveCount(1)
+    for (let i = 0; i < 5; i += 1) await card.getByRole('button', { name: '다음' }).click()
+    await expect(card).toContainText('6 / 6')
+    await page.keyboard.press('Escape')
+    await expect(card).toHaveCount(0)
   })
 })

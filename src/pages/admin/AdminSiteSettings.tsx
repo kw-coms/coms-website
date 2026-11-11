@@ -291,7 +291,7 @@ export default function AdminSiteSettings() {
           <label className="text-sm font-semibold text-[var(--theme-body-dark)] sm:col-span-2">
             질문 받을 메일 주소
             <input type="email" value={form.askInboxEmail} onChange={(e) => update('askInboxEmail', e.target.value)} maxLength={254} placeholder="test@example.com" className="mt-1 w-full rounded-lg border border-[var(--app-hairline)] bg-white px-3 py-2 text-sm outline-none" />
-            <span className="mt-1 block text-xs font-medium text-[var(--theme-body-muted)]">비워 두면 방문자 질문 위젯이 표시되지 않습니다. 입력한 주소는 관리자에게만 보입니다.</span>
+            <span className="mt-1 block text-xs font-medium text-[var(--theme-body-muted)]">비워 두면 이메일 문의만 비활성화됩니다. 자주 묻는 질문은 계속 표시됩니다. 입력한 주소는 관리자에게만 보입니다.</span>
           </label>
         </div>
 

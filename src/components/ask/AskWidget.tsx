@@ -1,15 +1,18 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { MessageCircle, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ASK_FAQS, type AskFaq } from '../../data/askFaq'
 import { useAuth } from '../../contexts/useAuth'
 import { useModalFocus } from '../../hooks/useModalFocus'
 import { getPublicSiteSettings } from '../../services/siteSettingsApi'
 import { sendAsk } from '../../services/askApi'
 
-type Stage = 'question' | 'email' | 'done'
+type Stage = 'faq' | 'answer' | 'question' | 'email' | 'done'
 
-function AskDialog({ onClose, user }: { onClose: () => void; user: { email?: string } | null }) {
-  const [stage, setStage] = useState<Stage>('question')
+function AskDialog({ onClose, user, askEnabled }: { onClose: () => void; user: { email?: string } | null; askEnabled: boolean }) {
+  const [stage, setStage] = useState<Stage>('faq')
+  const [selectedFaq, setSelectedFaq] = useState<AskFaq | null>(null)
   const [question, setQuestion] = useState('')
   const [email, setEmail] = useState('')
   const [emailEdited, setEmailEdited] = useState(false)
@@ -19,15 +22,33 @@ function AskDialog({ onClose, user }: { onClose: () => void; user: { email?: str
   const [error, setError] = useState('')
   const [keyboardInset, setKeyboardInset] = useState<{ bottom: number; maxHeight: number } | null>(null)
   const questionRef = useRef<HTMLTextAreaElement>(null)
+  const firstFaqRef = useRef<HTMLButtonElement>(null)
+  const answerRef = useRef<HTMLDivElement>(null)
   const emailRef = useRef<HTMLInputElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const errorRef = useRef<HTMLDivElement>(null)
-  const dialogRef = useModalFocus(true, onClose, { initialFocusRef: questionRef })
+  const dialogRef = useModalFocus(true, onClose, { initialFocusRef: firstFaqRef })
   const replyEmail = emailEdited ? email : (user?.email || '')
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (stage === 'email') emailRef.current?.focus()
+    else if (stage === 'question') questionRef.current?.focus()
+    else if (stage === 'faq') firstFaqRef.current?.focus()
+    else if (stage === 'answer') answerRef.current?.focus()
   }, [stage])
+
+  const backToFaq = () => {
+    if (stage === 'done') {
+      setQuestion('')
+      setEmail('')
+      setEmailEdited(false)
+      setName('')
+      setHoneypot('')
+    }
+    setSelectedFaq(null)
+    setError('')
+    setStage('faq')
+  }
 
   useEffect(() => {
     const viewport = window.visualViewport
@@ -67,7 +88,7 @@ function AskDialog({ onClose, user }: { onClose: () => void; user: { email?: str
 
   async function send(event?: React.FormEvent) {
     event?.preventDefault()
-    if (sending) return
+    if (sending || !askEnabled) return
     const trimmedEmail = replyEmail.trim()
     if (!/^[^\s@\r\n]+@[^\s@\r\n]+\.[^\s@\r\n]+$/.test(trimmedEmail)) {
       setError('답장받을 이메일 주소를 확인해 주세요.')
@@ -99,20 +120,40 @@ function AskDialog({ onClose, user }: { onClose: () => void; user: { email?: str
         <div className="coms-ask-header">
           <div>
             <p className="coms-ask-eyebrow">COM&apos;s</p>
-            <h2 id="coms-ask-title">사람에게 질문하기</h2>
+            <h2 id="coms-ask-title">COM&apos;s 질문하기</h2>
           </div>
           <button ref={closeRef} type="button" className="coms-ask-close" onClick={onClose} aria-label="질문 창 닫기"><X size={18} aria-hidden="true" /></button>
         </div>
         <div className="coms-ask-body">
           <div className="coms-ask-messages" aria-live="polite" aria-relevant="additions">
-            <p className="coms-ask-bubble coms-ask-bubble--club">궁금한 점을 남겨 주세요. 사람이 직접 읽고 메일로 답해 드려요.</p>
-            {stage !== 'question' && <p className="coms-ask-bubble coms-ask-bubble--visitor">{question}</p>}
+            <p className="coms-ask-bubble coms-ask-bubble--club">{stage === 'faq' || stage === 'answer' ? '궁금한 내용을 골라보세요. 답을 바로 확인할 수 있어요.' : '다른 궁금한 점을 남겨 주세요. 사람이 직접 읽고 메일로 답해 드려요.'}</p>
+            {stage === 'answer' && selectedFaq && <>
+              <p className="coms-ask-bubble coms-ask-bubble--visitor">{selectedFaq.question}</p>
+              <div ref={answerRef} tabIndex={-1} className="coms-ask-bubble coms-ask-bubble--club">
+                <p>{selectedFaq.answer}</p>
+                <Link to={selectedFaq.href} onClick={onClose} className="coms-ask-source">{selectedFaq.linkLabel}</Link>
+              </div>
+            </>}
+            {(stage === 'email' || stage === 'done') && <p className="coms-ask-bubble coms-ask-bubble--visitor">{question}</p>}
             {stage === 'email' && <p className="coms-ask-bubble coms-ask-bubble--club">{user ? '답장받을 이메일 주소를 확인해 주세요.' : '답장받을 이메일 주소를 알려 주세요.'}</p>}
             {stage === 'done' && <p className="coms-ask-bubble coms-ask-bubble--club">질문을 보냈어요. 답변은 이메일로 도착할 거예요.</p>}
             {error && <div ref={errorRef} className="coms-ask-bubble coms-ask-bubble--error"><p>{error}</p><button type="button" onClick={() => { if (stage === 'question') next(); else void send() }} disabled={sending}>다시 시도</button></div>}
           </div>
+          {stage === 'faq' && <div className="coms-ask-choices">
+            <div className="coms-ask-faq" role="group" aria-label="자주 묻는 질문">
+              {ASK_FAQS.map((faq, index) => <button key={faq.id} ref={index === 0 ? firstFaqRef : undefined} type="button" onClick={() => { setSelectedFaq(faq); setStage('answer') }}>{faq.question}</button>)}
+            </div>
+            <button type="button" className="coms-ask-other" disabled={!askEnabled} onClick={() => setStage('question')}>다른 질문 보내기</button>
+            {!askEnabled && <p className="coms-ask-unavailable">지금은 이메일 문의를 받지 않고 있어요. 위 답변은 계속 확인할 수 있습니다.</p>}
+          </div>}
+          {stage === 'answer' && <div className="coms-ask-choices">
+            <button type="button" className="coms-ask-back" onClick={backToFaq}>자주 묻는 질문으로</button>
+            <button type="button" className="coms-ask-other" disabled={!askEnabled} onClick={() => setStage('question')}>다른 질문 보내기</button>
+            {!askEnabled && <p className="coms-ask-unavailable">지금은 이메일 문의를 받지 않고 있어요. 위 답변은 계속 확인할 수 있습니다.</p>}
+          </div>}
           {stage === 'question' && (
             <form className="coms-ask-form" onSubmit={next} noValidate>
+              <button type="button" className="coms-ask-back" onClick={backToFaq}>자주 묻는 질문으로</button>
               <label htmlFor="coms-ask-question">질문</label>
               <textarea id="coms-ask-question" ref={questionRef} value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={2000} rows={4} placeholder="무엇이 궁금하신가요?" />
               <button type="submit" className="coms-ask-submit">다음</button>
@@ -120,13 +161,16 @@ function AskDialog({ onClose, user }: { onClose: () => void; user: { email?: str
           )}
           {stage === 'email' && (
             <form className="coms-ask-form" onSubmit={(event) => void send(event)} noValidate>
+              <button type="button" className="coms-ask-back" onClick={() => { setError(''); setStage('question') }}>질문 수정</button>
               <label htmlFor="coms-ask-email">답장받을 이메일</label>
               <input id="coms-ask-email" ref={emailRef} type="email" autoComplete="email" value={replyEmail} onChange={(event) => { setEmailEdited(true); setEmail(event.target.value) }} maxLength={254} />
               {!user && <><label htmlFor="coms-ask-name">이름 (선택)</label><input id="coms-ask-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={60} autoComplete="name" /></>}
               <div className="coms-ask-honeypot" aria-hidden="true"><label htmlFor="coms-ask-website">웹사이트</label><input id="coms-ask-website" tabIndex={-1} autoComplete="off" value={honeypot} onChange={(event) => setHoneypot(event.target.value)} /></div>
-              <button type="submit" className="coms-ask-submit" disabled={sending}>{sending ? '보내는 중…' : '질문 보내기'}</button>
+              {!askEnabled && <p className="coms-ask-unavailable">지금은 이메일 문의를 받지 않고 있어요.</p>}
+              <button type="submit" className="coms-ask-submit" disabled={sending || !askEnabled}>{sending ? '보내는 중…' : '질문 보내기'}</button>
             </form>
           )}
+          {stage === 'done' && <div className="coms-ask-choices"><button type="button" className="coms-ask-back" onClick={backToFaq}>자주 묻는 질문으로</button></div>}
         </div>
       </section>
     </div>
@@ -194,12 +238,10 @@ export default function AskWidget() {
       viewport?.removeEventListener('scroll', positionTrigger)
     }
   }, [])
-  if (!settings?.askEnabled) return null
-
   return (
     <div className="coms-ask-root">
-      <button ref={triggerRef} type="button" className="coms-ask-trigger" data-open={open} aria-hidden={open} tabIndex={open ? -1 : 0} aria-expanded={open} aria-controls="coms-ask-panel" onClick={() => { if (!loading && !document.querySelector('[role="dialog"], [role="alertdialog"], .appearance-popover, #mobile-menu, [data-coms-intro]')) setOpen(true) }} aria-label="사람에게 질문하기"><MessageCircle size={22} aria-hidden="true" /><span>질문하기</span></button>
-      {open && <AskDialog onClose={() => setOpen(false)} user={user} />}
+      <button ref={triggerRef} type="button" className="coms-ask-trigger" data-tour="ask" data-open={open} aria-hidden={open} tabIndex={open ? -1 : 0} aria-expanded={open} aria-controls="coms-ask-panel" onClick={() => { if (!loading && !document.querySelector('[role="dialog"], [role="alertdialog"], .appearance-popover, #mobile-menu, [data-coms-intro], .coms-tour')) setOpen(true) }} aria-label="질문하기"><MessageCircle size={22} aria-hidden="true" /><span>질문하기</span></button>
+      {open && <AskDialog key={user ? `member:${user.studentId || user.id || 'unknown'}` : 'guest'} onClose={() => setOpen(false)} user={user} askEnabled={Boolean(settings?.askEnabled)} />}
     </div>
   )
 }

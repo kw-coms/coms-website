@@ -1,15 +1,11 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronLeft, ChevronRight } from 'lucide-react'
-import { TOUR_STEPS } from '../../data/tourSteps'
+import { MOBILE_TOUR_STEPS, TOUR_STEPS, type TourStep } from '../../data/tourSteps'
 import type { TourKind } from './tourState'
+import { placeTourCard, type Box, type Layout, type Viewport } from './tourLayout'
 import '../../styles/tour.css'
 
-type Box = { left: number; top: number; width: number; height: number }
-type Layout = { spot: Box | null; left: number; top: number }
-
-const SPOT_PAD = 6
-const GAP = 14
 const EDGE = 12
 // Fixed header (44px) plus air: a target above this line is under the bar.
 const HEADER_CLEARANCE = 60
@@ -38,23 +34,16 @@ function findTargets(selectors: string[] = []) {
   return { els, box: { left, top, width: right - left, height: bottom - top } }
 }
 
-/** Where the card goes: below the target, else above it, else centred; centred on the target but kept on screen. */
-function place(box: Box | null, cw: number, ch: number): Layout {
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  if (!box) return { spot: null, left: Math.round((vw - cw) / 2), top: Math.round((vh - ch) / 2) }
-  const spot = { left: box.left - SPOT_PAD, top: box.top - SPOT_PAD, width: box.width + SPOT_PAD * 2, height: box.height + SPOT_PAD * 2 }
-  const below = vh - (spot.top + spot.height) - GAP - EDGE
-  const above = spot.top - GAP - EDGE
-  let top = (vh - ch) / 2
-  if (below >= ch) top = spot.top + spot.height + GAP
-  else if (above >= ch) top = spot.top - GAP - ch
-  const left = Math.min(Math.max(spot.left + spot.width / 2 - cw / 2, EDGE), Math.max(EDGE, vw - cw - EDGE))
-  return { spot, left: Math.round(left), top: Math.round(top) }
-}
+const visibleViewport = (): Viewport => ({
+  left: window.visualViewport?.offsetLeft ?? 0,
+  top: window.visualViewport?.offsetTop ?? 0,
+  width: window.visualViewport?.width ?? window.innerWidth,
+  height: window.visualViewport?.height ?? window.innerHeight,
+})
 
 const sameLayout = (a: Layout | null, b: Layout) =>
   Boolean(a) && a!.left === b.left && a!.top === b.top &&
+  a!.maxWidth === b.maxWidth && a!.maxHeight === b.maxHeight &&
   (a!.spot === null ? b.spot === null : b.spot !== null && (['left', 'top', 'width', 'height'] as const).every((k) => Math.round(a!.spot![k]) === Math.round(b.spot![k])))
 
 /**
@@ -64,7 +53,9 @@ const sameLayout = (a: Layout | null, b: Layout) =>
  * way out is the explicit 건너뛰기 (or Esc).
  */
 export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind; onClose: () => void; onShown?: () => void }) {
-  const steps = TOUR_STEPS[kind]
+  // Keep one profile for this tour; a resize moves the card without changing the step list.
+  const [mobile] = useState(() => window.matchMedia?.('(max-width: 1023px)').matches ?? false)
+  const steps = mobile ? MOBILE_TOUR_STEPS[kind] : TOUR_STEPS[kind]
   const [index, setIndex] = useState(0)
   const [layout, setLayout] = useState<Layout | null>(null)
   const [ready, setReady] = useState(false)
@@ -99,10 +90,12 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
   }, [])
 
   // `targets` is passed by the step-change effect, which runs before indexRef has caught up.
-  const measure = useCallback((targets?: string[]) => {
+  const measure = useCallback((selected?: TourStep) => {
     const card = cardRef.current
     if (!card) return
-    const next = place(findTargets(targets ?? steps[indexRef.current].targets).box, card.offsetWidth, card.offsetHeight)
+    const current = selected ?? steps[indexRef.current]
+    const next = placeTourCard(findTargets(current.targets).box, card.offsetWidth,
+      Math.max(card.offsetHeight, card.scrollHeight), visibleViewport(), current.id === 'questions')
     setLayout((prev) => (sameLayout(prev, next) ? prev : next))
   }, [steps])
 
@@ -118,14 +111,15 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
   useLayoutEffect(() => {
     const { els, box } = findTargets(step.targets)
     const el = els[0]
+    const view = visibleViewport()
     // Anything in the fixed header is always on screen; scrolling for it would only jolt the page.
-    if (el && box && !el.closest('header') && (box.top < HEADER_CLEARANCE || box.top + box.height > window.innerHeight - EDGE)) {
+    if (el && box && !el.closest('header') && (box.top < Math.max(HEADER_CLEARANCE, view.top + EDGE) || box.top + box.height > view.top + view.height - EDGE)) {
       // Glide when the target is near; a long page jumps (an 8000px glide to the footer drags).
-      const near = Math.abs(box.top - window.innerHeight / 2) < window.innerHeight * 2
+      const near = Math.abs(box.top - (view.top + view.height / 2)) < view.height * 2
       el.scrollIntoView({ block: 'center', behavior: near && !prefersReducedMotion() ? 'smooth' : 'auto' })
       scrolledRef.current = true
     }
-    measure(step.targets)
+    measure(step)
   }, [step, measure])
 
   // Glide between steps only after the first placement, so the opening is not a slide from the corner.
@@ -136,11 +130,19 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
 
   // Keep the spotlight on its target while the page scrolls or resizes.
   useEffect(() => {
+    const viewport = window.visualViewport
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
+    if (cardRef.current) observer?.observe(cardRef.current)
     window.addEventListener('resize', schedule)
     window.addEventListener('scroll', schedule, { capture: true, passive: true })
+    viewport?.addEventListener('resize', schedule)
+    viewport?.addEventListener('scroll', schedule)
     return () => {
+      observer?.disconnect()
       window.removeEventListener('resize', schedule)
       window.removeEventListener('scroll', schedule, { capture: true })
+      viewport?.removeEventListener('resize', schedule)
+      viewport?.removeEventListener('scroll', schedule)
       window.cancelAnimationFrame(frameRef.current)
       frameRef.current = 0
     }
@@ -207,11 +209,11 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
   const Icon = step.icon
   const spot = layout?.spot ?? null
   return createPortal(
-    <div className="coms-tour" data-site-tour>
+    <div className="coms-tour" data-site-tour data-tour-profile={mobile ? 'mobile' : 'desktop'} data-tour-step={step.id}>
       <div className="coms-tour-shield" onPointerDown={nudge} aria-hidden="true" />
       <div
         className={`coms-tour-spot ${ready ? 'is-ready' : ''} ${spot ? '' : 'is-none'}`}
-        style={spot ? { left: spot.left, top: spot.top, width: spot.width, height: spot.height } : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 }}
+        style={spot ? { left: spot.left, top: spot.top, width: spot.width, height: spot.height } : { left: visibleViewport().left + visibleViewport().width / 2, top: visibleViewport().top + visibleViewport().height / 2, width: 0, height: 0 }}
         aria-hidden="true"
       />
       <div
@@ -224,7 +226,8 @@ export default function TourOverlay({ kind, onClose, onShown }: { kind: TourKind
         data-site-tour
         className={`coms-tour-card ${ready ? 'is-ready' : ''} ${nudged ? 'is-nudged' : ''}`}
         // Placed in a layout effect, before the first paint; until then it sits at 0,0 (and must stay focusable).
-        style={{ left: layout?.left ?? 0, top: layout?.top ?? 0 }}
+        style={{ left: layout?.left ?? 0, top: layout?.top ?? 0,
+          maxWidth: layout?.maxWidth, maxHeight: layout?.maxHeight }}
       >
         <div className="coms-tour-progress" aria-hidden="true">
           {steps.map((s, i) => <span key={s.id} className={i <= index ? 'is-on' : ''} />)}
