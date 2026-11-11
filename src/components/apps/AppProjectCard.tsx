@@ -39,6 +39,7 @@ type AppProject = {
   linkUrl?: string
   displayUrl?: string
   files?: { id?: string | number; url?: string; originalName?: string; name?: string; size?: number; fileSize?: number }[]
+  images?: { id: number; url: string }[]
   [key: string]: unknown
 }
 
@@ -63,7 +64,7 @@ export default function AppProjectCard({
   const hasLink = Boolean(linkHref)
   // Keep the whole card clickable only when there's nothing interactive nested
   // inside it (no embed button, no download files) — anchors can't wrap buttons.
-  const wholeCardLink = hasLink && interactive && files.length === 0
+  const wholeCardLink = hasLink && interactive && files.length === 0 && !project.images?.length
   const CardTag = wholeCardLink ? 'a' : 'div'
   const cardProps = wholeCardLink
     ? { href: linkHref, target: '_blank', rel: 'noreferrer' }
@@ -73,7 +74,7 @@ export default function AppProjectCard({
   // can be minutes old), but a visitor should not find out from an error page.
   const notAnswering = hasLink && linkState === 'DOWN' && !showStatusBadges
 
-  const title = project?.title || '입력 중인 Apps 항목'
+  const title = project?.title || '입력 중인 작품'
   const host = hostOf(project?.displayUrl)
   const open = hasLink && (
     wholeCardLink ? (
@@ -99,7 +100,7 @@ export default function AppProjectCard({
     <CardTag
       {...cardProps}
       data-testid={testId}
-      className={`apple-product-panel app-card group text-left no-underline transition hover:-translate-y-0.5 ${className}`}
+      className={`apple-product-panel app-card group text-left no-underline transition hover:-translate-y-0.5 ${project.images?.length ? 'app-card-with-images' : ''} ${className}`}
     >
       <div className="app-card-head">
         <p className="app-card-eyebrow">{project?.eyebrow}</p>
@@ -117,11 +118,14 @@ export default function AppProjectCard({
         )}
         {host && <span className="app-card-host">{host}</span>}
       </div>
+      {project.images?.length ? <div className="app-card-images" aria-label="작품 사진">
+        {project.images.map((image, index) => <a key={image.id} href={image.url} target="_blank" rel="noreferrer" aria-label={`${title} ${index === 0 ? '대표 사진' : `스크린샷 ${index}`} 크게 보기`}><img src={image.url} alt="" loading="lazy" /></a>)}
+      </div> : null}
 
       {/* Always rendered: CSS reserves the row only where some card in the grid has files or badges. */}
       <div className="app-card-more">
         {badges.length > 0 && (
-          <div className="app-card-badges flex shrink-0 gap-1.5" aria-label="앱 상태">
+          <div className="app-card-badges flex shrink-0 gap-1.5" aria-label="작품 상태">
             {badges.map((badge) => (
               <span
                 key={badge.key}

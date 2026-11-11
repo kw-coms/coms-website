@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/useAuth'
 import AppProjectCard from '../apps/AppProjectCard'
 import { ListSearch } from '../common/ListTools'
 import { matchesQuery } from '../../utils/listTools'
+import WorkEditor from './WorkEditor'
 import '../../styles/site-pages.css'
 
 function groupByCategory(projects, categories) {
@@ -42,6 +43,15 @@ function CompanionServicesSection() {
   const [query, setQuery] = useState('')
   // Bumped by the retry button to run the load again.
   const [attempt, setAttempt] = useState(0)
+  const [editing, setEditing] = useState(null)
+  const [showEditor, setShowEditor] = useState(false)
+
+  const reload = async () => {
+    const data = await listClubProjects()
+    setProjects(Array.isArray(data) ? data : [])
+    setEditing(null)
+    setShowEditor(false)
+  }
 
   useEffect(() => {
     let mounted = true
@@ -89,10 +99,11 @@ function CompanionServicesSection() {
       <div className="site-page-inner">
         <div className="site-head">
           <div>
-            <PageHeading>COM&apos;s Apps</PageHeading>
+            <PageHeading>COM&apos;s 작품</PageHeading>
             <p className="site-head-lead">
               동아리 부원들이 직접 만든 웹사이트·앱·게임 프로젝트를 한곳에 모았습니다. 링크로 바로 열거나 배포 파일을 내려받아 사용해 보세요.
             </p>
+            {user && <button type="button" className="apps-chip mt-5" onClick={() => { setEditing(null); setShowEditor(true) }}>작품 올리기</button>}
           </div>
           {groups.length > 0 && (
             <dl className="site-stats">
@@ -101,6 +112,8 @@ function CompanionServicesSection() {
             </dl>
           )}
         </div>
+
+        {showEditor && <WorkEditor key={editing?.id || 'new'} work={editing} categories={categories} onSaved={reload} onCancel={() => { setEditing(null); setShowEditor(false) }} />}
 
         {loadState === 'error' ? (
           <div className="mt-8 flex flex-wrap items-center gap-3" role="alert">
@@ -148,7 +161,14 @@ function CompanionServicesSection() {
                   </div>
                   <div className="apps-grid">
                     {group.projects.map((project) => (
-                      <AppProjectCard key={project.id} project={project} linkState={linkStateOf(project, user ? linkStatuses : [])} />
+                      <div key={project.id} className="flex flex-col">
+                        <AppProjectCard project={project} linkState={linkStateOf(project, user ? linkStatuses : [])} className="flex-1" />
+                        {user && project.canEdit && (
+                          <button type="button" className="mt-2 text-sm font-semibold text-[var(--app-accent-text)] underline" onClick={() => { setEditing(project); setShowEditor(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>
+                            작품 수정
+                          </button>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </section>

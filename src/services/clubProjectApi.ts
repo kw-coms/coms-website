@@ -69,6 +69,16 @@ export async function deleteClubProjectFile(id, fileId) {
   })
 }
 
+export async function uploadClubProjectImages(id, images) {
+  const form = new FormData()
+  for (const image of images) form.append('images', image)
+  return request(`/api/club-projects/${id}/images`, { method: 'POST', body: form })
+}
+
+export async function deleteClubProjectImage(id, imageId) {
+  return requestNoContent(`/api/club-projects/${id}/images/${imageId}`, { method: 'DELETE' })
+}
+
 // ─── Admin-managed categories (CRUD) ─────────────────────────────────────────
 
 export async function createClubProjectCategory({ key, name, position }: {

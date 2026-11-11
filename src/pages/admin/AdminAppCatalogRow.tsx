@@ -77,7 +77,7 @@ export default function AdminAppCatalogRow({ item, categories, linkState = null,
       onUpdated(updated)
       setEditing(false)
     } catch (err) {
-      setRowError(err.message || 'Apps 항목을 수정하지 못했습니다.')
+      setRowError(err.message || '작품을 수정하지 못했습니다.')
     } finally {
       setBusy(false)
     }

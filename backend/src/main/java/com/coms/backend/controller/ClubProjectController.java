@@ -1,11 +1,13 @@
 package com.coms.backend.controller;
 
 import com.coms.backend.domain.ClubProjectFile;
+import com.coms.backend.domain.ClubProjectImage;
 import com.coms.backend.dto.ClubProjectLinkStatusResponse;
 import com.coms.backend.dto.ClubProjectResponse;
 import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.ClubProjectLinkStatusService;
 import com.coms.backend.service.ClubProjectService;
+import com.coms.backend.service.PermissionService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -35,19 +37,23 @@ public class ClubProjectController {
     private final ClubProjectService projectService;
     private final ClubProjectLinkStatusService linkStatusService;
     private final AuditLogService auditLogService;
+    private final PermissionService permissionService;
 
     public ClubProjectController(ClubProjectService projectService,
                                  ClubProjectLinkStatusService linkStatusService,
-                                 AuditLogService auditLogService) {
+                                 AuditLogService auditLogService,
+                                 PermissionService permissionService) {
         this.projectService = projectService;
         this.linkStatusService = linkStatusService;
         this.auditLogService = auditLogService;
+        this.permissionService = permissionService;
     }
 
     // Public: the /apps page and the home section render from this endpoint.
     @GetMapping
-    public ResponseEntity<List<ClubProjectResponse>> list() {
-        return ResponseEntity.ok(projectService.list());
+    public ResponseEntity<List<ClubProjectResponse>> list(Authentication authentication) {
+        String viewer = authentication == null ? null : authentication.getName();
+        return ResponseEntity.ok(projectService.list(viewer, authentication != null && canManageAll(authentication)));
     }
 
     // Members only (SecurityConfig; guests do not need it): whether each entry's link answered
@@ -57,7 +63,7 @@ public class ClubProjectController {
         return ResponseEntity.ok(linkStatusService.list());
     }
 
-    @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")
+    @PreAuthorize("isAuthenticated()")
     @PostMapping
     public ResponseEntity<ClubProjectResponse> create(
             @RequestParam("category") String category,
@@ -69,12 +75,15 @@ public class ClubProjectController {
             @RequestParam(value = "displayUrl", required = false) String displayUrl,
             @RequestParam(value = "position", required = false) Integer position,
             Authentication authentication) {
-        ClubProjectResponse response = projectService.create(category, title, description, eyebrow, madeBy, linkUrl, displayUrl, position);
-        auditProject(authentication, "CREATE", response);
+        boolean manager = canManageAll(authentication);
+        ClubProjectResponse response = manager
+                ? projectService.create(category, title, description, eyebrow, madeBy, linkUrl, displayUrl, position)
+                : projectService.createForMember(authentication.getName(), category, title, description, linkUrl);
+        auditProject(authentication, manager ? "ADMIN_CLUB_PROJECT_CREATE" : "MEMBER_CLUB_PROJECT_CREATE", response);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")
+    @PreAuthorize("isAuthenticated()")
     @PatchMapping("/{id}")
     public ResponseEntity<ClubProjectResponse> update(
             @PathVariable Long id,
@@ -87,17 +96,21 @@ public class ClubProjectController {
             @RequestParam(value = "displayUrl", required = false) String displayUrl,
             @RequestParam(value = "position", required = false) Integer position,
             Authentication authentication) {
-        ClubProjectResponse response = projectService.update(id, category, title, description, eyebrow, madeBy, linkUrl, displayUrl, position);
-        auditProject(authentication, "UPDATE", response);
+        boolean manager = canManageAll(authentication);
+        ClubProjectResponse response = manager
+                ? projectService.update(id, category, title, description, eyebrow, madeBy, linkUrl, displayUrl, position)
+                : projectService.updateForMember(id, authentication.getName(), category, title, description, linkUrl);
+        auditProject(authentication, manager ? "ADMIN_CLUB_PROJECT_UPDATE" : "MEMBER_CLUB_PROJECT_UPDATE", response);
         return ResponseEntity.ok(response);
     }
 
-    @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
+        projectService.requireEditor(id, authentication.getName(), canManageAll(authentication));
         com.coms.backend.domain.ClubProject project = projectService.get(id);
         projectService.delete(id);
-        auditLogService.record(actor(authentication), "ADMIN_CLUB_PROJECT_DELETE", "CLUB_PROJECT", String.valueOf(id),
+        auditLogService.record(actor(authentication), canManageAll(authentication) ? "ADMIN_CLUB_PROJECT_DELETE" : "MEMBER_CLUB_PROJECT_DELETE", "CLUB_PROJECT", String.valueOf(id),
                 projectAuditDetail(project.getTitle(), project.getCategory(), project.getLinkUrl()), null);
         return ResponseEntity.noContent().build();
     }
@@ -137,8 +150,39 @@ public class ClubProjectController {
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping(path = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<List<Long>> uploadImages(@PathVariable Long id,
+                                                    @RequestParam("images") List<MultipartFile> images,
+                                                    Authentication authentication) {
+        projectService.requireEditor(id, authentication.getName(), canManageAll(authentication));
+        return ResponseEntity.status(HttpStatus.CREATED).body(projectService.addImages(id, images));
+    }
+
+    @GetMapping("/{id}/images/{imageId}")
+    public ResponseEntity<Resource> image(@PathVariable Long id, @PathVariable Long imageId) {
+        ClubProjectImage meta = projectService.loadImageMeta(id, imageId);
+        return ResponseEntity.ok()
+                .contentType("image/png".equals(meta.getMimeType()) ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG)
+                .header("X-Content-Type-Options", "nosniff")
+                .body(projectService.loadImageResource(id, imageId));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @DeleteMapping("/{id}/images/{imageId}")
+    public ResponseEntity<Void> deleteImage(@PathVariable Long id, @PathVariable Long imageId,
+                                             Authentication authentication) {
+        projectService.requireEditor(id, authentication.getName(), canManageAll(authentication));
+        projectService.deleteImage(id, imageId);
+        return ResponseEntity.noContent().build();
+    }
+
+    private boolean canManageAll(Authentication authentication) {
+        return permissionService.has(authentication, "PROJECT_WRITE");
+    }
+
     private void auditProject(Authentication authentication, String verb, ClubProjectResponse response) {
-        auditLogService.record(actor(authentication), "ADMIN_CLUB_PROJECT_" + verb, "CLUB_PROJECT",
+        auditLogService.record(actor(authentication), verb, "CLUB_PROJECT",
                 String.valueOf(response.id()),
                 projectAuditDetail(response.title(), response.category(), response.linkUrl()),
                 null);

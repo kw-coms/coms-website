@@ -15,8 +15,11 @@ public record ClubProjectResponse(
         String displayUrl,
         int position,
         List<FileInfo> files,
+        boolean canEdit,
+        List<ImageInfo> images,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
+    public record ImageInfo(Long id, String url) {}
     public record FileInfo(Long id, String url, String originalName, long size) {}
 }

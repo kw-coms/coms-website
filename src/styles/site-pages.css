@@ -269,6 +269,27 @@
 	grid-area: head;
 	min-width: 0;
 }
+.app-card-with-images {
+	grid-template-areas: 'head open' 'desc desc' 'foot foot' 'images images' 'more more' !important;
+	grid-template-rows: auto 1fr auto auto auto !important;
+}
+.app-card-images {
+	grid-area: images;
+	display: flex;
+	gap: 6px;
+	margin-top: 12px;
+	overflow-x: auto;
+}
+.app-card-images img {
+	width: 64px;
+	height: 64px;
+	flex: none;
+	border-radius: 6px;
+	object-fit: cover;
+}
+.app-card-images img:first-child {
+	width: 114px;
+}
 .app-card-eyebrow {
 	margin: 0;
 	overflow: hidden;

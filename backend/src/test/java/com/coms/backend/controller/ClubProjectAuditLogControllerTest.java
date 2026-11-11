@@ -28,12 +28,14 @@ class ClubProjectAuditLogControllerTest {
     private final ClubProjectService projectService = mock(ClubProjectService.class);
     private final ClubProjectCategoryService categoryService = mock(ClubProjectCategoryService.class);
     private final AuditLogService auditLogService = mock(AuditLogService.class);
-    private final ClubProjectController projectController = new ClubProjectController(projectService, mock(ClubProjectLinkStatusService.class), auditLogService);
+    private final com.coms.backend.service.PermissionService permissionService = mock(com.coms.backend.service.PermissionService.class);
+    private final ClubProjectController projectController = new ClubProjectController(projectService, mock(ClubProjectLinkStatusService.class), auditLogService, permissionService);
     private final ClubProjectCategoryController categoryController = new ClubProjectCategoryController(categoryService, auditLogService);
 
     @Test
     void projectCreateUpdateDeleteAndFileMutationsWriteAuditLog() {
         var actor = new TestingAuthenticationToken("2026000001", "password");
+        when(permissionService.has(actor, "PROJECT_WRITE")).thenReturn(true);
         var created = projectResponse(31L, "WEBSITE", "신규 앱", "https://example.com/app");
         when(projectService.create("WEBSITE", "신규 앱", "설명", "Web", "홍길동",
                 "https://example.com/app", "example.com/app", 3)).thenReturn(created);
@@ -148,9 +150,28 @@ class ClubProjectAuditLogControllerTest {
         );
     }
 
+    @Test
+    void memberCreateUsesAuthenticatedIdentityAndMemberEditsCheckOwnership() {
+        var member = new TestingAuthenticationToken("2099000001", "password");
+        var created = projectResponse(44L, "APP", "회원 작품", null);
+        when(projectService.createForMember("2099000001", "APP", "회원 작품", "설명", null))
+                .thenReturn(created);
+        projectController.create("APP", "회원 작품", "설명", null, "위조된 제작자", null, null, -999, member);
+        verify(projectService).createForMember("2099000001", "APP", "회원 작품", "설명", null);
+
+        when(projectService.updateForMember(44L, "2099000001", null, "수정", "새 소개", null))
+                .thenReturn(created);
+        projectController.update(44L, null, "수정", "새 소개", null, "다른 이름", null, null, -1, member);
+        verify(projectService).updateForMember(44L, "2099000001", null, "수정", "새 소개", null);
+
+        when(projectService.get(44L)).thenReturn(projectResponseEntity("회원 작품", "APP", null));
+        projectController.delete(44L, member);
+        verify(projectService).requireEditor(44L, "2099000001", false);
+    }
+
     private ClubProjectResponse projectResponse(Long id, String category, String title, String linkUrl) {
         return new ClubProjectResponse(id, category, category, title, "설명", "Web", "홍길동",
-                linkUrl, linkUrl == null ? null : "example.com/app", 0, List.of(),
+                linkUrl, linkUrl == null ? null : "example.com/app", 0, List.of(), false, List.of(),
                 LocalDateTime.now(), LocalDateTime.now());
     }
 

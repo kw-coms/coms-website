@@ -21,7 +21,7 @@ export const ADMIN_TABS: { id: string; label: string; group: AdminGroupId | null
   { id: 'community', label: '커뮤니티 관리', group: 'content' },
   { id: 'deleted-posts', label: '삭제 보관함', group: 'content' },
   { id: 'files', label: '파일 관리', group: 'content' },
-  { id: 'projects', label: 'Apps 관리', group: 'content' },
+  { id: 'projects', label: '작품 관리', group: 'content' },
   { id: 'sponsors', label: '후원자', group: 'content' },
   { id: 'site-settings', label: '사이트 문구', group: 'site' },
   { id: 'fonts', label: '폰트 관리', group: 'site' },
