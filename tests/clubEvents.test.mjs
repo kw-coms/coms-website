@@ -15,6 +15,12 @@ assert.match(
 )
 
 assert.match(
+  app,
+  /<Route path="\/activity-events\/:id" element={<RequireAuth><ClubEventPage \/><\/RequireAuth>} \/>/,
+  'an opened event should have its own member-only address',
+)
+
+assert.match(
   homeUi,
   /CLUB_EVENTS_QUERY_KEY/,
   'app shell should keep club events in a dedicated query cache',

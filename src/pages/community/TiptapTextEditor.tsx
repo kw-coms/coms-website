@@ -225,7 +225,7 @@ export default function TiptapTextEditor({ initialBlocks, apiRef, onError, isAll
   }, [editor])
 
   useEffect(() => {
-    if (!apiRef) return
+    if (!apiRef || !editor) return
     apiRef.current = {
       insertFiles: (files: File[]) => files.forEach(insertFile),
       insertExternalEmbed,
@@ -257,6 +257,7 @@ export default function TiptapTextEditor({ initialBlocks, apiRef, onError, isAll
       getBlocks: currentBlocks,
       updateFigureMeta: (id: string, changes: Record<string, unknown>) => updateFigureNodeAttrs(id, changes),
     }
+    return () => { apiRef.current = null }
   }, [apiRef, currentBlocks, editor, insertExternalEmbed, insertFile, insertPoll, updateFigureNodeAttrs])
 
   const updateSelectedFigureAttrs = (changes: Record<string, unknown>) => {

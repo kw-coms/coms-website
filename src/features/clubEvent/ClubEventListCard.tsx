@@ -1,6 +1,6 @@
 import { Trash2 } from 'lucide-react'
 import { RichTextContent } from '../../shared/RichText'
-import { formatEventWindow } from './clubEventUtils'
+import { formatEventWindow, isContestEvent } from './clubEventUtils'
 
 export default function ClubEventListCard({ item, isAdmin, deletingId, onOpen, onDelete }) {
   return (
@@ -12,8 +12,12 @@ export default function ClubEventListCard({ item, isAdmin, deletingId, onOpen, o
         <small>{formatEventWindow(item)}</small>
       </button>
       <div className="club-event-list-stats">
-        <span>{item.entryCount ?? 0}작품</span>
-        <span>{item.totalVotes ?? 0}표</span>
+        {isContestEvent(item) && (
+          <>
+            <span>{item.entryCount ?? 0}작품</span>
+            <span>{item.totalVotes ?? 0}표</span>
+          </>
+        )}
         {isAdmin && (
           <button type="button" onClick={() => onDelete(item)} disabled={deletingId === `event-${item.id}`} className="club-event-danger-button" aria-label={`${item.title} 이벤트 삭제`}>
             <Trash2 size={14} aria-hidden="true" />

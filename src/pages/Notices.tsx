@@ -35,9 +35,18 @@ import { renderRichBody, richBodyToPlainText as noticeContentSearchText } from '
 import { serializeRichBody, richBodyPlainText } from '../components/richEditor/serializeRichBody'
 import { parseRichBodyBlocks } from '../components/richEditor/parseRichBodyBlocks'
 import { parsePostBlocks } from './community/postEditorUtils'
-import { canManageSensitiveAdmin, canWriteNotice } from '../utils/roleAccess'
+import { canDeleteNotice, canEditNotice, canManageSensitiveAdmin, canWriteNotice } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
 import Chip from '../components/common/Chip'
+import DraftNotice, { DraftConflictNotice } from '../components/common/DraftNotice'
+import { confirmEditorLeave, useEditorDraft } from '../hooks/useEditorDraft'
+import { draftIsStale, draftRevision, draftStorageKey, readDraft } from '../utils/editorDraft'
+import { isNoticeUnread, loadNoticeReadState, markAllNoticesRead, markNoticeRead, saveNoticeReadState, visitList } from '../utils/noticeReads'
+import { memberSessionEpoch } from '../utils/memberSession'
+
+function NewDot() {
+  return <span data-notice-new className="inline-flex shrink-0 items-center gap-1 text-[10px] font-black text-[var(--app-accent-text)]"><span className="size-1.5 rounded-full bg-[var(--app-accent)]" aria-hidden="true" />새 글</span>
+}
 
 function formatDate(iso) {
   const date = new Date(iso)
@@ -106,26 +115,71 @@ function noticeCategoryMeta(value) {
   return NOTICE_CATEGORY_META[value] || NOTICE_CATEGORY_META.GENERAL
 }
 
-function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
+type NoticeFormProps = {
   initialNotice?: { id?: number; title?: string; category?: string; content?: string; [key: string]: unknown } | null
   defaultCategory?: string
   onCancel: () => void
   onSave: (saved: unknown) => void
-}) {
+}
+
+function NoticeForm(props: NoticeFormProps) {
+  const { user } = useAuth()
+  if (!user?.studentId) return null
+  return <NoticeEditor key={`${user.studentId}:${props.initialNotice?.id ?? 'new'}`} {...props} />
+}
+
+function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: NoticeFormProps) {
+  const { user } = useAuth()
+  const storageKey = draftStorageKey(user?.studentId, 'notice', initialNotice?.id)
+  const [stored] = useState(() => readDraft(storageKey))
+  const [baseRevision] = useState(() => initialNotice ? draftRevision(initialNotice) : undefined)
+  const conflict = draftIsStale(stored, baseRevision)
+  const [restored, setRestored] = useState(conflict ? null : stored)
+  const [pendingDraft, setPendingDraft] = useState(conflict ? stored : null)
+  const savedCategory = initialNotice?.category || defaultCategory || 'GENERAL'
   const [formData, setFormData] = useState({
-    title: initialNotice?.title || '',
-    category: initialNotice?.category || defaultCategory || 'GENERAL',
+    title: restored?.title ?? (initialNotice?.title || ''),
+    category: restored?.category || savedCategory,
   })
+  const [editorKey, setEditorKey] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const editorApiRef = useRef(null)
   // Convert existing plain or rich content into editor blocks once at mount.
   // Intentionally runs once: re-deriving blocks on every initialNotice change
   // would clobber in-progress edits, so the dependency array is empty by design.
-  const initialBlocks = useMemo(
-    () => (initialNotice ? parseRichBodyBlocks(initialNotice.content || '') : []),
-    [], // eslint-disable-line react-hooks/exhaustive-deps
-  )
+  const savedBlocks = () => (initialNotice ? parseRichBodyBlocks(initialNotice.content || '') : [])
+  const [initialBlocks, setInitialBlocks] = useState(() => (restored ? parseRichBodyBlocks(restored.content) : savedBlocks()))
+  const [originalBlocks] = useState(savedBlocks)
+  const draft = useEditorDraft({
+    storageKey,
+    baseRevision,
+    baseline: () => ({ title: initialNotice?.title || '', category: savedCategory, anonymousName: '', content: serializeRichBody(originalBlocks) }),
+    current: () => {
+      const blocks = editorApiRef.current?.getBlocks()
+      return { title: formData.title, category: formData.category, anonymousName: '', content: serializeRichBody(blocks ?? initialBlocks) }
+    },
+    hasPending: () => (editorApiRef.current?.getBlocks() || []).some((block) => block.type !== 'text' && block.status !== 'saved' && block.file),
+    paused: Boolean(pendingDraft),
+  })
+  const applyDraft = (picked) => {
+    setFormData({ title: picked.title, category: picked.category || savedCategory })
+    setInitialBlocks(parseRichBodyBlocks(picked.content))
+    setEditorKey((key) => key + 1)
+    setRestored(picked)
+    setPendingDraft(null)
+  }
+  const keepCurrent = () => {
+    draft.reset()
+    setPendingDraft(null)
+  }
+  const discardDraft = () => {
+    draft.reset()
+    setRestored(null)
+    setFormData({ title: initialNotice?.title || '', category: savedCategory })
+    setInitialBlocks(savedBlocks())
+    setEditorKey((key) => key + 1)
+  }
 
   const save = async () => {
     if (!formData.title.trim()) { setError('제목을 입력해주세요.'); return }
@@ -140,6 +194,7 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
       const saved = initialNotice
         ? await updateNotice(initialNotice.id, body)
         : await createNotice(body)
+      draft.clear()
       onSave(saved)
     } catch (err) {
       resetRejectedRichBlocks(blocks, err, (id, patch) => editorApiRef.current?.updateFigureMeta(id, patch))
@@ -151,6 +206,11 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
 
   return (
     <div className="apple-soft-panel space-y-3 p-4 sm:space-y-4 sm:p-5">
+      {pendingDraft && <DraftConflictNotice savedAt={pendingDraft.savedAt} updatedAt={typeof initialNotice?.updatedAt === 'string' ? initialNotice.updatedAt : null} onApply={() => applyDraft(pendingDraft)} onKeep={keepCurrent} />}
+      {draft.saveFailed && <p role="alert" className="text-xs font-semibold text-red-500">임시 저장하지 못했어요. 저장 공간이 부족하거나 막혀 있습니다. 이 페이지를 떠나면 작성한 내용이 사라질 수 있어요.</p>}
+      {draft.sessionEnded && <p role="alert" className="text-sm font-semibold">다른 탭에서 로그인 상태가 변경되었습니다. 다시 로그인해주세요.</p>}
+      {restored && <DraftNotice onDiscard={discardDraft} />}
+      <fieldset disabled={Boolean(pendingDraft) || draft.sessionEnded} inert={Boolean(pendingDraft) || draft.sessionEnded} className="min-w-0 space-y-3 sm:space-y-4">
       <input
         value={formData.title}
         onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
@@ -158,6 +218,7 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
         className="w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm"
       />
       <RichBodyEditor
+        key={editorKey}
         initialBlocks={initialBlocks}
         apiRef={editorApiRef}
         features={UPLOAD_RICH_FEATURES}
@@ -184,6 +245,7 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
           취소
         </button>
       </div>
+      </fieldset>
     </div>
   )
 }
@@ -253,15 +315,26 @@ export default function Notices() {
     `${activeCategory}|${searchQuery}|${sortKey}`,
   )
   const visibleNotices = sortedNotices.slice(0, visible)
+  // "최신" is the newest by date; the server order puts pinned notices first, so an old pinned
+  // notice would otherwise be labelled newest.
   const featuredNotices = useMemo(
     () => NOTICE_CATEGORY_OPTIONS
       .map((category) => ({
         category,
-        notice: notices.find((notice) => (notice.category || 'GENERAL') === category),
+        notice: notices
+          .filter((notice) => (notice.category || 'GENERAL') === category)
+          .reduce((latest, notice) => (!latest || compareDate(notice.createdAt, latest.createdAt, 'desc') < 0 ? notice : latest), null),
       }))
       .filter((item) => item.notice),
     [notices],
   )
+
+  // Unread markers live in this browser only (see utils/noticeReads).
+  const [readState, setReadState] = useState(() => visitList(loadNoticeReadState(user?.studentId), Date.now()))
+  const [readEpoch] = useState(memberSessionEpoch)
+  useEffect(() => { saveNoticeReadState(user?.studentId, readState, undefined, readEpoch) }, [readState, user?.studentId, readEpoch])
+  const unreadCount = notices.filter((notice) => isNoticeUnread(readState, notice)).length
+  const markRead = (id) => setReadState((prev) => markNoticeRead(prev, id))
 
   useEffect(() => {
     if (!urlId) return
@@ -274,6 +347,7 @@ export default function Notices() {
       .then((detail) => {
         if (!mounted) return
         setSelectedNotice(detail)
+        markRead(detail.id)
         setNotices((prev) => prev.map((item) => (item.id === detail.id ? { ...item, ...detail } : item)))
       })
       .catch(() => { if (mounted) navigate('/notices', { replace: true }) })
@@ -282,13 +356,15 @@ export default function Notices() {
   }, [urlId, loading])
 
   const openNotice = (notice) => {
+    markRead(notice.id)
     setMode('list')
     setSelectedNotice(notice)
     // Remembered so "목록" on the notice returns to the filtered list it was opened from.
     navigate('/notices/' + notice.id, { state: { listSearch: location.search } })
   }
 
-  const backToList = () => {
+  const backToList = async () => {
+    if (!(await confirmEditorLeave())) return
     setMode('list')
     setSelectedNotice(null)
     // Leaving write mode, the URL already is the list with its filter query; pushing a bare
@@ -401,7 +477,24 @@ export default function Notices() {
         {!urlId && visibleMode === 'list' && (
           <>
             {featuredNotices.length > 0 && (
-              <div className="apple-control-strip grid gap-3 px-4 py-4 sm:px-6 md:grid-cols-2 xl:grid-cols-4">
+              <>
+              {/* Phones: one compact scrolling row instead of four stacked cards. */}
+              <div data-notice-featured-compact className="apple-control-strip flex snap-x gap-2 overflow-x-auto px-4 py-3 sm:hidden" aria-label="최신 공지">
+                {featuredNotices.map(({ category, notice }) => {
+                  const meta = noticeCategoryMeta(category)
+                  return (
+                    <button key={category} type="button" onClick={() => openNotice(notice)} className="apple-soft-panel min-w-[62%] max-w-[62%] shrink-0 snap-start px-3 py-2 text-left">
+                      <span className="flex items-center gap-1.5 text-[11px] font-black text-[var(--app-accent-text)]">
+                        {meta.featuredLabel}
+                        {notice.pinned && <Chip variant="pinned">고정</Chip>}
+                        {isNoticeUnread(readState, notice) && <NewDot />}
+                      </span>
+                      <span className="mt-0.5 block truncate text-sm font-bold text-[var(--app-text)]">{notice.title}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="apple-control-strip hidden gap-3 px-4 py-4 sm:grid sm:px-6 md:grid-cols-2 xl:grid-cols-4">
                 {featuredNotices.map(({ category, notice }) => {
                   const meta = noticeCategoryMeta(category)
                   const Icon = meta.icon
@@ -416,7 +509,7 @@ export default function Notices() {
                         <Icon size={18} />
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-xs font-black text-[var(--app-accent-text)]">{meta.featuredLabel}</span>
+                        <span className="flex items-center gap-1.5 text-xs font-black text-[var(--app-accent-text)]">{meta.featuredLabel}{notice.pinned && <Chip variant="pinned">고정</Chip>}</span>
                         <span className="mt-1 block line-clamp-2 text-sm font-black leading-5 text-[var(--app-text)] sm:text-[15px]">{notice.title}</span>
                         <span className="mt-1 block truncate text-xs font-semibold text-[var(--app-subtle)]">{formatDate(notice.createdAt)} · {notice.author}</span>
                       </span>
@@ -424,6 +517,7 @@ export default function Notices() {
                   )
                 })}
               </div>
+              </>
             )}
             <div className="apple-control-strip flex flex-col gap-3 px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6 sm:py-3">
               <div className="grid grid-cols-2 gap-2 text-sm font-bold sm:flex sm:flex-wrap">
@@ -450,12 +544,17 @@ export default function Notices() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => updateListFilter(activeCategory, e.target.value)}
-                    placeholder="제목, 작성자 검색"
+                    placeholder="제목, 내용, 작성자 검색"
                     className="h-11 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-8 pr-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:h-auto sm:w-64"
                   />
                 </div>
                 <ListSelect value={sortKey} onChange={setSortKey} options={NOTICE_SORT_OPTIONS} label="공지 정렬" />
                 <span className="shrink-0 text-xs font-semibold text-[var(--app-subtle)]">{filteredNotices.length}개</span>
+                {unreadCount > 0 && (
+                  <button type="button" onClick={() => { setReadState((prev) => markAllNoticesRead(prev, Date.now())); showToast({ message: '모든 공지를 읽음으로 표시했습니다.', duration: 2500 }) }} className="apple-action-secondary shrink-0 px-3 py-1.5 text-xs">
+                    모두 읽음
+                  </button>
+                )}
               </div>
             </div>
             {loading && (
@@ -536,6 +635,7 @@ export default function Notices() {
                           {notice.pinned && (
                             <Chip variant="pinned">고정</Chip>
                           )}
+                          {isNoticeUnread(readState, notice) && <NewDot />}
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${meta.badgeClass}`}>
                             {meta.label}
                           </span>
@@ -586,6 +686,7 @@ export default function Notices() {
                             <td className="cursor-pointer px-4 py-3.5">
                               <span className="flex max-w-[440px] items-center gap-1.5 text-left font-semibold text-[var(--app-text)]">
                                 {notice.pinned && <Chip variant="pinned">고정</Chip>}
+                                {isNoticeUnread(readState, notice) && <NewDot />}
                                 <span className="min-w-0 truncate">{notice.title}</span>
                               </span>
                             </td>
@@ -631,7 +732,8 @@ export default function Notices() {
           <div className="p-4 sm:p-6">
             <NoticeForm
               initialNotice={selectedNotice}
-              onCancel={() => {
+              onCancel={async () => {
+                if (!(await confirmEditorLeave())) return
                 setMode('list')
                 navigate('/notices/' + selectedNotice.id)
               }}
@@ -699,18 +801,18 @@ export default function Notices() {
                 </button>
               )}
               {editingAuthor && canManageSensitiveAdmin(user?.role) && <AuthorChangeDialog name={selectedNotice.author} allowMemberSelection onClose={() => setEditingAuthor(false)} onSave={handleAuthorEdit} />}
-              {(isAdmin || (!!user?.studentId && selectedNotice.authorStudentId === user.studentId)) && (
+              {(isAdmin || canEditNotice(user, selectedNotice)) && (
                 <>
                   {isAdmin &&
                   <button type="button" onClick={handlePinSelected} disabled={pinning} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50 max-md:col-span-2 sm:min-h-0">
                     {selectedNotice.pinned ? <PinOff size={14} /> : <Pin size={14} />}
                     {selectedNotice.pinned ? '고정 해제' : '고정'}
                   </button>}
-                  {(user?.role === 'ADMIN' || (!!user?.studentId && selectedNotice.authorStudentId === user.studentId)) && <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
+                  {canEditNotice(user, selectedNotice) && <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
                     <Pencil size={14} />
                     수정
                   </button>}
-                  {isAdmin && <button type="button" onClick={deleteSelected} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 sm:min-h-0">
+                  {canDeleteNotice(permissions) && <button type="button" onClick={deleteSelected} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 sm:min-h-0">
                     <Trash2 size={14} />
                     삭제
                   </button>}

@@ -23,7 +23,7 @@ test('footer has the four Korean sitemap groups and keeps external destinations'
   const sitemap = page.getByRole('navigation', { name: '사이트맵' })
   await expect(sitemap.getByRole('heading')).toHaveText(['동아리', '배움', '멤버', '도구'])
   const paths = await sitemap.getByRole('link').evaluateAll((links) => links.map((link) => link.getAttribute('href')))
-  expect(paths).toEqual(['/about', '/activities', '/projects', '/sponsors', '/recruit', '/study', '/notices', '/community', '/resources', '/activity-log', '/monthly-calendar', '/activity-events', '/gatherings', '/meet', '/attendance', '/draw', '/apps'])
+  expect(paths).toEqual(['/about', '/activities', '/projects', '/sponsors', '/recruit', '/study', '/lab/', '/notices', '/community', '/resources', '/activity-log', '/monthly-calendar', '/activity-events', '/gatherings', '/meet', '/attendance', '/draw', '/apps'])
   await expect(sitemap.getByRole('link', { name: /^공지/ }).locator('[data-member-lock]')).toHaveCount(1)
   await expect(page.locator('.coms-footer-wordmark')).toHaveAttribute('aria-hidden', 'true')
   await expect(page.locator('.coms-footer-wordmark')).toHaveCSS('-webkit-text-stroke-width', '1px')
@@ -47,11 +47,13 @@ test('signed-in footer removes locks and internal links stay in the SPA', async 
   expect(await page.evaluate(() => window.footerSpaMarker)).toBe(true)
 })
 
-test('footer sitemap leaves the Lab to the header menu', async ({ page }) => {
+test('footer sitemap includes the Lab as a full-page link', async ({ page }) => {
   await page.goto('/activities')
   const sitemap = page.getByRole('navigation', { name: '사이트맵' })
   await expect(sitemap.getByRole('link', { name: '스터디 자료' })).toBeVisible()
-  await expect(sitemap.locator('a[href*="/lab"]')).toHaveCount(0)
+  await expect(sitemap.getByRole('link', { name: '회로 Lab' })).toHaveAttribute('href', '/lab/')
+  await expect(sitemap.getByRole('link', { name: '지원하기' })).toHaveAttribute('href', '/recruit')
+  await expect(sitemap.getByRole('link', { name: '작품' })).toHaveAttribute('href', '/apps')
 })
 
 test.describe('desktop popover', () => {

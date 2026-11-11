@@ -83,3 +83,25 @@ export function isEventImageFile(file) {
   const name = String(file?.name || '').toLowerCase()
   return type.startsWith('image/') || /\.(avif|gif|jpe?g|png|webp)$/i.test(name)
 }
+
+/** Contest wording (votes, ranking, entries) only fits events that have entries or an open vote. */
+export function isContestEvent(event) {
+  return Boolean(event?.votingOpen) || Number(event?.entryCount ?? event?.entries?.length ?? 0) > 0
+}
+
+/** 0 = open now, 1 = upcoming, 2 = closed. */
+export function clubEventPhase(event, now = Date.now()) {
+  if (event?.votingOpen) return 0
+  const starts = new Date(event?.startsAt).getTime()
+  if (Number.isFinite(starts) && starts > now) return 1
+  return 2
+}
+
+/** Open events first, then upcoming, then closed; newest start first inside each group. */
+export function sortClubEvents(events, now = Date.now()) {
+  const startOf = (event) => {
+    const time = new Date(event?.startsAt).getTime()
+    return Number.isFinite(time) ? time : 0
+  }
+  return [...(events || [])].sort((a, b) => clubEventPhase(a, now) - clubEventPhase(b, now) || startOf(b) - startOf(a) || (b.id ?? 0) - (a.id ?? 0))
+}

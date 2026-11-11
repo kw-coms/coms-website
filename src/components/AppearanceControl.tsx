@@ -355,9 +355,11 @@ export default function AppearanceControl({
             <div key={group.id}>
               <h3 className="font-semibold text-[var(--app-text)]">{group.label}</h3>
               <ul className="mt-1">
-                {/* The Lab is a separate app with one entry point, the header menu: it is not repeated here. */}
-                {group.items.filter((item) => !isFullPageLink(item.path)).map((item) => (
+                {group.items.map((item) => (
                   <li key={item.id}>
+                    {isFullPageLink(item.path) ? (
+                      <a href={item.path} className="coms-footer-link gap-1.5 rounded-sm text-[var(--app-muted)] hover:text-[var(--app-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-accent)]">{item.label}</a>
+                    ) : (
                     <Link
                       to={item.path}
                       aria-disabled={item.auth && authLoading || undefined}
@@ -371,6 +373,7 @@ export default function AppearanceControl({
                     >
                       {item.label}{item.auth && <MemberLock />}
                     </Link>
+                    )}
                   </li>
                 ))}
               </ul>

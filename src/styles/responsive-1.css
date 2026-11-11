@@ -453,6 +453,11 @@
 		display: block;
 	}
 
+	/* The agenda above the grid lists the same events: show one list on phones. */
+	.calendar-month-summary {
+		display: none;
+	}
+
 	.appearance-swatches > button {
 		aspect-ratio: 1 / 1;
 	}
