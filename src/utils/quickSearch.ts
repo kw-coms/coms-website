@@ -11,7 +11,7 @@ export function openQuickSearch() {
   window.dispatchEvent(new Event(QUICK_SEARCH_EVENT))
 }
 
-export type QuickGroup = 'page' | 'notice' | 'post' | 'file' | 'poll'
+export type QuickGroup = 'page' | 'study' | 'notice' | 'post' | 'file' | 'poll'
 
 export type QuickItem = {
   /** Unique across groups, e.g. "page:/about" or "notice:12". */
@@ -28,6 +28,7 @@ export type QuickItem = {
 /** The groups in the order the dialog lists them. */
 export const QUICK_GROUPS: { key: QuickGroup; label: string }[] = [
   { key: 'page', label: '페이지' },
+  { key: 'study', label: '스터디' },
   { key: 'notice', label: '공지사항' },
   { key: 'post', label: '커뮤니티' },
   { key: 'file', label: '자료실' },

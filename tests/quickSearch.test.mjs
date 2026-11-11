@@ -73,7 +73,7 @@ const many = Array.from({ length: 8 }, (_, index) => item(`n${index}`, 'notice',
 assert.deepEqual(searchQuickItems(many, '세미나', 3)[0].items.map((entry) => entry.id), ['n0', 'n1', 'n2'])
 assert.equal(searchQuickItems(many, '세미나')[0].items.length, 5, 'five by default')
 
-assert.deepEqual(QUICK_GROUPS.map((group) => group.key), ['page', 'notice', 'post', 'file', 'poll'])
+assert.deepEqual(QUICK_GROUPS.map((group) => group.key), ['page', 'study', 'notice', 'post', 'file', 'poll'])
 
 // The highlight wraps round both ends and stays put in an empty list.
 assert.equal(moveQuickIndex(0, 1, 3), 1)
