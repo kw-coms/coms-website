@@ -1,0 +1,45 @@
+.coms-roster-account {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
+  background: var(--app-accent-soft);
+  color: var(--app-accent-text);
+  font: 600 10px/1.5 var(--app-font, sans-serif);
+}
+
+@media (max-width: 639px) {
+  .coms-roster-scroll { overflow-x: hidden; }
+  .coms-roster-table { display: block; width: 100%; }
+  .coms-roster-table colgroup { display: none; }
+  .coms-roster-table thead,
+  .coms-roster-table tbody,
+  .coms-roster-table tr { display: block; width: 100%; }
+  .coms-roster-table thead tr { display: flex; flex-wrap: wrap; }
+  .coms-roster-table thead th { padding: 0.25rem 0.5rem; }
+  .coms-roster-table thead button { min-height: 44px; }
+  .coms-roster-table thead th:not(:has(button)) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .coms-roster-table td[data-label] {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    overflow-wrap: anywhere;
+  }
+  .coms-roster-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--app-muted);
+    font: 500 0.75rem/1.5 sans-serif;
+  }
+  .coms-roster-table td > span { min-width: 0; flex-wrap: wrap; }
+  .coms-roster-table td button { min-height: 44px; min-width: 44px; }
+  .coms-roster-edit { display: block; width: 100%; }
+  .coms-roster-edit label,
+  .coms-roster-edit input { max-width: 100%; }
+}
