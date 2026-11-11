@@ -1,17 +1,46 @@
 import { expect, test } from '@playwright/test'
 import { mockOptionalApis } from './visualSupport.js'
+import { RECRUIT_FACTS } from '../../src/data/recruitFacts'
 
 test.use({ serviceWorkers: 'block' })
 
-async function openAsk(page, enabled = true) {
+async function openFaq(page, enabled = true) {
   await mockOptionalApis(page)
   await page.route('**/api/site-settings', (route) => route.fulfill({ json: { askEnabled: enabled } }))
   await page.goto('/about')
-  if (enabled) {
-    await page.getByRole('button', { name: '사람에게 질문하기' }).click()
-    return page.getByRole('dialog', { name: '사람에게 질문하기' })
-  }
-  return null
+  await page.getByRole('button', { name: '질문하기' }).click()
+  return page.getByRole('dialog', { name: "COM's 질문하기" })
+}
+
+async function openAsk(page) {
+  const dialog = await openFaq(page)
+  await dialog.getByRole('button', { name: '다른 질문 보내기' }).click()
+  return dialog
+}
+
+for (const enabled of [true, false]) {
+  test(`three FAQ answers stay local with email contact ${enabled ? 'enabled' : 'disabled'}`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    let posts = 0
+    await page.route('**/api/ask', (route) => { posts += 1; return route.fulfill({ status: 204 }) })
+    const dialog = await openFaq(page, enabled)
+    const faqs = dialog.getByRole('group', { name: '자주 묻는 질문' }).getByRole('button')
+    await expect(faqs).toHaveText(['어떻게 가입하나요?', '코딩을 처음 해도 괜찮나요?', '회비와 동아리방이 궁금해요'])
+    const groupWidth = (await dialog.getByRole('group', { name: '자주 묻는 질문' }).boundingBox()).width
+    for (const width of await faqs.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().width))) expect(width).toBeGreaterThanOrEqual(groupWidth - 1)
+    for (const [index, expected] of [[0, '로그인 없이'], [1, '코딩이 처음이어도 괜찮'], [2, `${RECRUIT_FACTS.fee}, 동아리방은 ${RECRUIT_FACTS.room}`]]) {
+      await faqs.nth(index).click()
+      await expect(dialog.locator('.coms-ask-bubble--club').last()).toContainText(expected)
+      await expect(dialog.locator('.coms-ask-bubble--club').last()).toBeFocused()
+      await expect(dialog.getByRole('link', { name: /안내 보기/ })).toHaveAttribute('href', '/recruit')
+      await dialog.getByRole('button', { name: '자주 묻는 질문으로' }).click()
+    }
+    expect(posts).toBe(0)
+    if (!enabled) {
+      await expect(dialog.getByRole('button', { name: '다른 질문 보내기' })).toBeDisabled()
+      await expect(dialog).toContainText('지금은 이메일 문의를 받지 않고 있어요.')
+    }
+  })
 }
 
 test('guest question and reply email reach the mail endpoint', async ({ page }) => {
@@ -47,7 +76,8 @@ test('member email is prefilled and can be changed', async ({ page }) => {
   await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 7, studentId: '2026000000', name: 'Test Member', email: 'test@example.com', role: 'USER', emailVerified: true } }))
   await page.route('**/api/site-settings', (route) => route.fulfill({ json: { askEnabled: true } }))
   await page.goto('/about')
-  const dialog = await page.getByRole('button', { name: '사람에게 질문하기' }).click().then(() => page.getByRole('dialog', { name: '사람에게 질문하기' }))
+  const dialog = await page.getByRole('button', { name: '질문하기' }).click().then(() => page.getByRole('dialog', { name: "COM's 질문하기" }))
+  await dialog.getByRole('button', { name: '다른 질문 보내기' }).click()
   await dialog.getByRole('textbox', { name: '질문' }).fill('부원도 참여할 수 있나요?')
   await dialog.getByRole('button', { name: '다음' }).click()
   await expect(dialog.getByRole('textbox', { name: '답장받을 이메일' })).toHaveValue('test@example.com')
@@ -124,11 +154,13 @@ test('keyboard focus stays in the dialog and Escape restores the opener', async 
   await mockOptionalApis(page)
   await page.route('**/api/site-settings', (route) => route.fulfill({ json: { askEnabled: true } }))
   await page.goto('/about')
-  const opener = page.getByRole('button', { name: '사람에게 질문하기' })
+  const opener = page.getByRole('button', { name: '질문하기' })
   await opener.focus()
   await page.keyboard.press('Enter')
-  const dialog = page.getByRole('dialog', { name: '사람에게 질문하기' })
+  const dialog = page.getByRole('dialog', { name: "COM's 질문하기" })
   await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '어떻게 가입하나요?' })).toBeFocused()
+  await dialog.getByRole('button', { name: '다른 질문 보내기' }).click()
   await expect(dialog.getByRole('textbox', { name: '질문' })).toBeFocused()
   await expect(opener).toBeHidden()
   await page.keyboard.press('Tab')
@@ -151,9 +183,10 @@ test('Escape restores the opener after sending on reduced-motion home', async ({
   await page.route('**/api/site-settings', (route) => route.fulfill({ json: { askEnabled: true } }))
   await page.route('**/api/ask', (route) => route.fulfill({ status: 204 }))
   await page.goto('/')
-  const opener = page.getByRole('button', { name: '사람에게 질문하기' })
+  const opener = page.getByRole('button', { name: '질문하기' })
   await opener.click()
-  const dialog = page.getByRole('dialog', { name: '사람에게 질문하기' })
+  const dialog = page.getByRole('dialog', { name: "COM's 질문하기" })
+  await dialog.getByRole('button', { name: '다른 질문 보내기' }).click()
   await dialog.getByRole('textbox', { name: '질문' }).fill('스터디에 참여할 수 있나요?')
   await dialog.getByRole('button', { name: '다음' }).click()
   await dialog.getByRole('textbox', { name: '답장받을 이메일' }).fill('reply@example.com')
@@ -186,10 +219,10 @@ test('floating button clears footer controls and stays focusable after late scro
   await mockOptionalApis(page)
   await page.route('**/api/site-settings', (route) => route.fulfill({ json: { askEnabled: true } }))
   await page.goto('/about')
-  const opener = page.getByRole('button', { name: '사람에게 질문하기' })
+  const opener = page.getByRole('button', { name: '질문하기' })
   await expect(opener).toBeVisible()
   await opener.click()
-  const dialog = page.getByRole('dialog', { name: '사람에게 질문하기' })
+  const dialog = page.getByRole('dialog', { name: "COM's 질문하기" })
   await page.locator('.appearance-actions').scrollIntoViewIfNeeded()
   await page.keyboard.press('Escape')
   await expect(dialog).toHaveCount(0)
@@ -214,7 +247,7 @@ test('phone keyboard leaves the reply controls in the visible viewport', async (
   const box = await dialog.boundingBox()
   expect(box.y).toBeGreaterThanOrEqual(80)
   expect(box.y + box.height).toBeLessThanOrEqual(420)
-  const title = await dialog.getByRole('heading', { name: '사람에게 질문하기' }).boundingBox()
+  const title = await dialog.getByRole('heading', { name: "COM's 질문하기" }).boundingBox()
   const close = await dialog.getByRole('button', { name: '질문 창 닫기' }).boundingBox()
   expect(title.y).toBeGreaterThanOrEqual(box.y)
   expect(close.y).toBeGreaterThanOrEqual(box.y)
@@ -225,9 +258,11 @@ test('phone keyboard leaves the reply controls in the visible viewport', async (
   await expect(dialog.getByRole('textbox', { name: '답장받을 이메일' })).toBeFocused()
 })
 
-test('blank inbox disables the widget', async ({ page }) => {
-  await openAsk(page, false)
-  await expect(page.getByRole('button', { name: '사람에게 질문하기' })).toHaveCount(0)
+test('blank inbox keeps FAQ available while direct mail is disabled', async ({ page }) => {
+  const dialog = await openFaq(page, false)
+  await expect(page.getByRole('button', { name: '질문하기' })).toBeHidden()
+  await expect(dialog.getByRole('group', { name: '자주 묻는 질문' }).getByRole('button')).toHaveCount(3)
+  await expect(dialog.getByRole('button', { name: '다른 질문 보내기' })).toBeDisabled()
 })
 
 for (const mode of ['lite', 'reduced motion']) {
@@ -266,7 +301,7 @@ test('phone launcher stays above a keyboard opened in another form', async ({ pa
   await mockOptionalApis(page)
   await page.route('**/api/site-settings', (route) => route.fulfill({ json: { askEnabled: true } }))
   await page.goto('/about')
-  const opener = page.getByRole('button', { name: '사람에게 질문하기' })
+  const opener = page.getByRole('button', { name: '질문하기' })
   await expect(opener).toBeVisible()
   await page.evaluate(() => {
     window.visualViewport.height = 420
@@ -280,7 +315,7 @@ test('phone launcher stays above a keyboard opened in another form', async ({ pa
   expect(box.y).toBeGreaterThanOrEqual(104)
   expect(box.y + box.height).toBeLessThanOrEqual(420)
   await opener.click()
-  await expect(page.getByRole('dialog', { name: '사람에게 질문하기' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: "COM's 질문하기" })).toBeVisible()
 })
 
 async function expectClearRightCorner(page, width) {
@@ -340,7 +375,7 @@ for (const width of [1440, 390]) for (const theme of ['light', 'dark']) {
         await expectClearRightCorner(page, width)
         const trigger = page.locator('.coms-ask-trigger')
         await trigger.click()
-        const dialog = page.getByRole('dialog', { name: '사람에게 질문하기' })
+        const dialog = page.getByRole('dialog', { name: "COM's 질문하기" })
         await expect(dialog).toBeVisible()
         const panel = await dialog.boundingBox()
         expect(width - panel.x - panel.width).toBeGreaterThanOrEqual(0)
@@ -349,6 +384,7 @@ for (const width of [1440, 390]) for (const theme of ['light', 'dark']) {
         expect(panel.y).toBeGreaterThanOrEqual(0)
         expect(panel.y + panel.height).toBeLessThanOrEqual(width === 390 ? 844 : 900)
         if (width === 390) {
+          await dialog.getByRole('button', { name: '다른 질문 보내기' }).click()
           await dialog.getByRole('textbox', { name: '질문' }).fill('참여 방법을 알려 주세요.')
           await dialog.getByRole('button', { name: '다음' }).click()
           await page.evaluate(() => {
@@ -432,5 +468,5 @@ test('crowded phone keyboard keeps the launcher below the header and clears stac
   expect(box.y + box.height).toBeLessThanOrEqual(420)
   await expect(page.getByRole('button', { name: '맨 위로' })).toBeHidden()
   await page.locator('.coms-ask-trigger').click()
-  await expect(page.getByRole('dialog', { name: '사람에게 질문하기' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: "COM's 질문하기" })).toBeVisible()
 })
