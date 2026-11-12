@@ -66,7 +66,7 @@ const show = (event) => {
     panel.dataset.height = '300'
     const group = document.createElement('section')
     group.dataset.tourGroup = event.detail === 'menu' ? 'club' : event.detail
-    for (const path of ['/about', '/study', '/lab/', '/apps']) {
+    for (const path of ['/about', '/activities', '/study', '/lab/', '/apps', '/recruit']) {
       const row = document.createElement('button')
       row.dataset.tourPath = path
       row.dataset.top = path === '/about' ? '120' : '900'
@@ -144,6 +144,17 @@ assert.equal(frames.size, 0, 'no queued preparation survives close')
 assert.equal(host.hasAttribute('inert'), false)
 assert.equal(document.activeElement === opener, true)
 assert.equal(restored.at(-1), 321)
+// Keyboard navigation can keep focus on the modal itself, including when FAQ content opens.
+await act(async () => root.render(h(TourOverlay, { kind: 'guest', onClose: () => root.render(null) })))
+await flush()
+for (let i = 0; i < 5; i++) {
+  await act(async () => document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
+  await flush()
+}
+assert.equal(surfaces.at(-1), 'ask')
+assert.equal(document.activeElement === card(), true, 'keyboard steps preserve valid focus on the dialog itself')
+assert.equal(card().contains(document.activeElement), true, 'modal focus containment includes the dialog itself')
+assert.equal(host.querySelector('#coms-ask-panel').contains(document.activeElement), false, 'the FAQ preview never owns keyboard focus')
 window.removeEventListener(TOUR_SURFACE_EVENT, show)
 await act(async () => root.unmount())
 host.remove()

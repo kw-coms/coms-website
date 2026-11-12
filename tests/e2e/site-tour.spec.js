@@ -310,7 +310,7 @@ test.describe('guest tour', () => {
     await expect(panel).toBeVisible()
     await expect(panel.locator('.coms-ask-faq button')).toHaveCount(3)
     await expect(page.locator('.coms-ask-backdrop[data-tour-preview="true"]')).toHaveAttribute('inert', '')
-    await expect(tour(page).locator(':focus')).toHaveCount(1)
+    await expect.poll(() => tour(page).evaluate((modal) => modal.contains(document.activeElement))).toBe(true)
     await tour(page).getByRole('button', { name: '건너뛰기' }).click()
     await expect(panel).toHaveCount(0)
     expect(sent).toBe(0)
