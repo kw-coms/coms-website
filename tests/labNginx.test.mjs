@@ -92,6 +92,8 @@ assert.doesNotMatch(frontend.slice(frontend.indexOf('depends_on:')), /coms-lab-c
 // Image: the Lab is built in its own stage, and the service worker leaves /lab/ alone.
 assert.match(dockerfile, /COPY --from=lab-build \/lab\/dist \/usr\/share\/nginx\/html\/lab/)
 assert.match(viteConfig, /\/\^\\\/lab\(\\\/\|\$\)\//, 'navigateFallbackDenylist must keep the SPA shell off /lab/')
+// /booth is a separate app proxied by the host nginx; the SPA shell must not answer its navigations.
+assert.match(viteConfig, /\|phonemote\|booth\)\(\\\/\|\$\)\//, 'navigateFallbackDenylist must keep the SPA shell off /booth/')
 
 // Deploy: the sidecars (compiler, study runner) can never fail or roll back the site. The site's services are started by name,
 // the compiler goes through the warn-only helpers, and it is never in the rollback or health path.

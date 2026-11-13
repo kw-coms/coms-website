@@ -98,7 +98,7 @@ const pwaPlugin = VitePWA({
       /^\/lab(\/|$)/,
       // Sibling apps the host nginx serves under sub-paths of this origin.
       // Without these the SW hijacks their navigations and renders the SPA 404.
-      /^\/(foodclub|gameclub|BugSnap|LogDoctor|PRDoctor|worldcup|tier|team-randomizer|companion|phonemote)(\/|$)/,
+      /^\/(foodclub|gameclub|BugSnap|LogDoctor|PRDoctor|worldcup|tier|team-randomizer|companion|phonemote|booth)(\/|$)/,
     ],
     // The install used to precache every chunk (~2.2 MB), so each first-time visitor —
     // including logged-out phones on the recruit page — downloaded the rich-text editor,
