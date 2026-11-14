@@ -14,6 +14,7 @@ import { openQuickSearch } from '../utils/quickSearch'
 import { ROLE_LABELS, canAccessOperationsPanel } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
 import { confirmEditorLeave } from '../hooks/useEditorDraft'
+import { TOUR_SURFACE_EVENT, type TourSurface } from './tour/tourState'
 
 const floatingBarBaseClass = 'apple-topbar border-b border-[var(--app-hairline)]'
 
@@ -54,6 +55,8 @@ export default function GlobalNavigation() {
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const [tourSurface, setTourSurface] = useState<TourSurface>(null)
+  const tourSurfaceRef = useRef<TourSurface>(null)
   const [frequent, setFrequent] = useState<NavItem[]>([])
   const [scrolled, setScrolled] = useState(false)
   const [showTop, setShowTop] = useState(false)
@@ -117,15 +120,49 @@ export default function GlobalNavigation() {
 
   useEffect(() => () => window.clearTimeout(hoverTimer.current), [])
 
+  useEffect(() => {
+    const onTourSurface = (event: Event) => {
+      const surface = (event as CustomEvent<TourSurface>).detail
+      if (surface === null || surface === 'ask') {
+        if (tourSurfaceRef.current !== null) {
+          window.clearTimeout(hoverTimer.current)
+          setMobileMenuOpen(false)
+          setOpenGroup(null)
+        }
+        tourSurfaceRef.current = null
+        setTourSurface(null)
+        return
+      }
+      tourSurfaceRef.current = surface
+      setTourSurface(surface)
+      window.clearTimeout(hoverTimer.current)
+      openedByHover.current = false
+      clickedGroup.current = null
+      focusColumn.current = null
+      setFrequent(frequentItems())
+      if (window.matchMedia?.('(max-width: 1023px)').matches ?? window.innerWidth < 1024) {
+        setOpenGroup(null)
+        setMobileMenuOpen(true)
+      } else {
+        setMobileMenuOpen(false)
+        setOpenGroup(surface === 'account' ? null : surface === 'menu' ? 'club' : surface)
+      }
+    }
+    window.addEventListener(TOUR_SURFACE_EVENT, onTourSurface)
+    return () => window.removeEventListener(TOUR_SURFACE_EVENT, onTourSurface)
+  }, [])
+
   // Panel open: Escape and a press outside close it.
   useEffect(() => {
     if (!openGroup) return undefined
     const onDocDown = (event: MouseEvent) => {
+      if (tourSurfaceRef.current) return
       const target = event.target as Node
       if (panelRef.current?.contains(target) || groupNavRef.current?.contains(target)) return
       setOpenGroup(null)
     }
     const onKey = (event: KeyboardEvent) => {
+      if (tourSurfaceRef.current) return
       if (event.key !== 'Escape') return
       // Hand focus back only if it is in the menu: a hover-opened panel must not take it from a field being typed in.
       const focus = document.activeElement
@@ -207,6 +244,7 @@ export default function GlobalNavigation() {
   }
 
   const scheduleClose = (event: React.PointerEvent) => {
+    if (tourSurfaceRef.current) return
     // Only a hover-opened panel closes when the pointer leaves; a clicked or keyboard-opened one stays.
     if (event.pointerType !== 'mouse' || !openedByHover.current) return
     window.clearTimeout(hoverTimer.current)
@@ -229,6 +267,7 @@ export default function GlobalNavigation() {
   }
 
   const onGroupEnter = (event: React.PointerEvent, groupId: string) => {
+    if (tourSurfaceRef.current) return
     if (event.pointerType !== 'mouse') return
     window.clearTimeout(hoverTimer.current)
     if (openGroup === groupId) return
@@ -236,6 +275,7 @@ export default function GlobalNavigation() {
   }
 
   const onPanelBlur = (event: React.FocusEvent) => {
+    if (tourSurfaceRef.current) return
     const next = event.relatedTarget as Node | null
     if (next && !panelRef.current?.contains(next) && !groupNavRef.current?.contains(next)) setOpenGroup(null)
   }
@@ -249,6 +289,7 @@ export default function GlobalNavigation() {
     <button
       type="button"
       className={className}
+      data-tour-path={item.path}
       data-nav-activity={item.activityGroup}
       aria-current={activePath === item.path ? 'page' : undefined}
       disabled={item.auth && authLoading}
@@ -321,6 +362,7 @@ export default function GlobalNavigation() {
           <div
             ref={panelRef}
             id="nav-panel"
+            data-tour-guided={tourSurface !== null ? 'true' : undefined}
             className="nav-panel hidden lg:block"
             onPointerEnter={() => window.clearTimeout(hoverTimer.current)}
             onPointerLeave={scheduleClose}
@@ -340,6 +382,7 @@ export default function GlobalNavigation() {
                   <section
                     key={group.id}
                     data-nav-col={group.id}
+                    data-tour-group={group.id}
                     data-open={group.id === openGroup ? 'true' : undefined}
                     aria-labelledby={`nav-col-${group.id}`}
                     className="nav-col"
@@ -414,6 +457,7 @@ export default function GlobalNavigation() {
 
       {mobileMenuOpen && (
         <MobileNavMenu
+          guidedPreview={tourSurface !== null}
           frequent={frequent}
           activePath={activePath}
           onGo={(path, options) => goMenuPath(path, options)}

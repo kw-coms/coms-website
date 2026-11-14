@@ -6,11 +6,13 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { AuthContext } from '../src/contexts/useAuth.ts'
+import { setTourSurface } from '../src/components/tour/tourState.ts'
 import AskWidget from '../src/components/ask/AskWidget.tsx'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 globalThis.MutationObserver = window.MutationObserver
 globalThis.getComputedStyle = window.getComputedStyle
+globalThis.CustomEvent = window.CustomEvent
 window.HTMLElement.prototype.scrollIntoView = () => {}
 window.requestAnimationFrame = (callback) => setTimeout(callback, 0)
 window.cancelAnimationFrame = clearTimeout
@@ -67,9 +69,27 @@ assert.equal(Boolean(dialog()), false, 'Escape closes the FAQ dialog')
 assert.equal(document.activeElement === launcher, true, 'Escape restores focus to the launcher')
 const tour = document.createElement('div')
 tour.className = 'coms-tour'
+tour.dataset.tourStep = 'questions'
 document.body.append(tour)
+await act(async () => setTourSurface('ask'))
+const preview = host.querySelector('#coms-ask-panel')
+assert.ok(preview, 'the question tour step shows the real FAQ panel')
+assert.equal(preview.getAttribute('role'), 'region', 'tour preview is not a second modal')
+assert.equal(preview.hasAttribute('aria-modal'), false)
+assert.equal(Boolean(preview.closest('[inert]')), true, 'the tour owns interactions')
+assert.equal(preview.querySelectorAll('.coms-ask-faq button').length, 3)
+assert.equal(document.activeElement === launcher, true, 'preview does not steal focus')
+await click(preview.querySelector('.coms-ask-faq button'))
+assert.equal(preview.querySelectorAll('.coms-ask-faq button').length, 3, 'programmatic clicks cannot advance an inert preview')
+assert.equal(mailCalls, 0)
 await click(launcher)
 assert.equal(dialog(), null, 'tour spotlight cannot open a nested chat dialog')
+await act(async () => setTourSurface('menu'))
+assert.equal(Boolean(host.querySelector('#coms-ask-panel')), false, 'other tour surfaces close only preview')
+await act(async () => setTourSurface('ask'))
+assert.equal(Boolean(host.querySelector('#coms-ask-panel')), true)
+await act(async () => setTourSurface(null))
+assert.equal(Boolean(host.querySelector('#coms-ask-panel')), false, 'tour close releases preview')
 tour.remove()
 
 askEnabled = true
@@ -84,6 +104,9 @@ await act(async () => { setter.call(question, '회원A의 아직 보내지 않�
 await click(findButton('자주 묻는 질문으로'))
 await click(findButton('다른 질문 보내기'))
 assert.equal(host.querySelector('#coms-ask-question').value, '회원A의 아직 보내지 않은 질문', 'FAQ back/return keeps the contact draft')
+await act(async () => setTourSurface('menu'))
+await act(async () => setTourSurface(null))
+assert.equal(host.querySelector('#coms-ask-question').value, '회원A의 아직 보내지 않은 질문', 'tour exit does not close or clear ordinary contact')
 await render(memberMe)
 assert.equal(host.querySelector('#coms-ask-question')?.value, '회원A의 아직 보내지 않은 질문', 'same studentId preserves the unsent draft')
 await click(findButton('다음'))
