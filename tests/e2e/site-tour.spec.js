@@ -14,6 +14,8 @@ test.use({ serviceWorkers: 'block' })
 const FORCE_AUTO = 'coms.tour.force-auto:v1'
 
 const tour = (page) => page.locator('[data-site-tour][role="dialog"]')
+const readyTour = (page) => expect(page.locator('.coms-tour')).toHaveAttribute('data-tour-ready', 'true')
+const entry = (page, group, path) => page.locator(`[data-tour-group="${group}"] [data-tour-path="${path}"]`).filter({ visible: true })
 // The overlay's chunk (and its stylesheet): hashed under /assets/ in the build, a plain module path in the dev server.
 const TOUR_CHUNK = /\/(assets\/)?TourOverlay[-.].*\.(js|css)|\/TourOverlay\.(tsx|css)/
 const footerStart = (page) => page.getByRole('button', { name: '튜토리얼 시작' })
@@ -48,7 +50,7 @@ test.describe('starting', () => {
     await page.goto('/')
     await expect(tour(page)).toBeVisible({ timeout: 10_000 })
     await expect(tour(page)).toContainText("COM's는 이런 동아리예요")
-    await expect(tour(page)).toContainText('1 / 6')
+    await expect(tour(page)).toContainText('1 / 7')
     await page.keyboard.press('Escape')
     await expect(tour(page)).toHaveCount(0)
 
@@ -192,7 +194,7 @@ test.describe('starting', () => {
     await page.goto('/about')
     await footerStart(page).click()
     await expect(tour(page)).toContainText('공지사항', { timeout: 8000 })
-    await expect(tour(page)).toContainText('1 / 8')
+    await expect(tour(page)).toContainText('1 / 9')
   })
 
   test('waits while quick jump is open, then starts', async ({ page }) => {
@@ -245,31 +247,38 @@ test.describe('guest tour', () => {
     const spot = page.locator('.coms-tour-spot')
     await expect(card).toHaveAccessibleName("COM's는 이런 동아리예요")
     await expect(card).toHaveAttribute('aria-modal', 'true')
+    await readyTour(page)
     await expect(page.getByRole('button', { name: '이전' })).toBeDisabled()
-    // The nav is on screen at 1280px: the spotlight sits on the 동아리 group, which holds About.
+    // The real dropdown is open and the spotlight points to its actual About entry.
+    await expect(page.locator('#nav-panel')).toBeVisible()
     await expect(spot).not.toHaveClass(/is-none/)
-    const about = await page.locator('[data-tour="nav-club"]').boundingBox()
+    const about = await entry(page, 'club', '/about').boundingBox()
     const lit = await spot.boundingBox()
     expect(Math.abs(lit.x + lit.width / 2 - (about.x + about.width / 2))).toBeLessThan(2)
 
     await page.getByRole('button', { name: '다음' }).click()
-    await expect(card).toContainText('2 / 6')
-    await expect(page.getByRole('status').filter({ hasText: /^2 \/ 6 · / })).toHaveCount(1)
+    await expect(card).toContainText('2 / 7')
+    await expect(page.getByRole('status').filter({ hasText: /^2 \/ 7 · / })).toHaveCount(1)
     await page.keyboard.press('ArrowRight')
     await expect(card).toContainText('읽고, 풀고, 만들어 봐요')
+    await readyTour(page)
+    await expect(entry(page, 'learn', '/study')).toBeInViewport()
+    await expect(entry(page, 'learn', '/lab/')).toBeInViewport()
     await page.keyboard.press('ArrowLeft')
-    await expect(card).toContainText('2 / 6')
+    await expect(card).toContainText('2 / 7')
     await page.getByRole('button', { name: '이전' }).click()
-    await expect(card).toContainText('1 / 6')
+    await expect(card).toContainText('1 / 7')
     // Focus stays in the card even though 이전 has just been disabled.
     await expect(card.locator(':focus')).toHaveCount(1)
 
-    for (let i = 0; i < 5; i += 1) await page.keyboard.press('ArrowRight')
-    await expect(card).toContainText('6 / 6')
+    for (let i = 0; i < 6; i += 1) await page.keyboard.press('ArrowRight')
+    await expect(card).toContainText('7 / 7')
+    await readyTour(page)
     await expect(card).toContainText('이미 동아리원이라면')
     await expect(page.getByRole('button', { name: '건너뛰기' })).toBeVisible()
     await page.getByRole('button', { name: '완료' }).click()
     await expect(card).toHaveCount(0)
+    await expect(page.locator('#nav-panel, #coms-ask-panel')).toHaveCount(0)
   })
 
   test('건너뛰기 ends it; a click on the dimmed page does not', async ({ page }) => {
@@ -290,8 +299,39 @@ test.describe('guest tour', () => {
     await expect(page.locator('#root')).not.toHaveAttribute('inert', '')
   })
 
+  test('shows the real FAQ on desktop without sending mail and cleans it up on skip', async ({ page }) => {
+    let sent = 0
+    page.on('request', (request) => { if (request.method() === 'POST' && request.url().endsWith('/api/ask')) sent++ })
+    for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowRight')
+    await expect(tour(page)).toHaveAccessibleName('질문하기')
+    await readyTour(page)
+    await expect(page.locator('#nav-panel')).toHaveCount(0)
+    const panel = page.locator('#coms-ask-panel')
+    await expect(panel).toBeVisible()
+    await expect(panel.locator('.coms-ask-faq button')).toHaveCount(3)
+    await expect(page.locator('.coms-ask-backdrop[data-tour-preview="true"]')).toHaveAttribute('inert', '')
+    await expect.poll(() => tour(page).evaluate((modal) => modal.contains(document.activeElement))).toBe(true)
+    await tour(page).getByRole('button', { name: '건너뛰기' }).click()
+    await expect(panel).toHaveCount(0)
+    expect(sent).toBe(0)
+    await page.getByRole('button', { name: '질문하기', exact: true }).click()
+    await expect(page.getByRole('dialog', { name: "COM's 질문하기" })).toBeVisible()
+  })
+
+  test('opens the real phone menu after a desktop tour is resized', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await readyTour(page)
+    await expect(page.locator('.coms-tour')).toHaveAttribute('data-tour-profile', 'desktop')
+    await expect(page.locator('#nav-panel')).toHaveCount(0)
+    await expect(page.locator('#mobile-menu')).toBeVisible()
+    await expect(entry(page, 'club', '/about')).toBeInViewport()
+    await page.keyboard.press('Escape')
+    await expect(page.locator('#mobile-menu')).toHaveCount(0)
+  })
+
   test('no horizontal overflow on any step', async ({ page }) => {
-    for (let i = 0; i < 6; i += 1) {
+    for (let i = 0; i < 7; i += 1) {
+      await readyTour(page)
       expect(await noHorizontalOverflow(page)).toBeLessThanOrEqual(1)
       const box = await tour(page).boundingBox()
       const view = page.viewportSize()
@@ -299,7 +339,7 @@ test.describe('guest tour', () => {
       expect(box.x + box.width).toBeLessThanOrEqual(view.width)
       expect(box.y).toBeGreaterThanOrEqual(0)
       expect(box.y + box.height).toBeLessThanOrEqual(view.height)
-      if (i < 5) await page.keyboard.press('ArrowRight')
+      if (i < 6) await page.keyboard.press('ArrowRight')
     }
   })
 })
@@ -314,14 +354,15 @@ test.describe('member tour', () => {
     const card = tour(page)
     await expect(card).toBeVisible({ timeout: 10_000 })
     await expect(card).toContainText('공지사항')
-    await expect(card).toContainText('1 / 8')
+    await expect(card).toContainText('1 / 9')
 
     const titles = []
-    for (let i = 0; i < 8; i += 1) {
+    for (let i = 0; i < 9; i += 1) {
+      await readyTour(page)
       titles.push(await card.locator('.coms-tour-title').innerText())
-      if (i < 7) await page.keyboard.press('ArrowRight')
+      if (i < 8) await page.keyboard.press('ArrowRight')
     }
-    expect(titles).toEqual(['공지사항', '커뮤니티', '자료실', '활동 기록과 일정', '푼 문제가 쌓여요', 'Lab', '화면 설정', '계정 설정'])
+    expect(titles).toEqual(['공지사항', '커뮤니티', '자료실', '활동 기록과 일정', '푼 문제가 쌓여요', 'Lab', '화면 설정', '질문하기', '계정 설정'])
     // The last step points at the account button and offers 완료.
     await expect(page.locator('.coms-tour-spot')).not.toHaveClass(/is-none/)
     await page.getByRole('button', { name: '완료' }).click()
@@ -340,6 +381,7 @@ test.describe('member tour', () => {
     await footerStart(page).click()
     const card = tour(page)
     await expect(card).toBeVisible()
+    await readyTour(page)
     for (let i = 0; i < 6; i += 1) await page.keyboard.press('ArrowRight')
     await expect(card).toContainText('화면 설정')
     const trigger = page.getByRole('button', { name: '화면 설정', exact: true })
@@ -360,14 +402,16 @@ test.describe('phone', () => {
     await page.goto('/about')
     await page.getByRole('button', { name: '메뉴 열기' }).click()
     await page.locator('#mobile-menu').getByRole('button', { name: /튜토리얼 시작/ }).click()
-    await expect(page.locator('#mobile-menu')).toHaveCount(0)
     const card = tour(page)
     await expect(card).toBeVisible()
+    await readyTour(page)
+    await expect(page.locator('#mobile-menu')).toBeVisible()
     await expect(page.locator('.coms-tour')).toHaveAttribute('data-tour-profile', 'mobile')
     await expect(card).toContainText('메뉴와 빠른 이동')
     await expect(page.locator('.coms-tour-spot')).not.toHaveClass(/is-none/)
     const titles = []
     for (let i = 0; i < 6; i += 1) {
+      await readyTour(page)
       titles.push(await card.locator('.coms-tour-title').innerText())
       expect(await noHorizontalOverflow(page)).toBeLessThanOrEqual(1)
       const box = await card.boundingBox()
@@ -376,14 +420,30 @@ test.describe('phone', () => {
       expect(box.y + box.height).toBeLessThanOrEqual(844)
       if (i === 4) {
         await expect(page.locator('.coms-tour')).toHaveAttribute('data-tour-step', 'questions')
-        await expect(page.locator('[data-tour="ask"]')).toBeVisible()
+        await expect(page.locator('#mobile-menu')).toHaveCount(0)
+        await expect(page.locator('#coms-ask-panel')).toBeVisible()
+        await expect(page.locator('#coms-ask-panel .coms-ask-faq button')).toHaveCount(3)
         await expect(page.locator('.coms-tour-spot')).not.toHaveClass(/is-none/)
       }
+      if (i === 1) {
+        await expect(entry(page, 'learn', '/study')).toBeInViewport()
+        await expect(entry(page, 'learn', '/lab/')).toBeInViewport()
+        for (const path of ['/study', '/lab/']) {
+          expect(await entry(page, 'learn', path).evaluate((el) => {
+            const row = el.getBoundingClientRect()
+            const scrollport = el.closest('#mobile-menu').getBoundingClientRect()
+            return row.top >= scrollport.top - 1 && row.bottom <= scrollport.bottom + 1
+          }), 'the real menu rows are not clipped inside their scrollport').toBe(true)
+        }
+      }
+      if (i === 2) await expect(entry(page, 'tools', '/apps')).toBeInViewport()
+      if (i === 5) await expect(page.locator('#mobile-menu [data-tour="login"]')).toBeInViewport()
       if (i < 5) await card.getByRole('button', { name: '다음' }).click()
     }
     expect(titles).toEqual(['메뉴와 빠른 이동', '스터디 자료와 회로 Lab', '부원들의 작품', '내 화면 꾸미기', '질문하기', '동아리원으로 시작하기'])
     await page.getByRole('button', { name: '완료' }).click()
     await expect(card).toHaveCount(0)
+    await expect(page.locator('#mobile-menu, #coms-ask-panel')).toHaveCount(0)
   })
 
   test('the member footer step stays on screen at 390px', async ({ page }) => {
@@ -395,6 +455,7 @@ test.describe('phone', () => {
     const card = tour(page)
     for (let i = 0; i < 3; i += 1) await page.getByRole('button', { name: '다음' }).click()
     await expect(card).toContainText('내 화면 꾸미기')
+    await readyTour(page)
     await expect(page.getByRole('button', { name: '화면 설정', exact: true })).toBeInViewport()
     const box = await card.boundingBox()
     expect(box.x).toBeGreaterThanOrEqual(0)
@@ -412,6 +473,7 @@ test.describe('phone', () => {
       const card = tour(page)
       for (let i = 0; i < 6; i += 1) {
         await expect(card).toContainText(`${i + 1} / 6`)
+        await readyTour(page)
         const box = await card.boundingBox()
         const view = await page.evaluate(() => {
           const vv = window.visualViewport
@@ -427,7 +489,17 @@ test.describe('phone', () => {
           const spot = await page.locator('.coms-tour-spot').boundingBox()
           const separated = box.y + box.height <= spot.y - 13 || box.y >= spot.y + spot.height + 13
             || box.x + box.width <= spot.x - 13 || box.x >= spot.x + spot.width + 13
-          expect(separated, 'the question launcher remains visible beside the card').toBe(true)
+          expect(separated, 'the actual FAQ panel remains visible beside the card').toBe(true)
+          const panel = page.locator('#coms-ask-panel')
+          await expect(panel).toBeVisible()
+          for (const row of await panel.locator('.coms-ask-faq button').all()) {
+            await expect(row).toBeInViewport()
+            expect(await row.evaluate((el) => {
+              const r = el.getBoundingClientRect()
+              const body = el.closest('.coms-ask-body').getBoundingClientRect()
+              return r.top >= body.top - 1 && r.bottom <= body.bottom + 1
+            }), 'all three FAQ rows are actually visible inside the preview').toBe(true)
+          }
         }
         const action = card.getByRole('button', { name: i === 5 ? '완료' : '다음' })
         await action.scrollIntoViewIfNeeded()
@@ -446,6 +518,9 @@ test.describe('phone', () => {
     const card = tour(page)
     await expect(card).toContainText('1 / 6')
     await page.setViewportSize({ width: 1280, height: 900 })
+    await readyTour(page)
+    await expect(page.locator('#mobile-menu')).toHaveCount(0)
+    await expect(page.locator('#nav-panel')).toBeVisible()
     await expect(page.locator('.coms-tour')).toHaveAttribute('data-tour-profile', 'mobile')
     await expect(card).toHaveCount(1)
     for (let i = 0; i < 5; i += 1) await card.getByRole('button', { name: '다음' }).click()

@@ -44,7 +44,7 @@
 }
 
 .coms-tour-spot.is-ready {
-	transition: left 300ms cubic-bezier(0.2, 0.8, 0.2, 1), top 300ms cubic-bezier(0.2, 0.8, 0.2, 1), width 300ms cubic-bezier(0.2, 0.8, 0.2, 1), height 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+	transition: none;
 }
 
 .coms-tour-card {
@@ -69,8 +69,11 @@
 }
 
 .coms-tour-card.is-ready {
-	transition: left 300ms cubic-bezier(0.2, 0.8, 0.2, 1), top 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+	transition: none;
 }
+
+.coms-tour[data-tour-ready='false'] .coms-tour-card,
+.coms-tour[data-tour-ready='false'] .coms-tour-spot { visibility: hidden; }
 
 .coms-tour-card.is-nudged {
 	animation: coms-tour-nudge 420ms ease-out;
@@ -241,9 +244,10 @@
 
 @media (max-width: 1023px) {
 	.coms-tour-btn { min-height: 2.75rem; }
-	/* Phone steps change card height and spotlight target together; intermediate positions can cover the target or exit the viewport. */
-	.coms-tour-card.is-ready,
-	.coms-tour-spot.is-ready { transition: none; }
+}
+
+@media (min-width: 600px) and (max-width: 1023px) and (max-height: 480px) {
+	.coms-tour-card { width: min(18rem, calc(50vw - 24px)); }
 }
 
 @keyframes coms-tour-pop {

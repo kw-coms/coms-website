@@ -24,8 +24,7 @@
 .coms-ask-trigger:hover { background: var(--app-surface-soft); }
 .coms-ask-trigger[data-open='true'] { opacity: 0; pointer-events: none; }
 
-body:has(.coms-tour:not([data-tour-step='questions']), .coms-quick, .appearance-popover, #mobile-menu, [data-coms-intro], [role='alertdialog'], [role='dialog']:not(#coms-ask-panel):not([data-site-tour])) .coms-ask-trigger { display: none; }
-body:has(.coms-tour[data-tour-step='questions']) .coms-ask-trigger { visibility: visible !important; }
+body:has(.coms-tour, .coms-ask-backdrop[data-tour-preview='true'], .coms-quick, .appearance-popover, #mobile-menu, [data-coms-intro], [role='alertdialog'], [role='dialog']:not(#coms-ask-panel)) .coms-ask-trigger { display: none; }
 
 .coms-ask-backdrop {
   position: fixed;
@@ -82,6 +81,22 @@ body:has(.coms-tour[data-tour-step='questions']) .coms-ask-trigger { visibility:
 
 @media (max-width: 639px) {
   .coms-ask-panel { left: 1rem; right: 1rem; width: auto; }
+}
+
+.coms-ask-backdrop[data-tour-preview='true'] { background: transparent; pointer-events: none; }
+.coms-ask-backdrop[data-tour-preview='true'] .coms-ask-panel { max-height: min(24rem, 50dvh); }
+.coms-ask-backdrop[data-tour-preview='true'] .coms-ask-messages,
+.coms-ask-backdrop[data-tour-preview='true'] .coms-ask-other,
+.coms-ask-backdrop[data-tour-preview='true'] .coms-ask-unavailable { display: none; }
+@media (max-height: 500px) and (orientation: landscape) {
+  .coms-ask-backdrop[data-tour-preview='true'] .coms-ask-panel {
+    top: max(0.5rem, env(safe-area-inset-top));
+    right: max(0.5rem, env(safe-area-inset-right));
+    bottom: auto;
+    left: auto;
+    width: min(46vw, 22rem);
+    max-height: calc(100dvh - 1rem);
+  }
 }
 
 /* Keep both buttons together when footer controls or notices move the launcher. */

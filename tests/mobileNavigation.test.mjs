@@ -42,13 +42,13 @@ assert.match(
 // The menu is a full-screen overlay with every group open (not a dropdown list), and it is modal.
 assert.match(
   mobileMenu,
-  /role="dialog" aria-modal="true"/,
-  'the phone menu should be a modal overlay',
+  /role=\{guidedPreview \? undefined : 'dialog'\} aria-modal=\{guidedPreview \? undefined : 'true'\}/,
+  'the ordinary phone menu remains modal while guided preview leaves focus to the tour',
 )
 
 assert.match(
   mobileMenu,
-  /useModalFocus\(true, onClose\)/,
+  /useModalFocus\(!guidedPreview, onClose\)/,
   'the phone menu should trap focus and close on Escape',
 )
 
@@ -80,6 +80,12 @@ assert.match(
   css,
   /\.nav-m-overlay \{[\s\S]*?animation: nav-panel-in 250ms cubic-bezier\(0\.16, 1, 0\.3, 1\) both;/,
   'the phone menu should use one short rise-and-fade open animation',
+)
+
+assert.match(
+  css,
+  /@media \(min-width: 600px\) and \(max-width: 1023px\) and \(max-height: 480px\) \{[\s\S]*?\.nav-m-overlay\[data-tour-guided='true'\] \{[\s\S]*?width: calc\(50vw - 12px\)/,
+  'only the guided phone menu narrows in short landscape',
 )
 
 assert.match(

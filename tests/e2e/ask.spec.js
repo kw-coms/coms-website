@@ -43,6 +43,34 @@ for (const enabled of [true, false]) {
   })
 }
 
+for (const [width, height] of [[390, 844], [640, 320]]) {
+  test(`guided question preview shows all three real FAQ rows at ${width}x${height}`, async ({ page }) => {
+    await page.setViewportSize({ width, height })
+    await mockOptionalApis(page)
+    await page.route('**/api/site-settings', (route) => route.fulfill({ json: { askEnabled: false } }))
+    let posts = 0
+    await page.route('**/api/ask', (route) => { posts++; return route.fulfill({ status: 204 }) })
+    await page.goto('/about')
+    await expect(page.locator('.coms-ask-trigger')).toBeAttached()
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('coms:tour-surface', { detail: 'ask' })))
+    const preview = page.locator('#coms-ask-panel')
+    await expect(preview).toBeVisible()
+    await expect(preview).toHaveAttribute('role', 'region')
+    const body = await preview.locator('.coms-ask-body').boundingBox()
+    const rows = preview.locator('.coms-ask-faq button')
+    await expect(rows).toHaveCount(3)
+    for (const row of await rows.all()) {
+      const box = await row.boundingBox()
+      expect(box.y).toBeGreaterThanOrEqual(body.y - 1)
+      expect(box.y + box.height).toBeLessThanOrEqual(body.y + body.height + 1)
+    }
+    expect(await preview.evaluate((panel) => panel.contains(document.activeElement))).toBe(false)
+    expect(posts).toBe(0)
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('coms:tour-surface', { detail: null })))
+    await expect(preview).toHaveCount(0)
+  })
+}
+
 test('guest question and reply email reach the mail endpoint', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   let sent
