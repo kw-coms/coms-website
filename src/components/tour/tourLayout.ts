@@ -29,7 +29,7 @@ export function placeTourCard(box: Box | null, cardWidth: number, cardHeight: nu
   let height = fullHeight
   let cardTop = viewport.top + (viewport.height - height) / 2
   let cardLeft = spot.left + spot.width / 2 - maxWidth / 2
-  if (preferAbove && roomAbove >= MIN_SIDE_HEIGHT) {
+  if (preferAbove && roomAbove >= height) {
     height = Math.min(height, roomAbove)
     cardTop = spot.top - GAP - height
   } else if (roomBelow >= height) {

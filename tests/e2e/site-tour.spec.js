@@ -396,6 +396,23 @@ test.describe('member tour', () => {
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
+  test('keeps every action fully visible when returning visitors have frequent links', async ({ page }) => {
+    await mockOptionalApis(page)
+    await skipIntro(page)
+    await page.addInitScript(() => localStorage.setItem('kwcoms-nav-visits:v1', JSON.stringify({ '/about': 3 })))
+    await page.goto('/about')
+    await footerStart(page).click()
+    await readyTour(page)
+    await expect(page.locator('#mobile-menu [aria-labelledby="nav-m-frequent"]')).toBeVisible()
+    const card = tour(page)
+    for (const action of await card.getByRole('button').all()) {
+      await expect(action).toBeInViewport({ ratio: 1 })
+    }
+    expect(await card.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeLessThanOrEqual(1)
+    await card.getByRole('button', { name: '다음' }).click()
+    await expect(card).toContainText('스터디 자료와 회로 Lab')
+  })
+
   test('opens from the mobile menu and follows visible phone controls without overflow', async ({ page }) => {
     await mockOptionalApis(page)
     await skipIntro(page)

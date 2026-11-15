@@ -34,6 +34,15 @@ inside(raisedAsk, landscape, 580)
 assert.ok(raisedAsk.left + raisedAsk.maxWidth <= raisedAsk.spot.left - 14,
   'a raised question launcher in landscape leaves room for the card beside it')
 
+const returningPhone = { left: 0, top: 0, width: 390, height: 844 }
+const aboutAfterFrequent = placeTourCard({ left: 0, top: 211.1875, width: 390, height: 44 },
+  366, 247, returningPhone, true)
+inside(aboutAfterFrequent, returningPhone, 247)
+assert.equal(aboutAfterFrequent.maxHeight, 247,
+  'a returning visitor keeps the complete card when the space below fits it')
+assert.ok(aboutAfterFrequent.top >= aboutAfterFrequent.spot.top + aboutAfterFrequent.spot.height + 13,
+  'the whole card belongs below the About row when the preferred side would clip its actions')
+
 const keyboard = { left: 16, top: 195, width: 320, height: 320 }
 const centered = placeTourCard(null, 368, 440, keyboard)
 inside(centered, keyboard, 440)
