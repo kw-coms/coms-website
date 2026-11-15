@@ -109,9 +109,9 @@ jobs:
 
       - name: Install Playwright browser
         run: |
-          # Keep the metric-matched CJK fallback fonts while avoiding the failing runner mirror.
+          # Retain calibrated CJK fonts when a package mirror is unavailable.
           if [ -f /etc/apt/apt-mirrors.txt ]; then
-            echo 'https://mirrors.edge.kernel.org/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+            printf '%s\tpriority:1\n%s\tpriority:2\n' 'https://mirrors.edge.kernel.org/ubuntu/' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
           fi
           fc-match :lang=ko
           npx playwright install --with-deps chromium
@@ -494,7 +494,7 @@ jobs:
       - name: Install Playwright browser for the stack e2e
         run: |
           if [ -f /etc/apt/apt-mirrors.txt ]; then
-            echo 'https://mirrors.edge.kernel.org/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+            printf '%s\tpriority:1\n%s\tpriority:2\n' 'https://mirrors.edge.kernel.org/ubuntu/' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
           fi
           npx playwright install --with-deps chromium
 
@@ -598,7 +598,7 @@ jobs:
       - name: Install Playwright browser
         run: |
           if [ -f /etc/apt/apt-mirrors.txt ]; then
-            echo 'https://mirrors.edge.kernel.org/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+            printf '%s\tpriority:1\n%s\tpriority:2\n' 'https://mirrors.edge.kernel.org/ubuntu/' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
           fi
           npx playwright install --with-deps chromium
 
