@@ -68,7 +68,7 @@ export default defineConfig({
       ? [
           {
             name: 'stack',
-            testMatch: /study-runner-stack\.spec\.js/,
+            testMatch: [/study-runner-stack\.spec\.js/, /hackathon-stack\.spec\.js/],
             use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } },
           },
         ]

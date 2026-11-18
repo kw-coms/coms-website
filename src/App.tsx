@@ -209,6 +209,7 @@ function App() {
         <Route path="/study/:id/practice/:problemId" element={<ProblemPage />} />
         <Route path="/apps" element={<AppsPage />} />
         <Route path="/hackathon" element={<HackathonPage />} />
+        <Route path="/hackathon/:eventId" element={<HackathonPage />} />
         <Route path="/apps/:workId" element={<WorkDetailPage />} />
         <Route path="/draw" element={<DrawPage />} />
         <Route path="/sponsors" element={<SponsorsPage />} />

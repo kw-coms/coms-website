@@ -41,6 +41,21 @@ public class MediaUploadValidator {
         return type;
     }
 
+    public String validateImageContent(MultipartFile file, String expectedType) {
+        requireFile(file, MAX_IMAGE_BYTES, "이미지는 5MB 이하만 업로드할 수 있습니다.");
+        String claimed = file.getContentType();
+        if (!IMAGE_TYPES.contains(expectedType)
+                || (claimed != null && !claimed.isBlank() && !"application/octet-stream".equals(claimed)
+                    && !expectedType.equals(claimed))) {
+            throw badRequest("이미지 파일 형식이 확장자와 일치하지 않습니다.");
+        }
+        var actual = UploadSniffer.imageType(UploadSniffer.header(file));
+        if (actual == null || !expectedType.equals(actual.mimeType())) {
+            throw badRequest("이미지 파일 내용이 형식과 일치하지 않습니다.");
+        }
+        return expectedType;
+    }
+
     public String validateVideo(MultipartFile file) {
         requireFile(file, MAX_VIDEO_BYTES, "영상은 100MB 이하만 업로드할 수 있습니다.");
         String type = file.getContentType();
@@ -51,6 +66,20 @@ public class MediaUploadValidator {
             throw badRequest("영상 파일 내용이 형식과 일치하지 않습니다.");
         }
         return type;
+    }
+
+    public String validateVideoContent(MultipartFile file, String expectedType) {
+        requireFile(file, MAX_VIDEO_BYTES, "영상은 100MB 이하만 업로드할 수 있습니다.");
+        String claimed = file.getContentType();
+        if (!VIDEO_TYPES.contains(expectedType)
+                || (claimed != null && !claimed.isBlank() && !"application/octet-stream".equals(claimed)
+                    && !expectedType.equals(claimed))) {
+            throw badRequest("영상 파일 형식이 확장자와 일치하지 않습니다.");
+        }
+        if (!UploadSniffer.matchesVideoType(expectedType, UploadSniffer.header(file))) {
+            throw badRequest("영상 파일 내용이 형식과 일치하지 않습니다.");
+        }
+        return expectedType;
     }
 
     public String validateFile(MultipartFile file) {

@@ -2,8 +2,11 @@ package com.coms.backend.controller;
 
 import com.coms.backend.domain.Member;
 import com.coms.backend.domain.HackathonSettings;
+import com.coms.backend.domain.HackathonEvent;
 import com.coms.backend.repository.HackathonReviewRepository;
 import com.coms.backend.repository.HackathonSettingsRepository;
+import com.coms.backend.repository.HackathonEventRepository;
+import com.coms.backend.service.StorageService;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
 import jakarta.servlet.http.Cookie;
@@ -13,13 +16,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
+import javax.sql.DataSource;
 
 import java.util.concurrent.CountDownLatch;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -30,6 +38,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,6 +55,10 @@ class HackathonIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired HackathonReviewRepository reviews;
     @Autowired HackathonSettingsRepository settings;
+    @Autowired HackathonEventRepository events;
+    @Autowired DataSource dataSource;
+    @Autowired StorageService storage;
+    private final ObjectMapper json = new ObjectMapper();
     @Autowired MemberRepository members;
     @Autowired JwtTokenProvider tokens;
     @Autowired PlatformTransactionManager transactionManager;
@@ -53,8 +66,25 @@ class HackathonIntegrationTest {
     @BeforeEach
     void reset() {
         reviews.deleteAll();
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        for (String stored : jdbc.queryForList("SELECT stored_name FROM hackathon_materials WHERE stored_name IS NOT NULL", String.class)) storage.delete(stored);
+        jdbc.update("DELETE FROM hackathon_materials WHERE event_id <> 1 OR stored_name IS NOT NULL");
+        jdbc.update("DELETE FROM hackathon_projects WHERE event_id <> 1");
+        jdbc.update("DELETE FROM hackathon_events WHERE id <> 1");
         settings.deleteAll();
         settings.saveAndFlush(new HackathonSettings());
+        jdbc.update("MERGE INTO hackathon_events (id,title,event_year,semester,theme,introduction,rules,published,open) KEY(id) VALUES (1,'COM’s 해커톤 2026',2026,2,'전쟁','','',TRUE,TRUE)");
+        for (String projectId : new String[]{"wargether", "underground-route", "still"}) {
+            jdbc.update("MERGE INTO hackathon_projects (id,event_id,title,author,description,position) KEY(id) VALUES (?,1,?,'기존 팀','기존 작품',0)", projectId, projectId);
+        }
+        jdbc.update("MERGE INTO hackathon_materials (id,event_id,project_id,kind,label,original_name,mime_type,file_size,legacy_url) KEY(id) VALUES (1,1,NULL,'presentation','개회식 안내','opening.pptx','application/vnd.openxmlformats-officedocument.presentationml.presentation',402827,'/hackathon-2026/opening.pptx')");
+        for (int i = 0; i < 3; i++) {
+            String projectId = new String[]{"wargether", "underground-route", "still"}[i];
+            jdbc.update("MERGE INTO hackathon_materials (id,event_id,project_id,kind,label,original_name,mime_type,file_size,legacy_url) KEY(id) VALUES (?,1,?,'proposal','계획서','proposal.pdf','application/pdf',123941,?)",
+                    i + 2, projectId, "/hackathon-2026/" + projectId + "/proposal.pdf");
+        }
+        jdbc.execute("ALTER TABLE hackathon_events ALTER COLUMN id RESTART WITH 2");
+        jdbc.execute("ALTER TABLE hackathon_materials ALTER COLUMN id RESTART WITH 5");
         members.deleteAll();
     }
 
@@ -143,15 +173,15 @@ class HackathonIntegrationTest {
     }
 
     @Test
-    void missingSettingsFailClosedUntilAdminRestoresThem() throws Exception {
+    void legacySettingsRowIsNotAnotherSourceOfEvaluationState() throws Exception {
         settings.deleteAll();
-        mvc.perform(get("/api/hackathon")).andExpect(jsonPath("$.open").value(false));
-        submit("still", 2, "Alum").andExpect(status().isConflict());
+        mvc.perform(get("/api/hackathon")).andExpect(jsonPath("$.open").value(true));
+        submit("still", 2, "Alum").andExpect(status().isCreated());
         Cookie admin = account(Member.Role.ADMIN, "chair");
         mvc.perform(put("/api/admin/hackathon/settings").cookie(admin).header("Origin", ORIGIN)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"open\":true}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"open\":false}"))
                 .andExpect(status().isOk());
-        submit("still", 2, "Alum").andExpect(status().isCreated());
+        submit("wargether", 2, "Alum").andExpect(status().isConflict());
     }
 
     @Test
@@ -165,14 +195,14 @@ class HackathonIntegrationTest {
     }
 
     @Test
-    void closingAndSubmittingShareThePersistedSettingsLock() throws Exception {
+    void closingAndSubmittingShareTheEventLock() throws Exception {
         var pool = Executors.newFixedThreadPool(2);
         var locked = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         var started = new CountDownLatch(1);
         try {
             var closing = pool.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-                HackathonSettings state = settings.lockState().orElseThrow();
+                HackathonEvent state = events.lockById(1L).orElseThrow();
                 state.setOpen(false);
                 locked.countDown();
                 try {
@@ -245,6 +275,218 @@ class HackathonIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{" + SCORES + "}"))
                 .andExpect(status().isOk());
         assertThat(reviews.count()).isEqualTo(2);
+    }
+
+    @Test
+    void chairAuthorsAnotherEventWithoutExposingItsDraftOrMixingReviews() throws Exception {
+        Cookie admin = account(Member.Role.ADMIN, "chair");
+        mvc.perform(get("/api/hackathon/events"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(1));
+        String body = "{\"title\":\"2027년 1학기 해커톤\",\"year\":2027,\"semester\":1,\"introduction\":\"함께 만들어요\"}";
+        MvcResult created = mvc.perform(post("/api/admin/hackathon/events").cookie(admin).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.published").value(false))
+                .andExpect(jsonPath("$.title").value("2027년 1학기 해커톤")).andReturn();
+        long eventId = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+        mvc.perform(get("/api/hackathon/events/{id}", eventId)).andExpect(status().isNotFound());
+        mvc.perform(post("/api/admin/hackathon/events/{id}/projects", eventId).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"무단 팀\",\"author\":\"테스트\",\"description\":\"작품\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(put("/api/admin/hackathon/events/{id}/settings", eventId).cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"open\":true}"))
+                .andExpect(status().isConflict());
+        mvc.perform(put("/api/admin/hackathon/events/{id}/published", eventId).cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"published\":true}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/hackathon/events/{id}", eventId)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.projects.length()").value(0))
+                .andExpect(jsonPath("$.reviews").doesNotExist());
+        MvcResult project = mvc.perform(post("/api/admin/hackathon/events/{id}/projects", eventId)
+                .cookie(admin).header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"새 작품\",\"author\":\"테스트 팀\",\"description\":\"피난 지원 서비스\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        String projectId = json.readTree(project.getResponse().getContentAsString()).get("projectId").asText();
+        assertThat(projectId).isNotBlank();
+        mvc.perform(put("/api/admin/hackathon/events/{id}/settings", eventId).cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"open\":true}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/hackathon/events/{id}/reviews", eventId).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(body(projectId, 42, "Same Member")))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.projectId").value(projectId));
+        mvc.perform(post("/api/hackathon/events/{id}/reviews", eventId).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(body(projectId, 42, "Same Member")))
+                .andExpect(status().isConflict());
+        submit("wargether", 42, "Same Member").andExpect(status().isCreated());
+        mvc.perform(get("/api/admin/hackathon/events/{id}/reviews", eventId).cookie(admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].eventId").value(eventId))
+                .andExpect(jsonPath("$[0].projectId").value(projectId));
+        mvc.perform(get("/api/admin/hackathon/reviews").cookie(admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].projectId").value("wargether"))
+                .andExpect(jsonPath("$.length()").value(1));
+        mvc.perform(put("/api/admin/hackathon/events/{id}/published", eventId).cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"published\":false}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void legacyMaterialsHaveFixedRedirectsAndUploadedPdfNeedsRealBytes() throws Exception {
+        Cookie admin = account(Member.Role.ADMIN, "chair");
+        MvcResult event = mvc.perform(get("/api/hackathon/events/1")).andExpect(status().isOk()).andReturn();
+        var eventJson = json.readTree(event.getResponse().getContentAsString());
+        long opening = eventJson.get("materials").get(0).get("id").asLong();
+        long pdf = eventJson.get("projects").get(0).get("materials").get(0).get("id").asLong();
+        mvc.perform(get("/api/hackathon/events/1/materials/{id}", opening))
+                .andExpect(status().isFound()).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Location", "/hackathon-2026/opening.pptx"));
+        mvc.perform(get("/api/hackathon/events/1/materials/{id}/inline.pdf", opening))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/hackathon/events/1/materials/{id}/inline.pdf", pdf))
+                .andExpect(status().isFound());
+        mvc.perform(get("/api/hackathon/events/2/materials/{id}", pdf))
+                .andExpect(status().isNotFound());
+        mvc.perform(put("/api/admin/hackathon/events/1/settings").cookie(admin).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"open\":false}"))
+                .andExpect(status().isOk());
+        mvc.perform(multipart("/api/admin/hackathon/events/1/materials")
+                .file(new MockMultipartFile("file", "unsafe.pdf", "application/pdf", "not a PDF".getBytes(StandardCharsets.UTF_8)))
+                .param("kind", "other").cookie(admin).header("Origin", ORIGIN))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void uploadedDocumentsUseVerifiedTypesAndSupportVideoRanges() throws Exception {
+        Cookie admin = account(Member.Role.ADMIN, "chair");
+        mvc.perform(put("/api/admin/hackathon/events/1/settings").cookie(admin).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"open\":false}"))
+                .andExpect(status().isOk());
+        byte[] pdfBytes = "%PDF-1.4\nverified document".getBytes(StandardCharsets.UTF_8);
+        MvcResult pdf = mvc.perform(multipart("/api/admin/hackathon/events/1/materials")
+                        .file(new MockMultipartFile("file", "document.pdf", "application/pdf", pdfBytes))
+                        .param("kind", "proposal").cookie(admin).header("Origin", ORIGIN))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.mimeType").value("application/pdf"))
+                .andReturn();
+        long pdfId = json.readTree(pdf.getResponse().getContentAsString()).get("id").asLong();
+        mvc.perform(get("/api/hackathon/events/1/materials/{id}/inline.pdf", pdfId))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().doesNotExist("Content-Security-Policy"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Type", "application/pdf"));
+        mvc.perform(get("/api/hackathon/events/1/materials/{id}/inline.pdf", pdfId).header("Range", "bytes=0-3"))
+                .andExpect(status().isPartialContent())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Range", "bytes 0-3/" + pdfBytes.length));
+        byte[] video = new byte[]{0, 0, 0, 20, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm', 1, 2, 3, 4};
+        MvcResult movie = mvc.perform(multipart("/api/admin/hackathon/events/1/materials")
+                        .file(new MockMultipartFile("file", "demo.mp4", "video/mp4", video))
+                        .param("kind", "video").cookie(admin).header("Origin", ORIGIN))
+                .andExpect(status().isCreated()).andReturn();
+        long movieId = json.readTree(movie.getResponse().getContentAsString()).get("id").asLong();
+        mvc.perform(get("/api/hackathon/events/1/materials/{id}", movieId).header("Range", "bytes=0-7"))
+                .andExpect(status().isPartialContent())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Range", "bytes 0-7/16"));
+        byte[] pptx = new byte[]{'P','K',3,4,0,0,0,0};
+        MvcResult slides = mvc.perform(multipart("/api/admin/hackathon/events/1/materials")
+                        .file(new MockMultipartFile("file", "slides.pptx", "application/octet-stream", pptx))
+                        .param("kind", "presentation").cookie(admin).header("Origin", ORIGIN))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.mimeType")
+                        .value("application/vnd.openxmlformats-officedocument.presentationml.presentation"))
+                .andReturn();
+        long slidesId = json.readTree(slides.getResponse().getContentAsString()).get("id").asLong();
+        mvc.perform(get("/api/hackathon/events/1/materials/{id}", slidesId))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Content-Disposition", org.hamcrest.Matchers.containsString("attachment")));
+        for (long id : new long[]{pdfId, movieId, slidesId}) {
+            mvc.perform(delete("/api/admin/hackathon/events/1/materials/{id}", id)
+                    .cookie(admin).header("Origin", ORIGIN)).andExpect(status().isNoContent());
+        }
+    }
+
+    @Test
+    void eventAndProjectWritingPreserveMultilineTextAndAppendAfterHighestPosition() throws Exception {
+        Cookie admin = account(Member.Role.ADMIN, "chair");
+        MvcResult created = mvc.perform(post("/api/admin/hackathon/events").cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"2028년 1학기\",\"year\":2028,\"semester\":1,\"introduction\":\"첫 줄\\n둘째 줄\",\"rules\":\"규칙 A\\t규칙 B\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.introduction").value("첫 줄\n둘째 줄"))
+                .andReturn();
+        long eventId = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+        MvcResult first = mvc.perform(post("/api/admin/hackathon/events/{id}/projects", eventId)
+                .cookie(admin).header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"첫 팀\",\"author\":\"팀원\",\"description\":\"설명 1\\n설명 2\",\"position\":10}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.description").value("설명 1\n설명 2"))
+                .andReturn();
+        String firstId = json.readTree(first.getResponse().getContentAsString()).get("projectId").asText();
+        MvcResult second = mvc.perform(post("/api/admin/hackathon/events/{id}/projects", eventId)
+                .cookie(admin).header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"둘째 팀\",\"author\":\"팀원\",\"description\":\"설명\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.position").value(11)).andReturn();
+        String secondId = json.readTree(second.getResponse().getContentAsString()).get("projectId").asText();
+        mvc.perform(delete("/api/admin/hackathon/events/{id}/projects/{projectId}", eventId, firstId)
+                .cookie(admin).header("Origin", ORIGIN)).andExpect(status().isNoContent());
+        mvc.perform(post("/api/admin/hackathon/events/{id}/projects", eventId)
+                .cookie(admin).header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"셋째 팀\",\"author\":\"팀원\",\"description\":\"설명\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.position").value(12));
+        mvc.perform(put("/api/admin/hackathon/events/{id}/projects/{projectId}", eventId, secondId)
+                .cookie(admin).header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"둘째 팀 수정\",\"author\":\"팀원\",\"description\":\"설명\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.position").value(11));
+        mvc.perform(put("/api/admin/hackathon/events/{id}/projects/{projectId}", eventId, secondId)
+                .cookie(admin).header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"둘째 팀 수정\",\"author\":\"팀원\",\"description\":\"설명\",\"position\":9999}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/admin/hackathon/events/{id}/projects", eventId)
+                .cookie(admin).header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"넷째 팀\",\"author\":\"팀원\",\"description\":\"설명\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void fractionalEventNumbersAreRejectedAtTheRequestBoundary() throws Exception {
+        Cookie admin = account(Member.Role.ADMIN, "chair");
+        for (String body : new String[]{
+                "{\"title\":\"행사\",\"year\":2027.5,\"semester\":1}",
+                "{\"title\":\"행사\",\"year\":2027,\"semester\":1.5}"
+        }) {
+            mvc.perform(post("/api/admin/hackathon/events").cookie(admin).header("Origin", ORIGIN)
+                    .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest());
+        }
+        MvcResult created = mvc.perform(post("/api/admin/hackathon/events").cookie(admin).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"행사\",\"year\":2027,\"semester\":1}"))
+                .andExpect(status().isCreated()).andReturn();
+        long eventId = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+        mvc.perform(post("/api/admin/hackathon/events/{id}/projects", eventId).cookie(admin).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"팀\",\"author\":\"작성자\",\"description\":\"설명\",\"position\":1.5}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void genericMediaMimeCannotBypassImageVideoValidationOrSizeLimits() throws Exception {
+        Cookie admin = account(Member.Role.ADMIN, "chair");
+        mvc.perform(put("/api/admin/hackathon/events/1/settings").cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"open\":false}"))
+                .andExpect(status().isOk());
+        byte[] hugePng = new byte[5 * 1024 * 1024 + 1];
+        System.arraycopy(new byte[]{(byte) 0x89,'P','N','G'}, 0, hugePng, 0, 4);
+        mvc.perform(multipart("/api/admin/hackathon/events/1/materials")
+                .file(new MockMultipartFile("file", "oversized.png", "application/octet-stream", hugePng))
+                .param("kind", "poster").cookie(admin).header("Origin", ORIGIN))
+                .andExpect(status().isBadRequest());
+        for (String type : new String[]{"application/octet-stream", "video/mp4"}) {
+            mvc.perform(multipart("/api/admin/hackathon/events/1/materials")
+                    .file(new MockMultipartFile("file", "fake.mp4", type, "not an MP4".getBytes(StandardCharsets.UTF_8)))
+                    .param("kind", "video").cookie(admin).header("Origin", ORIGIN))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(multipart("/api/admin/hackathon/events/1/materials")
+                .file(new MockMultipartFile("file", "fake.mp4", null, "not an MP4".getBytes(StandardCharsets.UTF_8)))
+                .param("kind", "video").cookie(admin).header("Origin", ORIGIN))
+                .andExpect(status().isBadRequest());
+        mvc.perform(multipart("/api/admin/hackathon/events/1/materials")
+                .file(new MockMultipartFile("file", "fake.png", "video/mp4", "not a PNG".getBytes(StandardCharsets.UTF_8)))
+                .param("kind", "poster").cookie(admin).header("Origin", ORIGIN))
+                .andExpect(status().isBadRequest());
     }
 
     private ResultActions submit(String projectId, int generation, String name) throws Exception {

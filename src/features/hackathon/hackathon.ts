@@ -1,4 +1,4 @@
-import type { HackathonReview, Scores } from '../../services/hackathonApi'
+import type { HackathonProject, HackathonReview, Scores } from '../../services/hackathonApi'
 
 export const CRITERIA = [
   { key: 'themeFit', label: '주제 적합성', description: '주제에 맞는 문제를 골랐는가' },
@@ -40,10 +40,10 @@ export function reviewTotal(review: Scores) {
   return CRITERIA.reduce((total, { key }) => total + review[key], 0)
 }
 
-export function summarizeHackathon(reviews: HackathonReview[]) {
-  const rows = HACKATHON_PROJECTS.map((project) => {
-    const alumni = reviews.filter((review) => review.projectId === project.id && !review.chair)
-    const chair = reviews.find((review) => review.projectId === project.id && review.chair)
+export function summarizeHackathon(reviews: HackathonReview[], projects: Pick<HackathonProject, 'projectId' | 'title'>[]) {
+  const rows = projects.map((project) => {
+    const alumni = reviews.filter((review) => review.projectId === project.projectId && !review.chair)
+    const chair = reviews.find((review) => review.projectId === project.projectId && review.chair)
     const alumniAverage = alumni.length ? alumni.reduce((sum, review) => sum + reviewTotal(review), 0) / alumni.length : null
     const weighted = (key: keyof Scores) => chair && alumni.length
       ? (alumni.reduce((sum, review) => sum + review[key], 0) / alumni.length + chair[key]) / 2 : 0
