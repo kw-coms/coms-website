@@ -530,7 +530,8 @@ jobs:
       - name: Check that the image applied every migration
         run: |
           set -euo pipefail
-          expected="$(ls backend/src/main/resources/db/migration | sed -nE 's/^V([0-9]+)__.*\.sql$/\1/p' | sort -n | tail -n 1)"
+          # Flyway runs SQL files and Java migrations from the same version sequence.
+          expected="$(ls backend/src/main/resources/db/migration backend/src/main/java/db/migration | sed -nE 's/^V([0-9]+)__.*\.(sql|java)$/\1/p' | sort -n | tail -n 1)"
           applied="$(docker compose --env-file .env -f docker-compose.yml exec -T db sh -c \
             'psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select max(version::int) from flyway_schema_history where success"')"
           echo "newest migration file: V$expected, newest applied: V$applied"
