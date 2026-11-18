@@ -98,6 +98,19 @@ class HackathonEventsMigrationTest {
     }
 
     @Test
+    void unusualCatalogIdentifierFailsBeforeDdl() throws Exception {
+        try (Connection db = DriverManager.getConnection("jdbc:h2:mem:hackathon-events-bad-identifier;MODE=PostgreSQL")) {
+            legacySchema(db);
+            try (Statement sql = db.createStatement()) {
+                sql.execute("ALTER TABLE hackathon_reviews DROP CONSTRAINT \"" + projectCheckName(db) + "\"");
+                sql.execute("ALTER TABLE hackathon_reviews ADD CONSTRAINT \"unsafe;identifier\" CHECK (project_id IN ('wargether','underground-route','still'))");
+            }
+            assertThatThrownBy(() -> new V113__hackathon_events().migrate(context(db))).isInstanceOf(SQLException.class);
+            assertNoNewEventTable(db);
+        }
+    }
+
+    @Test
     void alteredBooleanLogicAndDuplicateChecksFailBeforeDdl() throws Exception {
         String[] additions = {
                 "CHECK (project_id IN ('wargether','underground-route','still') OR chair)",

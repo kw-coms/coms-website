@@ -114,7 +114,7 @@ public class V113__hackathon_events extends BaseJavaMigration {
             sql.execute("ALTER TABLE hackathon_reviews ADD COLUMN event_id BIGINT DEFAULT 1");
             sql.execute("UPDATE hackathon_reviews SET event_id = 1 WHERE event_id IS NULL");
             sql.execute("ALTER TABLE hackathon_reviews ALTER COLUMN event_id SET NOT NULL");
-            sql.execute("ALTER TABLE hackathon_reviews DROP CONSTRAINT " + quoted(check));
+            sql.execute("ALTER TABLE hackathon_reviews DROP CONSTRAINT " + sql.enquoteIdentifier(check, true));
             sql.execute("ALTER TABLE hackathon_reviews DROP CONSTRAINT uq_hackathon_review_identity");
             sql.execute("ALTER TABLE hackathon_reviews ADD CONSTRAINT uq_hackathon_review_identity UNIQUE (event_id, project_id, generation, name_key)");
             sql.execute("ALTER TABLE hackathon_reviews ADD CONSTRAINT fk_hackathon_review_project FOREIGN KEY (event_id, project_id) REFERENCES hackathon_projects(event_id, id)");
@@ -169,7 +169,11 @@ public class V113__hackathon_events extends BaseJavaMigration {
                 if (!values.equals(List.of("wargether", "underground-route", "still")) || !definition.equals(expected)) {
                     throw new SQLException("Unexpected legacy hackathon project constraint: " + definition);
                 }
-                matches.add(rows.getString(1));
+                String name = rows.getString(1);
+                if (!name.matches("[A-Za-z_][A-Za-z0-9_]{0,127}")) {
+                    throw new SQLException("Unexpected legacy hackathon constraint identifier");
+                }
+                matches.add(name);
             }
             }
         }
@@ -177,7 +181,4 @@ public class V113__hackathon_events extends BaseJavaMigration {
         return matches.getFirst();
     }
 
-    private static String quoted(String identifier) {
-        return "\"" + identifier.replace("\"", "\"\"") + "\"";
-    }
 }
