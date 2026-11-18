@@ -38,11 +38,23 @@ test('hackathon PDFs avoid the HTML CSP while other pages keep it', () => {
 
 test('the shared entry also reaches the server through the previously deployed worker', () => {
   const previousDenylist = pwaOptions.workbox.navigateFallbackDenylist.filter(pattern => !pattern.test('/hackathon-2026/still/proposal.pdf'))
-  assert.ok(previousDenylist.some(pattern => pattern.test('/hackathon/share')))
+  for (const path of ['/hackathon/share', '/hackathon/1/share', '/hackathon/2028/share']) {
+    assert.ok(previousDenylist.some(pattern => pattern.test(path)))
+  }
   const page = readFileSync(new URL('../public/hackathon/share.html', import.meta.url), 'utf8')
-  assert.match(page, /<script[^>]*src=["']\/hackathon-refresh\.js["']/)
+  assert.match(page, /<script[^>]*src=["']\/hackathon-refresh\.js\?v=events["']/)
   assert.doesNotMatch(page, /\bon[a-z]+\s*=/i, 'strict CSP does not permit inline event handlers')
   assert.match(nginx, /try_files \$uri \$uri\.html \$uri\/ \/index\.html;/, 'the extensionless entry serves its real HTML')
+})
+
+test('event share pages use the real recovery document without colliding with SPA event details', () => {
+  const header = 'location ~ "^/hackathon/[1-9][0-9]*/share$" {'
+  const start = nginx.indexOf(header)
+  assert.ok(start >= 0)
+  const block = nginx.slice(start, nginx.indexOf('\n    }', start))
+  assert.match(block, /try_files \/hackathon\/share\.html =404;/)
+  assert.match(block, /security-headers\.conf/)
+  assert.match(block, /no-store/)
 })
 
 test('the recovery document directory cannot redirect the evaluator to a directory listing', () => {

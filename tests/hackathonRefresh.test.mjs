@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { refreshWorker } from '../public/hackathon-refresh.js'
+import { evaluationPath, refreshWorker } from '../public/hackathon-refresh.js'
+
+test('share paths preserve their event identity without accepting arbitrary destinations', () => {
+  for (const [path, target] of [
+    ['/hackathon/share', '/hackathon'],
+    ['/hackathon/1/share', '/hackathon/1'],
+    ['/hackathon/2028/share', '/hackathon/2028'],
+    ['/hackathon/0/share', null],
+    ['/hackathon/01/share', null],
+    ['/hackathon/-1/share', null],
+    ['/hackathon/2/share/extra', null],
+    ['/hackathon/https://example.com/share', null],
+  ]) assert.equal(evaluationPath(path), target)
+})
 
 test('an existing registration checks for a new worker', async () => {
   let updates = 0

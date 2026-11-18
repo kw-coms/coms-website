@@ -102,6 +102,9 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.POST, "/api/ask").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/hackathon").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/api/hackathon/reviews").permitAll();
+                auth.requestMatchers(HttpMethod.GET, "/api/hackathon/events/**").permitAll();
+                auth.requestMatchers(HttpMethod.HEAD, "/api/hackathon/events/**").permitAll();
+                auth.requestMatchers(HttpMethod.POST, "/api/hackathon/events/*/reviews").permitAll();
                 // 동아리방 비밀번호: club_room.view 권한 — 실제 판정은 SiteSettingsController 의
                 // @perm.has 가 한다. URL 규칙은 "로그인했는가"까지만 본다.
                 auth.requestMatchers("/api/club-room").authenticated();
@@ -194,18 +197,16 @@ public class SecurityConfig {
                 })
                 .contentTypeOptions(ct -> {})
                 .xssProtection(xss -> {})
-                .contentSecurityPolicy(csp -> csp.policyDirectives(
-                    "default-src 'self'; " +
-                    "script-src 'self'; " +
-                    "style-src 'self' 'unsafe-inline'; " +
-                    "img-src 'self' data: blob:; " +
-                    "font-src 'self'; " +
-                    "connect-src 'self'; " +
-                    "object-src 'none'; " +
-                    "base-uri 'self'; " +
-                    "form-action 'self'; " +
-                    "frame-ancestors 'none';"
-                ))
+                .addHeaderWriter((request, response) -> {
+                    // Browser PDF viewers need their own script/style context; omit the HTML CSP only for this resource.
+                    if (response.getStatus() >= 400
+                            || !request.getRequestURI().matches("^/api/hackathon/events/[0-9]+/materials/[0-9]+/inline\\.pdf$")) {
+                        response.setHeader("Content-Security-Policy",
+                                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                                + "img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; "
+                                + "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';");
+                    }
+                })
             )
             // Ahead of everything that reads a body or looks at credentials, so an anonymous
             // caller is refused too; after CORS, so a browser can still read the 413.

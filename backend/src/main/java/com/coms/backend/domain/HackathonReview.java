@@ -12,10 +12,12 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "hackathon_reviews", uniqueConstraints =
-        @UniqueConstraint(name = "uq_hackathon_review_identity", columnNames = {"project_id", "generation", "name_key"}))
+        @UniqueConstraint(name = "uq_hackathon_review_identity", columnNames = {"event_id", "project_id", "generation", "name_key"}))
 public class HackathonReview {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Column(name = "event_id", nullable = false)
+    private Long eventId = 1L;
     @Column(name = "project_id", nullable = false, length = 40)
     private String projectId;
     @Column(nullable = false)
@@ -42,6 +44,8 @@ public class HackathonReview {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public Long getId() { return id; }
+    public Long getEventId() { return eventId; }
+    public void setEventId(Long value) { eventId = value; }
     public String getProjectId() { return projectId; }
     public void setProjectId(String value) { projectId = value; }
     public Integer getGeneration() { return generation; }

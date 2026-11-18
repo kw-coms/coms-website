@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { AuthContext } from '../src/contexts/useAuth.ts'
 import { ConfirmHost } from '../src/components/common/ConfirmDialog.tsx'
+import { legacyEvent, summary, adminSummary } from './hackathonFixture.mjs'
 
 registerHooks({ load(url, context, next) { return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context) } })
 const { default: Hackathon } = await import('../src/pages/Hackathon.tsx')
@@ -22,22 +23,25 @@ let clipboardText = ''
 const deleted = []
 let deleteFails = false
 globalThis.fetch = async (url, options = {}) => {
-  if (String(url).includes('/api/admin/hackathon/reviews/') && options.method === 'DELETE') {
+  if (String(url).includes('/api/admin/hackathon/events/1/reviews/') && options.method === 'DELETE') {
     const id = Number(String(url).split('/').at(-1))
     deleted.push(id)
     if (deleteFails) return Response.json({ message: '삭제 실패' }, { status: 500 })
     adminReviews.splice(adminReviews.findIndex((review) => review.id === id), 1)
     return new Response(null, { status: 204 })
   }
-  if (String(url).endsWith('/api/admin/hackathon/reviews')) return Response.json(adminReviews)
-  if (String(url).endsWith('/api/admin/hackathon/settings')) { open = JSON.parse(options.body).open; return Response.json({ open }) }
-  if (String(url).includes('/api/admin/hackathon/chair-reviews/')) {
+  if (String(url).endsWith('/api/admin/hackathon/events')) return Response.json([adminSummary(legacyEvent)])
+  if (String(url).endsWith('/api/admin/hackathon/events/1')) return Response.json({ ...legacyEvent, open })
+  if (String(url).endsWith('/api/admin/hackathon/events/1/reviews')) return Response.json(adminReviews)
+  if (String(url).endsWith('/api/admin/hackathon/events/1/settings')) { open = JSON.parse(options.body).open; return Response.json({ open }) }
+  if (String(url).includes('/api/admin/hackathon/events/1/chair-reviews/')) {
     const review = { ...JSON.parse(options.body), id: 2, projectId: 'wargether', chair: true, generation: null, name: '회장' }
     adminReviews.push(review)
     return Response.json(review)
   }
-  if (String(url).endsWith('/api/hackathon')) return Response.json({ open })
-  assert.ok(String(url).endsWith('/api/hackathon/reviews'), 'guest flow only asks for public API')
+  if (String(url).endsWith('/api/hackathon/events')) return Response.json([summary(legacyEvent)])
+  if (String(url).endsWith('/api/hackathon/events/1')) return Response.json({ ...legacyEvent, open })
+  assert.ok(String(url).endsWith('/api/hackathon/events/1/reviews'), 'guest flow only asks for public API')
   submitted.push(JSON.parse(options.body))
   return Response.json(responseStatus === 201 ? { projectId: 'wargether' } : { message: '이미 평가를 제출했습니다.' }, { status: responseStatus })
 }
@@ -149,7 +153,7 @@ assert.ok(deleteChair, 'chair may also clear their own submitted evaluation')
 await act(async () => deleteChair.click())
 await act(async () => { document.querySelector('.coms-confirm-ok').click(); await new Promise((resolve) => setTimeout(resolve, 10)) })
 assert.equal(host.querySelector('tbody tr').children[4].textContent, '미집계')
-assert.equal(host.querySelector('form select').value, '', 'deleting chair scores resets the editor')
+assert.equal(host.querySelector('form[aria-label="chair-wargether 채점"] select').value, '', 'deleting chair scores resets the editor')
 await act(async () => root.unmount())
 queryClient.clear()
 host.remove()

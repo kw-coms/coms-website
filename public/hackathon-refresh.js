@@ -1,3 +1,9 @@
+export function evaluationPath(pathname) {
+  if (pathname === '/hackathon/share') return '/hackathon'
+  const match = /^\/hackathon\/([1-9][0-9]*)\/share$/.exec(pathname)
+  return match ? `/hackathon/${match[1]}` : null
+}
+
 export async function refreshWorker(registration, serviceWorker = navigator.serviceWorker, timeoutMs = 10000) {
   const previous = registration.active
   let timer, next, onStateChange, onControllerChange
@@ -34,7 +40,14 @@ export async function refreshWorker(registration, serviceWorker = navigator.serv
 if (typeof document !== 'undefined') {
   const status = document.getElementById('status')
   const fallback = document.getElementById('fallback')
+  const target = evaluationPath(location.pathname)
+  document.getElementById('evaluation-link').href = target || '/hackathon'
   async function open() {
+    if (!target) {
+      status.textContent = '해커톤 주소를 확인해 주세요.'
+      fallback.hidden = false
+      return
+    }
     status.textContent = '평가 자료를 준비하고 있습니다.'
     fallback.hidden = true
     try {
@@ -42,7 +55,7 @@ if (typeof document !== 'undefined') {
         const registration = await navigator.serviceWorker.getRegistration()
         if (registration) await refreshWorker(registration)
       }
-      location.replace('/hackathon')
+      location.replace(target)
     } catch {
       status.textContent = '자료 준비가 지연되고 있습니다. 다시 시도해 주세요.'
       fallback.hidden = false
