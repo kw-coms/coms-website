@@ -295,6 +295,10 @@ jobs:
           curl -fsS -o /dev/null -w 'backend /api/server/time: %{http_code}\n' http://127.0.0.1:8080/api/server/time
           curl -fsS -o /dev/null -w 'site /: %{http_code}\n' http://127.0.0.1:3000/
           curl -fsS http://127.0.0.1:3000/actuator/health | grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"'
+          [ "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/hackathon)" = 200 ]
+          curl -fsS http://127.0.0.1:3000/hackathon | grep -q 'id="root"'
+          [ "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/hackathon/share)" = 200 ]
+          curl -fsS http://127.0.0.1:3000/hackathon/share | grep -q 'hackathon-refresh.js'
 
       # coms-frontend serves /lab/ and sends /lab/api/compile to coms-lab-compiler over a unix socket,
       # after asking the backend whether the visitor is signed in. Everything here goes through the

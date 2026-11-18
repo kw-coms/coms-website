@@ -44,3 +44,14 @@ test('the shared entry also reaches the server through the previously deployed w
   assert.doesNotMatch(page, /\bon[a-z]+\s*=/i, 'strict CSP does not permit inline event handlers')
   assert.match(nginx, /try_files \$uri \$uri\.html \$uri\/ \/index\.html;/, 'the extensionless entry serves its real HTML')
 })
+
+test('the recovery document directory cannot redirect the evaluator to a directory listing', () => {
+  const page = nginx.match(/location = \/hackathon \{([\s\S]*?)\n {4}}/)
+  assert.ok(page, 'the evaluator needs an exact SPA route even when public/hackathon exists')
+  assert.match(page[1], /try_files \/index\.html =404;/)
+  assert.match(page[1], /security-headers\.conf/)
+  const slash = nginx.match(/location = \/hackathon\/ \{([\s\S]*?)\n {4}}/)
+  assert.ok(slash)
+  assert.match(slash[1], /absolute_redirect off;/)
+  assert.match(slash[1], /return 301 \/hackathon;/)
+})
