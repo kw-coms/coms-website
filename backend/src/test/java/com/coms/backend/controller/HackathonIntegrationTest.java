@@ -27,6 +27,7 @@ import java.util.concurrent.TimeoutException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -199,6 +200,51 @@ class HackathonIntegrationTest {
             release.countDown();
             pool.shutdownNow();
         }
+    }
+
+    @Test
+    void onlyChairCanDeleteOneAlumniReviewAndItsIdentityCanSubmitAgain() throws Exception {
+        submit("still", 3, "Alum").andExpect(status().isCreated());
+        submit("wargether", 3, "Other").andExpect(status().isCreated());
+        long id = reviews.findByProjectIdAndGenerationAndNameKey("still", 3, "alum").orElseThrow().getId();
+        mvc.perform(delete("/api/admin/hackathon/reviews/{id}", id).header("Origin", ORIGIN))
+                .andExpect(status().isUnauthorized());
+        for (Member.Role role : new Member.Role[]{Member.Role.USER, Member.Role.OFFICER, Member.Role.VICE_PRESIDENT}) {
+            mvc.perform(delete("/api/admin/hackathon/reviews/{id}", id).header("Origin", ORIGIN)
+                            .cookie(account(role, role.name())))
+                    .andExpect(status().isForbidden());
+        }
+        Cookie admin = account(Member.Role.ADMIN, "chair");
+        mvc.perform(delete("/api/admin/hackathon/reviews/{id}", id).cookie(admin))
+                .andExpect(status().isForbidden());
+        mvc.perform(delete("/api/admin/hackathon/reviews/{id}", id).header("Origin", ORIGIN).cookie(admin))
+                .andExpect(status().isNoContent()).andExpect(jsonPath("$").doesNotExist());
+        assertThat(reviews.count()).isEqualTo(1);
+        assertThat(reviews.findAll().getFirst().getProjectId()).isEqualTo("wargether");
+        mvc.perform(get("/api/admin/hackathon/reviews").cookie(admin))
+                .andExpect(jsonPath("$.length()").value(1));
+        submit("still", 3, "Alum").andExpect(status().isCreated());
+        assertThat(reviews.count()).isEqualTo(2);
+        mvc.perform(delete("/api/admin/hackathon/reviews/{id}", id).header("Origin", ORIGIN).cookie(admin))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("평가를 찾을 수 없습니다."));
+    }
+
+    @Test
+    void chairReviewCanBeDeletedAndRecreatedWithoutTouchingAlumni() throws Exception {
+        submit("still", 2, "Alum").andExpect(status().isCreated());
+        Cookie admin = account(Member.Role.ADMIN, "chair");
+        mvc.perform(put("/api/admin/hackathon/chair-reviews/still").cookie(admin).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content("{" + SCORES + "}"))
+                .andExpect(status().isOk());
+        long chairId = reviews.findByProjectIdAndGenerationAndNameKey("still", 0, "chair").orElseThrow().getId();
+        mvc.perform(delete("/api/admin/hackathon/reviews/{id}", chairId).cookie(admin).header("Origin", ORIGIN))
+                .andExpect(status().isNoContent());
+        assertThat(reviews.count()).isEqualTo(1);
+        assertThat(reviews.findAll().getFirst().isChair()).isFalse();
+        mvc.perform(put("/api/admin/hackathon/chair-reviews/still").cookie(admin).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content("{" + SCORES + "}"))
+                .andExpect(status().isOk());
+        assertThat(reviews.count()).isEqualTo(2);
     }
 
     private ResultActions submit(String projectId, int generation, String name) throws Exception {

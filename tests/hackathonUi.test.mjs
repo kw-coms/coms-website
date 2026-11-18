@@ -6,17 +6,29 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { AuthContext } from '../src/contexts/useAuth.ts'
+import { ConfirmHost } from '../src/components/common/ConfirmDialog.tsx'
 
 registerHooks({ load(url, context, next) { return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context) } })
 const { default: Hackathon } = await import('../src/pages/Hackathon.tsx')
 const { default: AdminHackathon } = await import('../src/pages/admin/AdminHackathon.tsx')
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
+globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0)
+globalThis.cancelAnimationFrame = clearTimeout
 let open = true
 let responseStatus = 201
 const submitted = []
 const adminReviews = []
 let clipboardText = ''
+const deleted = []
+let deleteFails = false
 globalThis.fetch = async (url, options = {}) => {
+  if (String(url).includes('/api/admin/hackathon/reviews/') && options.method === 'DELETE') {
+    const id = Number(String(url).split('/').at(-1))
+    deleted.push(id)
+    if (deleteFails) return Response.json({ message: '삭제 실패' }, { status: 500 })
+    adminReviews.splice(adminReviews.findIndex((review) => review.id === id), 1)
+    return new Response(null, { status: 204 })
+  }
   if (String(url).endsWith('/api/admin/hackathon/reviews')) return Response.json(adminReviews)
   if (String(url).endsWith('/api/admin/hackathon/settings')) { open = JSON.parse(options.body).open; return Response.json({ open }) }
   if (String(url).includes('/api/admin/hackathon/chair-reviews/')) {
@@ -92,7 +104,7 @@ Object.defineProperty(globalThis.navigator, 'clipboard', { configurable: true, v
 const previousClient = queryClient
 queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 await act(async () => {
-  root.render(h(MemoryRouter, null, h(QueryClientProvider, { client: queryClient }, h(AdminHackathon))))
+  root.render(h(MemoryRouter, null, h(QueryClientProvider, { client: queryClient }, h(AdminHackathon), h(ConfirmHost))))
   await new Promise(setImmediate)
 })
 await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
@@ -108,7 +120,32 @@ assert.doesNotMatch(clipboardText, /홍길동|42기/, 'forwarded feedback exclud
 await act(async () => { [...host.querySelectorAll('button')].find((button) => button.textContent === '평가 다시 열기').click(); await new Promise((resolve) => setTimeout(resolve, 10)) })
 assert.equal(open, true)
 assert.match(host.textContent, /평가 접수 중/)
+const deleteAlumni = () => host.querySelector('button[aria-label="42기 홍길동 평가 삭제"]')
+assert.ok(deleteAlumni(), 'chair can delete an individual alumni evaluation')
+await act(async () => deleteAlumni().click())
+assert.match(document.querySelector('.coms-confirm-message').textContent, /wargether.*42기 홍길동/)
+assert.equal(deleted.length, 0, 'opening confirmation does not delete data')
+await act(async () => document.querySelector('.coms-confirm-cancel').click())
+assert.equal(deleted.length, 0, 'cancel preserves the evaluation')
+deleteFails = true
+await act(async () => deleteAlumni().click())
+await act(async () => { document.querySelector('.coms-confirm-ok').click(); await new Promise((resolve) => setTimeout(resolve, 10)) })
+assert.ok(host.querySelector('[role="alert"]'), 'failed deletion is visible')
+assert.match(host.textContent, /42기 홍길동/, 'failed deletion keeps the review')
+deleteFails = false
+await act(async () => deleteAlumni().click())
+await act(async () => { document.querySelector('.coms-confirm-ok').click(); await new Promise((resolve) => setTimeout(resolve, 10)) })
+assert.deepEqual(deleted, [1, 1], 'retry uses the same review ID')
+assert.equal(deleteAlumni(), null)
+assert.equal(host.querySelector('tbody tr').children[2].textContent, '0명')
+assert.equal(host.querySelector('tbody tr').children[3].textContent, '미집계', 'deleted scores leave the average')
+const deleteChair = host.querySelector('button[aria-label="wargether 회장 평가 삭제"]')
+assert.ok(deleteChair, 'chair may also clear their own submitted evaluation')
+await act(async () => deleteChair.click())
+await act(async () => { document.querySelector('.coms-confirm-ok').click(); await new Promise((resolve) => setTimeout(resolve, 10)) })
+assert.equal(host.querySelector('tbody tr').children[4].textContent, '미집계')
+assert.equal(host.querySelector('form select').value, '', 'deleting chair scores resets the editor')
 await act(async () => root.unmount())
 queryClient.clear()
 host.remove()
-console.log('hackathon UI: guest submission, identity, receipt, duplicate retry, closure, chair scoring and private feedback copy passed')
+console.log('hackathon UI: guest submission, identity, duplicate retry, closure, chair scoring, private feedback and confirmed deletion passed')

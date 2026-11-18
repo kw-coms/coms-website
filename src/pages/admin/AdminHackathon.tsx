@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { getHackathon, listHackathonReviews, saveHackathonChairReview, setHackathonOpen } from '../../services/hackathonApi'
+import { deleteHackathonReview, getHackathon, listHackathonReviews, saveHackathonChairReview, setHackathonOpen, type HackathonReview } from '../../services/hackathonApi'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { CRITERIA, summarizeHackathon } from '../../features/hackathon/hackathon'
 import HackathonScoreForm from '../../features/hackathon/HackathonScoreForm'
 import '../../styles/hackathon.css'
@@ -17,12 +18,30 @@ export default function AdminHackathon() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
+  const [removingId, setRemovingId] = useState<number | null>(null)
   if (query.isPending) return <p role="status">해커톤 평가를 불러오는 중…</p>
   if (query.isError) return <div role="alert">평가를 불러오지 못했습니다. <button type="button" onClick={() => query.refetch()} className="apple-action-secondary min-h-11 px-4">다시 불러오기</button></div>
   const rows = summarizeHackathon(query.data.reviews)
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: ['admin', 'hackathon'] })
     await client.invalidateQueries({ queryKey: ['hackathon', 'settings'] })
+  }
+  const removeReview = async (review: HackathonReview, title: string) => {
+    if (removingId !== null) return
+    const name = review.chair ? '회장' : `${review.generation}기 ${review.name}`
+    const confirmed = await confirmDialog({
+      title: '해커톤 평가 삭제',
+      message: `${title}의 ${name} 평가와 피드백을 삭제할까요? 삭제 후 복구할 수 없습니다. ${review.chair ? '회장 점수도 집계에서 제외됩니다.' : '접수가 열려 있으면 같은 기수·이름으로 다시 평가할 수 있습니다.'}`,
+      confirmText: '평가 삭제', tone: 'danger',
+    })
+    if (!confirmed) return
+    setRemovingId(review.id); setError(''); setMessage('')
+    try {
+      await deleteHackathonReview(review.id)
+      await refresh()
+      setMessage(`${title}의 ${name} 평가를 삭제했습니다.`)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : '평가를 삭제하지 못했습니다.') }
+    finally { setRemovingId(null) }
   }
   return <section className="space-y-6" aria-label="해커톤 평가 관리">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -47,7 +66,10 @@ export default function AdminHackathon() {
       <tbody>{rows.map((row) => <tr key={row.project.id}>{[row.rank ?? '대기', row.project.title, `${row.alumniCount}명`, scoreText(row.alumniAverage), scoreText(row.chairScore), scoreText(row.finalScore)].map((value, index) => <td key={index} className="border-b border-[var(--app-hairline)] p-3">{value}</td>)}</tr>)}</tbody>
     </table></div>
     {rows.map((row) => <article key={row.project.id} className="hackathon-project">
-      <h3 className="mb-5 text-xl font-bold">{row.project.title} · 회장 평가</h3>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-xl font-bold">{row.project.title} · 회장 평가</h3>
+        {row.chair && <button type="button" aria-label={`${row.project.title} 회장 평가 삭제`} disabled={removingId !== null} onClick={() => removeReview(row.chair, row.project.title)} className="apple-action-secondary min-h-11 px-4 text-sm text-[var(--app-danger)] disabled:opacity-50">{removingId === row.chair.id ? '삭제 중…' : '회장 평가 삭제'}</button>}
+      </div>
       <HackathonScoreForm key={JSON.stringify(row.chair ?? null)} projectId={`chair-${row.project.id}`} initial={row.chair} submitLabel="회장 평가 저장" onSubmit={async (scores) => {
         await saveHackathonChairReview(row.project.id, scores)
         await refresh()
@@ -57,7 +79,10 @@ export default function AdminHackathon() {
         <summary className="cursor-pointer text-sm font-bold">졸업생 평가·피드백 {row.alumniCount}건</summary>
         {row.alumni.length === 0 && <p className="mt-4 text-sm text-[var(--app-muted)]">아직 접수된 평가가 없습니다.</p>}
         <ul className="mt-4 space-y-4">{row.alumni.map((review) => <li key={review.id} className="rounded-xl border border-[var(--app-hairline)] p-4 text-sm">
-          <p className="font-semibold">{review.generation}기 {review.name}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="min-w-0 break-words font-semibold">{review.generation}기 {review.name}</p>
+            <button type="button" aria-label={`${review.generation}기 ${review.name} 평가 삭제`} disabled={removingId !== null} onClick={() => removeReview(review, row.project.title)} className="apple-action-secondary min-h-11 px-4 text-sm text-[var(--app-danger)] disabled:opacity-50">{removingId === review.id ? '삭제 중…' : '평가 삭제'}</button>
+          </div>
           <p className="mt-2 text-xs leading-6 text-[var(--app-muted)]">{CRITERIA.map(({ key, label }) => `${label} ${review[key]}점`).join(' · ')}</p>
           <p className="mt-2 whitespace-pre-wrap break-words leading-7">{review.feedback || '피드백 없음'}</p>
         </li>)}</ul>
