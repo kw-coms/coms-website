@@ -35,3 +35,12 @@ test('hackathon PDFs avoid the HTML CSP while other pages keep it', () => {
   const siteHeaders = readFileSync(new URL('../security-headers.conf', import.meta.url), 'utf8')
   assert.match(siteHeaders, /object-src 'none'/, 'the site-wide HTML policy stays strict')
 })
+
+test('the shared entry also reaches the server through the previously deployed worker', () => {
+  const previousDenylist = pwaOptions.workbox.navigateFallbackDenylist.filter(pattern => !pattern.test('/hackathon-2026/still/proposal.pdf'))
+  assert.ok(previousDenylist.some(pattern => pattern.test('/hackathon/share')))
+  const page = readFileSync(new URL('../public/hackathon/share.html', import.meta.url), 'utf8')
+  assert.match(page, /<script[^>]*src=["']\/hackathon-refresh\.js["']/)
+  assert.doesNotMatch(page, /\bon[a-z]+\s*=/i, 'strict CSP does not permit inline event handlers')
+  assert.match(nginx, /try_files \$uri \$uri\.html \$uri\/ \/index\.html;/, 'the extensionless entry serves its real HTML')
+})

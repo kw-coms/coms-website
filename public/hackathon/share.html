@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>COM’s 해커톤 평가</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 1.5rem; box-sizing: border-box; background: #f8faf8; color: #20372a; font: 1rem/1.6 system-ui, sans-serif; }
+    main { width: min(100%, 30rem); padding: 2rem; border: 1px solid #dce5dc; border-radius: 1rem; background: white; }
+    h1 { font-size: 1.4rem; margin: 0 0 1rem; }
+    button, a { font: inherit; color: #245337; }
+    button { margin-right: 1rem; padding: .5rem .8rem; cursor: pointer; }
+  </style>
+  <script type="module" src="/hackathon-refresh.js"></script>
+</head>
+<body>
+  <main>
+    <h1>COM’s 해커톤 평가</h1>
+    <p id="status" role="status" aria-live="polite">평가 자료를 준비하고 있습니다.</p>
+    <div id="fallback" hidden>
+      <button id="retry" type="button">다시 시도</button>
+      <a href="/hackathon">평가 페이지 열기</a>
+    </div>
+  </main>
+</body>
+</html>

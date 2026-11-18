@@ -57,11 +57,11 @@ export default function Hackathon() {
     <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--app-muted)]">선배님들의 경험으로 후배들의 작품을 살펴봐 주세요.<br />로그인 없이 기수와 이름만 입력하면 평가에 참여하실 수 있습니다.</p>
     <div className="mt-5 flex flex-wrap gap-3">
       <button type="button" className="apple-action-secondary inline-flex min-h-11 items-center gap-2 px-4 text-sm" onClick={async () => {
-        try { await navigator.clipboard.writeText(`${window.location.origin}/hackathon`); setCopied(true); setCopyError(false) } catch { setCopied(false); setCopyError(true) }
+        try { await navigator.clipboard.writeText(`${window.location.origin}/hackathon/share`); setCopied(true); setCopyError(false) } catch { setCopied(false); setCopyError(true) }
       }}><Copy size={14} aria-hidden="true" />{copied ? '링크 복사됨' : '평가 링크 복사'}</button>
       {user?.role === 'ADMIN' && <Link to="/admin?tab=hackathon" className="apple-action-secondary inline-flex min-h-11 items-center px-4 text-sm">평가 집계·회장 채점</Link>}
     </div>
-    {copyError && <p role="alert" className="mt-3 break-all text-sm">자동 복사가 지원되지 않습니다. 주소를 길게 눌러 복사해 주세요: <a href="/hackathon" className="select-all text-[var(--app-accent-text)] underline">{window.location.origin}/hackathon</a></p>}
+    {copyError && <p role="alert" className="mt-3 break-all text-sm">자동 복사가 지원되지 않습니다. 주소를 길게 눌러 복사해 주세요: <a href="/hackathon/share" className="select-all text-[var(--app-accent-text)] underline">{window.location.origin}/hackathon/share</a></p>}
     <section className="hackathon-intro mt-8" aria-labelledby="hackathon-theme">
       <p className="text-sm font-semibold text-[var(--app-accent-text)]">이번 주제</p>
       <h2 id="hackathon-theme" className="mt-2 text-3xl font-bold">전쟁</h2>
