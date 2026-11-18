@@ -63,7 +63,7 @@ const publicPageHtmlPlugin = {
 //  - manifest:false — we ship our own public/manifest.webmanifest, already linked
 //  - API + bot share routes are NEVER served the cached SPA shell (always network)
 //  - disabled in dev so it never interferes with the dev server
-const pwaPlugin = VitePWA({
+export const pwaOptions = {
   // A service worker intercepts requests in headless Playwright and is hard to
   // reason about in e2e; disable it for test builds (PWA_DISABLE=1). The SW is an
   // additive layer over identical app logic, so smoke coverage is unaffected.
@@ -89,6 +89,8 @@ const pwaPlugin = VitePWA({
     navigateFallback: '/index.html',
     navigateFallbackDenylist: [
       /^\/api\//,
+      // Submitted documents must reach the file server, including navigations in new tabs.
+      /^\/hackathon-2026\//,
       /\/(share|share-data|share-image)$/,
       // Demo sandbox for /study: a real document with its own CSP (nginx.frontend.conf), never the SPA shell.
       /^\/study-sandbox\.html$/,
@@ -128,7 +130,8 @@ const pwaPlugin = VitePWA({
     ],
   },
   devOptions: { enabled: false },
-})
+}
+const pwaPlugin = VitePWA(pwaOptions)
 
 export default defineConfig({
   // sentryVitePlugin must come AFTER react/tailwind so it sees the final build output.
