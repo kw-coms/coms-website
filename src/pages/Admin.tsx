@@ -22,6 +22,7 @@ import AdminTabNav from './admin/AdminTabNav'
 import { ADMIN_TABS } from './admin/adminTabs'
 import AdminSiteSettings from './admin/AdminSiteSettings'
 import AdminSponsors from './admin/AdminSponsors'
+import AdminHackathon from './admin/AdminHackathon'
 import {
   adminTabsForRole,
   ROLE_LABELS,
@@ -190,6 +191,7 @@ export default function Admin({ onBack }: { onBack: () => void }) {
             {isSensitiveAdmin && resolvedActiveTab === 'roster' && <AdminRoster />}
             {canManageContent(permissions) && resolvedActiveTab === 'activities' && <AdminActivities />}
             {canManageProjects(permissions) && resolvedActiveTab === 'projects' && <AdminAppCatalog />}
+            {isSensitiveAdmin && resolvedActiveTab === 'hackathon' && <AdminHackathon />}
             {canManageArchive(permissions) && resolvedActiveTab === 'files' && <AdminFiles />}
             {canEditSiteSettings(permissions) && resolvedActiveTab === 'site-settings' && <AdminSiteSettings />}
             {isSensitiveAdmin && resolvedActiveTab === 'sponsors' && <AdminSponsors />}
