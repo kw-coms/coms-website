@@ -3,7 +3,7 @@ import { mockOptionalApis } from './visualSupport.js'
 
 test.use({ serviceWorkers: 'block' })
 
-for (const width of [390, 1280]) {
+for (const width of [320, 390, 1280]) {
   test(`alumni can evaluate and leave feedback without login at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await mockOptionalApis(page)

@@ -48,7 +48,7 @@ export default function HackathonScoreForm({ projectId, onSubmit, initial, disab
     </fieldset>
     <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
       <p role="status" className="text-sm font-semibold">{selected === 5 ? `합계 ${total} / 100점` : `${selected} / 5개 항목 선택`}</p>
-      <button type="submit" disabled={disabled || pending || selected !== 5} className="apple-action-primary min-h-11 px-5 text-sm disabled:cursor-not-allowed disabled:opacity-50">{pending ? '제출 중…' : submitLabel}</button>
+      <button type="submit" disabled={disabled || pending || selected !== 5} className="apple-action-primary min-h-11 w-full px-5 text-sm disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">{pending ? '제출 중…' : submitLabel}</button>
     </div>
     {note && <p className="mt-3 text-sm text-[var(--app-muted)]">{note}</p>}
     {error && <p role="alert" className="mt-3 text-sm text-[var(--app-danger)]">{error}</p>}
