@@ -89,6 +89,8 @@ const pwaPlugin = VitePWA({
     navigateFallback: '/index.html',
     navigateFallbackDenylist: [
       /^\/api\//,
+      // Submitted documents must reach the file server, including navigations in new tabs.
+      /^\/hackathon-2026\//,
       /\/(share|share-data|share-image)$/,
       // Demo sandbox for /study: a real document with its own CSP (nginx.frontend.conf), never the SPA shell.
       /^\/study-sandbox\.html$/,
