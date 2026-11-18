@@ -837,6 +837,7 @@ test.describe('review fixes', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await mockAdminApis(page)
     await page.route('**/api/community/posts{,?*}', (route) => route.fulfill({ json: [] }))
+    await page.route('**/api/community/posts/bookmarked/me?*', (route) => route.fulfill({ json: [] }))
     await page.goto('/community')
     const button = page.getByRole('button', { name: '더보기' })
     await expect(button).toHaveAttribute('aria-haspopup', 'menu')
@@ -853,7 +854,9 @@ test.describe('review fixes', () => {
     await button.click()
     await page.getByRole('menuitem', { name: '내 스크랩' }).click()
     await expect(page.getByRole('menu')).toHaveCount(0)
-    await expect(page.locator('[data-community-count]')).toBeVisible()
+    await expect(page).toHaveURL(/\/community\/bookmarks$/)
+    await expect(page.getByRole('heading', { name: '내 스크랩', level: 1 })).toBeVisible()
+    await expect(page.getByText('스크랩한 글이 없습니다.')).toBeVisible()
   })
 
   test('the restored-draft notice and 모두 읽음 are announced in the polite live region', async ({ page }) => {
