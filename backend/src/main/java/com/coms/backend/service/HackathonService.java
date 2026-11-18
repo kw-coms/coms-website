@@ -94,6 +94,13 @@ public class HackathonService {
     }
 
     @Transactional
+    public void deleteReview(Long id) {
+        HackathonReview review = reviews.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "평가를 찾을 수 없습니다."));
+        reviews.delete(review);
+    }
+
+    @Transactional
     public HackathonReviewResponse saveChair(String projectId, HackathonScoresRequest request) {
         if (!validProject(projectId) || request == null) throw invalid();
         String feedback = checkedFeedback(request.feedback());

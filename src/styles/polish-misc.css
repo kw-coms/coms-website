@@ -627,10 +627,10 @@
 	background: var(--app-accent-hover);
 }
 .coms-confirm-ok.is-danger {
-	background: #ff3b30;
+	background: #d92d20;
 }
 .coms-confirm-ok.is-danger:hover {
-	background: #e0291f;
+	background: #b42318;
 }
 .coms-confirm-ok:disabled {
 	opacity: 0.5;
