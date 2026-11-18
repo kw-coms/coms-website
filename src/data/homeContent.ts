@@ -533,6 +533,7 @@ export const navGroups: NavGroup[] = [
       fromActivityItem('activity-log'),
       fromActivityItem('monthly-calendar'),
       fromActivityItem('activity-events'),
+      { id: 'hackathon', label: '해커톤 평가', sub: 'Hackathon', path: '/hackathon', icon: ClipboardCheck, keywords: '졸업생 투표 해커톤 평가 피드백' },
     ],
   },
   {

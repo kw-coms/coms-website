@@ -100,6 +100,8 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.POST, "/api/recruit/apply", "/api/recruit/status").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/site-settings").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/api/ask").permitAll();
+                auth.requestMatchers(HttpMethod.GET, "/api/hackathon").permitAll();
+                auth.requestMatchers(HttpMethod.POST, "/api/hackathon/reviews").permitAll();
                 // 동아리방 비밀번호: club_room.view 권한 — 실제 판정은 SiteSettingsController 의
                 // @perm.has 가 한다. URL 규칙은 "로그인했는가"까지만 본다.
                 auth.requestMatchers("/api/club-room").authenticated();
