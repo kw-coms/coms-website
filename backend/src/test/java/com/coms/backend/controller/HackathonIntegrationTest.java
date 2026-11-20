@@ -111,7 +111,7 @@ class HackathonIntegrationTest {
                 .andExpect(status().isBadRequest());
         submitBody("{\"projectId\":\"wargether\",\"generation\":0,\"name\":\"Ann\"," + SCORES + "}")
                 .andExpect(status().isBadRequest());
-        submitBody("{\"projectId\":\"wargether\",\"generation\":61,\"name\":\"Ann\"," + SCORES + "}")
+        submitBody("{\"projectId\":\"wargether\",\"generation\":" + (java.time.Year.now().getValue() - 1966 + 1) + ",\"name\":\"Ann\"," + SCORES + "}")
                 .andExpect(status().isBadRequest());
         submitBody("{\"projectId\":\"wargether\",\"generation\":2.9,\"name\":\"Ann\"," + SCORES + "}")
                 .andExpect(status().isBadRequest());

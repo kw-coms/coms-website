@@ -22,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.Clock;
+import java.time.Year;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -63,7 +64,7 @@ public class HackathonService {
             if (eventId == 1L) throw invalid();
             throw notFound();
         }
-        int generation = checkedInt(request.generation(), 1, 60);
+        int generation = checkedInt(request.generation(), 1, Year.now(clock).getValue() - 1966);
         String name = request.name() == null ? "" : Normalizer.normalize(request.name(), Normalizer.Form.NFKC)
                 .strip().replaceAll("(?U)\\s+", " ");
         String nameKey = name.replaceAll("(?U)\\s+", "").toLowerCase(Locale.ROOT);
