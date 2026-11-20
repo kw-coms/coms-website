@@ -41,6 +41,7 @@ export function splitNames(cell: string, warn?: (message: string) => void): stri
     if (depth === 0 && (char === ',' || char === '，' || char === '、')) { parts.push(current); current = '' } else current += char
   }
   parts.push(current)
+  if (depth > 0) warn?.(`'${text}': 괄호가 닫히지 않았습니다`)
   const names: string[] = []
   for (const part of parts) {
     let name = part.trim()
@@ -51,7 +52,7 @@ export function splitNames(cell: string, warn?: (message: string) => void): stri
     }
     if (name && !names.includes(name)) names.push(name)
   }
-  if (parts.length === 1 && names.length === 1 && /\s/.test(names[0])) warn?.(`'${names[0]}': 한 칸에 이름이 둘이면 쉼표로 구분하세요`)
+  if (depth === 0 && parts.length === 1 && names.length === 1 && /\s/.test(names[0])) warn?.(`'${names[0]}': 한 칸에 이름이 둘이면 쉼표로 구분하세요`)
   return names
 }
 
@@ -153,7 +154,8 @@ const keyOf = (value: unknown) => String(value ?? '').toLowerCase().replace(/[\s
  * ('52' 가 1952년을 불러오지 않도록). 여러 단어는 모두 맞아야 하고 빈 검색어는 전부 통과한다.
  */
 export function termMatches(query: string, term: TermView): boolean {
-  const words = String(query ?? '').split(/\s+/).map(keyOf).filter(Boolean)
+  // '2026 년' 처럼 떨어진 '년' 은 앞의 숫자에 붙은 연도 접미사로 읽는다.
+  const words = String(query ?? '').replace(/(\d)\s+년/g, '$1년').split(/\s+/).map(keyOf).filter(Boolean)
   if (words.length === 0) return true
   const fields = [
     term.label, term.note,

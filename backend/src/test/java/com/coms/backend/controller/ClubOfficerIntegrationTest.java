@@ -80,7 +80,6 @@ class ClubOfficerIntegrationTest {
                 get(ADMIN_API), post(ADMIN_API + "/terms").content("{\"label\":\"x\",\"year\":2000}"),
                 put(ADMIN_API + "/terms/" + term).content("{\"label\":\"x\",\"year\":2000}"),
                 delete(ADMIN_API + "/terms/" + term),
-                put(ADMIN_API + "/terms/order").content("{\"ids\":[" + term + "]}"),
                 post(ADMIN_API + "/terms/" + term + "/officers").content("{\"role\":\"PRESIDENT\",\"name\":\"x\"}"),
                 put(ADMIN_API + "/terms/" + term + "/officers/order").content("{\"ids\":[" + officer + "]}"),
                 put(ADMIN_API + "/officers/" + officer).content("{\"role\":\"PRESIDENT\",\"name\":\"x\"}"),
@@ -110,24 +109,7 @@ class ClubOfficerIntegrationTest {
         JsonNode list = json(mvc.perform(get(API).cookie(user)).andExpect(status().isOk()));
         assertThat(labels(list)).containsExactly("71대", "70대", "69대", "초대");
 
-        // 같은 해 안의 순서를 뒤집으면 목록도 뒤집힌다.
-        mvc.perform(admin(put(ADMIN_API + "/terms/order"), "{\"ids\":[" + c + "," + b + "]}")).andExpect(status().isOk());
-        assertThat(labels(json(mvc.perform(get(API).cookie(user)))))
-                .containsExactly("70대", "71대", "69대", "초대");
         assertThat(a + d).isPositive();
-    }
-
-    @Test
-    void reorderRejectsMixedYearsAndPartialYears() throws Exception {
-        long a = createTerm(admin, "70대", 2026);
-        long b = createTerm(admin, "71대", 2026);
-        long c = createTerm(admin, "69대", 2025);
-        mvc.perform(admin(put(ADMIN_API + "/terms/order"), "{\"ids\":[" + a + "," + c + "]}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("같은 해의 임기끼리만 순서를 바꿀 수 있습니다."));
-        mvc.perform(admin(put(ADMIN_API + "/terms/order"), "{\"ids\":[" + a + "]}"))
-                .andExpect(status().isBadRequest());
-        assertThat(b).isPositive();
     }
 
     @Test

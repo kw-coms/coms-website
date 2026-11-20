@@ -118,8 +118,20 @@ for (const [query, expected] of [['52', false], ['195', false], ['1952', true], 
   assert.equal(termMatches(query, old), expected, `old "${query}"`)
 }
 assert.equal(termMatches('52', term(9, '52대', 2018)), true, '52 는 임기 이름 52대 에 맞는다')
+assert.equal(termMatches('2018 년', sample), true, '떨어진 년 은 연도 접미사')
+assert.equal(termMatches('2019 년', sample), false)
+assert.equal(termMatches('가나다 2018 년', sample), true)
 assert.equal(termMatches('201', sample), false)
 assert.equal(termMatches('18', sample), false)
 assert.equal(termMatches('가나다 2018년', sample), true)
+
+// 괄호가 닫히지 않은 칸은 경고한다.
+const open = []
+splitNames('가나다(대행, 라마바', (message) => open.push(message))
+assert.deepEqual(open, ["'가나다(대행, 라마바': 괄호가 닫히지 않았습니다"])
+const balanced = []
+splitNames('가나다(대행), 라마바', (message) => balanced.push(message))
+assert.equal(balanced.some((message) => message.includes('닫히지')), false)
+assert.equal(parseOfficerPaste('52대\t2018\t가나다(대행\t').warnings.some((warning) => warning.message.includes('닫히지')), true)
 
 console.log('clubOfficers: ok')

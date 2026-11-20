@@ -18,7 +18,7 @@ public final class ClubOfficerDto {
     public record AdminTermView(Long id, String label, int year, int position, String note,
                                 List<AdminOfficerView> officers) {}
 
-    public record TermWrite(String label, Integer year, Integer position, String note) {}
+    public record TermWrite(String label, Integer year, String note) {}
 
     public record OfficerWrite(String role, String name) {}
 

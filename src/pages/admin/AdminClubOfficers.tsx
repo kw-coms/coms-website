@@ -12,7 +12,7 @@ import {
 import { listEligibleMembers } from '../../services/adminApi'
 import {
   addOfficer, createTerm, deleteOfficer, deleteTerm, importOfficerRows, linkOfficer, listAdminClubOfficers,
-  reorderOfficers, reorderTerms, updateOfficer, updateTerm, type AdminOfficer, type AdminTerm,
+  reorderOfficers, updateOfficer, updateTerm, type AdminOfficer, type AdminTerm,
 } from '../../services/clubOfficerApi'
 import { matchesQuery } from '../../utils/listTools'
 import '../../styles/officers.css'
@@ -142,16 +142,8 @@ function OfficerAdd({ term, busy, act }: { term: AdminTerm; busy: boolean; act: 
   </form>
 }
 
-function TermCard({ term, sameYear, busy, act }: { term: AdminTerm; sameYear: AdminTerm[]; busy: boolean; act: Act }) {
+function TermCard({ term, busy, act }: { term: AdminTerm; busy: boolean; act: Act }) {
   const [editing, setEditing] = useState(false)
-  // 목록은 같은 해 안에서 나중 임기가 위다. 서버 ids 는 앞선 임기가 먼저(오름차순)다.
-  const move = (delta: number) => {
-    const shown = sameYear.map((item) => item.id)
-    const at = shown.indexOf(term.id)
-    ;[shown[at], shown[at + delta]] = [shown[at + delta], shown[at]]
-    return act(() => reorderTerms(shown.reverse()), '같은 해 임기 순서를 바꿨습니다.')
-  }
-  const at = sameYear.findIndex((item) => item.id === term.id)
   const remove = async () => {
     if (await confirmDialog({ title: '임기 삭제', message: `${term.label}(${term.year}년)과 소속 임원 ${term.officers.length}명을 삭제할까요? 복구할 수 없습니다.`, confirmText: '삭제', tone: 'danger' })) await act(() => deleteTerm(term.id), '임기를 삭제했습니다.')
   }
@@ -161,10 +153,6 @@ function TermCard({ term, sameYear, busy, act }: { term: AdminTerm; sameYear: Ad
       : <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0"><h4 className="text-lg font-bold"><span className="text-[var(--app-accent-text)]">{term.label}</span> <span className="text-sm font-semibold text-[var(--app-muted)]">{term.year}년{term.note ? ` · ${term.note}` : ''}</span></h4></div>
         <div className="flex flex-wrap gap-2">
-          {sameYear.length > 1 && <>
-            <button type="button" className="of-icon-button" aria-label={`${term.label} 위로`} disabled={busy || at === 0} onClick={() => move(-1)}><ArrowUp size={16} aria-hidden="true" /></button>
-            <button type="button" className="of-icon-button" aria-label={`${term.label} 아래로`} disabled={busy || at === sameYear.length - 1} onClick={() => move(1)}><ArrowDown size={16} aria-hidden="true" /></button>
-          </>}
           <button type="button" className={actionClass} onClick={() => setEditing(true)}>{term.label} 편집</button>
           <button type="button" className={`${actionClass} text-[var(--app-danger)]`} disabled={busy} onClick={remove}>{term.label} 삭제</button>
         </div>
@@ -250,7 +238,7 @@ export default function AdminClubOfficers() {
       <div className="flex"><ListSearch value={query} onChange={setQuery} label="임기 검색" placeholder="이름·연도·임기로 검색" /></div>
       {terms.data.length === 0 && <p className="of-card text-sm">아직 임기가 없습니다. 위에서 붙여넣거나 임기를 추가하세요.</p>}
       {terms.data.length > 0 && visible.length === 0 && <p className="text-sm text-[var(--app-muted)]">검색 결과가 없습니다.</p>}
-      {visible.map((term) => <TermCard key={term.id} term={term} sameYear={terms.data.filter((item) => item.year === term.year)} busy={pending} act={act} />)}
+      {visible.map((term) => <TermCard key={term.id} term={term} busy={pending} act={act} />)}
     </section>
   </section>
 }

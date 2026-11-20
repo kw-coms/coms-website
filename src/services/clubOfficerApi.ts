@@ -19,7 +19,6 @@ export const listAdminClubOfficers = (): Promise<AdminTerm[]> => request(base)
 export const createTerm = (body: TermWrite): Promise<AdminTerm> => request(`${base}/terms`, json('POST', body))
 export const updateTerm = (id: number, body: TermWrite): Promise<AdminTerm> => request(`${base}/terms/${id}`, json('PUT', body))
 export const deleteTerm = (id: number): Promise<void> => requestNoContent(`${base}/terms/${id}`, { method: 'DELETE' })
-export const reorderTerms = (ids: number[]): Promise<AdminTerm[]> => request(`${base}/terms/order`, json('PUT', { ids }))
 export const addOfficer = (termId: number, body: { role: OfficerRole; name: string }): Promise<AdminTerm> =>
   request(`${base}/terms/${termId}/officers`, json('POST', body))
 export const updateOfficer = (id: number, body: { role: OfficerRole; name: string }): Promise<AdminTerm> =>

@@ -39,7 +39,7 @@ class ClubOfficerServiceTest {
                 "Unique index or primary key violation: \"PUBLIC.UQ_CLUB_OFFICER_TERMS_LABEL_INDEX_2 ON PUBLIC.CLUB_OFFICER_TERMS(LABEL)\"",
                 "ERROR: duplicate key value violates unique constraint \"uq_club_officer_terms_label\"")) {
             saveFailsWith(message);
-            assertThatThrownBy(() -> service.createTerm(new TermWrite("70대", 2026, null, "")))
+            assertThatThrownBy(() -> service.createTerm(new TermWrite("70대", 2026, "")))
                     .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
                         assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
                         assertThat(e.getReason()).isEqualTo("같은 대수가 이미 있습니다.");
@@ -50,7 +50,7 @@ class ClubOfficerServiceTest {
     @Test
     void otherIntegrityViolationsAreRethrown() {
         saveFailsWith("ERROR: value too long for type character varying(20)");
-        assertThatThrownBy(() -> service.createTerm(new TermWrite("70대", 2026, null, "")))
+        assertThatThrownBy(() -> service.createTerm(new TermWrite("70대", 2026, "")))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

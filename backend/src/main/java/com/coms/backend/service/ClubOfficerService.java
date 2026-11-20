@@ -117,21 +117,6 @@ public class ClubOfficerService {
         terms.delete(term(id));
     }
 
-    /** 같은 해의 임기 전부를 오름차순(앞선 임기부터)으로 다시 매긴다. */
-    @Transactional
-    public List<AdminTermView> reorderTerms(OrderWrite request) {
-        List<Long> ids = ids(request);
-        List<ClubOfficerTerm> found = terms.findAllById(ids);
-        if (found.size() != ids.size()) throw notFound("임기를 찾을 수 없습니다.");
-        Set<Integer> years = found.stream().map(ClubOfficerTerm::getYear).collect(Collectors.toSet());
-        if (years.size() != 1) throw bad("같은 해의 임기끼리만 순서를 바꿀 수 있습니다.");
-        if (terms.findByYear(years.iterator().next()).size() != ids.size()) throw bad("해당 연도의 임기를 모두 포함해야 합니다.");
-        Map<Long, ClubOfficerTerm> byId = found.stream().collect(Collectors.toMap(ClubOfficerTerm::getId, Function.identity()));
-        for (int i = 0; i < ids.size(); i++) byId.get(ids.get(i)).setPosition(i);
-        terms.saveAll(found);
-        return adminViews(ids.stream().map(byId::get).toList());
-    }
-
     // ---- 임원 ------------------------------------------------------------------------------
 
     @Transactional

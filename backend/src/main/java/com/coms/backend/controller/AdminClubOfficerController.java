@@ -57,14 +57,6 @@ public class AdminClubOfficerController {
         return ResponseEntity.noContent().build();
     }
 
-    /** 같은 해 임기들의 순서. ids 의 앞쪽이 먼저(position 이 작은) 임기다. */
-    @PutMapping("/terms/order")
-    public List<AdminTermView> reorderTerms(@RequestBody OrderWrite request, Authentication authentication) {
-        List<AdminTermView> ordered = service.reorderTerms(request);
-        audit(authentication, "ADMIN_CLUB_OFFICER_TERM_REORDER", "CLUB_OFFICER_TERM", ordered.get(0).year());
-        return ordered;
-    }
-
     @PostMapping("/terms/{termId}/officers")
     public ResponseEntity<AdminTermView> addOfficer(@PathVariable Long termId, @RequestBody OfficerWrite request,
                                                     Authentication authentication) {
