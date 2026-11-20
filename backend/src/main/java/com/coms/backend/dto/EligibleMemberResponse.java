@@ -20,5 +20,7 @@ public record EligibleMemberResponse(
     String suggestedStudentId,
     String suggestedEmail,
     /** 이 명부 행으로 가입할 때 부여될 등급. 리크루팅 합격 이관 행만 ASSOCIATE(준회원). */
-    String initialRole
+    String initialRole,
+    /** 회장단 이력(자유 서술). 없으면 null. */
+    String officerHistory
 ) {}

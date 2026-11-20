@@ -10,5 +10,6 @@ public record UpdateEligibleMemberRequest(
     String generation,
     String phone,
     @Size(max = 100) String department,
-    @Email @Size(max = 255) String email
+    @Email @Size(max = 255) String email,
+    String officerHistory
 ) {}

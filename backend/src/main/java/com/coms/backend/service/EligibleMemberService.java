@@ -82,7 +82,12 @@ public class EligibleMemberService {
 
     public void addSingle(String studentId, String name, String generation, String phone,
                           String department, String email, Member.Role initialRole) {
-        addSingle(studentId, name, generation, phone, department, email, initialRole, false);
+        addSingle(studentId, name, generation, phone, department, email, initialRole, false, null);
+    }
+
+    public void addSingle(String studentId, String name, String generation, String phone,
+                          String department, String email, Member.Role initialRole, String officerHistory) {
+        addSingle(studentId, name, generation, phone, department, email, initialRole, false, officerHistory);
     }
 
     /**
@@ -91,11 +96,13 @@ public class EligibleMemberService {
      */
     public void addSingle(String studentId, String name, String generation, String phone,
                           String department, Member.Role initialRole, boolean keepExistingDepartment) {
-        addSingle(studentId, name, generation, phone, department, null, initialRole, keepExistingDepartment);
+        addSingle(studentId, name, generation, phone, department, null, initialRole, keepExistingDepartment, null);
     }
 
     private void addSingle(String studentId, String name, String generation, String phone,
-                           String department, String email, Member.Role initialRole, boolean keepExistingDepartment) {
+                           String department, String email, Member.Role initialRole, boolean keepExistingDepartment,
+                           String officerHistory) {
+        String normalizedOfficerHistory = normalizeOfficerHistory(officerHistory);
         String normalized = normalize(studentId);
         if (!STUDENT_ID_PATTERN.matcher(normalized).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
@@ -116,6 +123,9 @@ public class EligibleMemberService {
         if (normalizedDepartment != null
                 && (!keepExistingDepartment || normalizeDepartment(member.getDepartment()) == null)) {
             member.setDepartment(normalizedDepartment);
+        }
+        if (normalizedOfficerHistory != null) {
+            member.setOfficerHistory(normalizedOfficerHistory);
         }
         eligibleMemberRepository.save(member);
     }
@@ -293,7 +303,22 @@ public class EligibleMemberService {
 
     public void addGraduateSingle(String name, String twoDigitYearStr, String generationStr, String phone,
                                   String department, String email) {
+        addGraduateSingle(name, twoDigitYearStr, generationStr, phone, department, email, null, null);
+    }
+
+    /**
+     * @param studentId 졸업생이 실제 10자리 학번을 가진 경우(선택). 주어지면 입학연도는 학번에서 정하고
+     *                  기수는 명시값을 우선한다. 이미 명부에 있는 학번이면 409.
+     */
+    public void addGraduateSingle(String name, String twoDigitYearStr, String generationStr, String phone,
+                                  String department, String email, String studentId, String officerHistory) {
         String normalizedName = normalize(name);
+        String normalizedOfficerHistory = normalizeOfficerHistory(officerHistory);
+        String normalizedStudentId = normalize(studentId);
+        boolean hasStudentId = !normalizedStudentId.isBlank();
+        if (hasStudentId && !STUDENT_ID_PATTERN.matcher(normalizedStudentId).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
+        }
 
         boolean hasYear = twoDigitYearStr != null && !twoDigitYearStr.isBlank();
         Integer admissionYear = null;
@@ -305,7 +330,9 @@ public class EligibleMemberService {
             }
             explicitGeneration = String.valueOf(Integer.parseInt(digits));
         }
-        if (twoDigitYearStr != null && !twoDigitYearStr.isBlank()) {
+        if (hasStudentId) {
+            admissionYear = Integer.parseInt(normalizedStudentId.substring(0, 4));
+        } else if (twoDigitYearStr != null && !twoDigitYearStr.isBlank()) {
             String digits = normalizeGeneration(twoDigitYearStr);
             if (!digits.matches("\\d{2}")) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "입학연도는 2자리 숫자여야 합니다. (예: 19)");
@@ -325,13 +352,19 @@ public class EligibleMemberService {
         String generation = explicitGeneration != null
                 ? explicitGeneration
                 : String.valueOf(admissionYear - FIRST_GENERATION_YEAR);
-        String verificationKey = verificationKey(normalizedName, admissionYear);
+        // 학번이 있는 행은 학번이 식별자라 인증 키(이름|입학연도)를 발급하지 않는다(가져오기와 같은 규칙).
+        String verificationKey = hasStudentId ? null : verificationKey(normalizedName, admissionYear);
         String normalizedPhone = normalizePhone(phone);
         String normalizedDepartment = normalizeDepartment(department);
         String normalizedEmail = normalizeEmail(email);
 
-        Optional<EligibleMember> existing = eligibleMemberRepository.findByVerificationKey(verificationKey);
-        if (existing.isEmpty() && explicitGeneration != null && !hasYear) {
+        if (hasStudentId && eligibleMemberRepository.findByStudentId(normalizedStudentId).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 명부에 있는 학번입니다.");
+        }
+        Optional<EligibleMember> existing = hasStudentId
+                ? Optional.empty()
+                : eligibleMemberRepository.findByVerificationKey(verificationKey);
+        if (existing.isEmpty() && !hasStudentId && explicitGeneration != null && !hasYear) {
             // 기수만 준 경우: 늦게 가입한 사람(입학연도 != 기수+1966)의 기존 행을 기수로 찾는다.
             existing = findGraduateByNameAndStoredGeneration(normalizedName, explicitGeneration);
         }
@@ -349,8 +382,11 @@ public class EligibleMemberService {
             if (explicitGeneration != null) {
                 existing.get().setGeneration(explicitGeneration);
             }
+            if (normalizedOfficerHistory != null) {
+                existing.get().setOfficerHistory(normalizedOfficerHistory);
+            }
             if (!normalizedPhone.isBlank() || normalizedDepartment != null || normalizedEmail != null
-                    || explicitGeneration != null) {
+                    || explicitGeneration != null || normalizedOfficerHistory != null) {
                 eligibleMemberRepository.save(existing.get());
             }
             return;
@@ -359,12 +395,13 @@ public class EligibleMemberService {
         EligibleMember member = new EligibleMember();
         member.setName(normalizedName);
         member.setEmail(normalizedEmail);
-        member.setStudentId(null);
+        member.setStudentId(hasStudentId ? normalizedStudentId : null);
         member.setAdmissionYear(admissionYear);
         member.setGeneration(generation);
         member.setVerificationKey(verificationKey);
         member.setPhone(normalizedPhone.isBlank() ? null : normalizedPhone);
         member.setDepartment(normalizedDepartment);
+        member.setOfficerHistory(normalizedOfficerHistory);
         eligibleMemberRepository.save(member);
     }
 
@@ -383,6 +420,12 @@ public class EligibleMemberService {
     }
 
     public void addPendingByGeneration(String name, String generationStr, String phone, String department, String email) {
+        addPendingByGeneration(name, generationStr, phone, department, email, null);
+    }
+
+    public void addPendingByGeneration(String name, String generationStr, String phone, String department, String email,
+                                       String officerHistory) {
+        String normalizedOfficerHistory = normalizeOfficerHistory(officerHistory);
         String normalizedName = normalize(name);
         if (normalizedName.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름을 입력해주세요.");
@@ -393,7 +436,7 @@ public class EligibleMemberService {
         }
         int admissionYear = Integer.parseInt(digits) + FIRST_GENERATION_YEAR;
         if (isGraduate(admissionYear)) {
-            addGraduateSingle(normalizedName, null, digits, phone, department, email);
+            addGraduateSingle(normalizedName, null, digits, phone, department, email, null, officerHistory);
             return;
         }
         // 같은 이름+기수 임시 행이 이미 있으면 전화번호만 보강.
@@ -416,6 +459,9 @@ public class EligibleMemberService {
         String normalizedDepartment = normalizeDepartment(department);
         if (normalizedDepartment != null) {
             member.setDepartment(normalizedDepartment);
+        }
+        if (normalizedOfficerHistory != null) {
+            member.setOfficerHistory(normalizedOfficerHistory);
         }
         eligibleMemberRepository.save(member);
     }
@@ -481,7 +527,8 @@ public class EligibleMemberService {
                             suggestedAccount == null ? null : suggestedAccount.getId(),
                             suggestedAccount == null ? null : suggestedAccount.getStudentId(),
                             suggestedAccount == null ? null : suggestedAccount.getEmail(),
-                            member.getInitialRole().name());
+                            member.getInitialRole().name(),
+                            member.getOfficerHistory());
                 })
                 .toList();
     }
@@ -542,6 +589,13 @@ public class EligibleMemberService {
 
     public void updateEligibleMember(Long id, String studentId, String name, String generation, String phone,
                                      String department, String email) {
+        updateEligibleMember(id, studentId, name, generation, phone, department, email, null);
+    }
+
+    /** @param officerHistory null 이면 기존 값 유지, 공백이면 지운다. */
+    public void updateEligibleMember(Long id, String studentId, String name, String generation, String phone,
+                                     String department, String email, String officerHistory) {
+        String normalizedOfficerHistory = normalizeOfficerHistory(officerHistory);
         EligibleMember member = eligibleMemberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "명부에서 해당 항목을 찾을 수 없습니다."));
         String normalizedStudentId = normalize(studentId);
@@ -564,6 +618,9 @@ public class EligibleMemberService {
         }
         if (email != null) {
             member.setEmail(normalizeEmail(email));
+        }
+        if (officerHistory != null) {
+            member.setOfficerHistory(normalizedOfficerHistory);
         }
         eligibleMemberRepository.save(member);
     }
@@ -700,9 +757,7 @@ public class EligibleMemberService {
                 }
 
                 String studentId = extractStudentId(normalize(safeGet(record, colMap.get("studentId"))));
-                String generation = studentId.isBlank()
-                        ? normalizeGeneration(safeGet(record, colMap.get("generation")))
-                        : calculateGeneration(studentId);
+                String generation = importGeneration(studentId, safeGet(record, colMap.get("generation")));
                 Integer admissionYear = admissionYear(studentId, generation);
                 if (admissionYear == null) {
                     skipped++;
@@ -719,6 +774,7 @@ public class EligibleMemberService {
                 String email = colMap.containsKey("email")
                         ? normalizeEmail(safeGet(record, colMap.get("email")))
                         : null;
+                String officerHistory = normalizeOfficerHistory(safeGet(record, colMap.get("officerHistory")));
 
                 Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
                 if (existing.isEmpty() && studentId.isBlank() && isGraduate(admissionYear)) {
@@ -732,6 +788,9 @@ public class EligibleMemberService {
                         departmentFilled++;
                     }
                     fillMissingEmail(existing.get(), name, email);
+                    if (officerHistory != null) {
+                        existing.get().setOfficerHistory(officerHistory);
+                    }
                     skipped++;
                     continue;
                 }
@@ -745,6 +804,7 @@ public class EligibleMemberService {
                 member.setGeneration(generation);
                 member.setAdmissionYear(admissionYear);
                 member.setVerificationKey(verificationKey);
+                member.setOfficerHistory(officerHistory);
                 eligibleMemberRepository.save(member);
                 imported++;
             }
@@ -790,6 +850,7 @@ public class EligibleMemberService {
             if (flat.equalsIgnoreCase("phone")) map.putIfAbsent("phone", header);
             if (flat.equals("이메일") || flat.equals("이메일 주소") || flat.equals("email") || flat.equals("e-mail")) map.putIfAbsent("email", header);
             if (isDepartmentHeader(flat)) map.putIfAbsent("department", header);
+            if (isOfficerHistoryHeader(flat)) map.putIfAbsent("officerHistory", header);
         }
         return map;
     }
@@ -837,9 +898,7 @@ public class EligibleMemberService {
                 }
 
                 String studentId = extractStudentId(normalize(readCell(row, header.get("studentId"), evaluator)));
-                String generation = studentId.isBlank()
-                        ? normalizeGeneration(readCell(row, header.get("generation"), evaluator))
-                        : calculateGeneration(studentId);
+                String generation = importGeneration(studentId, readCell(row, header.get("generation"), evaluator));
                 Integer admissionYear = admissionYear(studentId, generation);
                 if (admissionYear == null) {
                     skipped++;
@@ -856,6 +915,7 @@ public class EligibleMemberService {
                 String email = header.containsKey("email")
                         ? normalizeEmail(readCell(row, header.get("email"), evaluator))
                         : null;
+                String officerHistory = normalizeOfficerHistory(readCell(row, header.get("officerHistory"), evaluator));
 
                 Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
                 if (existing.isEmpty() && studentId.isBlank() && isGraduate(admissionYear)) {
@@ -869,6 +929,9 @@ public class EligibleMemberService {
                         departmentFilled++;
                     }
                     fillMissingEmail(existing.get(), name, email);
+                    if (officerHistory != null) {
+                        existing.get().setOfficerHistory(officerHistory);
+                    }
                     skipped++;
                     continue;
                 }
@@ -884,6 +947,7 @@ public class EligibleMemberService {
                 member.setGeneration(generation);
                 member.setAdmissionYear(admissionYear);
                 member.setVerificationKey(verificationKey);
+                member.setOfficerHistory(officerHistory);
                 member.setNote(note.isBlank() ? null : note);
                 eligibleMemberRepository.save(member);
                 imported++;
@@ -920,6 +984,7 @@ public class EligibleMemberService {
             if (label.equals("이메일") || label.equals("이메일 주소") || label.equals("email") || label.equals("e-mail")) header.putIfAbsent("email", cell.getColumnIndex());
             if (label.contains("기수")) header.putIfAbsent("generation", cell.getColumnIndex());
             if (isDepartmentHeader(label)) header.putIfAbsent("department", cell.getColumnIndex());
+            if (isOfficerHistoryHeader(label)) header.putIfAbsent("officerHistory", cell.getColumnIndex());
             if (label.equals("특이사항") || label.equals("비고")) header.putIfAbsent("note", cell.getColumnIndex());
         }
         return header;
@@ -1053,8 +1118,30 @@ public class EligibleMemberService {
         return normalized;
     }
 
+    /** 회장단 이력: 앞뒤 공백 제거, 공백뿐이면 null, 500자 초과는 400. */
+    private String normalizeOfficerHistory(String value) {
+        String trimmed = value == null ? "" : value.trim();
+        if (trimmed.length() > 500) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "회장단 이력은 500자 이하로 입력해주세요.");
+        }
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     private boolean blank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private boolean isOfficerHistoryHeader(String label) {
+        return label.contains("회장") || label.contains("임원") || label.contains("officer");
+    }
+
+    /** 가져오기 칸에 명시된 기수가 있으면 그것이 정답이고, 없을 때만 학번에서 계산한다. */
+    private String importGeneration(String studentId, String rawGeneration) {
+        String explicit = normalizeGeneration(rawGeneration);
+        if (studentId.isBlank() || GENERATION_PATTERN.matcher(explicit).matches()) {
+            return explicit;
+        }
+        return calculateGeneration(studentId);
     }
 
     private boolean isDepartmentHeader(String label) {
