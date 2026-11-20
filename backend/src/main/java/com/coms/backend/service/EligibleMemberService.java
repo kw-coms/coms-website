@@ -1107,14 +1107,18 @@ public class EligibleMemberService {
         throw invalidRoster();
     }
 
-    /** 이름과 저장된 기수가 같은 졸업생 행. 입학연도가 공식과 달라도(2학년 가입 등) 같은 사람으로 본다. */
+    /**
+     * 이름과 저장된 기수가 같은 졸업생 행. 입학연도가 공식과 달라도(2학년 가입 등) 같은 사람으로 본다.
+     * 같은 이름·기수의 졸업생이 둘 이상이면 누구인지 알 수 없으니 기존 행을 고르지 않는다.
+     */
     private Optional<EligibleMember> findGraduateByNameAndStoredGeneration(String name, String generation) {
         String wanted = generationValue(generation);
-        return eligibleMemberRepository.findAllByName(normalize(name)).stream()
+        List<EligibleMember> rows = eligibleMemberRepository.findAllByName(normalize(name)).stream()
                 .filter(row -> row.getAdmissionYear() != null && isGraduate(row.getAdmissionYear())
                         && GENERATION_PATTERN.matcher(normalizeGeneration(row.getGeneration())).matches()
                         && generationValue(row.getGeneration()).equals(wanted))
-                .findFirst();
+                .toList();
+        return rows.size() == 1 ? Optional.of(rows.getFirst()) : Optional.empty();
     }
 
     /** 졸업생 가입 매칭. 기수는 명부에 저장된 기수가 정답이라 공식(입학연도-1966)이 아니라 저장값으로 비교한다. */
