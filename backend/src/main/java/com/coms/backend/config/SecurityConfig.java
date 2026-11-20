@@ -118,6 +118,8 @@ public class SecurityConfig {
                 auth.requestMatchers("/api/admin/community/**").authenticated();
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**").authenticated();
+                // 역대 회장단: 공지와 같은 독자(로그인한 회원). 쓰기는 /api/admin/** ADMIN 경계.
+                auth.requestMatchers(HttpMethod.GET, "/api/club-officers").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/notices/*/vote").authenticated();
                 // notice.write — 컨트롤러의 @perm.has 가 실제 게이트.
                 auth.requestMatchers(HttpMethod.POST, "/api/notices").authenticated();

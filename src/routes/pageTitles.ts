@@ -25,6 +25,7 @@ const ROUTE_LABELS: Array<[pattern: RegExp, label: string | ((...groups: string[
   [/^\/study\/([^/]+)\/practice(?:\/[^/]+)?$/, (id) => { const study = findStudy(id); return study ? `${study.title} 실습 문제` : null }],
   [/^\/study\/([^/]+)$/, (id) => findStudy(id)?.title ?? null],
   [/^\/apps$/, '작품'],
+  [/^\/officers$/, '역대 회장단'],
   [/^\/team-projects(\/[^/]+)?$/, '팀 프로젝트'],
   [/^\/hackathon$/, '해커톤 평가'],
   [/^\/hackathon\/[1-9]\d*$/, '해커톤 평가'],
