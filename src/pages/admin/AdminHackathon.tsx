@@ -2,27 +2,30 @@ import { useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
-import { CRITERIA, summarizeHackathon } from '../../features/hackathon/hackathon'
+import { CRITERIA, STATUS_META, summarizeHackathon } from '../../features/hackathon/hackathon'
 import HackathonScoreForm from '../../features/hackathon/HackathonScoreForm'
+import HackathonStatusBadge from '../../features/hackathon/HackathonStatusBadge'
 import {
   createHackathonEvent, createHackathonProject, deleteEventReview, deleteHackathonMaterial, deleteHackathonProject,
   getAdminHackathonEvent, listAdminHackathonEvents, listEventReviews, publishHackathonEvent,
-  saveEventChairReview, setEventOpen, updateHackathonEvent, updateHackathonProject, uploadHackathonMaterial,
+  saveEventChairReview, setEventOpen, setEventResultsPublished, updateHackathonEvent, updateHackathonProject, uploadHackathonMaterial,
   type AdminHackathonEvent, type HackathonEventWrite, type HackathonMaterial, type HackathonProject,
   type HackathonProjectWrite, type HackathonReview,
 } from '../../services/hackathonApi'
 import '../../styles/hackathon.css'
 
 const scoreText = (score: number | null) => score === null ? '미집계' : `${score.toFixed(2)}점`
-const eventPath = (id: number) => id === 1 ? '/hackathon' : `/hackathon/${id}`
+const eventPath = (id: number) => `/hackathon/${id}`
 const errorText = (cause: unknown) => cause instanceof Error ? cause.message : '요청을 처리하지 못했습니다.'
 const inputClass = 'hackathon-input mt-2'
 const actionClass = 'apple-action-secondary min-h-11 px-4 text-sm'
 const materialKinds: HackathonMaterial['kind'][] = ['proposal', 'presentation', 'video', 'poster', 'other']
 
-function EventEditor({ event, busy, save }: { event?: AdminHackathonEvent; busy: boolean; save: (payload: HackathonEventWrite) => Promise<boolean> }) {
-  const [draft, setDraft] = useState<HackathonEventWrite>({ title: event?.title ?? '', year: event?.year ?? new Date().getFullYear(), semester: event?.semester ?? 1, theme: event?.theme ?? '', introduction: event?.introduction ?? '', rules: event?.rules ?? '' })
+function EventEditor({ event, busy, error, save }: { event?: AdminHackathonEvent; busy: boolean; error?: string; save: (payload: HackathonEventWrite) => Promise<boolean> }) {
+  const [draft, setDraft] = useState<HackathonEventWrite>({ title: event?.title ?? '', year: event?.year ?? new Date().getFullYear(), semester: event?.semester ?? 1, theme: event?.theme ?? '', introduction: event?.introduction ?? '', rules: event?.rules ?? '', startsAt: event?.startsAt?.slice(0, 16) ?? null, endsAt: event?.endsAt?.slice(0, 16) ?? null })
   const submit = async (e: FormEvent) => { e.preventDefault(); await save({ ...draft, title: draft.title.trim(), theme: draft.theme.trim(), introduction: draft.introduction.trim(), rules: draft.rules.trim() }) }
+  const periodError = Boolean(draft.startsAt) !== Boolean(draft.endsAt) ? '시작과 종료를 함께 입력해 주세요. 둘 다 비우면 미정으로 표시됩니다.'
+    : draft.startsAt && draft.endsAt && draft.startsAt > draft.endsAt ? '종료가 시작보다 빠를 수 없습니다.' : ''
   return <form onSubmit={submit} aria-label={event ? `${event.title} 행사 편집` : '새 해커톤 작성'} className="hackathon-project space-y-4">
     <h3 className="text-lg font-bold">{event ? '해커톤 글 편집' : '새 해커톤 글 작성'}</h3>
     <div className="grid gap-4 sm:grid-cols-3">
@@ -30,10 +33,17 @@ function EventEditor({ event, busy, save }: { event?: AdminHackathonEvent; busy:
       <label className="text-sm font-semibold">연도<input required type="number" min="2000" max="2200" className={inputClass} value={draft.year} onChange={e => setDraft({ ...draft, year: Number(e.target.value) })} /></label>
       <label className="text-sm font-semibold">학기<select className={inputClass} value={draft.semester} onChange={e => setDraft({ ...draft, semester: Number(e.target.value) as 1 | 2 })}><option value="1">1학기</option><option value="2">2학기</option></select></label>
     </div>
+    <fieldset className="grid gap-4 sm:grid-cols-2">
+      <legend className="text-sm font-semibold">개발 기간 (한국 시간 기준 · 지난 행사도 기록할 수 있어요)</legend>
+      <label className="text-sm font-semibold">개발 시작 (한국 시간)<input type="datetime-local" className={inputClass} value={draft.startsAt ?? ''} onChange={e => setDraft({ ...draft, startsAt: e.target.value || null })} /></label>
+      <label className="text-sm font-semibold">개발 종료 (한국 시간)<input type="datetime-local" className={inputClass} value={draft.endsAt ?? ''} onChange={e => setDraft({ ...draft, endsAt: e.target.value || null })} /></label>
+      {periodError && <p role="alert" className="text-sm text-[var(--app-danger)] sm:col-span-2">{periodError}</p>}
+    </fieldset>
     <label className="block text-sm font-semibold">주제<input maxLength={200} className={inputClass} value={draft.theme} onChange={e => setDraft({ ...draft, theme: e.target.value })} /></label>
     <label className="block text-sm font-semibold">소개<textarea maxLength={10000} rows={4} className={inputClass} value={draft.introduction} onChange={e => setDraft({ ...draft, introduction: e.target.value })} /></label>
     <label className="block text-sm font-semibold">평가 안내·규칙<textarea maxLength={10000} rows={4} className={inputClass} value={draft.rules} onChange={e => setDraft({ ...draft, rules: e.target.value })} /></label>
-    <button disabled={busy || !draft.title.trim() || !Number.isInteger(draft.year) || draft.year < 2000 || draft.year > 2200} className="apple-action-primary min-h-11 px-5 text-sm disabled:opacity-50">{busy ? '저장 중…' : event ? '글 저장' : '초안 만들기'}</button>
+    <button disabled={busy || Boolean(periodError) || !draft.title.trim() || !Number.isInteger(draft.year) || draft.year < 2000 || draft.year > 2200} className="apple-action-primary min-h-11 px-5 text-sm disabled:opacity-50">{busy ? '저장 중…' : event ? '글 저장' : '초안 만들기'}</button>
+    {error && <p role="alert" className="text-sm text-[var(--app-danger)]">{error}</p>}
   </form>
 }
 
@@ -78,11 +88,13 @@ export default function AdminHackathon() {
   const reviews = useQuery({ queryKey: ['admin', 'hackathon', 'reviews', eventId], queryFn: () => listEventReviews(eventId), enabled: events.isSuccess })
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
   const [removingId, setRemovingId] = useState<number | null>(null)
   const [newEvent, setNewEvent] = useState(false)
   const event = detail.data
   const guarded = Boolean(event?.open || reviews.isPending || reviews.isError || reviews.data?.length)
+  const resultsBlocked = event && !event.resultsPublished ? (!event.published ? '결과 공개: 먼저 해커톤 글을 공개해 주세요.' : event.status !== 'DONE' ? `결과 공개: 완료 상태(평가 마감 + 개발 기간 종료)에서만 켤 수 있습니다. 지금은 '${STATUS_META[event.status].label}'입니다.` : '') : ''
   const rows = event && reviews.data ? summarizeHackathon(reviews.data, event.projects) : []
   const refresh = async () => {
     await Promise.all([
@@ -91,11 +103,11 @@ export default function AdminHackathon() {
       client.invalidateQueries({ queryKey: ['hackathon', 'event', eventId] }),
     ])
   }
-  const act = async (work: () => Promise<unknown>, success: string) => {
+  const act = async (work: () => Promise<unknown>, success: string, inForm = false) => {
     if (pending) return false
-    setPending(true); setError(''); setMessage('')
+    setPending(true); setError(''); setFormError(''); setMessage('')
     try { await work(); await refresh(); setMessage(success); return true }
-    catch (cause) { setError(errorText(cause)); return false }
+    catch (cause) { (inForm ? setFormError : setError)(errorText(cause)); return false }
     finally { setPending(false) }
   }
   const remove = async (title: string, message: string, work: () => Promise<void>) => {
@@ -114,9 +126,9 @@ export default function AdminHackathon() {
   if (events.isPending) return <p role="status">해커톤 목록을 불러오는 중…</p>
   if (events.isError) return <div role="alert">해커톤 목록을 불러오지 못했습니다. <button onClick={() => events.refetch()} className={actionClass}>다시 불러오기</button></div>
   return <section className="space-y-6" aria-label="해커톤 평가 관리">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">해커톤 평가·행사 관리</h2><p className="mt-2 text-sm text-[var(--app-muted)]">행사별 글·팀·자료·평가를 관리합니다.</p></div>{event?.published && <Link to={eventPath(eventId)} className={actionClass}>공개 평가 페이지</Link>}</div>
-    <div className="flex flex-wrap items-center gap-3"><label className="text-sm font-semibold">관리할 해커톤<select aria-label="관리할 해커톤" className={inputClass} value={events.data.some(item => item.id === eventId) ? eventId : ''} onChange={e => { setParams(previous => { previous.set('event', e.target.value); return previous }); setMessage(''); setError('') }}><option value="" disabled>선택</option>{events.data.map(item => <option key={item.id} value={item.id}>{item.title}{item.published ? '' : ' · 초안'}</option>)}</select></label><button type="button" className={actionClass} onClick={() => setNewEvent(value => !value)}>{newEvent ? '작성 닫기' : '새 해커톤 작성'}</button></div>
-    {newEvent && <EventEditor busy={pending} save={payload => act(async () => { const created = await createHackathonEvent(payload); setParams(previous => { previous.set('event', String(created.id)); return previous }); setNewEvent(false) }, '해커톤 초안을 만들었습니다.')} />}
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">해커톤 평가·행사 관리</h2><p className="mt-2 text-sm text-[var(--app-muted)]">행사별 글·팀·자료·평가를 관리합니다.</p></div>{event?.published && <Link to={eventPath(eventId)} className={actionClass}>공개 페이지</Link>}</div>
+    <div className="flex flex-wrap items-center gap-3"><label className="text-sm font-semibold">관리할 해커톤<select aria-label="관리할 해커톤" className={inputClass} value={events.data.some(item => item.id === eventId) ? eventId : ''} onChange={e => { setParams(previous => { previous.set('event', e.target.value); return previous }); setMessage(''); setError(''); setFormError('') }}><option value="" disabled>선택</option>{events.data.map(item => <option key={item.id} value={item.id}>{item.title}{item.published ? '' : ' · 초안'} · {STATUS_META[item.status].label}</option>)}</select></label><button type="button" className={actionClass} onClick={() => setNewEvent(value => !value)}>{newEvent ? '작성 닫기' : '새 해커톤 작성'}</button></div>
+    {newEvent && <EventEditor busy={pending} error={formError} save={payload => act(async () => { const created = await createHackathonEvent(payload); setParams(previous => { previous.set('event', String(created.id)); return previous }); setNewEvent(false) }, '해커톤 초안을 만들었습니다.', true)} />}
     {message && <p role="status" className="text-sm">{message}</p>}
     {error && <p role="alert" className="text-sm text-[var(--app-danger)]">{error}</p>}
     {detail.isPending && <p role="status">행사 내용을 불러오는 중…</p>}
@@ -126,8 +138,11 @@ export default function AdminHackathon() {
         <button type="button" disabled={pending || (event.published && (event.open || reviews.isPending || reviews.isError || Boolean(reviews.data?.length)))} className={actionClass} onClick={() => act(() => publishHackathonEvent(eventId, !event.published), event.published ? '공개를 중단했습니다.' : '해커톤 글을 공개했습니다.')}>{event.published ? '공개 중단' : '글 공개'}</button>
         <button type="button" disabled={pending || (!event.open && (!event.published || !event.projects.length))} className={actionClass} onClick={() => act(() => setEventOpen(eventId, !event.open), event.open ? '평가를 마감했습니다.' : '평가를 열었습니다.')}>{event.open ? '평가 마감하기' : '평가 다시 열기'}</button>
         <button type="button" className={actionClass} onClick={() => refresh()}>집계 새로고침</button>
+        <HackathonStatusBadge status={event.status} />
+        <button type="button" aria-pressed={event.resultsPublished} disabled={pending || Boolean(resultsBlocked)} aria-describedby={resultsBlocked ? 'hackathon-results-reason' : undefined} className={actionClass} onClick={() => act(() => setEventResultsPublished(eventId, !event.resultsPublished), event.resultsPublished ? '결과 공개를 중단했습니다.' : '결과를 공개했습니다.')}>{event.resultsPublished ? '결과 공개 중 · 비공개로 전환' : '결과 공개'}</button>
+        {resultsBlocked && <p id="hackathon-results-reason" className="w-full text-sm text-[var(--app-muted)]">{resultsBlocked}</p>}
       </div>
-      <EventEditor key={event.id} event={event} busy={pending} save={payload => act(() => updateHackathonEvent(eventId, payload), '해커톤 글을 저장했습니다.')} />
+      <EventEditor key={event.id} event={event} busy={pending} error={formError} save={payload => act(() => updateHackathonEvent(eventId, payload), '해커톤 글을 저장했습니다.', true)} />
       <section className="space-y-4"><h3 className="text-lg font-bold">행사 자료</h3><p className="text-sm text-[var(--app-muted)]">개회식 안내와 규칙 자료를 이 행사에 올립니다.</p>
         {event.materials.map(item => <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--app-hairline)] p-3"><span>{item.label || item.originalName}</span>{event.published && <a href={item.url} target="_blank" rel="noreferrer" className="underline">열기</a>}<button type="button" disabled={pending || guarded} className={actionClass} onClick={() => remove('행사 자료 삭제', `${item.originalName} 파일을 삭제할까요?`, () => deleteHackathonMaterial(eventId, item.id))}>삭제</button></div>)}
         {!guarded && event.materials.length < 20 && <MaterialEditor eventId={eventId} busy={pending} save={(file, projectId, kind, label) => act(() => uploadHackathonMaterial(eventId, file, projectId, kind, label), '행사 자료를 올렸습니다.')} />}

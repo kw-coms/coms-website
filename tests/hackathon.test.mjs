@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { HACKATHON_PROJECTS, summarizeHackathon, reviewTotal } from '../src/features/hackathon/hackathon.ts'
+import { HACKATHON_PROJECTS, summarizeHackathon, reviewTotal, formatPeriod, STATUS_META } from '../src/features/hackathon/hackathon.ts'
 
 const review = (projectId, score, chair = false) => ({ projectId, chair, themeFit: score, creativity: score, technology: score, completeness: score, practicality: score })
 const summarizeLegacy = (reviews) => summarizeHackathon(reviews, HACKATHON_PROJECTS.map(project => ({ projectId: project.id, title: project.title, id: project.id })))
@@ -27,3 +27,7 @@ const future = summarizeHackathon([review('future-team', 20), review('future-tea
 assert.equal(future.length, 1)
 assert.equal(future[0].finalScore, 75, 'a future event is ranked from its own project list')
 console.log('hackathon: 10 scoring, tie-break and incomplete-results checks passed')
+
+assert.equal(formatPeriod('2026-11-08T18:00:00', '2026-11-15T04:00:00'), '11/8(일) 18:00 ~ 11/15(일) 04:00')
+assert.equal(formatPeriod(null, null), null)
+assert.deepEqual(Object.values(STATUS_META).map((meta) => meta.label), ['시작 예정', '진행 중', '평가 중', '완료'])

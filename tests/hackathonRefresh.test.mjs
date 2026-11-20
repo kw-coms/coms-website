@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { evaluationPath, refreshWorker } from '../public/hackathon-refresh.js'
+import { evaluationPath, refreshWorker, resolveTarget } from '../public/hackathon-refresh.js'
 
 test('share paths preserve their event identity without accepting arbitrary destinations', () => {
   for (const [path, target] of [
-    ['/hackathon/share', '/hackathon'],
+    ['/hackathon/share', '/hackathon/1'],
     ['/hackathon/1/share', '/hackathon/1'],
     ['/hackathon/2028/share', '/hackathon/2028'],
     ['/hackathon/0/share', null],
@@ -52,4 +52,13 @@ test('failed update leaves the browser on the recovery page', async () => {
 test('a stalled update has a bounded wait', async () => {
   const registration = { active: { state: 'activated' }, update: () => new Promise(() => {}) }
   await assert.rejects(refreshWorker(registration, {}, 10), /timed out/)
+})
+
+test('the legacy share link falls back to the archive when the first event is unavailable', async () => {
+  const answer = (ok) => async () => ({ ok })
+  assert.equal(await resolveTarget('/hackathon/share', answer(true)), '/hackathon/1')
+  assert.equal(await resolveTarget('/hackathon/share', answer(false)), '/hackathon')
+  assert.equal(await resolveTarget('/hackathon/share', async () => { throw new Error('offline') }), '/hackathon')
+  assert.equal(await resolveTarget('/hackathon/7/share', answer(false)), '/hackathon/7')
+  assert.equal(await resolveTarget('/hackathon/0/share', answer(true)), null)
 })

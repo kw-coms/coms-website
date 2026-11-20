@@ -73,7 +73,7 @@ class HackathonIntegrationTest {
         jdbc.update("DELETE FROM hackathon_events WHERE id <> 1");
         settings.deleteAll();
         settings.saveAndFlush(new HackathonSettings());
-        jdbc.update("MERGE INTO hackathon_events (id,title,event_year,semester,theme,introduction,rules,published,open) KEY(id) VALUES (1,'COM’s 해커톤 2026',2026,2,'전쟁','','',TRUE,TRUE)");
+        jdbc.update("MERGE INTO hackathon_events (id,title,event_year,semester,theme,introduction,rules,published,open,starts_at,ends_at,results_published) KEY(id) VALUES (1,'COM’s 해커톤 2026',2026,2,'전쟁','','',TRUE,TRUE,NULL,NULL,FALSE)");
         for (String projectId : new String[]{"wargether", "underground-route", "still"}) {
             jdbc.update("MERGE INTO hackathon_projects (id,event_id,title,author,description,position) KEY(id) VALUES (?,1,?,'기존 팀','기존 작품',0)", projectId, projectId);
         }

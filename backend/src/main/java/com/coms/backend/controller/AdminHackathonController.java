@@ -6,6 +6,7 @@ import com.coms.backend.dto.HackathonSettingsRequest;
 import com.coms.backend.dto.HackathonEventWrite;
 import com.coms.backend.dto.HackathonProjectWrite;
 import com.coms.backend.dto.HackathonPublicationRequest;
+import com.coms.backend.dto.HackathonResultsRequest;
 import com.coms.backend.dto.AdminHackathonEventSummary;
 import com.coms.backend.dto.AdminHackathonEventResponse;
 import com.coms.backend.dto.HackathonProjectResponse;
@@ -100,6 +101,14 @@ public class AdminHackathonController {
         boolean published = events.publish(eventId, request == null ? null : request.published());
         audit(authentication, "ADMIN_HACKATHON_EVENT_PUBLISH", "HACKATHON_EVENT", eventId);
         return Map.of("published", published);
+    }
+
+    @PutMapping("/events/{eventId}/results-published")
+    public Map<String, Boolean> resultsPublished(@PathVariable Long eventId, @RequestBody HackathonResultsRequest request,
+                                                  Authentication authentication) {
+        boolean value = events.setResultsPublished(eventId, request == null ? null : request.resultsPublished());
+        audit(authentication, "ADMIN_HACKATHON_EVENT_RESULTS", "HACKATHON_EVENT", eventId);
+        return Map.of("resultsPublished", value);
     }
 
     @PutMapping("/events/{eventId}/settings")

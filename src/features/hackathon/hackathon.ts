@@ -1,4 +1,4 @@
-import type { HackathonProject, HackathonReview, Scores } from '../../services/hackathonApi'
+import type { HackathonProject, HackathonReview, HackathonStatus, Scores } from '../../services/hackathonApi'
 
 export const CRITERIA = [
   { key: 'themeFit', label: '주제 적합성', description: '주제에 맞는 문제를 골랐는가' },
@@ -66,3 +66,26 @@ export function summarizeHackathon(reviews: HackathonReview[], projects: Pick<Ha
   rows.forEach((row, index) => { row.rank = index > 0 && compare(rows[index - 1], row) === 0 ? rows[index - 1].rank : index + 1 })
   return rows
 }
+
+export const STATUS_META: Record<HackathonStatus, { label: string; hint: string }> = {
+  UPCOMING: { label: '시작 예정', hint: '아직 시작하지 않았습니다.' },
+  IN_PROGRESS: { label: '진행 중', hint: '팀들이 작품을 만들고 있습니다.' },
+  REVIEWING: { label: '평가 중', hint: '졸업생 평가를 받고 있습니다.' },
+  DONE: { label: '완료', hint: '평가까지 끝난 행사입니다.' },
+}
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
+
+/** 서버의 서울 벽시계 시각(2026-11-08T18:00:00)을 브라우저 시간대와 무관하게 '11/8(일) 18:00'으로 바꾼다. */
+export function formatKstMoment(iso: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso)
+  if (!match) return iso
+  const [, year, month, day, hour, minute] = match.map(Number)
+  return `${month}/${day}(${WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()]}) ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+export function formatPeriod(startsAt: string | null, endsAt: string | null) {
+  return startsAt && endsAt ? `${formatKstMoment(startsAt)} ~ ${formatKstMoment(endsAt)}` : null
+}
+
+export const semesterLabel = (event: { year: number; semester: number }) => `${event.year}년 ${event.semester}학기`

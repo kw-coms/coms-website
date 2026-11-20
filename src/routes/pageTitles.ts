@@ -27,7 +27,7 @@ const ROUTE_LABELS: Array<[pattern: RegExp, label: string | ((...groups: string[
   [/^\/apps$/, '작품'],
   [/^\/officers$/, '역대 회장단'],
   [/^\/team-projects(\/[^/]+)?$/, '팀 프로젝트'],
-  [/^\/hackathon$/, '해커톤 평가'],
+  [/^\/hackathon$/, '해커톤 아카이브'],
   [/^\/hackathon\/[1-9]\d*$/, '해커톤 평가'],
   [/^\/apps\/[^/]+$/, '작품'],
   [/^\/draw$/, '뽑기'],

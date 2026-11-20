@@ -7,10 +7,10 @@ test.use({ serviceWorkers: 'block' })
 
 async function mockEvents(page, open = () => true) {
   await page.route('**/api/hackathon/events', route => route.fulfill({ json: [summary(legacyEvent), summary(futureEvent)] }))
-  await page.route('**/api/hackathon/events/1', route => route.fulfill({ json: { ...legacyEvent, open: open() } }))
+  await page.route('**/api/hackathon/events/1', route => route.fulfill({ json: { ...legacyEvent, open: open(), status: open() ? 'REVIEWING' : 'DONE' } }))
   await page.route('**/api/hackathon/events/2', route => route.fulfill({ json: futureEvent }))
   await page.route('**/api/admin/hackathon/events', route => route.fulfill({ json: [adminSummary(legacyEvent), adminSummary(futureEvent)] }))
-  await page.route('**/api/admin/hackathon/events/1', route => route.fulfill({ json: { ...legacyEvent, open: open() } }))
+  await page.route('**/api/admin/hackathon/events/1', route => route.fulfill({ json: { ...legacyEvent, open: open(), status: open() ? 'REVIEWING' : 'DONE' } }))
 }
 
 
@@ -24,7 +24,7 @@ for (const width of [320, 390, 1280]) {
       submissions.push(route.request().postDataJSON())
       return route.fulfill({ status: 201, json: { projectId: 'wargether' } })
     })
-    await page.goto('/hackathon')
+    await page.goto('/hackathon/1')
     await expect(page.getByRole('heading', { name: 'COM’s 해커톤 2026', exact: true })).toBeVisible()
     await expect(page.locator('[data-members-gate]')).toHaveCount(0)
     await expect(page.locator('#wargether button[type="submit"]')).toBeDisabled()
@@ -49,7 +49,7 @@ test('duplicate errors preserve scores and a closed event disables submissions',
   let open = true
   await mockEvents(page, () => open)
   await page.route('**/api/hackathon/events/1/reviews', (route) => route.fulfill({ status: 409, json: { message: '이 기수와 이름으로 이 팀의 평가를 이미 제출했습니다.' } }))
-  await page.goto('/hackathon')
+  await page.goto('/hackathon/1')
   await page.getByLabel('기수', { exact: true }).fill('42')
   await page.getByLabel('이름', { exact: true }).fill('홍길동')
   const form = page.getByRole('form', { name: 'wargether 채점' })
@@ -60,7 +60,9 @@ test('duplicate errors preserve scores and a closed event disables submissions',
   open = false
   await page.reload()
   await expect(page.getByRole('status').filter({ hasText: '평가가 마감되었습니다' })).toBeVisible()
-  for (const button of await page.getByRole('button', { name: '평가 제출', exact: true }).all()) await expect(button).toBeDisabled()
+  await expect(page.getByRole('heading', { name: 'wargether', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '평가 제출', exact: true })).toHaveCount(0)
+  await expect(page.locator('form')).toHaveCount(0)
 })
 
 for (const width of [390, 1280]) {
@@ -136,7 +138,7 @@ test('events keep guest reviews and share links separate', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '2027년 1학기 해커톤', exact: true })).toBeVisible()
   await expect(page.getByText('2027년 1학기', { exact: true })).toBeVisible()
   await expect(page).toHaveTitle(/2027년 1학기 해커톤/)
-  await expect(page.getByRole('link', { name: 'COM’s 해커톤 2026' })).toHaveAttribute('href', '/hackathon')
+  await expect(page.getByRole('link', { name: '← 해커톤 아카이브' })).toHaveAttribute('href', '/hackathon')
   await expect(page.locator('#wargether')).toHaveCount(0)
   await page.getByLabel('기수', { exact: true }).fill('42')
   await page.getByLabel('이름', { exact: true }).fill('테스트사용자')
@@ -144,13 +146,15 @@ test('events keep guest reviews and share links separate', async ({ page }) => {
   for (const select of await futureForm.locator('select').all()) await select.selectOption('15')
   await futureForm.getByRole('button', { name: '평가 제출' }).click()
   await expect(page.locator('#future-team')).toContainText('평가가 접수되었습니다')
-  await page.getByRole('link', { name: 'COM’s 해커톤 2026' }).click()
-  await expect(page.getByRole('heading', { name: 'COM’s 해커톤 2026', exact: true })).toBeVisible()
+  await page.getByRole('link', { name: '← 해커톤 아카이브' }).click()
+  await page.getByRole('link', { name: /COM’s 해커톤 2026/ }).first().click()
+  await expect(page.getByRole('heading', { name: 'COM’s 해커톤 2026', exact: true, level: 1 })).toBeVisible({ timeout: 15000 })
   await expect(page.locator('#wargether form')).toBeVisible()
   expect(submissions).toEqual([{ path: '/api/hackathon/events/2/reviews', body: { projectId: 'future-team', generation: 42, name: '테스트사용자', themeFit: 15, creativity: 15, technology: 15, completeness: 15, practicality: 15, feedback: '' } }])
   const shared = []
   await page.evaluate(() => { navigator.clipboard.writeText = async text => { window.__hackathonCopied = text } })
-  await page.getByRole('link', { name: '2027년 1학기 해커톤' }).click()
+  await page.getByRole('link', { name: '← 해커톤 아카이브' }).click()
+  await page.getByRole('link', { name: /2027년 1학기 해커톤/ }).first().click()
   await page.getByRole('button', { name: '평가 링크 복사' }).click()
   shared.push(await page.evaluate(() => window.__hackathonCopied))
   expect(shared).toEqual([`${new URL(page.url()).origin}/hackathon/2/share`])
@@ -175,7 +179,7 @@ for (const width of [320, 390, 1280]) test(`chair can publish an announcement be
     if (route.request().method() === 'GET') return route.fulfill({ json: events.map(adminSummary) })
     const body = route.request().postDataJSON()
     calls.push({ method: 'POST', body })
-    const created = { ...body, id: 3, published: false, open: false, projects: [], materials: [] }
+    const created = { ...body, id: 3, published: false, open: false, status: 'DONE', resultsPublished: false, projects: [], materials: [] }
     events = [...events, created]
     return route.fulfill({ status: 201, json: created })
   })
@@ -247,8 +251,8 @@ for (const width of [320, 390, 1280]) test(`chair can publish an announcement be
 
 test('switching cached events clears unsaved team, material and chair drafts', async ({ page }) => {
   await mockAdminApis(page)
-  const first = { ...legacyEvent, open: false }
-  const second = { ...futureEvent, open: false }
+  const first = { ...legacyEvent, open: false, status: 'DONE' }
+  const second = { ...futureEvent, open: false, status: 'DONE' }
   const writes = []
   await page.route('**/api/admin/hackathon/events', route => route.fulfill({ json: [adminSummary(first), adminSummary(second)] }))
   await page.route(/\/api\/admin\/hackathon\/events\/\d+(?:\/.*)?$/, route => {
