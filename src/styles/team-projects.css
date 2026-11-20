@@ -1,0 +1,110 @@
+.tp-page { max-width: 960px; }
+.tp-card {
+  padding: clamp(16px, 3.5vw, 28px);
+  border-radius: 20px;
+  background: var(--app-surface-soft);
+  min-width: 0;
+}
+.tp-card[data-mine] { border-inline-start: 4px solid var(--app-accent); }
+.tp-input {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--app-hairline);
+  border-radius: 10px;
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-size: 16px;
+}
+.tp-input:focus-visible, .tp-text-button:focus-visible, .tp-icon-button:focus-visible, .tp-cell:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+.tp-icon-button {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--app-hairline);
+  border-radius: 10px;
+  color: var(--app-muted);
+}
+.tp-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 0 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--app-accent-text);
+}
+.tp-text-button:disabled { opacity: .5; }
+.tp-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--app-surface);
+  color: var(--app-muted);
+  border: 1px solid var(--app-hairline);
+}
+.tp-chip[data-status="SUBMITTED"], .tp-chip[data-tone="accent"] { background: var(--app-accent-soft); color: var(--app-accent-text); border-color: transparent; }
+.tp-chip[data-status="LATE"], .tp-chip[data-tone="warn"] { color: var(--app-danger); border-color: var(--app-danger); }
+.tp-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--app-hairline);
+  border-radius: 999px;
+  font-size: 0.875rem;
+  background: var(--app-bg);
+}
+.tp-file small { color: var(--app-muted); white-space: nowrap; }
+
+/* Timeline: one row per milestone, the next one highlighted. */
+.tp-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.tp-milestone {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--app-surface-soft);
+  border: 1px solid transparent;
+  min-width: 0;
+}
+.tp-milestone[data-phase="past"] { opacity: .65; }
+.tp-milestone[data-next] { border-color: var(--app-accent); background: var(--app-accent-soft); }
+.tp-dday { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 1.25rem; color: var(--app-accent-text); }
+.tp-milestone[data-phase="past"] .tp-dday { color: var(--app-muted); }
+
+/* Status board: a table that scrolls sideways on a phone, with the team column pinned. */
+.tp-board { overflow-x: auto; }
+.tp-board table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 0.875rem; }
+.tp-board th, .tp-board td { padding: 10px 12px; border-bottom: 1px solid var(--app-hairline); text-align: left; vertical-align: middle; }
+.tp-board th[scope="row"] { position: sticky; inset-inline-start: 0; background: var(--app-bg); min-width: 120px; }
+.tp-cell { cursor: pointer; border-radius: 999px; }
+.tp-cell[aria-pressed="true"] .tp-chip { outline: 2px solid var(--app-accent); }
+
+.tp-member-pick { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.tp-member-pick li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid var(--app-hairline); border-radius: 12px; min-width: 0; }
+@media (max-width: 480px) {
+  .tp-milestone { padding: 14px; }
+}
+
+.tp-file-row { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; min-width: 0; }
+.tp-file-row[data-removed] { opacity: .6; }
+.tp-file-row[data-removed] .tp-file-name { text-decoration: line-through; }
+.tp-progress { flex: 1; min-width: 0; height: 8px; accent-color: var(--app-accent); }
+.tp-field-error { color: var(--app-danger); font-size: 0.875rem; }
+.tp-kinds { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 0; }
+.tp-kind { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid var(--app-hairline); border-radius: 12px; font-size: 0.875rem; font-weight: 600; }
+.tp-kind:has(input:checked) { border-color: var(--app-accent); background: var(--app-accent-soft); }
+.tp-cell { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.tp-edited { font-size: 0.6875rem; color: var(--app-muted); }
