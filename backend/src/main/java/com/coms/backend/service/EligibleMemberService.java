@@ -295,6 +295,7 @@ public class EligibleMemberService {
                                   String department, String email) {
         String normalizedName = normalize(name);
 
+        boolean hasYear = twoDigitYearStr != null && !twoDigitYearStr.isBlank();
         Integer admissionYear = null;
         String explicitGeneration = null;
         if (generationStr != null && !generationStr.isBlank()) {
@@ -330,6 +331,10 @@ public class EligibleMemberService {
         String normalizedEmail = normalizeEmail(email);
 
         Optional<EligibleMember> existing = eligibleMemberRepository.findByVerificationKey(verificationKey);
+        if (existing.isEmpty() && explicitGeneration != null && !hasYear) {
+            // 기수만 준 경우: 늦게 가입한 사람(입학연도 != 기수+1966)의 기존 행을 기수로 찾는다.
+            existing = findGraduateByNameAndStoredGeneration(normalizedName, explicitGeneration);
+        }
         if (existing.isPresent()) {
             // 중복 등록은 무시하되 전달된 연락처와 학부/학과는 보강한다.
             if (!normalizedPhone.isBlank()) {
@@ -716,6 +721,9 @@ public class EligibleMemberService {
                         : null;
 
                 Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
+                if (existing.isEmpty() && studentId.isBlank() && isGraduate(admissionYear)) {
+                    existing = findGraduateByNameAndStoredGeneration(name, generation);
+                }
                 if (existing.isPresent()) {
                     if (fillMissingPhone(existing.get(), name, phone)) {
                         phoneFilled++;
@@ -850,6 +858,9 @@ public class EligibleMemberService {
                         : null;
 
                 Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
+                if (existing.isEmpty() && studentId.isBlank() && isGraduate(admissionYear)) {
+                    existing = findGraduateByNameAndStoredGeneration(name, generation);
+                }
                 if (existing.isPresent()) {
                     if (fillMissingPhone(existing.get(), name, phone)) {
                         phoneFilled++;
@@ -1096,6 +1107,16 @@ public class EligibleMemberService {
         throw invalidRoster();
     }
 
+    /** 이름과 저장된 기수가 같은 졸업생 행. 입학연도가 공식과 달라도(2학년 가입 등) 같은 사람으로 본다. */
+    private Optional<EligibleMember> findGraduateByNameAndStoredGeneration(String name, String generation) {
+        String wanted = generationValue(generation);
+        return eligibleMemberRepository.findAllByName(normalize(name)).stream()
+                .filter(row -> row.getAdmissionYear() != null && isGraduate(row.getAdmissionYear())
+                        && GENERATION_PATTERN.matcher(normalizeGeneration(row.getGeneration())).matches()
+                        && generationValue(row.getGeneration()).equals(wanted))
+                .findFirst();
+    }
+
     /** 졸업생 가입 매칭. 기수는 명부에 저장된 기수가 정답이라 공식(입학연도-1966)이 아니라 저장값으로 비교한다. */
     private List<EligibleMember> findGraduateMatches(String normalizedName, String type, String value) {
         int admissionYear = admissionYearFromGraduateVerification(type, value);
@@ -1107,6 +1128,8 @@ public class EligibleMemberService {
         }
         String generation = generationValue(value);
         return eligibleMemberRepository.findAllByName(normalizedName).stream()
+                .filter(row -> row.getAdmissionYear() != null
+                        || GENERATION_PATTERN.matcher(normalizeGeneration(row.getGeneration())).matches())
                 .filter(row -> {
                     int rowYear = row.getAdmissionYear() != null ? row.getAdmissionYear() : admissionYear;
                     return isGraduate(rowYear) && storedOrDerivedGeneration(row, rowYear).equals(generation);

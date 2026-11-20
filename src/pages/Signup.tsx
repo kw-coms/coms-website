@@ -230,6 +230,7 @@ export default function Signup({ onBack }: { onBack: () => void }) {
     if (!form.email.trim()) return '이메일을 입력해주세요.'
     if (!form.email.includes('@')) return '올바른 이메일 형식이 아닙니다.'
     if (!form.phone.trim()) return '전화번호를 입력해주세요.'
+    if (form.phone.replace(/\D/g, '').length < 9) return '전화번호를 정확히 입력해주세요.'
     if (!form.password) return '비밀번호를 입력해주세요.'
     if (/\s/.test(form.password)) return '비밀번호에 공백을 사용할 수 없습니다.'
     if (!PASSWORD_PATTERN.test(form.password)) return '비밀번호는 8자 이상, 영문·숫자·특수문자(!@#$ 등)를 모두 포함해야 합니다.'

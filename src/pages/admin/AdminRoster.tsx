@@ -140,10 +140,10 @@ export default function AdminRoster() {
         // 학번 미상이면 이름+기수(+전화)만으로 임시 등록되고, 학번은 나중에 편집으로 채운다.
         if (addForm.studentId.trim()) payload.studentId = addForm.studentId.trim()
         if (addForm.generation.trim()) payload.generation = addForm.generation.trim()
-      } else if (addForm.admissionYear.trim()) {
-        payload.admissionYear = addForm.admissionYear.trim()
       } else {
-        payload.generation = addForm.generation.trim()
+        // 입학연도와 기수는 따로 정할 수 있다(2학년 가입 등) — 둘 다 있으면 둘 다 보낸다.
+        if (addForm.admissionYear.trim()) payload.admissionYear = addForm.admissionYear.trim()
+        if (addForm.generation.trim()) payload.generation = addForm.generation.trim()
       }
       if (addForm.phone.trim()) payload.phone = addForm.phone.trim()
       if (addForm.email.trim()) payload.email = addForm.email.trim()
@@ -261,9 +261,10 @@ export default function AdminRoster() {
       setAddForm((p) => ({ ...p, admissionYear: digits, generation: String(fullYear - GRAD_BASE_YEAR) }))
       return
     }
-    // 직접 입력한 값: 이 칸이 자동 채움이었다면 이제 수동 값이다.
-    if (autoFilled === 'admissionYear') setAutoFilled(null)
-    setAddForm((p) => ({ ...p, admissionYear: digits }))
+    // 직접 입력한 값: 이 칸이 자동 채움이었다면 이제 수동 값이다. 자동 채움 기수는 오래된 값이라 비운다.
+    const staleGeneration = autoFilled === 'generation'
+    if (autoFilled !== null) setAutoFilled(null)
+    setAddForm((p) => ({ ...p, admissionYear: digits, ...(staleGeneration ? { generation: '' } : {}) }))
   }
 
   const handleGenerationChange = (raw) => {
@@ -275,8 +276,9 @@ export default function AdminRoster() {
       setAddForm((p) => ({ ...p, generation: digits, admissionYear: String(gen + GRAD_BASE_YEAR).slice(-2) }))
       return
     }
-    if (autoFilled === 'generation') setAutoFilled(null)
-    setAddForm((p) => ({ ...p, generation: digits }))
+    const staleYear = autoFilled === 'admissionYear'
+    if (autoFilled !== null) setAutoFilled(null)
+    setAddForm((p) => ({ ...p, generation: digits, ...(staleYear ? { admissionYear: '' } : {}) }))
   }
 
   const inputCls = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-2 py-1 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
@@ -291,7 +293,10 @@ export default function AdminRoster() {
             <button
               key={m.id}
               type="button"
-              onClick={() => setAddForm((p) => ({ ...p, mode: m.id }))}
+              onClick={() => {
+                setAutoFilled(null)
+                setAddForm((p) => ({ ...p, mode: m.id }))
+              }}
               className={`shape-cut-sm px-3 py-1 text-xs font-semibold transition ${
                 addForm.mode === m.id
                   ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
@@ -314,7 +319,10 @@ export default function AdminRoster() {
               />
               <input
                 value={addForm.generation}
-                onChange={(e) => setAddForm((p) => ({ ...p, generation: e.target.value.replace(/[^0-9]/g, '') }))}
+                onChange={(e) => {
+                  setAutoFilled(null)
+                  setAddForm((p) => ({ ...p, generation: e.target.value.replace(/[^0-9]/g, '') }))
+                }}
                 placeholder="기수 (학번 없으면 필수)"
                 maxLength={3}
                 inputMode="numeric"

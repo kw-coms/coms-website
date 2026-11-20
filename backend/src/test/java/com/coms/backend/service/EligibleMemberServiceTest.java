@@ -554,6 +554,28 @@ class EligibleMemberServiceTest {
     }
 
     @Test
+    void generationOnlyAddReusesExistingLateJoinerRow() {
+        eligibleMemberService.addGraduateSingle("박늦깎", "05", "40", "01011112222");
+        eligibleMemberService.addGraduateSingle("박늦깎", null, "40", "01033334444");
+        eligibleMemberService.addPendingByGeneration("박늦깎", "40", "01033334444");
+
+        assertThat(eligibleMemberService.listRoster()).hasSize(1);
+        assertThat(eligibleMemberService.validateAndClaimGraduateSignup("박늦깎", "GENERATION", "40", null))
+                .isNotBlank();
+    }
+
+    @Test
+    void generationClaimSkipsRowWithoutYearAndWithoutValidGeneration() {
+        EligibleMember blank = new EligibleMember();
+        blank.setName("박무명");
+        eligibleMemberRepository.saveAndFlush(blank);
+
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimGraduateSignup("박무명", "GENERATION", "40", null))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
     void addGraduateSingleAcceptsGeneration() {
         // generation 53 → 1966+53=2019 ≤ 2019 → valid
         eligibleMemberService.addGraduateSingle("홍길동", null, "53");
