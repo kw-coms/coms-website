@@ -26,7 +26,10 @@ test.describe('lock icons', () => {
     await expect(column('멤버').getByRole('button', { name: '해커톤 평가' }).locator(LOCK)).toHaveCount(0)
     await expect(panel.getByRole('button', { name: '공지 (회원 전용)' })).toBeVisible()
     // Public entries have none.
-    for (const name of ['동아리', '배움']) await expect(column(name).locator(LOCK), name).toHaveCount(0)
+    await expect(column('배움').locator(LOCK)).toHaveCount(0)
+    // 동아리 is public except 역대 회장단.
+    await expect(column('동아리').getByRole('button', { name: /^역대 회장단/ }).locator(LOCK)).toHaveCount(1)
+    await expect(column('동아리').locator(LOCK)).toHaveCount(1)
     const tools = column('도구')
     for (const label of ['모임 신청', '일정 조율', '출석 체크']) await expect(tools.getByRole('button', { name: new RegExp(`^${label}`) }).locator(LOCK)).toHaveCount(1)
     await expect(tools.getByRole('button', { name: /^조 편성/ }).locator(LOCK)).toHaveCount(0)
@@ -51,7 +54,8 @@ test.describe('lock icons', () => {
     const tools = section('도구')
     await expect(tools.locator(LOCK)).toHaveCount(3)
     await expect(tools.getByRole('button', { name: /^조 편성/ }).locator(LOCK)).toHaveCount(0)
-    await expect(section('동아리').locator(LOCK)).toHaveCount(0)
+    await expect(section('동아리').getByRole('button', { name: /^역대 회장단/ }).locator(LOCK)).toHaveCount(1)
+    await expect(section('동아리').locator(LOCK)).toHaveCount(1)
     await expect(section('배움').locator(LOCK)).toHaveCount(0)
   })
 
