@@ -15,6 +15,7 @@ import {
   HeartHandshake,
   Megaphone,
   MessagesSquare,
+  Users,
   type LucideIcon,
 } from 'lucide-react'
 import { ActivityCategory } from '../contract/enums'
@@ -533,6 +534,7 @@ export const navGroups: NavGroup[] = [
       fromActivityItem('activity-log'),
       fromActivityItem('monthly-calendar'),
       fromActivityItem('activity-events'),
+      { id: 'team-projects', label: '팀 프로젝트', sub: 'Team Projects', path: '/team-projects', icon: Users, auth: true, keywords: '팀프 팀 프로젝트 주제 선정 개발 계획서 중간 점검 최종 발표 제출' },
       { id: 'hackathon', label: '해커톤 평가', sub: 'Hackathon', path: '/hackathon', icon: ClipboardCheck, keywords: '졸업생 투표 해커톤 평가 피드백' },
     ],
   },
