@@ -1197,6 +1197,7 @@ test(`admin roster tab can add edit and delete eligible members at ${width}px`, 
   await editRow.getByLabel('기수', { exact: true }).fill('60')
   await editRow.getByLabel('전화번호', { exact: true }).fill('01000000001')
   await editRow.getByLabel('이메일', { exact: true }).fill('edited@example.com')
+  await editRow.getByLabel('회장단 이력', { exact: true }).fill('2026 1학기 회장')
   await page.getByRole('button', { name: '저장' }).click()
 
   await expect.poll(() => updatePayload).toEqual({
@@ -1206,9 +1207,11 @@ test(`admin roster tab can add edit and delete eligible members at ${width}px`, 
     phone: '01000000001',
     email: 'edited@example.com',
     department: '컴퓨터정보공학부',
+    officerHistory: '2026 1학기 회장',
   })
   await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toBeVisible()
   await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toContainText('컴퓨터정보공학부')
+  await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toContainText('2026 1학기 회장')
 
   await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toContainText('edited@example.com')
   if (width === 390) {
