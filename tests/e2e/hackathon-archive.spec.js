@@ -44,7 +44,8 @@ for (const width of [320, 1280]) {
     await expect(archived).toContainText('완료')
     await expect(archived).toContainText('결과 공개')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-    const results = await new AxeBuilder({ page }).analyze()
+    // 저장소의 다른 axe 검사처럼 이 화면(아카이브 본문)만, WCAG 2 A/AA 기준으로 본다. 전역 내비게이션은 accessibility.spec.js 가 맡는다.
+    const results = await new AxeBuilder({ page }).include('.hackathon-page').withTags(['wcag2a', 'wcag2aa']).analyze()
     expect(results.violations.filter(item => ['serious', 'critical'].includes(item.impact))).toEqual([])
   })
 }
