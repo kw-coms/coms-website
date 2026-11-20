@@ -983,6 +983,246 @@ class EligibleMemberServiceTest {
                 .isEqualTo("01012345678");
     }
 
+    @Test
+    void officerHistoryIsSavedByAddEditAndImportAndBlankImportCellKeepsIt() throws Exception {
+        eligibleMemberService.addSingle("2026991001", "가상회원", "60", null, null, null, Member.Role.USER,
+                "  2018 회장, 2017 2학기 부회장  ");
+        var row = eligibleMemberRepository.findByStudentId("2026991001").orElseThrow();
+        assertThat(row.getOfficerHistory()).isEqualTo("2018 회장, 2017 2학기 부회장");
+        assertThat(eligibleMemberService.listRoster().getFirst().officerHistory()).isEqualTo("2018 회장, 2017 2학기 부회장");
+
+        eligibleMemberService.updateEligibleMember(row.getId(), "2026991001", "가상회원", "60", null, null, null, "2019 부회장");
+        assertThat(eligibleMemberRepository.findById(row.getId()).orElseThrow().getOfficerHistory()).isEqualTo("2019 부회장");
+        eligibleMemberService.updateEligibleMember(row.getId(), "2026991001", "가상회원", "60", null, null, null, null);
+        assertThat(eligibleMemberRepository.findById(row.getId()).orElseThrow().getOfficerHistory()).isEqualTo("2019 부회장");
+        eligibleMemberService.updateEligibleMember(row.getId(), "2026991001", "가상회원", "60", null, null, null, "   ");
+        assertThat(eligibleMemberRepository.findById(row.getId()).orElseThrow().getOfficerHistory()).isNull();
+
+        // CSV: new row stores it, a later blank cell does not clear it, a non-blank cell overwrites it.
+        eligibleMemberService.importRoster(csvFile(
+                "이름,학번,회장단 이력\n가상회원,2026991002,2020 회장\n".getBytes(StandardCharsets.UTF_8)));
+        assertThat(eligibleMemberRepository.findByStudentId("2026991002").orElseThrow().getOfficerHistory()).isEqualTo("2020 회장");
+        eligibleMemberService.importRoster(csvFile(
+                "이름,학번,회장단 이력\n가상회원,2026991002,\n".getBytes(StandardCharsets.UTF_8)));
+        assertThat(eligibleMemberRepository.findByStudentId("2026991002").orElseThrow().getOfficerHistory()).isEqualTo("2020 회장");
+        eligibleMemberService.importRoster(csvFile(
+                "이름,학번,임원\n가상회원,2026991002,2021 부회장\n".getBytes(StandardCharsets.UTF_8)));
+        assertThat(eligibleMemberRepository.findByStudentId("2026991002").orElseThrow().getOfficerHistory()).isEqualTo("2021 부회장");
+
+        // XLSX path
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "officer"},
+                new String[]{"2026991003", "가상회원", "2016 회장"}));
+        assertThat(eligibleMemberRepository.findByStudentId("2026991003").orElseThrow().getOfficerHistory()).isEqualTo("2016 회장");
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "officer"},
+                new String[]{"2026991003", "가상회원", ""}));
+        assertThat(eligibleMemberRepository.findByStudentId("2026991003").orElseThrow().getOfficerHistory()).isEqualTo("2016 회장");
+    }
+
+    @Test
+    void officerHistoryOver500CharsIsRejectedOnAddAndEdit() {
+        String tooLong = "가".repeat(501);
+        assertThatThrownBy(() -> eligibleMemberService.addSingle("2026991001", "가상회원", "60", null, null, null,
+                Member.Role.USER, tooLong))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode().value()).isEqualTo(400);
+                    assertThat(e.getReason()).isEqualTo("회장단 이력은 500자 이하로 입력해주세요.");
+                });
+        assertThatThrownBy(() -> eligibleMemberService.addGraduateSingle("가상회원", "15", null, null, null, null, null, tooLong))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> eligibleMemberService.addPendingByGeneration("가상회원", "60", null, null, null, tooLong))
+                .isInstanceOf(ResponseStatusException.class);
+        eligibleMemberService.addSingle("2026991002", "가상회원", "60", null);
+        Long id = eligibleMemberRepository.findByStudentId("2026991002").orElseThrow().getId();
+        assertThatThrownBy(() -> eligibleMemberService.updateEligibleMember(id, "2026991002", "가상회원", "60", null, null, null, tooLong))
+                .isInstanceOf(ResponseStatusException.class);
+        eligibleMemberService.addGraduateSingle("가상회원", "15", null, null, null, null, null, "가".repeat(500));
+        assertThat(eligibleMemberRepository.findAll()).anySatisfy(r -> assertThat(r.getOfficerHistory()).hasSize(500));
+    }
+
+    @Test
+    void officerHistoryIsSavedByGraduateAndPendingAdds() {
+        eligibleMemberService.addGraduateSingle("가상졸업", "15", null, null, null, null, null, "2016 회장");
+        eligibleMemberService.addPendingByGeneration("가상재학", "60", null, null, null, "2026 총무");
+        assertThat(eligibleMemberRepository.findAllByName("가상졸업").getFirst().getOfficerHistory()).isEqualTo("2016 회장");
+        assertThat(eligibleMemberRepository.findAllByName("가상재학").getFirst().getOfficerHistory()).isEqualTo("2026 총무");
+    }
+
+    @Test
+    void importKeepsExplicitGenerationWhenStudentIdIsPresentAndDerivesWhenBlank() throws Exception {
+        eligibleMemberService.importRoster(csvFile(
+                "이름,학번,기수\n가상회원,2026991001,58\n가상회원,2026991002,\n".getBytes(StandardCharsets.UTF_8)));
+        assertThat(eligibleMemberRepository.findByStudentId("2026991001").orElseThrow().getGeneration()).isEqualTo("58");
+        assertThat(eligibleMemberRepository.findByStudentId("2026991002").orElseThrow().getGeneration()).isEqualTo("60");
+        assertThat(eligibleMemberRepository.findByStudentId("2026991001").orElseThrow().getAdmissionYear()).isEqualTo(2026);
+
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "기수"},
+                new String[]{"2024991003", "가상회원", "57"}));
+        assertThat(eligibleMemberRepository.findByStudentId("2024991003").orElseThrow().getGeneration()).isEqualTo("57");
+
+        // 학번 연도 기수(58)와 3 넘게 어긋난 값은 잘못 적힌 칸으로 보고 학번에서 계산한다.
+        eligibleMemberService.importRoster(csvFile(
+                "이름,학번,기수\n가상회원,2024991004,1\n가상회원,2024991005,54\n가상회원,2024991006,55\n".getBytes(StandardCharsets.UTF_8)));
+        assertThat(eligibleMemberRepository.findByStudentId("2024991004").orElseThrow().getGeneration()).isEqualTo("58");
+        assertThat(eligibleMemberRepository.findByStudentId("2024991005").orElseThrow().getGeneration()).isEqualTo("58");
+        assertThat(eligibleMemberRepository.findByStudentId("2024991006").orElseThrow().getGeneration()).isEqualTo("55");
+    }
+
+    @Test
+    void graduateAddWithStudentIdStoresItAndKeepsExplicitGeneration() {
+        eligibleMemberService.addGraduateSingle("가상졸업", null, "50", null, null, null, "2015123456", null);
+
+        var row = eligibleMemberRepository.findByStudentId("2015123456").orElseThrow();
+        assertThat(row.getAdmissionYear()).isEqualTo(2015);
+        assertThat(row.getGeneration()).isEqualTo("50");
+        eligibleMemberService.addGraduateSingle("가상졸업이", null, null, null, null, null, "2014123456", null);
+        assertThat(eligibleMemberRepository.findByStudentId("2014123456").orElseThrow().getGeneration()).isEqualTo("48");
+    }
+
+    @Test
+    void graduateAddWithStudentIdRejectsDuplicateCurrentYearAndMalformed() {
+        eligibleMemberService.addSingle("2015123456", "다른사람", "49", null);
+
+        assertThatThrownBy(() -> eligibleMemberService.addGraduateSingle("가상졸업", null, "49", null, null, null, "2015123456", null))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode().value()).isEqualTo(409);
+                    assertThat(e.getReason()).isEqualTo("이미 명부에 있는 학번입니다.");
+                });
+        assertThatThrownBy(() -> eligibleMemberService.addGraduateSingle("가상졸업", null, "60", null, null, null, "2026123456", null))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+        assertThatThrownBy(() -> eligibleMemberService.addGraduateSingle("가상졸업", null, "50", null, null, null, "201512345", null))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+    }
+
+    @Test
+    void graduateAddWithStudentIdUpgradesExistingYearRegisteredRowInPlace() {
+        eligibleMemberService.addGraduateSingle("가상졸업", "15", null, "01011112222", null, null, null, null);
+        Long id = eligibleMemberRepository.findAllByName("가상졸업").getFirst().getId();
+
+        eligibleMemberService.addGraduateSingle("가상졸업", null, null, null, "컴퓨터공학부", null, "2015123456", "2016 회장");
+
+        var rows = eligibleMemberRepository.findAllByName("가상졸업");
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row.getId()).isEqualTo(id);
+            assertThat(row.getStudentId()).isEqualTo("2015123456");
+            assertThat(row.getAdmissionYear()).isEqualTo(2015);
+            assertThat(row.getGeneration()).isEqualTo("49");
+            assertThat(row.getVerificationKey()).isNull();
+            assertThat(row.getPhone()).isEqualTo("01011112222");
+            assertThat(row.getDepartment()).isEqualTo("컴퓨터공학부");
+            assertThat(row.getOfficerHistory()).isEqualTo("2016 회장");
+        });
+    }
+
+    @Test
+    void graduateAddWithStudentIdUpgradesGenerationRegisteredLateJoinerAndAppliesExplicitGeneration() {
+        eligibleMemberService.addGraduateSingle("가상졸업", null, "40", null);
+        eligibleMemberService.addGraduateSingle("가상졸업", null, "40", null, null, null, "2015123456", null);
+
+        assertThat(eligibleMemberRepository.findAllByName("가상졸업")).singleElement().satisfies(row -> {
+            assertThat(row.getStudentId()).isEqualTo("2015123456");
+            assertThat(row.getGeneration()).isEqualTo("40");
+            assertThat(row.getAdmissionYear()).isEqualTo(2015);
+        });
+    }
+
+    @Test
+    void graduateAddWithStudentIdRejectsRowThatAlreadySignedUpWithAccountId() {
+        eligibleMemberService.addGraduateSingle("가상졸업", "15", null, null);
+        var row = eligibleMemberRepository.findAllByName("가상졸업").getFirst();
+        row.setStudentId("G2015-" + row.getId());
+        eligibleMemberRepository.saveAndFlush(row);
+
+        assertThatThrownBy(() -> eligibleMemberService.addGraduateSingle("가상졸업", null, null, null, null, null, "2015123456", null))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode().value()).isEqualTo(409);
+                    assertThat(e.getReason()).isEqualTo("이미 가입한 졸업생입니다. 계정 학번 변경은 관리자에게 문의하세요.");
+                });
+        assertThat(eligibleMemberRepository.findAllByName("가상졸업")).hasSize(1);
+    }
+
+    @Test
+    void readdingGraduateByYearDoesNotDuplicateRowThatHasStudentId() {
+        eligibleMemberService.addGraduateSingle("가상졸업", null, "50", null, null, null, "2015123456", null);
+
+        eligibleMemberService.addGraduateSingle("가상졸업", "15", null, "01033334444");
+
+        assertThat(eligibleMemberRepository.findAllByName("가상졸업")).singleElement().satisfies(row -> {
+            assertThat(row.getStudentId()).isEqualTo("2015123456");
+            assertThat(row.getPhone()).isEqualTo("01033334444");
+        });
+    }
+
+    @Test
+    void graduateAddRejectsStudentIdAndAdmissionYearThatDisagree() {
+        assertThatThrownBy(() -> eligibleMemberService.addGraduateSingle("가상졸업", "22", null, null, null, null, "2015123456", null))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode().value()).isEqualTo(400);
+                    assertThat(e.getReason()).isEqualTo("학번과 입학연도가 다릅니다.");
+                });
+        eligibleMemberService.addGraduateSingle("가상졸업", "15", null, null, null, null, "2015123456", null);
+        assertThat(eligibleMemberRepository.findByStudentId("2015123456")).isPresent();
+    }
+
+    @Test
+    void graduateAddMapsStudentIdUniqueRaceTo409() {
+        var repo = org.mockito.Mockito.mock(EligibleMemberRepository.class);
+        org.mockito.Mockito.when(repo.saveAndFlush(org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("uk_student_id"));
+        var service = new EligibleMemberService(repo, bannedStudentRepository, memberRepository,
+                Clock.fixed(Instant.parse("2026-06-06T00:00:00Z"), ZoneId.of("Asia/Seoul")));
+
+        assertThatThrownBy(() -> service.addGraduateSingle("가상졸업", null, null, null, null, null, "2015123456", null))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode().value()).isEqualTo(409);
+                    assertThat(e.getReason()).isEqualTo("이미 명부에 있는 학번입니다.");
+                });
+    }
+
+    @Test
+    void importSkipsOnlyTheOfficerValueWhenOver500CharsAndCountsIt() throws Exception {
+        String longCell = "가".repeat(501);
+        var csv = eligibleMemberService.importRoster(csvFile(
+                ("이름,학번,회장단 이력\n가상회원,2026991001," + longCell + "\n가상회원,2026991002,2020 회장\n")
+                        .getBytes(StandardCharsets.UTF_8)));
+        assertThat(csv.imported()).isEqualTo(2);
+        assertThat(csv.officerHistoryTooLong()).isEqualTo(1);
+        assertThat(eligibleMemberRepository.findByStudentId("2026991001").orElseThrow().getOfficerHistory()).isNull();
+        assertThat(eligibleMemberRepository.findByStudentId("2026991002").orElseThrow().getOfficerHistory()).isEqualTo("2020 회장");
+
+        var xlsx = eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "임원"},
+                new String[]{"2026991003", "가상회원", longCell}));
+        assertThat(xlsx.imported()).isEqualTo(1);
+        assertThat(xlsx.officerHistoryTooLong()).isEqualTo(1);
+        assertThat(eligibleMemberRepository.findByStudentId("2026991003").orElseThrow().getOfficerHistory()).isNull();
+    }
+
+    @Test
+    void officerHeaderMatchesOnlyTheKnownNames() throws Exception {
+        String[] accepted = {"회장단 이력", "회장단", "임원 이력", "임원", "회장이력", "회장/부회장", "Officer History", "OFFICER",
+                "만약 회장 또는 부회장을 하셨다면 직책과 연도를 적어주세요"};
+        int n = 0;
+        for (String header : accepted) {
+            String id = "202699" + (2000 + n++);
+            eligibleMemberService.importRoster(csvFile(
+                    ("이름,학번,\"" + header + "\"\n가상회원," + id + ",이력" + n + "\n").getBytes(StandardCharsets.UTF_8)));
+            assertThat(eligibleMemberRepository.findByStudentId(id).orElseThrow().getOfficerHistory())
+                    .as(header).isEqualTo("이력" + n);
+        }
+        String[] rejected = {"회장 승인일", "임원진 연락처", "회장단 연락처"};
+        for (String header : rejected) {
+            String id = "202699" + (3000 + n++);
+            eligibleMemberService.importRoster(csvFile(
+                    ("이름,학번,\"" + header + "\"\n가상회원," + id + ",값\n").getBytes(StandardCharsets.UTF_8)));
+            assertThat(eligibleMemberRepository.findByStudentId(id).orElseThrow().getOfficerHistory()).as(header).isNull();
+        }
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "회장 승인일"},
+                new String[]{"2026993999", "가상회원", "2020"}));
+        assertThat(eligibleMemberRepository.findByStudentId("2026993999").orElseThrow().getOfficerHistory()).isNull();
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "회장단 이력"},
+                new String[]{"2026993998", "가상회원", "2019 회장"}));
+        assertThat(eligibleMemberRepository.findByStudentId("2026993998").orElseThrow().getOfficerHistory()).isEqualTo("2019 회장");
+    }
+
     private SignupRequest signupRequest(String studentId, String name, String phone) {
         return new SignupRequest(studentId, name, null, null, "roster-test@example.com", "Password1!",
                 null, null, phone, null, null, null);

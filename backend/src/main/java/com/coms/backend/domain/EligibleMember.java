@@ -34,6 +34,10 @@ public class EligibleMember {
     @Column(columnDefinition = "TEXT")
     private String note;
 
+    /** 회장단 이력 자유 서술. 예: "2018 회장, 2017 2학기 부회장". */
+    @Column(name = "officer_history", length = 500)
+    private String officerHistory;
+
     /**
      * 이 명부 행으로 가입할 때 부여할 등급. 리크루팅 합격 이관은 ASSOCIATE(준회원),
      * 관리자가 직접 등록한 행은 USER(회원). columnDefinition 이 DEFAULT 를 들고 있어야
@@ -74,6 +78,8 @@ public class EligibleMember {
     public void setVerificationKey(String verificationKey) { this.verificationKey = verificationKey; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
+    public String getOfficerHistory() { return officerHistory; }
+    public void setOfficerHistory(String officerHistory) { this.officerHistory = officerHistory; }
     public Member.Role getInitialRole() { return initialRole; }
     public void setInitialRole(Member.Role initialRole) { this.initialRole = initialRole; }
     public LocalDateTime getCreatedAt() { return createdAt; }
