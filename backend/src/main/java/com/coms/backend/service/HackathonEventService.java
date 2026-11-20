@@ -1,6 +1,7 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.HackathonEvent;
+import com.coms.backend.domain.HackathonEventStatus;
 import com.coms.backend.domain.HackathonMaterial;
 import com.coms.backend.domain.HackathonProject;
 import com.coms.backend.dto.AdminHackathonEventResponse;
@@ -10,6 +11,7 @@ import com.coms.backend.dto.HackathonEventSummary;
 import com.coms.backend.dto.HackathonEventWrite;
 import com.coms.backend.dto.HackathonMaterialResponse;
 import com.coms.backend.dto.HackathonProjectResponse;
+import com.coms.backend.dto.HackathonResultResponse;
 import com.coms.backend.dto.HackathonProjectWrite;
 import com.coms.backend.repository.HackathonEventRepository;
 import com.coms.backend.repository.HackathonMaterialRepository;
@@ -32,6 +34,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
@@ -56,38 +61,46 @@ public class HackathonEventService {
     private final HackathonReviewRepository reviews;
     private final MediaUploadValidator validator;
     private final StorageService storage;
+    private final Clock clock;
 
     public HackathonEventService(HackathonEventRepository events, HackathonProjectRepository projects,
                                  HackathonMaterialRepository materials, HackathonReviewRepository reviews,
-                                 MediaUploadValidator validator, StorageService storage) {
+                                 MediaUploadValidator validator, StorageService storage, Clock clock) {
         this.events = events;
         this.projects = projects;
         this.materials = materials;
         this.reviews = reviews;
         this.validator = validator;
         this.storage = storage;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
     public List<HackathonEventSummary> publicList() {
-        return events.findByPublishedTrueOrderByYearDescSemesterDescIdDesc().stream().map(HackathonEventSummary::from).toList();
+        return events.findByPublishedTrueOrderByYearDescSemesterDescIdDesc().stream()
+                .map(event -> HackathonEventSummary.from(event, status(event), (int) projects.countByEventId(event.getId()))).toList();
     }
 
     @Transactional(readOnly = true)
     public HackathonEventResponse publicDetail(Long id) {
         HackathonEvent event = requirePublic(id);
-        return HackathonEventResponse.from(event, projects.findByEventIdOrderByPositionAscIdAsc(id), materials.findByEventIdOrderByIdAsc(id));
+        HackathonEventStatus status = status(event);
+        List<HackathonProject> eventProjects = projects.findByEventIdOrderByPositionAscIdAsc(id);
+        // 점수는 완료 + 결과 공개일 때만 내려간다. 평가자 이름·의견은 어떤 경우에도 내려가지 않는다.
+        List<HackathonResultResponse> results = event.isResultsPublished() && status == HackathonEventStatus.DONE
+                ? HackathonRanking.rank(eventProjects, reviews.findByEventIdOrderByCreatedAtAscIdAsc(id)) : List.of();
+        return HackathonEventResponse.from(event, eventProjects, materials.findByEventIdOrderByIdAsc(id), status, results);
     }
 
     @Transactional(readOnly = true)
     public List<AdminHackathonEventSummary> adminList() {
-        return events.findAllByOrderByYearDescSemesterDescIdDesc().stream().map(AdminHackathonEventSummary::from).toList();
+        return events.findAllByOrderByYearDescSemesterDescIdDesc().stream().map(event -> AdminHackathonEventSummary.from(event, status(event))).toList();
     }
 
     @Transactional(readOnly = true)
     public AdminHackathonEventResponse adminDetail(Long id) {
         HackathonEvent event = requireEvent(id);
-        return AdminHackathonEventResponse.from(event, projects.findByEventIdOrderByPositionAscIdAsc(id), materials.findByEventIdOrderByIdAsc(id));
+        return AdminHackathonEventResponse.from(event, projects.findByEventIdOrderByPositionAscIdAsc(id), materials.findByEventIdOrderByIdAsc(id), status(event));
     }
 
     @Transactional
@@ -122,6 +135,21 @@ public class HackathonEventService {
         event.setOpen(open);
         events.saveAndFlush(event);
         return open;
+    }
+
+    @Transactional
+    public boolean setResultsPublished(Long id, Boolean resultsPublished) {
+        if (resultsPublished == null) throw invalid();
+        HackathonEvent event = lock(id);
+        if (resultsPublished && (!event.isPublished() || status(event) != HackathonEventStatus.DONE))
+            throw conflict("완료된 행사만 결과를 공개할 수 있습니다. 평가를 닫고 개발 기간이 끝난 뒤에 공개해 주세요.");
+        event.setResultsPublished(resultsPublished);
+        events.saveAndFlush(event);
+        return resultsPublished;
+    }
+
+    private HackathonEventStatus status(HackathonEvent event) {
+        return HackathonEventStatus.of(event, LocalDateTime.now(clock.withZone(ZoneId.of("Asia/Seoul"))));
     }
 
     @Transactional
@@ -318,6 +346,12 @@ public class HackathonEventService {
         event.setTheme(text(write.theme(), 200, false));
         event.setIntroduction(multiline(write.introduction(), 10000, false));
         event.setRules(multiline(write.rules(), 10000, false));
+        if ((write.startsAt() == null) != (write.endsAt() == null)
+                || (write.startsAt() != null && write.startsAt().isAfter(write.endsAt()))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "개발 기간은 시작과 종료를 함께 입력하고, 시작이 종료보다 늦을 수 없습니다.");
+        }
+        event.setStartsAt(write.startsAt());
+        event.setEndsAt(write.endsAt());
     }
 
     private void copyProject(HackathonProject project, HackathonProjectWrite write, boolean creating) {

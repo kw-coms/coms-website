@@ -7,11 +7,20 @@ export type HackathonReview = Scores & {
 }
 export type HackathonMaterial = { id: number; projectId: string | null; kind: 'proposal' | 'presentation' | 'video' | 'poster' | 'other'; label: string; originalName: string; mimeType: string; fileSize: number; url: string }
 export type HackathonProject = { projectId: string; title: string; author: string; description: string; github: string | null; live: string | null; position: number; materials: HackathonMaterial[] }
-export type HackathonEventSummary = { id: number; title: string; year: number; semester: 1 | 2; open: boolean }
-export type AdminHackathonEventSummary = HackathonEventSummary & { published: boolean }
-export type HackathonEvent = HackathonEventSummary & { theme: string; introduction: string; rules: string; projects: HackathonProject[]; materials: HackathonMaterial[] }
-export type AdminHackathonEvent = HackathonEvent & { published: boolean }
-export type HackathonEventWrite = Pick<HackathonEvent, 'title' | 'year' | 'semester' | 'theme' | 'introduction' | 'rules'>
+export type HackathonStatus = 'UPCOMING' | 'IN_PROGRESS' | 'REVIEWING' | 'DONE'
+export type HackathonEventBase = {
+  id: number; title: string; year: number; semester: 1 | 2; open: boolean
+  startsAt: string | null; endsAt: string | null; status: HackathonStatus; resultsPublished: boolean
+}
+export type HackathonEventSummary = HackathonEventBase & { theme: string; projectCount: number }
+export type AdminHackathonEventSummary = HackathonEventBase & { published: boolean }
+export type HackathonResult = {
+  projectId: string; title: string; author: string; rank: number
+  finalScore: number; alumniAverage: number; chairScore: number; alumniCount: number; criteria: Scores
+}
+export type HackathonEvent = HackathonEventBase & { theme: string; introduction: string; rules: string; projects: HackathonProject[]; materials: HackathonMaterial[]; results: HackathonResult[] }
+export type AdminHackathonEvent = Omit<HackathonEvent, 'results'> & { published: boolean }
+export type HackathonEventWrite = Pick<HackathonEvent, 'title' | 'year' | 'semester' | 'theme' | 'introduction' | 'rules' | 'startsAt' | 'endsAt'>
 export type HackathonProjectWrite = Pick<HackathonProject, 'title' | 'author' | 'description' | 'github' | 'live'> & { position?: number }
 
 const adminEventPath = (id: number) => `/api/admin/hackathon/events/${id}`
@@ -29,6 +38,8 @@ export const publishHackathonEvent = (id: number, published: boolean): Promise<{
   request(`${adminEventPath(id)}/published`, { method: 'PUT', body: JSON.stringify({ published }) })
 export const setEventOpen = (id: number, open: boolean): Promise<{ open: boolean }> =>
   request(`${adminEventPath(id)}/settings`, { method: 'PUT', body: JSON.stringify({ open }) })
+export const setEventResultsPublished = (id: number, resultsPublished: boolean): Promise<{ resultsPublished: boolean }> =>
+  request(`${adminEventPath(id)}/results-published`, { method: 'PUT', body: JSON.stringify({ resultsPublished }) })
 export const createHackathonProject = (id: number, payload: HackathonProjectWrite): Promise<HackathonProject> =>
   request(`${adminEventPath(id)}/projects`, { method: 'POST', body: JSON.stringify(payload) })
 export const updateHackathonProject = (id: number, projectId: string, payload: HackathonProjectWrite): Promise<HackathonProject> =>

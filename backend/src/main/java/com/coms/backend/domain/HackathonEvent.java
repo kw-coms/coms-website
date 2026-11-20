@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "hackathon_events")
@@ -28,6 +29,12 @@ public class HackathonEvent {
     private boolean published;
     @Column(nullable = false)
     private boolean open;
+    @Column(name = "starts_at")
+    private LocalDateTime startsAt;
+    @Column(name = "ends_at")
+    private LocalDateTime endsAt;
+    @Column(name = "results_published", nullable = false)
+    private boolean resultsPublished;
 
     public Long getId() { return id; }
     public String getTitle() { return title; }
@@ -46,4 +53,10 @@ public class HackathonEvent {
     public void setPublished(boolean value) { published = value; }
     public boolean isOpen() { return open; }
     public void setOpen(boolean value) { open = value; }
+    public LocalDateTime getStartsAt() { return startsAt; }
+    public void setStartsAt(LocalDateTime value) { startsAt = value; }
+    public LocalDateTime getEndsAt() { return endsAt; }
+    public void setEndsAt(LocalDateTime value) { endsAt = value; }
+    public boolean isResultsPublished() { return resultsPublished; }
+    public void setResultsPublished(boolean value) { resultsPublished = value; }
 }

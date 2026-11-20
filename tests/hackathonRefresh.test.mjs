@@ -4,7 +4,7 @@ import { evaluationPath, refreshWorker } from '../public/hackathon-refresh.js'
 
 test('share paths preserve their event identity without accepting arbitrary destinations', () => {
   for (const [path, target] of [
-    ['/hackathon/share', '/hackathon'],
+    ['/hackathon/share', '/hackathon/1'],
     ['/hackathon/1/share', '/hackathon/1'],
     ['/hackathon/2028/share', '/hackathon/2028'],
     ['/hackathon/0/share', null],

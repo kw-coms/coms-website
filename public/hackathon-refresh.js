@@ -1,5 +1,5 @@
 export function evaluationPath(pathname) {
-  if (pathname === '/hackathon/share') return '/hackathon'
+  if (pathname === '/hackathon/share') return '/hackathon/1' // 인쇄물·QR에 남은 첫 행사 링크
   const match = /^\/hackathon\/([1-9][0-9]*)\/share$/.exec(pathname)
   return match ? `/hackathon/${match[1]}` : null
 }
