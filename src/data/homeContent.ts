@@ -16,6 +16,7 @@ import {
   Megaphone,
   MessagesSquare,
   Users,
+  Crown,
   type LucideIcon,
 } from 'lucide-react'
 import { ActivityCategory } from '../contract/enums'
@@ -508,6 +509,7 @@ export const navGroups: NavGroup[] = [
     sub: 'Club',
     items: [
       { id: 'about', label: '소개', sub: 'About', path: '/about', icon: Binary, keywords: '정체성' },
+      { id: 'officers', label: '역대 회장단', sub: 'Officers', path: '/officers', icon: Crown, auth: true, keywords: '회장 부회장 회장단 역대 임원 임기 대 기수' },
       { id: 'activities', label: '활동', sub: 'Activities', path: '/activities', icon: Sparkles, keywords: '세미나·스터디' },
       { id: 'projects', label: '프로젝트', sub: 'Projects', path: '/projects', icon: CircuitBoard, keywords: '실전 제작' },
       { id: 'sponsors', label: '후원', sub: 'Sponsors', path: '/sponsors', icon: HeartHandshake },
