@@ -234,12 +234,15 @@ class TeamProjectIntegrationTest {
     @Test
     void membersEditReplaceAndRemoveWithoutLosingTheirSubmissionIdentity() throws Exception {
         Fixture f = fixture();
+        // 다른 테스트가 고정해 둔 시계에 기대지 않고, 수정 시각이 실제로 뒤로 가게 시계를 직접 옮긴다.
+        LocalDateTime start = LocalDateTime.now(SEOUL).withNano(0);
+        clock.at(start);
         JsonNode first = json(submitRaw(alice, f.program, f.teamA, f.proposal, "초안", List.of(
                 new MockMultipartFile("files", "a.txt", "text/plain", "a".getBytes()),
                 new MockMultipartFile("files", "b.txt", "text/plain", "b".getBytes())), "https://a.example").andExpect(status().isOk()));
         long keep = first.path("files").get(0).path("id").asLong();
         long drop = first.path("files").get(1).path("id").asLong();
-        Thread.sleep(15);
+        clock.at(start.plusMinutes(1));
         // 다른 팀원이 본문·링크를 바꾸고 파일 하나를 빼고 하나를 더한다.
         MockMultipartHttpServletRequestBuilder edit = multipartPut(bob, f.program, f.teamA, f.proposal)
                 .file(new MockMultipartFile("files", "c.txt", "text/plain", "c".getBytes()))
