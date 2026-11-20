@@ -164,7 +164,7 @@ class ClubOfficerIntegrationTest {
         long term = createTerm(admin, "52대", 2018);
         mvc.perform(admin(post(ADMIN_API + "/terms"), "{\"label\":\"52대\",\"year\":2019}"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("이미 같은 이름의 임기가 있습니다."));
+                .andExpect(jsonPath("$.message").value("같은 대수가 이미 있습니다."));
         mvc.perform(admin(post(ADMIN_API + "/terms"), "{\"label\":\"  \",\"year\":2019}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("임기 이름을(를) 입력해 주세요."));
@@ -300,7 +300,7 @@ class ClubOfficerIntegrationTest {
         mvc.perform(admin(post(ADMIN_API + "/import"), bad)).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("2번째 줄: 연도는 1900~2100 사이여야 합니다."));
         mvc.perform(admin(post(ADMIN_API + "/import"),
-                "{\"rows\":[{\"label\":\"70대\",\"year\":2026},{\"label\":\"70대\",\"year\":2026}]}"))
+                "{\"rows\":[{\"label\":\"70대\",\"year\":2026,\"presidents\":[\"가\"]},{\"label\":\"70대\",\"year\":2026,\"presidents\":[\"나\"]}]}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("2번째 줄: 임기 이름 '70대'이(가) 중복되었습니다."));
         mvc.perform(admin(post(ADMIN_API + "/import"), "{\"rows\":[]}")).andExpect(status().isBadRequest())
@@ -308,7 +308,86 @@ class ClubOfficerIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM club_officer_terms", Integer.class)).isZero();
     }
 
+    @Test
+    void importRejectsEmptyRowsNullRowsAndOversizedNameLists() throws Exception {
+        mvc.perform(admin(post(ADMIN_API + "/import"),
+                "{\"rows\":[{\"label\":\"70대\",\"year\":2026,\"presidents\":[\"가\"]},{\"label\":\"71대\",\"year\":2026,\"presidents\":[\" \"],\"vices\":[]}]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("2번째 줄: 회장과 부회장 이름이 모두 비어 있습니다."));
+        mvc.perform(admin(post(ADMIN_API + "/import"), "{\"rows\":[{\"label\":\"70대\",\"year\":2026,\"presidents\":[\"가\"]},null]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("2번째 줄: 비어 있는 항목입니다."));
+        mvc.perform(admin(post(ADMIN_API + "/import"), rowWith(names(41, false))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("1번째 줄: 회장 칸에 이름이 너무 많습니다. 10명까지 입력할 수 있습니다."));
+        mvc.perform(admin(post(ADMIN_API + "/import"), rowWith(names(11, false))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("1번째 줄: 회장은(는) 10명까지 입력할 수 있습니다."));
+        // 40개 안에서 중복을 걷어 10명이면 통과한다.
+        mvc.perform(admin(post(ADMIN_API + "/import"), rowWith(names(40, true)))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.created").value(1));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM club_officers", Integer.class)).isEqualTo(10);
+    }
+
+    @Test
+    void createAndUpdateRenumberTheYearByTermNumber() throws Exception {
+        createTerm(admin, "52대", 2018);
+        createTerm(admin, "초대", 2018);
+        createTerm(admin, "임시", 2018); // 번호로 읽을 수 없는 이름은 가장 나중 임기로 본다
+        createTerm(admin, "53대", 2018);
+        assertThat(positions(2018)).containsExactly("초대=0", "52대=1", "53대=2", "임시=3");
+        assertThat(labels(json(mvc.perform(get(API).cookie(user))))).containsExactly("임시", "53대", "52대", "초대");
+
+        long a = createTerm(admin, "70대", 2026);
+        long b = createTerm(admin, "71대", 2026);
+        createTerm(admin, "72대", 2026);
+        mvc.perform(admin(put(ADMIN_API + "/terms/" + b), "{\"label\":\"71대\",\"year\":2025}")).andExpect(status().isOk());
+        assertThat(positions(2026)).containsExactly("70대=0", "72대=1");
+        assertThat(positions(2025)).containsExactly("71대=0");
+        // 이름을 바꾸면 새 번호 기준으로 같은 해 안에서 다시 놓인다.
+        mvc.perform(admin(put(ADMIN_API + "/terms/" + a), "{\"label\":\"73대\",\"year\":2026}")).andExpect(status().isOk());
+        assertThat(positions(2026)).containsExactly("72대=0", "73대=1");
+    }
+
+    @Test
+    void officerAddUsesNextPositionAndCapsEachRole() throws Exception {
+        long term = createTerm(admin, "70대", 2026);
+        long first = addOfficer(admin, term, "PRESIDENT", "가");
+        long second = addOfficer(admin, term, "VICE_PRESIDENT", "나");
+        mvc.perform(admin(delete(ADMIN_API + "/officers/" + first), null)).andExpect(status().isOk());
+        addOfficer(admin, term, "VICE_PRESIDENT", "다");
+        // 삭제로 생긴 빈자리 뒤에 붙으므로 기존 임원과 position 이 겹치지 않는다.
+        assertThat(jdbc.queryForList("SELECT position FROM club_officers ORDER BY position", Integer.class)).containsExactly(1, 2);
+        assertThat(second).isPositive();
+        for (int i = 0; i < 10; i++) addOfficer(admin, term, "PRESIDENT", "회장" + i);
+        mvc.perform(admin(post(ADMIN_API + "/terms/" + term + "/officers"), "{\"role\":\"PRESIDENT\",\"name\":\"열한째\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("회장은(는) 10명까지 입력할 수 있습니다."));
+        // 직책을 바꿔 꽉 찬 쪽으로 옮기는 길도 막힌다.
+        mvc.perform(admin(put(ADMIN_API + "/officers/" + second), "{\"role\":\"PRESIDENT\",\"name\":\"나\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
     // ---- helpers ---------------------------------------------------------------------------
+
+    private List<String> positions(int year) throws Exception {
+        List<String> out = new ArrayList<>();
+        json(mvc.perform(admin(get(ADMIN_API), null))).forEach(t -> {
+            if (t.get("year").asInt() == year) out.add(t.get("label").asText() + "=" + t.get("position").asInt());
+        });
+        out.sort(java.util.Comparator.comparingInt(text -> Integer.parseInt(text.substring(text.indexOf('=') + 1))));
+        return out;
+    }
+
+    private static String names(int count, boolean repeating) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < count; i++) out.append(i == 0 ? "" : ",").append("\"이름").append(repeating ? i % 10 : i).append("\"");
+        return out.toString();
+    }
+
+    private static String rowWith(String presidents) {
+        return "{\"rows\":[{\"label\":\"70대\",\"year\":2026,\"presidents\":[" + presidents + "],\"vices\":[]}]}";
+    }
 
     private List<String> labels(JsonNode list) {
         List<String> out = new ArrayList<>();

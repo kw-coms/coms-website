@@ -147,3 +147,5 @@
 @media (max-width: 560px) {
   .of-add { grid-template-columns: minmax(0, 1fr); }
 }
+.of-warnings { padding: 12px 14px; border: 1px solid var(--app-hairline); border-radius: 12px; background: var(--app-surface); font-size: 0.875rem; }
+.of-warnings ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; color: var(--app-muted); }

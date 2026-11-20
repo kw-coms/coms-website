@@ -28,7 +28,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-/** 역대 회장단. 읽기는 로그인한 회원, 쓰기는 회장(/api/admin/** URL 규칙). */
+/**
+ * 역대 회장단. 읽기는 로그인한 회원, 쓰기는 회장(/api/admin/** URL 규칙).
+ * club_officers 가 회장단의 기준(authoritative) 기록이다. eligible_members.officer_history 는 본인 신고 답변을 포함한
+ * 자유 서술 메모일 뿐이며 이 서비스가 읽거나 맞추지 않는다.
+ */
 @Service
 public class ClubOfficerService {
     static final int MAX_LABEL = 20;
@@ -38,6 +42,9 @@ public class ClubOfficerService {
     static final int MAX_YEAR = 2100;
     static final int MAX_IMPORT_ROWS = 500;
     static final int MAX_NAMES_PER_ROLE = 10;
+    /** 한 칸에 들어올 수 있는 원시 이름 수(중복 제거 전). 이보다 많으면 입력 자체를 거절한다. */
+    static final int MAX_RAW_NAMES = 40;
+    static final String LABEL_CONSTRAINT = "uq_club_officer_terms_label";
     private static final Pattern TERM_NUMBER = Pattern.compile("^(\\d+)대$");
 
     private final ClubOfficerTermRepository terms;
@@ -76,13 +83,15 @@ public class ClubOfficerService {
     public AdminTermView createTerm(TermWrite request) {
         String label = required(request.label(), MAX_LABEL, "임기 이름");
         int year = year(request.year());
-        if (terms.findByLabel(label).isPresent()) throw conflict("이미 같은 이름의 임기가 있습니다.");
+        if (terms.findByLabel(label).isPresent()) throw conflict("같은 대수가 이미 있습니다.");
         ClubOfficerTerm term = new ClubOfficerTerm();
         term.setLabel(label);
         term.setYear(year);
         term.setNote(optional(request.note(), MAX_NOTE, "메모"));
-        term.setPosition(request.position() != null ? request.position() : nextPosition(year));
-        return adminView(save(term));
+        term.setPosition(nextPosition(year));
+        term = save(term);
+        renumber(year);
+        return adminView(term);
     }
 
     @Transactional
@@ -91,13 +100,16 @@ public class ClubOfficerService {
         String label = required(request.label(), MAX_LABEL, "임기 이름");
         int year = year(request.year());
         terms.findByLabel(label).filter(other -> !other.getId().equals(id)).ifPresent(other -> {
-            throw conflict("이미 같은 이름의 임기가 있습니다.");
+            throw conflict("같은 대수가 이미 있습니다.");
         });
+        int oldYear = term.getYear();
         term.setLabel(label);
         term.setYear(year);
         term.setNote(optional(request.note(), MAX_NOTE, "메모"));
-        if (request.position() != null) term.setPosition(request.position());
-        return adminView(save(term));
+        term = save(term);
+        renumber(year);
+        if (oldYear != year) renumber(oldYear);
+        return adminView(term);
     }
 
     @Transactional
@@ -127,9 +139,12 @@ public class ClubOfficerService {
         ClubOfficerTerm term = term(termId);
         ClubOfficer officer = new ClubOfficer();
         officer.setTermId(termId);
-        officer.setRole(role(request.role()));
+        OfficerRole role = role(request.role());
+        officer.setRole(role);
         officer.setName(required(request.name(), MAX_NAME, "이름"));
-        officer.setPosition(officers.findByTermIdOrderByPositionAscIdAsc(termId).size());
+        List<ClubOfficer> current = officers.findByTermIdOrderByPositionAscIdAsc(termId);
+        requireRoom(current, role);
+        officer.setPosition(current.stream().mapToInt(ClubOfficer::getPosition).max().orElse(-1) + 1);
         officers.save(officer);
         return adminView(term);
     }
@@ -137,7 +152,9 @@ public class ClubOfficerService {
     @Transactional
     public AdminTermView updateOfficer(Long id, OfficerWrite request) {
         ClubOfficer officer = officer(id);
-        officer.setRole(role(request.role()));
+        OfficerRole role = role(request.role());
+        if (role != officer.getRole()) requireRoom(officers.findByTermIdOrderByPositionAscIdAsc(officer.getTermId()), role);
+        officer.setRole(role);
         String name = required(request.name(), MAX_NAME, "이름");
         // 이름이 바뀌면 다른 사람이므로 기존 명부 연결을 유지하지 않는다.
         if (!name.equals(officer.getName())) officer.setEligibleMemberId(null);
@@ -196,6 +213,7 @@ public class ClubOfficerService {
         for (int i = 0; i < rows.size(); i++) {
             ImportRow row = rows.get(i);
             String where = (i + 1) + "번째 줄: ";
+            if (row == null) throw bad(where + "비어 있는 항목입니다.");
             String label;
             int year;
             List<String> presidents;
@@ -205,6 +223,7 @@ public class ClubOfficerService {
                 year = year(row.year());
                 presidents = names(row.presidents(), "회장");
                 vices = names(row.vices(), "부회장");
+                if (presidents.isEmpty() && vices.isEmpty()) throw bad("회장과 부회장 이름이 모두 비어 있습니다.");
             } catch (ResponseStatusException e) {
                 throw bad(where + e.getReason());
             }
@@ -271,7 +290,10 @@ public class ClubOfficerService {
         return changed;
     }
 
-    /** 해당 연도 임기를 임기 번호(초대=1, 52대=52) 순으로 position 0.. 로 매긴다. */
+    /**
+     * 해당 연도 임기를 임기 번호(초대=1, 52대=52) 순으로 position 0.. 로 매긴다.
+     * 번호로 읽을 수 없는 이름(예: '임시')은 번호 있는 임기보다 뒤, 곧 가장 나중 임기로 본다(같으면 id 순).
+     */
     private void renumber(int year) {
         List<ClubOfficerTerm> inYear = new ArrayList<>(terms.findByYear(year));
         inYear.sort(Comparator.comparingInt((ClubOfficerTerm t) -> termNumber(t.getLabel())).thenComparing(ClubOfficerTerm::getId));
@@ -293,7 +315,23 @@ public class ClubOfficerService {
         try {
             return terms.saveAndFlush(term);
         } catch (DataIntegrityViolationException e) {
-            throw conflict("이미 같은 이름의 임기가 있습니다.");
+            if (!violatesLabelConstraint(e)) throw e;
+            throw conflict("같은 대수가 이미 있습니다.");
+        }
+    }
+
+    /** H2 는 제약 이름을 대문자로, PostgreSQL 은 소문자로 돌려준다. 원인 사슬 어디에든 이름이 있으면 라벨 중복이다. */
+    private static boolean violatesLabelConstraint(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause() == cause ? null : cause.getCause()) {
+            String message = cause.getMessage();
+            if (message != null && message.toLowerCase(java.util.Locale.ROOT).contains(LABEL_CONSTRAINT)) return true;
+        }
+        return false;
+    }
+
+    private static void requireRoom(List<ClubOfficer> current, OfficerRole role) {
+        if (current.stream().filter(o -> o.getRole() == role).count() >= MAX_NAMES_PER_ROLE) {
+            throw bad((role == OfficerRole.PRESIDENT ? "회장" : "부회장") + "은(는) " + MAX_NAMES_PER_ROLE + "명까지 입력할 수 있습니다.");
         }
     }
 
@@ -362,15 +400,17 @@ public class ClubOfficerService {
     }
 
     private static List<String> names(List<String> values, String label) {
-        List<String> out = new ArrayList<>();
-        for (String value : values == null ? List.<String>of() : values) {
+        List<String> raw = values == null ? List.of() : values;
+        if (raw.size() > MAX_RAW_NAMES) throw bad(label + " 칸에 이름이 너무 많습니다. " + MAX_NAMES_PER_ROLE + "명까지 입력할 수 있습니다.");
+        Set<String> out = new LinkedHashSet<>();
+        for (String value : raw) {
             String name = value == null ? "" : value.strip();
             if (name.isEmpty()) continue;
             if (name.length() > MAX_NAME) throw bad(label + " 이름은 " + MAX_NAME + "자까지 입력할 수 있습니다.");
-            if (!out.contains(name)) out.add(name);
+            out.add(name);
+            if (out.size() > MAX_NAMES_PER_ROLE) throw bad(label + "은(는) " + MAX_NAMES_PER_ROLE + "명까지 입력할 수 있습니다.");
         }
-        if (out.size() > MAX_NAMES_PER_ROLE) throw bad(label + "은(는) " + MAX_NAMES_PER_ROLE + "명까지 입력할 수 있습니다.");
-        return out;
+        return new ArrayList<>(out);
     }
 
     private static String required(String value, int max, String label) {

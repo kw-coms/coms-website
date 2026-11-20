@@ -201,6 +201,25 @@ test('bulk paste previews create / update / unchanged / invalid lines, then appl
   await expect(page.getByRole('article', { name: '초대 1971년' })).toBeVisible()
 })
 
+test('bulk paste warns about ignored notes and names crammed into one cell, and a dash means nobody', async ({ page }) => {
+  const db = await installAdminApi(page)
+  await page.goto('/admin?tab=club-officers')
+  const panel = page.getByRole('region', { name: '역대 회장단 관리' })
+  await expect(panel).toContainText('대수 번호(초대=1, 52대=52) 순으로 다시 매겨')
+  await panel.getByLabel('붙여넣을 내용').fill('53대\t2019\t바사아(회장 대행)\t자차카 타파하\n54대\t2019\t카타파\t-')
+  await panel.getByRole('button', { name: '미리보기' }).click()
+  const warnings = panel.getByRole('status').filter({ hasText: '확인해 주세요 2건' })
+  await expect(warnings).toContainText('1번째 줄: 바사아(회장 대행) → 이름 바사아, 메모 무시됨')
+  await expect(warnings).toContainText("1번째 줄: '자차카 타파하': 한 칸에 이름이 둘이면 쉼표로 구분하세요")
+  await expect(panel.getByRole('region', { name: '일괄 등록 미리보기' }).getByRole('row', { name: /54대/ })).toContainText('—')
+  await panel.getByRole('button', { name: '2개 임기 적용' }).click()
+  await expect(panel.getByRole('status').filter({ hasText: '일괄 등록을 마쳤습니다.' })).toBeVisible()
+  expect(db.imports[0]).toEqual([
+    { label: '53대', year: 2019, presidents: ['바사아'], vices: ['자차카 타파하'] },
+    { label: '54대', year: 2019, presidents: ['카타파'], vices: [] },
+  ])
+})
+
 test('an officer is linked to a roster row found by name, and 기수 appears on the chip', async ({ page }) => {
   const db = await installAdminApi(page)
   await page.goto('/admin?tab=club-officers')

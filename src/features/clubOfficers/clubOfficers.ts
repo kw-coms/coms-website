@@ -8,7 +8,8 @@ export type TermView = { id: number; label: string; year: number; position: numb
 
 export type ImportRow = { label: string; year: number; presidents: string[]; vices: string[] }
 export type ParseIssue = { line: number; text: string; message: string }
-export type ParseResult = { rows: ImportRow[]; issues: ParseIssue[] }
+// issues: 그 줄은 적용되지 않는다. warnings: 적용은 되지만 확인이 필요하다(무시된 메모, 이름이 둘로 보이는 칸).
+export type ParseResult = { rows: ImportRow[]; issues: ParseIssue[]; warnings: ParseIssue[] }
 export type ImportAction = 'create' | 'update' | 'same'
 
 export const MIN_YEAR = 1900
@@ -20,19 +21,45 @@ export const MAX_IMPORT_ROWS = 500
 
 const HEADER_YEAR = /^(연도|년도|년|year)$/i
 
-/** "홍길동, 김철수" → ['홍길동','김철수']. 쉼표(전각 포함) 앞뒤 공백은 무시하고 중복은 한 번만. */
-export function splitNames(cell: string): string[] {
+const EMPTY_CELL = /^(-|–|—|없음|x|X)$/
+const TRAILING_NOTE = /^(.*?)\s*[(（]([^()（）]*)[)）]\s*$/
+
+/**
+ * "홍길동, 김철수" → ['홍길동','김철수']. 괄호 밖의 쉼표(전각 포함)로만 나누고 중복은 한 번만 남긴다.
+ * 이름 끝의 '(…)' 는 메모로 보고 이름만 취한다. 무시한 메모와 '이름이 둘로 보이는 칸' 은 warn 으로 알린다.
+ * '-', '–', '—', '없음', 'x' 만 있는 칸은 빈 칸이다.
+ */
+export function splitNames(cell: string, warn?: (message: string) => void): string[] {
+  const text = cell.trim()
+  if (EMPTY_CELL.test(text)) return []
+  const parts: string[] = []
+  let depth = 0
+  let current = ''
+  for (const char of text) {
+    if (char === '(' || char === '（') depth += 1
+    else if ((char === ')' || char === '）') && depth > 0) depth -= 1
+    if (depth === 0 && (char === ',' || char === '，' || char === '、')) { parts.push(current); current = '' } else current += char
+  }
+  parts.push(current)
   const names: string[] = []
-  for (const part of cell.split(/[,，、]/)) {
-    const name = part.trim()
+  for (const part of parts) {
+    let name = part.trim()
+    const note = TRAILING_NOTE.exec(name)
+    if (note) {
+      name = note[1].trim()
+      warn?.(`${part.trim()} → 이름 ${name}, 메모 무시됨`)
+    }
     if (name && !names.includes(name)) names.push(name)
   }
+  if (parts.length === 1 && names.length === 1 && /\s/.test(names[0])) warn?.(`'${names[0]}': 한 칸에 이름이 둘이면 쉼표로 구분하세요`)
   return names
 }
 
-/** 탭이 있으면 탭으로, 없으면 공백 2칸 이상으로 칸을 나눈다(스프레드시트 복사 / 손으로 정렬한 글). */
+/** 탭이 있으면 탭으로, 없으면 공백(ASCII) 2칸 이상 또는 전각 공백(U+3000) 한 번 이상으로 칸을 나눈다. 끝의 빈 칸은 버린다. */
 export function splitCells(line: string): string[] {
-  return (line.includes('\t') ? line.split('\t') : line.trim().split(/ {2,}/)).map((cell) => cell.trim())
+  const cells = (line.includes('\t') ? line.split('\t') : line.trim().split(/ {2,}|\u3000+/)).map((cell) => cell.trim())
+  while (cells.length > 0 && cells[cells.length - 1] === '') cells.pop()
+  return cells
 }
 
 /**
@@ -42,6 +69,7 @@ export function splitCells(line: string): string[] {
 export function parseOfficerPaste(text: string): ParseResult {
   const rows: ImportRow[] = []
   const issues: ParseIssue[] = []
+  const warnings: ParseIssue[] = []
   const seen = new Map<string, number>()
   const lines = String(text ?? '').split(/\r\n|\r|\n/)
   lines.forEach((raw, index) => {
@@ -49,8 +77,10 @@ export function parseOfficerPaste(text: string): ParseResult {
     const line = index + 1
     const fail = (message: string) => { issues.push({ line, text: raw.trim(), message }) }
     const cells = splitCells(raw)
+    const columns = raw.includes('\t') ? raw.split('\t').length : cells.length
     // 첫 줄이 "임기 연도 회장 부회장" 머리글이면 건너뛴다.
     if (rows.length === 0 && issues.length === 0 && HEADER_YEAR.test(cells[1] ?? '')) return
+    if (cells.length < 3 && columns >= 3) return fail('회장과 부회장 이름이 모두 비어 있습니다.')
     if (cells.length < 3) return fail('칸이 부족합니다. 임기, 연도, 회장, 부회장 순서로 탭이나 공백 2칸 이상으로 나눠 주세요.')
     if (cells.length > 4) return fail('칸이 너무 많습니다. 임기, 연도, 회장, 부회장 4칸까지만 쓸 수 있습니다.')
     const [label, yearCell, presidentCell, viceCell = ''] = cells
@@ -58,8 +88,9 @@ export function parseOfficerPaste(text: string): ParseResult {
     if (label.length > MAX_LABEL) return fail(`임기 이름은 ${MAX_LABEL}자까지 입력할 수 있습니다.`)
     const year = /^\d{4}\s*년?$/.test(yearCell) ? Number(yearCell.replace(/\D/g, '')) : NaN
     if (!Number.isInteger(year) || year < MIN_YEAR || year > MAX_YEAR) return fail(`연도는 ${MIN_YEAR}~${MAX_YEAR} 사이 4자리 숫자여야 합니다.`)
-    const presidents = splitNames(presidentCell)
-    const vices = splitNames(viceCell)
+    const warn = (message: string) => { warnings.push({ line, text: raw.trim(), message }) }
+    const presidents = splitNames(presidentCell, warn)
+    const vices = splitNames(viceCell, warn)
     if (presidents.length === 0 && vices.length === 0) return fail('회장과 부회장 이름이 모두 비어 있습니다.')
     for (const [title, names] of [['회장', presidents], ['부회장', vices]] as const) {
       if (names.length > MAX_NAMES_PER_ROLE) return fail(`${title}은(는) ${MAX_NAMES_PER_ROLE}명까지 입력할 수 있습니다.`)
@@ -72,7 +103,8 @@ export function parseOfficerPaste(text: string): ParseResult {
   if (rows.length > MAX_IMPORT_ROWS) {
     issues.push({ line: 0, text: '', message: `한 번에 ${MAX_IMPORT_ROWS}개 임기까지 등록할 수 있습니다.` })
   }
-  return { rows, issues }
+  const failed = new Set(issues.map((issue) => issue.line))
+  return { rows, issues, warnings: warnings.filter((warning) => !failed.has(warning.line)) }
 }
 
 const namesOf = (officers: { role: string; name: string }[], role: OfficerRole) =>
@@ -116,13 +148,16 @@ export function groupByDecade(terms: TermView[]): DecadeGroup[] {
 
 const keyOf = (value: unknown) => String(value ?? '').toLowerCase().replace(/[\s-]+/g, '')
 
-/** 이름·연도·임기 이름·기수 중 하나에 검색어의 모든 단어가 들어 있으면 통과. 빈 검색어는 전부 통과. */
+/**
+ * 이름·임기 이름·기수·메모는 부분 일치, 연도는 검색어가 연도 그대로이거나 '<연도>년' 일 때만 맞는다
+ * ('52' 가 1952년을 불러오지 않도록). 여러 단어는 모두 맞아야 하고 빈 검색어는 전부 통과한다.
+ */
 export function termMatches(query: string, term: TermView): boolean {
   const words = String(query ?? '').split(/\s+/).map(keyOf).filter(Boolean)
   if (words.length === 0) return true
   const fields = [
-    term.label, term.year, `${term.year}년`, term.note,
+    term.label, term.note,
     ...term.officers.flatMap((officer) => [officer.name, officer.generation, generationLabel(officer.generation)]),
   ].map(keyOf)
-  return words.every((word) => fields.some((field) => field.includes(word)))
+  return words.every((word) => word === String(term.year) || word === `${term.year}년` || fields.some((field) => field.includes(word)))
 }

@@ -21,7 +21,8 @@ const errorText = (cause: unknown) => cause instanceof Error ? cause.message : '
 const actionClass = 'apple-action-secondary min-h-11 px-4 text-sm'
 const primaryClass = 'apple-action-primary min-h-11 px-5 text-sm disabled:opacity-50'
 const ROLE_LABEL: Record<OfficerRole, string> = { PRESIDENT: '회장', VICE_PRESIDENT: '부회장' }
-const KEY = ['club-officers']
+// 쓰기 뒤에는 회장단 목록 둘만 새로 받는다(명부 검색 결과 ['club-officers','roster'] 는 그대로 둔다).
+const REFRESH_KEYS = [['club-officers', 'admin'], ['club-officers', 'list']]
 
 /** Runs a write. A failure goes to `onError` (inside the form that asked) or, without one, to the top of the panel. */
 type Act = (work: () => Promise<unknown>, success: string, onError?: (message: string) => void) => Promise<boolean>
@@ -190,12 +191,14 @@ function BulkPaste({ terms, busy, act }: { terms: AdminTerm[]; busy: boolean; ac
   const tooMany = (preview?.rows.length ?? 0) > MAX_IMPORT_ROWS
   return <section aria-labelledby="of-bulk-title" className="of-card space-y-4">
     <div><h3 id="of-bulk-title" className="text-lg font-bold">한 번에 붙여넣기</h3>
-      <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">한 줄에 한 임기: <strong>임기, 연도, 회장, 부회장</strong> 순서로 탭(표 복사) 또는 공백 2칸 이상으로 나눕니다. 한 칸에 여러 명이면 쉼표(,)로 구분하세요. 같은 임기 이름이 이미 있으면 그 임기를 고치고, 이름이 같은 임원의 명부 연결은 그대로 둡니다. 적용 전에 미리보기로 확인합니다.</p></div>
+      <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">한 줄에 한 임기: <strong>임기, 연도, 회장, 부회장</strong> 순서로 탭(표 복사) 또는 공백 2칸 이상으로 나눕니다. 한 칸에 여러 명이면 쉼표(,)로 구분하세요. 같은 임기 이름이 이미 있으면 그 임기를 고치고, 이름이 같은 임원의 명부 연결은 그대로 둡니다. 적용하면 건드린 연도 안의 임기 순서는 대수 번호(초대=1, 52대=52) 순으로 다시 매겨지고, 번호가 없는 이름은 그 해의 가장 나중 임기로 봅니다. 적용 전에 미리보기로 확인합니다.</p></div>
     <label className="block text-sm font-semibold">붙여넣을 내용<textarea rows={6} className="of-input mt-2 font-mono" value={text} onChange={(event) => change(event.target.value)} placeholder={PLACEHOLDER} spellCheck={false} /></label>
     <div className="flex flex-wrap gap-2"><button type="button" className={actionClass} disabled={!text.trim()} onClick={() => setPreview(parseOfficerPaste(text))}>미리보기</button></div>
     {preview && <div className="space-y-3" aria-live="polite">
       {preview.issues.length > 0 && <div role="alert" className="of-issues"><strong>확인이 필요한 줄 {preview.issues.length}개 (이 줄은 적용되지 않습니다)</strong>
         <ul>{preview.issues.map((issue, index) => <li key={index}>{issue.line > 0 ? `${issue.line}번째 줄: ` : ''}{issue.message}{issue.text && <code>{issue.text}</code>}</li>)}</ul></div>}
+      {preview.warnings.length > 0 && <div role="status" className="of-warnings"><strong>확인해 주세요 {preview.warnings.length}건 (적용은 됩니다)</strong>
+        <ul>{preview.warnings.map((warning, index) => <li key={index}>{warning.line}번째 줄: {warning.message}</li>)}</ul></div>}
       {preview.rows.length === 0 && preview.issues.length === 0 && <p className="text-sm text-[var(--app-muted)]">읽을 수 있는 줄이 없습니다.</p>}
       {preview.rows.length > 0 && <div className="of-table" role="region" aria-label="일괄 등록 미리보기" tabIndex={0}><table>
         <thead><tr><th scope="col">임기</th><th scope="col">연도</th><th scope="col">회장</th><th scope="col">부회장</th><th scope="col">처리</th></tr></thead>
@@ -222,7 +225,7 @@ export default function AdminClubOfficers() {
     setPending(true); setError(''); setMessage('')
     try {
       await work()
-      await client.invalidateQueries({ queryKey: KEY })
+      await Promise.all(REFRESH_KEYS.map((queryKey) => client.invalidateQueries({ queryKey })))
       setMessage(success)
       return true
     } catch (cause) { (onError ?? setError)(errorText(cause)); return false } finally { setPending(false) }
@@ -247,7 +250,7 @@ export default function AdminClubOfficers() {
       <div className="flex"><ListSearch value={query} onChange={setQuery} label="임기 검색" placeholder="이름·연도·임기로 검색" /></div>
       {terms.data.length === 0 && <p className="of-card text-sm">아직 임기가 없습니다. 위에서 붙여넣거나 임기를 추가하세요.</p>}
       {terms.data.length > 0 && visible.length === 0 && <p className="text-sm text-[var(--app-muted)]">검색 결과가 없습니다.</p>}
-      {visible.map((term) => <TermCard key={term.id} term={term} sameYear={visible.filter((item) => item.year === term.year)} busy={pending} act={act} />)}
+      {visible.map((term) => <TermCard key={term.id} term={term} sameYear={terms.data.filter((item) => item.year === term.year)} busy={pending} act={act} />)}
     </section>
   </section>
 }

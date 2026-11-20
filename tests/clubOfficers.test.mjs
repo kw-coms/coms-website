@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  generationLabel, groupByDecade, importAction, parseOfficerPaste, splitNames, termMatches,
+  generationLabel, groupByDecade, importAction, parseOfficerPaste, splitCells, splitNames, termMatches,
 } from '../src/features/clubOfficers/clubOfficers.ts'
 
 // 가상의 이름만 쓴다(실제 명단은 저장소에 넣지 않는다).
@@ -10,7 +10,7 @@ assert.deepEqual(splitNames('  '), [])
 
 // 탭으로 나눈 줄과 공백 2칸 이상으로 나눈 줄을 모두 읽는다.
 const tabbed = parseOfficerPaste('52대\t2018\t가나다\t라마바, 사아자')
-assert.deepEqual(tabbed, { rows: [{ label: '52대', year: 2018, presidents: ['가나다'], vices: ['라마바', '사아자'] }], issues: [] })
+assert.deepEqual(tabbed, { rows: [{ label: '52대', year: 2018, presidents: ['가나다'], vices: ['라마바', '사아자'] }], issues: [], warnings: [] })
 const spaced = parseOfficerPaste('초대   1970   가나다   라마바')
 assert.deepEqual(spaced.rows, [{ label: '초대', year: 1970, presidents: ['가나다'], vices: ['라마바'] }])
 assert.deepEqual(parseOfficerPaste('초대 1970 가나다 라마바').issues.map((issue) => issue.line), [1], '한 칸 공백은 칸 구분이 아니다')
@@ -72,5 +72,54 @@ for (const [query, expected] of [
   ['', true], ['가나다', true], ['나다', true], ['2018', true], ['2018년', true], ['52대', true], ['52 대', true],
   ['50기', true], ['가나다 2018', true], ['라마바 50기', true], ['사아자', false], ['2019', false], ['가나다 2019', false],
 ]) assert.equal(termMatches(query, sample), expected, `query "${query}"`)
+
+// 7. 끝의 빈 칸은 칸 수에서 빼고, 전각 공백(U+3000)도 칸 구분이다.
+assert.deepEqual(parseOfficerPaste('52대\t2018\t가나다\t\t\t').rows, [{ label: '52대', year: 2018, presidents: ['가나다'], vices: [] }], '끝의 빈 칸이 여럿이어도 4칸 제한에 걸리지 않는다')
+assert.deepEqual(parseOfficerPaste('52대\t2018\t가나다\t라마바\t\t').issues, [])
+assert.deepEqual(parseOfficerPaste('52대\u30002018\u3000가나다\u3000라마바').rows, [{ label: '52대', year: 2018, presidents: ['가나다'], vices: ['라마바'] }])
+assert.deepEqual(parseOfficerPaste('52대\u3000\u3000\u30002018\u3000가나다').rows.map((row) => row.label), ['52대'], '전각 공백은 몇 개가 이어져도 한 구분')
+assert.deepEqual(splitCells('a  b\u3000c'), ['a', 'b', 'c'])
+assert.deepEqual(splitCells('a\tb\t\t'), ['a', 'b'])
+assert.match(parseOfficerPaste('52대\t2018\t\t').issues[0].message, /모두 비어/)
+assert.match(parseOfficerPaste('52대\t2018').issues[0].message, /칸이 부족/)
+
+// 8. 대시·없음·x 만 있는 칸은 빈 칸이다.
+for (const mark of ['-', '–', '—', '없음', 'x', 'X']) {
+  assert.deepEqual(parseOfficerPaste(`52대\t2018\t가나다\t${mark}`).rows[0].vices, [], `"${mark}"`)
+  assert.deepEqual(splitNames(mark), [])
+}
+assert.equal(parseOfficerPaste('52대\t2018\t-\t없음').issues.length, 1, '두 칸 모두 빈 칸이면 줄을 거절한다')
+assert.deepEqual(splitNames('x가나다'), ['x가나다'], '이름에 섞인 x 는 이름이다')
+
+// 9. 괄호 메모와 쉼표: 괄호 안의 쉼표로는 나누지 않고, 끝의 (…) 는 떼서 경고로 알린다.
+const notes = []
+assert.deepEqual(splitNames('가나다(회장 대행), 라마바', (message) => notes.push(message)), ['가나다', '라마바'])
+assert.deepEqual(notes, ['가나다(회장 대행) → 이름 가나다, 메모 무시됨'])
+assert.deepEqual(splitNames('가나다(1학기, 대행), 라마바'), ['가나다', '라마바'], '괄호 안 쉼표는 나누지 않는다')
+assert.deepEqual(splitNames('가나다（대행）'), ['가나다'], '전각 괄호도 같다')
+const spaced2 = []
+assert.deepEqual(splitNames('가 나다', (message) => spaced2.push(message)), ['가 나다'])
+assert.deepEqual(spaced2, ["'가 나다': 한 칸에 이름이 둘이면 쉼표로 구분하세요"])
+const quiet = []
+splitNames('가나다, 라마바', (message) => quiet.push(message))
+assert.deepEqual(quiet, [], '쉼표로 나눈 이름에는 경고가 없다')
+const withWarn = parseOfficerPaste('52대\t2018\t가나다(회장 대행)\t라마바 사아자')
+assert.deepEqual(withWarn.rows[0].presidents, ['가나다'])
+assert.deepEqual(withWarn.issues, [])
+assert.deepEqual(withWarn.warnings.map((warning) => [warning.line, warning.message]), [
+  [1, '가나다(회장 대행) → 이름 가나다, 메모 무시됨'],
+  [1, "'라마바 사아자': 한 칸에 이름이 둘이면 쉼표로 구분하세요"],
+])
+assert.deepEqual(parseOfficerPaste('52대\t99\t가(나)\t').warnings, [], '거절된 줄의 경고는 남기지 않는다')
+
+// 12. 연도는 검색어가 연도 그대로이거나 '<연도>년' 일 때만 맞고, 나머지는 이름·임기 이름 부분 일치.
+const old = term(8, '초대', 1952, [{ id: 3, role: 'PRESIDENT', name: '가나다', generation: null }])
+for (const [query, expected] of [['52', false], ['195', false], ['1952', true], ['1952년', true], ['52년', false], ['초대', true], ['가나', true]]) {
+  assert.equal(termMatches(query, old), expected, `old "${query}"`)
+}
+assert.equal(termMatches('52', term(9, '52대', 2018)), true, '52 는 임기 이름 52대 에 맞는다')
+assert.equal(termMatches('201', sample), false)
+assert.equal(termMatches('18', sample), false)
+assert.equal(termMatches('가나다 2018년', sample), true)
 
 console.log('clubOfficers: ok')
