@@ -97,7 +97,7 @@ export default function Hackathon() {
         <h2 id="hackathon-identity-title" className="text-lg font-bold">평가자 정보</h2>
         <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">기수와 이름으로 팀별 중복 평가를 확인합니다. 각 팀을 한 번씩 평가해 주세요. 입력 정보와 피드백은 운영진만 확인합니다.</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-[140px_1fr]">
-          <label className="text-sm font-semibold">기수<input className="hackathon-input mt-2" inputMode="numeric" autoComplete="off" placeholder="예: 42" value={generation} onChange={(e) => setGeneration(e.target.value.replace(/\D/g, '').slice(0, 3))} aria-describedby="hackathon-generation-help" /></label>
+          <label className="text-sm font-semibold">기수<input className="hackathon-input mt-2" inputMode="numeric" autoComplete="off" placeholder="예: 42" value={generation} onChange={(e) => setGeneration(e.target.value.normalize('NFKC').replace(/\D/g, '').slice(0, 3))} aria-describedby="hackathon-generation-help" /></label>
           <label className="text-sm font-semibold">이름<input className="hackathon-input mt-2" autoComplete="name" placeholder="실명을 입력해 주세요" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} /></label>
         </div>
         <p id="hackathon-generation-help" className="mt-2 text-xs text-[var(--app-muted)]">기수는 숫자만 적으면 됩니다. (예: 50기 → 50)</p>

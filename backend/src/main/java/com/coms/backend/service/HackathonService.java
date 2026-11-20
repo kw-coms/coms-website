@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.Clock;
 import java.time.Year;
+import java.time.ZoneId;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -64,7 +65,7 @@ public class HackathonService {
             if (eventId == 1L) throw invalid();
             throw notFound();
         }
-        int generation = checkedInt(request.generation(), 1, Year.now(clock).getValue() - 1966);
+        int generation = checkedInt(request.generation(), 1, currentGeneration(clock));
         String name = request.name() == null ? "" : Normalizer.normalize(request.name(), Normalizer.Form.NFKC)
                 .strip().replaceAll("(?U)\\s+", " ");
         String nameKey = name.replaceAll("(?U)\\s+", "").toLowerCase(Locale.ROOT);
@@ -194,6 +195,11 @@ public class HackathonService {
         int[] checked = new int[scores.length];
         for (int i = 0; i < scores.length; i++) checked[i] = checkedInt(scores[i], 0, 20);
         return checked;
+    }
+
+    /** 올해 들어오는 기수(서울 기준 연도 - 1966). 화면의 currentGeneration()과 같은 기준이다. */
+    static int currentGeneration(Clock clock) {
+        return Year.now(clock.withZone(ZoneId.of("Asia/Seoul"))).getValue() - 1966;
     }
 
     private static int checkedInt(BigDecimal value, int min, int max) {
