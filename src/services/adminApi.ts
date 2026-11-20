@@ -103,7 +103,7 @@ export async function addEligibleMember(payload) {
   })
 }
 
-export async function updateEligibleMember(id, studentId, name, phone, generation, department: string, email: string | null, officerHistory = '') {
+export async function updateEligibleMember(id, studentId, name, phone, generation, department: string, email: string | null, officerHistory?: string) {
   return requestNoContent(`/api/admin/eligible-members/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({
@@ -113,7 +113,7 @@ export async function updateEligibleMember(id, studentId, name, phone, generatio
       generation: generation || null,
       department: department ?? '',
       email,
-      // Empty string clears the history; the server keeps the stored value only when the field is absent.
+      // Empty string clears the history; an omitted key (undefined is dropped by JSON.stringify) keeps the stored value.
       officerHistory,
     }),
   })

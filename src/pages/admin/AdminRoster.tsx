@@ -142,13 +142,14 @@ export default function AdminRoster() {
         if (addForm.generation.trim()) payload.generation = addForm.generation.trim()
       } else {
         // 입학연도와 기수는 따로 정할 수 있다(2학년 가입 등) — 둘 다 있으면 둘 다 보낸다.
-        if (addForm.admissionYear.trim()) payload.admissionYear = addForm.admissionYear.trim()
-        if (addForm.generation.trim()) payload.generation = addForm.generation.trim()
-        // 졸업생도 실제 10자리 학번이 있으면 함께 보낸다. 서버가 졸업 연도인지 확인한다.
+        // 학번이 있으면 입학연도는 학번이 정하므로 따로 보내지 않는다(서버가 졸업 연도인지 확인한다).
         if (addForm.studentId.trim()) {
           payload.studentId = addForm.studentId.trim()
           payload.graduate = true
+        } else if (addForm.admissionYear.trim()) {
+          payload.admissionYear = addForm.admissionYear.trim()
         }
+        if (addForm.generation.trim()) payload.generation = addForm.generation.trim()
       }
       if (addForm.phone.trim()) payload.phone = addForm.phone.trim()
       if (addForm.email.trim()) payload.email = addForm.email.trim()
@@ -277,6 +278,23 @@ export default function AdminRoster() {
     setAddForm((p) => ({ ...p, admissionYear: digits, ...(staleGeneration ? { generation: '' } : {}) }))
   }
 
+  // 졸업생 학번이 10자리가 되면 입학연도(끝 두자리)를 학번에서 채우고, 기수도 자동 채움 규칙대로 따라온다.
+  const handleGraduateStudentIdChange = (raw) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 10)
+    if (digits.length < 10) {
+      setAddForm((p) => ({ ...p, studentId: digits }))
+      return
+    }
+    const fullYear = parseInt(digits.slice(0, 4), 10)
+    const canFill = !addForm.generation || autoFilled === 'generation'
+    if (canFill && fullYear >= GRAD_BASE_YEAR && fullYear <= thisYear) {
+      setAutoFilled('generation')
+      setAddForm((p) => ({ ...p, studentId: digits, admissionYear: digits.slice(2, 4), generation: String(fullYear - GRAD_BASE_YEAR) }))
+      return
+    }
+    setAddForm((p) => ({ ...p, studentId: digits, admissionYear: digits.slice(2, 4) }))
+  }
+
   const handleGenerationChange = (raw) => {
     const digits = raw.replace(/\D/g, '').slice(0, 2)
     const gen = parseInt(digits, 10)
@@ -351,7 +369,7 @@ export default function AdminRoster() {
             <div className="flex flex-wrap gap-2">
               <input
                 value={addForm.studentId}
-                onChange={(e) => setAddForm((p) => ({ ...p, studentId: e.target.value.replace(/[^0-9]/g, '') }))}
+                onChange={(e) => handleGraduateStudentIdChange(e.target.value)}
                 placeholder="학번 (선택, 10자리)"
                 maxLength={10}
                 inputMode="numeric"
@@ -644,6 +662,7 @@ export default function AdminRoster() {
             {result.message} 가져온 행: {result.imported}, 건너뜀: {result.skipped}
             {result.phoneFilled > 0 && `, 전화번호 채움: ${result.phoneFilled}`}
             {result.departmentFilled > 0 && `, 학부 채움: ${result.departmentFilled}`}
+            {result.officerHistoryTooLong > 0 && `, 회장단 이력 500자 초과로 건너뜀: ${result.officerHistoryTooLong}`}
           </p>
         )}
         {error && (
