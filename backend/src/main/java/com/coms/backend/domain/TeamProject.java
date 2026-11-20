@@ -37,6 +37,7 @@ public class TeamProject {
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String value) { createdBy = value; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime value) { createdAt = value; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime value) { updatedAt = value; }
 }

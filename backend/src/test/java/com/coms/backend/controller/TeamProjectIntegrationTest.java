@@ -79,6 +79,9 @@ class TeamProjectIntegrationTest {
     }
 
     @Autowired MutableClock clock;
+    @Autowired com.coms.backend.repository.TeamProjectTeamRepository teamRepository;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+    @org.springframework.beans.factory.annotation.Value("${storage.location}") String storageLocation;
 
     private static final String ORIGIN = "https://coms.kw.ac.kr";
     private static final String ADMIN_API = "/api/admin/team-projects";
@@ -439,6 +442,96 @@ class TeamProjectIntegrationTest {
         String longest = "https://example.com/" + "a".repeat(2000 - "https://example.com/".length());
         submitRaw(alice, f.program, f.teamA, f.final_, "링크", List.of(), longest).andExpect(status().isOk());
         submitRaw(alice, f.program, f.teamA, f.final_, "링크", List.of(), longest + "a").andExpect(status().isBadRequest());
+    }
+
+    // ---- 잠금과 저장소: 파일은 잠금 전에 저장하고, 실패하면 남기지 않는다 -----------------------
+
+    private long storedFileCount() throws Exception {
+        try (var entries = java.nio.file.Files.list(java.nio.file.Path.of(storageLocation).toAbsolutePath())) {
+            return entries.filter(java.nio.file.Files::isRegularFile).count();
+        }
+    }
+
+    /** 다른 트랜잭션이 팀 행을 잠근 채로 있게 하고, release 를 부르면 풀린다. */
+    private Runnable holdTeamLock(long teamId) throws Exception {
+        var locked = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var holder = new Thread(() -> new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            teamRepository.lockById(teamId);
+            locked.countDown();
+            try { release.await(15, java.util.concurrent.TimeUnit.SECONDS); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+        }));
+        holder.start();
+        assertThat(locked.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        return () -> { release.countDown(); try { holder.join(5000); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); } };
+    }
+
+    @Test
+    void filesAreStoredBeforeTheTeamLockIsTakenSoACopyNeverHoldsARowLock() throws Exception {
+        Fixture f = fixture();
+        long before = storedFileCount();
+        Runnable release = holdTeamLock(f.teamA);
+        var pool = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            var pending = pool.submit(() -> submitRaw(alice, f.program, f.teamA, f.proposal, "잠금 대기", List.of(
+                    new MockMultipartFile("files", "slow.bin", "application/octet-stream", new byte[]{1, 2, 3}))).andReturn().getResponse().getStatus());
+            long deadline = System.currentTimeMillis() + 2500;
+            while (storedFileCount() == before && System.currentTimeMillis() < deadline) Thread.sleep(25);
+            // 팀 행은 아직 다른 트랜잭션이 잡고 있는데도 파일은 이미 저장소에 올라가 있다.
+            assertThat(storedFileCount()).isEqualTo(before + 1);
+            assertThat(pending.isDone()).isFalse();
+            release.run();
+            assertThat(pending.get(5, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(200);
+        } finally {
+            release.run();
+            pool.shutdownNow();
+        }
+        assertThat(storedFileCount()).isEqualTo(before + 1);
+        mvc.perform(get(API + "/" + f.program + "/teams/" + f.teamA + "/submissions").cookie(alice)).andExpect(jsonPath("$[0].files.length()").value(1));
+    }
+
+    @Test
+    void aSubmitThatCannotGetTheTeamLockAnswers409AndLeavesNoStoredFile() throws Exception {
+        Fixture f = fixture();
+        long before = storedFileCount();
+        Runnable release = holdTeamLock(f.teamA);
+        try {
+            submitRaw(alice, f.program, f.teamA, f.proposal, "기다리다 포기", List.of(new MockMultipartFile("files", "x.bin", "application/octet-stream", new byte[]{1})))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message").value("다른 저장이 진행 중입니다. 잠시 후 다시 시도해 주세요."));
+        } finally {
+            release.run();
+        }
+        assertThat(storedFileCount()).isEqualTo(before);
+        assertThat(new JdbcTemplate(dataSource).queryForObject("SELECT COUNT(*) FROM team_project_submissions", Integer.class)).isZero();
+        submitRaw(alice, f.program, f.teamA, f.proposal, "풀린 뒤", List.of()).andExpect(status().isOk());
+    }
+
+    @Test
+    void failedSubmitsLeaveNoStoredFilesAndDeletesLeaveNoOrphans() throws Exception {
+        Fixture f = fixture();
+        long before = storedFileCount();
+        // 파일을 저장한 뒤 잠금 안에서 거절되는 경우(없는 파일 번호), 그리고 잠금 전에 거절되는 경우(남의 팀).
+        submitRaw(alice, f.program, f.teamA, f.proposal, "x", List.of(new MockMultipartFile("files", "a.bin", "application/octet-stream", new byte[]{1})))
+                .andExpect(status().isOk());
+        assertThat(storedFileCount()).isEqualTo(before + 1);
+        mvc.perform(multipartPut(alice, f.program, f.teamA, f.proposal).file(new MockMultipartFile("files", "b.bin", "application/octet-stream", new byte[]{2}))
+                .param("body", "y").param("removeFileIds", "999999")).andExpect(status().isBadRequest());
+        submitRaw(carol, f.program, f.teamA, f.proposal, "침입", List.of(new MockMultipartFile("files", "c.bin", "application/octet-stream", new byte[]{3})))
+                .andExpect(status().isForbidden());
+        assertThat(storedFileCount()).isEqualTo(before + 1);
+        // 일정·프로그램을 지우면 저장된 파일도 함께 사라진다.
+        submitRaw(carol, f.program, f.teamB, f.final_, "z", List.of(new MockMultipartFile("files", "d.bin", "application/octet-stream", new byte[]{4})))
+                .andExpect(status().isOk());
+        assertThat(storedFileCount()).isEqualTo(before + 2);
+        mvc.perform(delete(ADMIN_API + "/" + f.program + "/milestones/" + f.proposal).cookie(admin).header("Origin", ORIGIN)).andExpect(status().isNoContent());
+        assertThat(storedFileCount()).isEqualTo(before + 1);
+        mvc.perform(delete(ADMIN_API + "/" + f.program).cookie(admin).header("Origin", ORIGIN)).andExpect(status().isNoContent());
+        assertThat(storedFileCount()).isEqualTo(before);
+        // 지워진 프로그램에 늦게 도착한 제출은 404 이고 파일을 남기지 않는다.
+        submitRaw(alice, f.program, f.teamA, f.proposal, "늦은 도착", List.of(new MockMultipartFile("files", "e.bin", "application/octet-stream", new byte[]{5})))
+                .andExpect(status().isNotFound());
+        assertThat(storedFileCount()).isEqualTo(before);
     }
 
     private void setOpen(long program, boolean open) throws Exception {

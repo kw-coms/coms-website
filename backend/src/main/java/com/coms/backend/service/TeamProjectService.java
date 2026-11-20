@@ -25,7 +25,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
@@ -71,6 +73,7 @@ public class TeamProjectService {
     private final MemberRepository members;
     private final StorageService storage;
     private final Clock clock;
+    private final TransactionTemplate transactions;
     private final long maxFileBytes;
     private final long maxRequestBytes;
 
@@ -78,7 +81,7 @@ public class TeamProjectService {
                               TeamProjectTeamRepository teams, TeamProjectMemberRepository teamMembers,
                               TeamProjectSubmissionRepository submissions, TeamProjectSubmissionLinkRepository links,
                               TeamProjectSubmissionFileRepository files, MemberRepository members,
-                              StorageService storage, Clock clock,
+                              StorageService storage, Clock clock, PlatformTransactionManager transactionManager,
                               @Value("${spring.servlet.multipart.max-file-size:310MB}") DataSize maxFile,
                               @Value("${spring.servlet.multipart.max-request-size:320MB}") DataSize maxRequest) {
         this.programs = programs;
@@ -91,6 +94,7 @@ public class TeamProjectService {
         this.members = members;
         this.storage = storage;
         this.clock = clock;
+        this.transactions = new TransactionTemplate(transactionManager);
         this.maxFileBytes = maxFile.toBytes();
         this.maxRequestBytes = maxRequest.toBytes();
     }
@@ -146,6 +150,8 @@ public class TeamProjectService {
         program.setDescription(optional(write.description(), 5000, "설명"));
         program.setOpen(write.open() == null || write.open());
         program.setCreatedBy(actor);
+        program.setCreatedAt(now());
+        program.setUpdatedAt(now());
         programs.saveAndFlush(program);
         return new TeamProjectSummary(program.getId(), program.getTitle(), program.getDescription(), program.isOpen(), null, null);
     }
@@ -163,6 +169,8 @@ public class TeamProjectService {
 
     @Transactional
     public void delete(Long programId) {
+        lockProgram(programId);
+        lockAllTeams(programId);   // 진행 중인 제출이 끝난 뒤에 지울 목록을 만든다
         TeamProject program = requireProgram(programId);
         List<String> stored = purge(submissions.findByProgramId(programId));
         teamMembers.deleteAll(teamMembers.findByProgramIdOrderByIdAsc(programId));
@@ -211,6 +219,8 @@ public class TeamProjectService {
 
     @Transactional
     public void deleteMilestone(Long programId, Long milestoneId) {
+        lockProgram(programId);
+        lockAllTeams(programId);
         TeamProjectMilestone milestone = requireMilestone(programId, milestoneId);
         List<String> stored = purge(submissions.findByMilestoneId(milestoneId));
         milestones.delete(milestone);
@@ -266,6 +276,7 @@ public class TeamProjectService {
     @Transactional
     public void deleteTeam(Long programId, Long teamId) {
         lockProgram(programId);
+        lockTeam(programId, teamId);
         TeamProjectTeam team = requireTeam(programId, teamId);
         List<String> stored = purge(submissions.findByTeamIdOrderByIdAsc(teamId));
         teamMembers.deleteAll(teamMembers.findByTeamId(teamId));
@@ -277,7 +288,7 @@ public class TeamProjectService {
     @Transactional
     public TeamProjectMemberView addMember(Long programId, Long teamId, String studentId) {
         lockProgram(programId);
-        requireTeam(programId, teamId);
+        lockTeam(programId, teamId);
         String id = studentId == null ? "" : studentId.trim();
         Member person = members.findByStudentId(id).orElseThrow(() -> notFound("동아리 회원 중에서 찾을 수 없습니다."));
         if (teamMembers.findByProgramIdAndStudentId(programId, id).isPresent()) {
@@ -298,7 +309,7 @@ public class TeamProjectService {
     @Transactional
     public void removeMember(Long programId, Long teamId, String studentId) {
         lockProgram(programId);
-        requireTeam(programId, teamId);
+        lockTeam(programId, teamId);
         TeamProjectMember row = teamMembers.findByTeamIdAndStudentId(teamId, studentId).orElseThrow(() -> notFound("팀원을 찾을 수 없습니다."));
         teamMembers.delete(row);
     }
@@ -337,18 +348,18 @@ public class TeamProjectService {
 
     // ---- 제출 -----------------------------------------------------------------------------
 
-    @Transactional
+    /** 저장소에 먼저 올려 둔 업로드 한 건. 표시용 메타데이터만 클라이언트 값이고 저장 이름은 서버가 만든다. */
+    private record StoredUpload(String storedName, String originalName, String mimeType, long size) {}
+
+    /**
+     * 제출은 세 단계다. (a) 트랜잭션 밖에서 값싼 검증을 하고 파일을 저장소에 먼저 복사한다 — 디스크 복사 동안
+     * DB 연결도 행 잠금도 잡지 않는다. (b) 짧은 트랜잭션에서 팀 행만 잠그고 다시 검증한 뒤 올려 둔 파일을 붙인다.
+     * (c) 어느 단계든 실패하면 (a)에서 저장한 파일을 지운다. 빼기로 한 파일은 커밋 뒤에 지운다.
+     */
     public TeamProjectSubmissionView submit(Long programId, Long teamId, Long milestoneId, String viewer, String body,
                                             List<String> linkInputs, List<MultipartFile> uploads, List<Long> removeFileIds) {
-        // 프로그램 행을 잠가 같은 프로그램의 제출·삭제·수정을 한 줄로 세운다(같은 제출을 동시에 고쳐도 500 이 나지 않는다).
-        TeamProject program = programs.lockById(programId).orElseThrow(() -> notFound("팀 프로젝트를 찾을 수 없습니다."));
-        requireTeam(programId, teamId);
-        TeamProjectMilestone milestone = requireMilestone(programId, milestoneId);
         Member actor = requireMember(viewer);
-        if (!teamMembers.existsByTeamIdAndStudentId(teamId, viewer)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        if (!milestone.isSubmittable()) throw conflict("이 일정은 제출을 받지 않습니다.");
-        if (!program.isOpen()) throw conflict("마감된 프로그램에는 제출할 수 없습니다.");
-
+        requireSubmitter(programId, teamId, milestoneId, viewer);
         String text = body == null ? "" : body.strip();
         if (text.length() > MAX_BODY) throw bad("본문은 " + MAX_BODY + "자까지 쓸 수 있습니다.");
         List<String> urls = normalizeLinks(linkInputs);
@@ -356,6 +367,39 @@ public class TeamProjectService {
         for (MultipartFile file : incoming) {
             if (file.isEmpty()) throw bad("빈 파일은 올릴 수 없습니다.");
         }
+
+        List<StoredUpload> stored = new ArrayList<>();
+        try {
+            for (MultipartFile upload : incoming) {
+                // 저장 이름은 서버가 만든다. 클라이언트가 보낸 파일명은 표시용 메타데이터일 뿐 경로에 쓰지 않는다.
+                stored.add(new StoredUpload(storage.store(upload, STORED_EXTENSION), safeFilename(upload.getOriginalFilename()),
+                        storedMime(upload.getContentType()), upload.getSize()));
+            }
+            return transactions.execute(status -> attach(programId, teamId, milestoneId, actor, text, urls, stored, removeFileIds));
+        } catch (IOException ex) {
+            stored.forEach(upload -> deleteQuietly(upload.storedName()));
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일을 저장하지 못했습니다.", ex);
+        } catch (RuntimeException ex) {
+            stored.forEach(upload -> deleteQuietly(upload.storedName()));
+            throw ex;
+        }
+    }
+
+    /** 잠금 전 검사와 잠근 뒤 재검사가 같은 규칙을 쓰도록 한곳에 둔다. 팀원만, 제출을 받는 일정만, 열린 프로그램만. */
+    private TeamProjectMilestone requireSubmitter(Long programId, Long teamId, Long milestoneId, String viewer) {
+        TeamProject program = requireProgram(programId);
+        requireTeam(programId, teamId);
+        TeamProjectMilestone milestone = requireMilestone(programId, milestoneId);
+        if (!teamMembers.existsByTeamIdAndStudentId(teamId, viewer)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        if (!milestone.isSubmittable()) throw conflict("이 일정은 제출을 받지 않습니다.");
+        if (!program.isOpen()) throw conflict("마감된 프로그램에는 제출할 수 없습니다.");
+        return milestone;
+    }
+
+    private TeamProjectSubmissionView attach(Long programId, Long teamId, Long milestoneId, Member actor, String text,
+                                             List<String> urls, List<StoredUpload> incoming, List<Long> removeFileIds) {
+        lockTeam(programId, teamId);   // 같은 팀의 제출·삭제·팀원 변경만 한 줄로 세운다
+        TeamProjectMilestone milestone = requireSubmitter(programId, teamId, milestoneId, actor.getStudentId());
 
         TeamProjectSubmission submission = submissions.findByTeamIdAndMilestoneId(teamId, milestoneId).orElse(null);
         List<TeamProjectSubmissionFile> current = submission == null ? List.of()
@@ -381,8 +425,6 @@ public class TeamProjectService {
         submission.setUpdatedBy(actor.getStudentId());
         submission.setUpdatedByName(actor.getName());
         submission.setUpdatedAt(now);
-
-        List<String> newlyStored = new ArrayList<>();
         try {
             submission = submissions.saveAndFlush(submission);
             links.deleteBySubmissionId(submission.getId());
@@ -395,37 +437,20 @@ public class TeamProjectService {
                 links.save(link);
             }
             files.deleteAll(removed);
-            for (MultipartFile upload : incoming) {
-                // 저장 이름은 서버가 만든다. 클라이언트가 보낸 파일명은 표시용 메타데이터일 뿐 경로에 쓰지 않는다.
-                String stored = storage.store(upload, STORED_EXTENSION);
-                newlyStored.add(stored);
+            for (StoredUpload upload : incoming) {
                 TeamProjectSubmissionFile row = new TeamProjectSubmissionFile();
                 row.setSubmissionId(submission.getId());
-                row.setOriginalName(safeFilename(upload.getOriginalFilename()));
-                row.setMimeType(storedMime(upload.getContentType()));
-                row.setFileSize(upload.getSize());
-                row.setStoredName(stored);
+                row.setOriginalName(upload.originalName());
+                row.setMimeType(upload.mimeType());
+                row.setFileSize(upload.size());
+                row.setStoredName(upload.storedName());
                 row.setUploadedBy(actor.getStudentId());
                 row.setUploadedAt(now);
                 files.save(row);
             }
             files.flush();
         } catch (DataIntegrityViolationException ex) {
-            newlyStored.forEach(storage::delete);
             throw conflict("다른 팀원이 방금 제출했습니다. 새로고침한 뒤 다시 시도해 주세요.");
-        } catch (IOException ex) {
-            newlyStored.forEach(storage::delete);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일을 저장하지 못했습니다.", ex);
-        } catch (RuntimeException ex) {
-            newlyStored.forEach(storage::delete);
-            throw ex;
-        }
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override public void afterCompletion(int status) {
-                    if (status != STATUS_COMMITTED) newlyStored.forEach(TeamProjectService.this::deleteQuietly);
-                }
-            });
         }
         deleteAfterCommit(removed.stream().map(TeamProjectSubmissionFile::getStoredName).toList());
         return views(List.of(submission), Map.of(milestoneId, milestone), programId).get(0);
@@ -433,8 +458,8 @@ public class TeamProjectService {
 
     @Transactional
     public void deleteSubmission(Long programId, Long teamId, Long milestoneId, String viewer) {
-        TeamProject program = programs.lockById(programId).orElseThrow(() -> notFound("팀 프로젝트를 찾을 수 없습니다."));
-        requireTeam(programId, teamId);
+        lockTeam(programId, teamId);
+        TeamProject program = requireProgram(programId);
         TeamProjectMilestone milestone = requireMilestone(programId, milestoneId);
         requireMember(viewer);
         boolean admin = isAdmin(viewer);
@@ -568,8 +593,48 @@ public class TeamProjectService {
         return programs.findById(id).orElseThrow(() -> notFound("팀 프로젝트를 찾을 수 없습니다."));
     }
 
+    private static final String LOCK_BUSY = "다른 저장이 진행 중입니다. 잠시 후 다시 시도해 주세요.";
+
+    /** 잠금 순서는 항상 프로그램 → 팀이다. 제출은 팀 잠금만 쓴다. 잠금 대기가 길어지면 500 대신 409 로 돌려보낸다. */
     private void lockProgram(Long id) {
-        programs.lockById(id).orElseThrow(() -> notFound("팀 프로젝트를 찾을 수 없습니다."));
+        lockOrConflict(() -> programs.lockById(id)).orElseThrow(() -> notFound("팀 프로젝트를 찾을 수 없습니다."));
+    }
+
+    private void lockTeam(Long programId, Long teamId) {
+        TeamProjectTeam team = lockOrConflict(() -> teams.lockById(teamId)).orElseThrow(() -> notFound("팀을 찾을 수 없습니다."));
+        if (!team.getProgramId().equals(programId)) throw notFound("팀을 찾을 수 없습니다.");
+    }
+
+    private void lockAllTeams(Long programId) {
+        lockOrConflict(() -> teams.lockByProgramId(programId));
+    }
+
+    private <T> T lockOrConflict(java.util.function.Supplier<T> lock) {
+        try {
+            return lock.get();
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (RuntimeException ex) {
+            if (isLockTimeout(ex)) throw conflict(LOCK_BUSY);
+            throw ex;
+        }
+    }
+
+    private static boolean isLockTimeout(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof org.springframework.dao.PessimisticLockingFailureException
+                    || cause instanceof org.springframework.dao.QueryTimeoutException
+                    || cause instanceof jakarta.persistence.LockTimeoutException
+                    || cause instanceof jakarta.persistence.PessimisticLockException
+                    || cause instanceof java.sql.SQLTimeoutException) {
+                return true;
+            }
+            if (cause instanceof java.sql.SQLException sql && sql.getSQLState() != null
+                    && java.util.Set.of("50200", "55P03", "57014").contains(sql.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private TeamProjectTeam requireTeam(Long programId, Long teamId) {

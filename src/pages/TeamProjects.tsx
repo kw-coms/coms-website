@@ -77,11 +77,14 @@ function MilestoneSubmission({ program, team, milestone, submission, now }: { pr
       setProgress(0)
       return saveSubmission(program.id, team.id, milestone.id, draft, { onProgress: setProgress, signal: controller.current.signal }).finally(() => setProgress(null))
     },
-    onSuccess: async () => { await client.invalidateQueries({ queryKey: ['team-projects', 'submissions', program.id, team.id] }); showToast('제출을 저장했습니다.'); setEditing(false) },
+    onSuccess: () => { showToast('제출을 저장했습니다.'); setEditing(false) },
+    // 성공·실패·취소·시간 초과 어느 쪽이든 서버에 실제로 저장된 상태를 다시 읽는다. 그래야 다시 저장해도 같은 파일이 중복으로 올라가지 않는다.
+    onSettled: () => client.invalidateQueries({ queryKey: ['team-projects', 'submissions', program.id, team.id] }),
   })
   const remove = useMutation({
     mutationFn: () => deleteSubmission(program.id, team.id, milestone.id),
-    onSuccess: async () => { await client.invalidateQueries({ queryKey: ['team-projects', 'submissions', program.id, team.id] }); showToast('제출을 삭제했습니다.'); setEditing(true) },
+    onSuccess: () => { showToast('제출을 삭제했습니다.'); setEditing(true) },
+    onSettled: () => client.invalidateQueries({ queryKey: ['team-projects', 'submissions', program.id, team.id] }),
   })
   const error = save.error ?? remove.error
   const canEdit = program.open

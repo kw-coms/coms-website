@@ -66,9 +66,9 @@ function MilestoneForm({ milestone, busy, save, cancel }: { milestone?: Mileston
       dueAt: current.dueAt ? (next ? current.dueAt.slice(0, 10) : `${current.dueAt.slice(0, 10)}T23:59`) : '',
     }))
   }
-  const changeKind = (next: Kind) => { setKind(next); if (next === 'event') setDraft(current => ({ ...current, startsAt: '' })) }
-  const hasStart = kind !== 'event'
-  const startLabel = kind === 'period' ? '시작' : '시작 (선택)'
+  const changeKind = (next: Kind) => { setKind(next); if (next !== 'period') setDraft(current => ({ ...current, startsAt: '' })) }
+  const hasStart = kind === 'period'   // 시작은 기간에만 쓴다. 제출 마감과 일정·행사는 한 시각뿐이다.
+  const startLabel = '시작'
   const endLabel = kind === 'period' ? '종료' : kind === 'event' ? '일시 (선택)' : '마감 (선택)'
   const rangeError = draft.startsAt && draft.dueAt && draft.dueAt < draft.startsAt ? '종료(마감)는 시작보다 빠를 수 없습니다.'
     : kind === 'period' && (!draft.startsAt || !draft.dueAt) ? '기간은 시작과 종료를 모두 입력해 주세요.' : ''

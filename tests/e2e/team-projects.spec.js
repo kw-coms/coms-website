@@ -143,14 +143,18 @@ test('admin builds a program with every kind of schedule item, a member submits,
   await milestoneForm.getByLabel('마감 (선택)').fill('2020-01-01T23:59')
   await finish('지난 과제')
 
-  // 일정·행사: 종일(날짜만)
+  // 제출 마감 + 종일(날짜만): 시작 입력은 없고 startsAt 은 null 로 간다
+  await expect(milestoneForm.getByLabel('시작', { exact: true })).toHaveCount(0)
+  await milestoneForm.getByLabel('일정 이름').fill('중간 진행 상황 확인')
+  await milestoneForm.getByLabel('시간 없음 (종일)').check()
+  await milestoneForm.getByLabel('마감 (선택)').fill('2099-12-06')
+  await finish('중간 진행 상황 확인')
+  expect(db.milestones.find(m => m.title === '중간 진행 상황 확인')).toMatchObject({ allDay: true, submittable: true, startsAt: null, dueAt: '2099-12-06T00:00:00' })
+
+  // 일정·행사 도움말
   await milestoneForm.getByText('일정·행사', { exact: true }).click()
   await expect(milestoneForm.getByText('예: 최종 발표 18:00')).toBeVisible()
-  await milestoneForm.getByLabel('일정 이름').fill('중간 점검')
-  await milestoneForm.getByLabel('시간 없음 (종일)').check()
-  await milestoneForm.getByLabel('일시 (선택)').fill('2099-12-06')
-  await finish('중간 점검')
-  expect(db.milestones.find(m => m.title === '중간 점검')).toMatchObject({ allDay: true, submittable: false, dueAt: '2099-12-06T00:00:00' })
+  await milestoneForm.getByText('제출 마감', { exact: true }).click()
 
   // 기간: 시작·종료, 잘못된 범위는 입력칸 옆에 바로 알려 준다
   await milestoneForm.getByText('기간', { exact: true }).click()
@@ -175,16 +179,16 @@ test('admin builds a program with every kind of schedule item, a member submits,
   await expect.poll(() => db.milestones.find(m => m.title === '최종 발표').position).toBe(3)
 
   // 일정 수정: 종일을 풀면 시각 입력으로 바뀌고 저장된다
-  await page.getByRole('button', { name: '중간 점검 편집' }).click()
-  const edit = page.getByRole('form', { name: '중간 점검 일정 편집' })
-  await expect(edit.getByLabel('일시 (선택)')).toHaveAttribute('type', 'date')
+  await page.getByRole('button', { name: '중간 진행 상황 확인 편집' }).click()
+  const edit = page.getByRole('form', { name: '중간 진행 상황 확인 일정 편집' })
+  await expect(edit.getByLabel('마감 (선택)')).toHaveAttribute('type', 'date')
   await edit.getByLabel('시간 없음 (종일)').uncheck()
-  await expect(edit.getByLabel('일시 (선택)')).toHaveAttribute('type', 'datetime-local')
-  await edit.getByLabel('일시 (선택)').fill('2099-12-06T14:30')
+  await expect(edit.getByLabel('마감 (선택)')).toHaveAttribute('type', 'datetime-local')
+  await edit.getByLabel('마감 (선택)').fill('2099-12-06T14:30')
   await edit.getByLabel('설명').fill('GitHub 저장소와 초기 개발 현황 공유')
   await edit.getByRole('button', { name: '일정 저장' }).click()
   await expect(page.getByText('GitHub 저장소와 초기 개발 현황 공유')).toBeVisible()
-  expect(db.milestones.find(m => m.title === '중간 점검')).toMatchObject({ allDay: false, dueAt: '2099-12-06T14:30' })
+  expect(db.milestones.find(m => m.title === '중간 진행 상황 확인')).toMatchObject({ allDay: false, submittable: true, dueAt: '2099-12-06T14:30' })
 
   // 팀·팀원, 서버 오류는 그 폼 안에 보인다
   const teamForm = page.getByRole('form', { name: '새 팀 만들기' })

@@ -5,6 +5,8 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
+import jakarta.persistence.QueryHint;
 import java.util.List;
 import java.util.Optional;
 
@@ -12,6 +14,7 @@ public interface TeamProjectRepository extends JpaRepository<TeamProject, Long> 
     List<TeamProject> findAllByOrderByIdDesc();
     /** Serializes team/member writes of one program so "one team per member" holds under concurrency. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
     @Query("select p from TeamProject p where p.id = :id")
     Optional<TeamProject> lockById(Long id);
 }
