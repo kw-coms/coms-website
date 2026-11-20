@@ -111,7 +111,7 @@ class HackathonIntegrationTest {
                 .andExpect(status().isBadRequest());
         submitBody("{\"projectId\":\"wargether\",\"generation\":0,\"name\":\"Ann\"," + SCORES + "}")
                 .andExpect(status().isBadRequest());
-        submitBody("{\"projectId\":\"wargether\",\"generation\":61,\"name\":\"Ann\"," + SCORES + "}")
+        submitBody("{\"projectId\":\"wargether\",\"generation\":" + (java.time.Year.now(java.time.ZoneId.of("Asia/Seoul")).getValue() - 1966 + 1) + ",\"name\":\"Ann\"," + SCORES + "}")
                 .andExpect(status().isBadRequest());
         submitBody("{\"projectId\":\"wargether\",\"generation\":2.9,\"name\":\"Ann\"," + SCORES + "}")
                 .andExpect(status().isBadRequest());
@@ -125,6 +125,14 @@ class HackathonIntegrationTest {
                 SCORES.replace("좋은 작품", "a".repeat(2001)) + "}")
                 .andExpect(status().isBadRequest());
         assertThat(reviews.count()).isZero();
+    }
+
+    @Test
+    void acceptsTheCurrentGenerationAsTheUpperBound() throws Exception {
+        // 상한은 올해 기수(서울 기준 연도 - 1966)다. 2027년이면 61기도 받아야 한다.
+        int current = java.time.Year.now(java.time.ZoneId.of("Asia/Seoul")).getValue() - 1966;
+        submit("wargether", current, "Newest").andExpect(status().isCreated());
+        assertThat(reviews.count()).isEqualTo(1);
     }
 
     @Test
