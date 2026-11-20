@@ -34,7 +34,12 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.unit.DataSize;
+
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -65,12 +70,17 @@ public class TeamProjectService {
     private final TeamProjectSubmissionFileRepository files;
     private final MemberRepository members;
     private final StorageService storage;
+    private final Clock clock;
+    private final long maxFileBytes;
+    private final long maxRequestBytes;
 
     public TeamProjectService(TeamProjectRepository programs, TeamProjectMilestoneRepository milestones,
                               TeamProjectTeamRepository teams, TeamProjectMemberRepository teamMembers,
                               TeamProjectSubmissionRepository submissions, TeamProjectSubmissionLinkRepository links,
                               TeamProjectSubmissionFileRepository files, MemberRepository members,
-                              StorageService storage) {
+                              StorageService storage, Clock clock,
+                              @Value("${spring.servlet.multipart.max-file-size:310MB}") DataSize maxFile,
+                              @Value("${spring.servlet.multipart.max-request-size:320MB}") DataSize maxRequest) {
         this.programs = programs;
         this.milestones = milestones;
         this.teams = teams;
@@ -80,6 +90,16 @@ public class TeamProjectService {
         this.files = files;
         this.members = members;
         this.storage = storage;
+        this.clock = clock;
+        this.maxFileBytes = maxFile.toBytes();
+        this.maxRequestBytes = maxRequest.toBytes();
+    }
+
+    /** 모든 시각은 한국 시간(서버 시간대와 무관)의 벽시계 값으로 저장하고 비교한다. */
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+
+    private LocalDateTime now() {
+        return LocalDateTime.now(clock.withZone(SEOUL));
     }
 
     // ---- 프로그램 -------------------------------------------------------------------------
@@ -116,7 +136,7 @@ public class TeamProjectService {
                 }).toList())).toList();
         return new TeamProjectDetail(program.getId(), program.getTitle(), program.getDescription(), program.isOpen(),
                 milestones.findByProgramIdOrderByPositionAscIdAsc(programId).stream().map(TeamProjectService::view).toList(),
-                teamViews, myTeamId);
+                teamViews, myTeamId, maxFileBytes, maxRequestBytes);
     }
 
     @Transactional
@@ -136,7 +156,7 @@ public class TeamProjectService {
         program.setTitle(required(write == null ? null : write.title(), 120, "제목"));
         program.setDescription(optional(write.description(), 5000, "설명"));
         if (write.open() != null) program.setOpen(write.open());
-        program.setUpdatedAt(LocalDateTime.now());
+        program.setUpdatedAt(now());
         programs.saveAndFlush(program);
         return new TeamProjectSummary(program.getId(), program.getTitle(), program.getDescription(), program.isOpen(), null, null);
     }
@@ -202,11 +222,14 @@ public class TeamProjectService {
         if (write == null) throw bad("일정 내용을 입력해 주세요.");
         milestone.setTitle(required(write.title(), 120, "일정 이름"));
         milestone.setDescription(optional(write.description(), 2000, "일정 설명"));
-        if (write.startsAt() != null && write.dueAt() != null && write.dueAt().isBefore(write.startsAt())) {
-            throw bad("마감은 시작보다 빠를 수 없습니다.");
+        if (write.startsAt() != null && write.dueAt() != null
+                && (Boolean.TRUE.equals(write.allDay()) ? write.dueAt().toLocalDate().isBefore(write.startsAt().toLocalDate()) : write.dueAt().isBefore(write.startsAt()))) {
+            throw bad("종료는 시작보다 빠를 수 없습니다.");
         }
-        milestone.setStartsAt(write.startsAt());
-        milestone.setDueAt(write.dueAt());
+        boolean allDay = Boolean.TRUE.equals(write.allDay());
+        milestone.setAllDay(allDay);
+        milestone.setStartsAt(allDay && write.startsAt() != null ? write.startsAt().toLocalDate().atStartOfDay() : write.startsAt());
+        milestone.setDueAt(allDay && write.dueAt() != null ? write.dueAt().toLocalDate().atStartOfDay() : write.dueAt());
         milestone.setSubmittable(Boolean.TRUE.equals(write.submittable()));
     }
 
@@ -295,9 +318,9 @@ public class TeamProjectService {
                 new TeamProjectBoardTeam(team.getId(), team.getName(), team.getTopic(), sizes.getOrDefault(team.getId(), 0L).intValue(),
                         columns.stream().map(column -> {
                             TeamProjectSubmission found = byCell.get(team.getId() + ":" + column.getId());
-                            if (found == null) return new TeamProjectBoardCell(column.getId(), "MISSING", null, null);
+                            if (found == null) return new TeamProjectBoardCell(column.getId(), "MISSING", null, null, false);
                             return new TeamProjectBoardCell(column.getId(), isLate(found, column) ? "LATE" : "SUBMITTED",
-                                    found.getSubmittedAt(), found.getUpdatedAt());
+                                    found.getSubmittedAt(), found.getUpdatedAt(), isAfterDue(found.getUpdatedAt(), column));
                         }).toList())).toList();
         return new TeamProjectBoard(columns.stream().map(TeamProjectService::view).toList(), rows);
     }
@@ -317,7 +340,8 @@ public class TeamProjectService {
     @Transactional
     public TeamProjectSubmissionView submit(Long programId, Long teamId, Long milestoneId, String viewer, String body,
                                             List<String> linkInputs, List<MultipartFile> uploads, List<Long> removeFileIds) {
-        TeamProject program = requireProgram(programId);
+        // 프로그램 행을 잠가 같은 프로그램의 제출·삭제·수정을 한 줄로 세운다(같은 제출을 동시에 고쳐도 500 이 나지 않는다).
+        TeamProject program = programs.lockById(programId).orElseThrow(() -> notFound("팀 프로젝트를 찾을 수 없습니다."));
         requireTeam(programId, teamId);
         TeamProjectMilestone milestone = requireMilestone(programId, milestoneId);
         Member actor = requireMember(viewer);
@@ -343,7 +367,7 @@ public class TeamProjectService {
             throw bad("본문, 링크, 파일 중 하나는 입력해 주세요.");
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = now();
         if (submission == null) {
             submission = new TeamProjectSubmission();
             submission.setProgramId(programId);
@@ -409,11 +433,15 @@ public class TeamProjectService {
 
     @Transactional
     public void deleteSubmission(Long programId, Long teamId, Long milestoneId, String viewer) {
-        requireProgram(programId);
+        TeamProject program = programs.lockById(programId).orElseThrow(() -> notFound("팀 프로젝트를 찾을 수 없습니다."));
         requireTeam(programId, teamId);
-        requireMilestone(programId, milestoneId);
+        TeamProjectMilestone milestone = requireMilestone(programId, milestoneId);
         requireMember(viewer);
-        if (!teamMembers.existsByTeamIdAndStudentId(teamId, viewer) && !isAdmin(viewer)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        boolean admin = isAdmin(viewer);
+        if (!admin && !teamMembers.existsByTeamIdAndStudentId(teamId, viewer)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        // 팀원은 마감된 프로그램·제출을 받지 않는 일정의 제출을 지울 수 없다(회장은 정리할 수 있다).
+        if (!admin && !program.isOpen()) throw conflict("마감된 프로그램의 제출은 삭제할 수 없습니다.");
+        if (!admin && !milestone.isSubmittable()) throw conflict("이 일정은 제출을 받지 않습니다.");
         TeamProjectSubmission submission = submissions.findByTeamIdAndMilestoneId(teamId, milestoneId)
                 .orElseThrow(() -> notFound("제출을 찾을 수 없습니다."));
         List<String> stored = purge(List.of(submission));
@@ -453,7 +481,6 @@ public class TeamProjectService {
                 .collect(Collectors.groupingBy(TeamProjectSubmissionFile::getSubmissionId));
         return rows.stream().map(row -> {
             TeamProjectMilestone milestone = milestoneById.get(row.getMilestoneId());
-            LocalDateTime due = milestone == null ? null : milestone.getDueAt();
             return new TeamProjectSubmissionView(row.getId(), row.getTeamId(), row.getMilestoneId(), row.getBody(),
                     linkRows.getOrDefault(row.getId(), List.of()),
                     fileRows.getOrDefault(row.getId(), List.of()).stream().map(file -> new TeamProjectFileView(file.getId(),
@@ -461,7 +488,7 @@ public class TeamProjectService {
                             "/api/team-projects/" + programId + "/teams/" + row.getTeamId() + "/milestones/" + row.getMilestoneId()
                                     + "/submission/files/" + file.getId())).toList(),
                     row.getSubmittedByName(), row.getSubmittedAt(), row.getUpdatedByName(), row.getUpdatedAt(),
-                    due != null && row.getSubmittedAt().isAfter(due), due != null && row.getUpdatedAt().isAfter(due));
+                    isAfterDue(row.getSubmittedAt(), milestone), isAfterDue(row.getUpdatedAt(), milestone));
         }).toList();
     }
 
@@ -471,7 +498,12 @@ public class TeamProjectService {
     }
 
     private static boolean isLate(TeamProjectSubmission submission, TeamProjectMilestone milestone) {
-        return milestone.getDueAt() != null && submission.getSubmittedAt().isAfter(milestone.getDueAt());
+        return isAfterDue(submission.getSubmittedAt(), milestone);
+    }
+
+    private static boolean isAfterDue(LocalDateTime at, TeamProjectMilestone milestone) {
+        LocalDateTime due = milestone == null ? null : milestone.effectiveDue();
+        return due != null && at.isAfter(due);
     }
 
     private List<TeamProjectMemberView> memberViews(Collection<TeamProjectMember> rows, boolean admin) {
@@ -486,7 +518,7 @@ public class TeamProjectService {
 
     private static TeamProjectMilestoneView view(TeamProjectMilestone m) {
         return new TeamProjectMilestoneView(m.getId(), m.getTitle(), m.getDescription(), m.getStartsAt(), m.getDueAt(),
-                m.isSubmittable(), m.getPosition());
+                m.isAllDay(), m.isSubmittable(), m.getPosition());
     }
 
     /** 제출과 그 링크·파일 행을 지우고, 커밋 뒤에 지울 저장 파일 이름을 돌려준다. 자식 행부터 지운다. */

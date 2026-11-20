@@ -97,3 +97,14 @@
 @media (max-width: 480px) {
   .tp-milestone { padding: 14px; }
 }
+
+.tp-file-row { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; min-width: 0; }
+.tp-file-row[data-removed] { opacity: .6; }
+.tp-file-row[data-removed] .tp-file-name { text-decoration: line-through; }
+.tp-progress { flex: 1; min-width: 0; height: 8px; accent-color: var(--app-accent); }
+.tp-field-error { color: var(--app-danger); font-size: 0.875rem; }
+.tp-kinds { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 0; }
+.tp-kind { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid var(--app-hairline); border-radius: 12px; font-size: 0.875rem; font-weight: 600; }
+.tp-kind:has(input:checked) { border-color: var(--app-accent); background: var(--app-accent-soft); }
+.tp-cell { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.tp-edited { font-size: 0.6875rem; color: var(--app-muted); }

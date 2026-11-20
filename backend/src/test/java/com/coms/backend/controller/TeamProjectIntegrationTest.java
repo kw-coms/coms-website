@@ -23,7 +23,15 @@ import org.springframework.web.server.ResponseStatusException;
 
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,7 +52,34 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.url=jdbc:h2:mem:team-project-test;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1"
 })
 @AutoConfigureMockMvc
+@Import(TeamProjectIntegrationTest.ClockConfig.class)
 class TeamProjectIntegrationTest {
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+
+    /** 마감 경계를 초 단위로 확인하려고 시계를 고정한다. 평소에는 실제 시각을 따른다. */
+    static final class MutableClock extends Clock {
+        private volatile Instant fixed;
+        @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(ZoneId zone) {
+            MutableClock self = this;
+            return new Clock() {
+                @Override public ZoneId getZone() { return zone; }
+                @Override public Clock withZone(ZoneId other) { return self.withZone(other); }
+                @Override public Instant instant() { return self.instant(); }
+            };
+        }
+        @Override public Instant instant() { return fixed != null ? fixed : Instant.now(); }
+        void at(LocalDateTime seoulWallClock) { fixed = seoulWallClock.atZone(SEOUL).toInstant(); }
+        void useRealTime() { fixed = null; }
+    }
+
+    @TestConfiguration
+    static class ClockConfig {
+        @Bean @Primary MutableClock testClock() { return new MutableClock(); }
+    }
+
+    @Autowired MutableClock clock;
+
     private static final String ORIGIN = "https://coms.kw.ac.kr";
     private static final String ADMIN_API = "/api/admin/team-projects";
     private static final String API = "/api/team-projects";
@@ -63,6 +98,7 @@ class TeamProjectIntegrationTest {
 
     @BeforeEach
     void reset() {
+        clock.useRealTime();
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         for (String stored : jdbc.queryForList("SELECT stored_name FROM team_project_submission_files", String.class)) storage.delete(stored);
         for (String table : List.of("team_project_submission_files", "team_project_submission_links", "team_project_submissions",
@@ -315,6 +351,101 @@ class TeamProjectIntegrationTest {
         mvc.perform(get(API + "/" + f.program).cookie(alice)).andExpect(status().isNotFound());
     }
 
+    // ---- 마감 경계 · 종일 · 삭제 규칙 ---------------------------------------------------------
+
+    @Test
+    void lateIsJudgedByTheSecondAgainstSeoulTimeAndAllDayDueRunsToTheEndOfTheDay() throws Exception {
+        Fixture f = fixture();
+        LocalDateTime due = LocalDateTime.of(2030, 12, 26, 23, 59, 0);
+        long timed = createMilestone(f.program, "정각 마감", null, due, true);
+        long allDay = createMilestone(f.program, "종일 마감", null, LocalDateTime.of(2030, 12, 26, 15, 30), true, true);
+        clock.at(due);
+        submitRaw(alice, f.program, f.teamA, timed, "정각", List.of()).andExpect(status().isOk()).andExpect(jsonPath("$.late").value(false));
+        clock.at(due.plusSeconds(1));
+        submitRaw(carol, f.program, f.teamB, timed, "1초 뒤", List.of()).andExpect(status().isOk()).andExpect(jsonPath("$.late").value(true));
+        // 정각에 낸 제출을 마감 뒤에 고쳐도 늦은 제출이 되지는 않고, 마감 후 수정으로만 표시된다.
+        submitRaw(bob, f.program, f.teamA, timed, "마감 뒤 수정", List.of()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.late").value(false)).andExpect(jsonPath("$.editedAfterDue").value(true));
+
+        clock.at(LocalDateTime.of(2030, 12, 26, 23, 59, 59));
+        submitRaw(alice, f.program, f.teamA, allDay, "종일 막판", List.of()).andExpect(status().isOk()).andExpect(jsonPath("$.late").value(false));
+        clock.at(LocalDateTime.of(2030, 12, 27, 0, 0, 0));
+        submitRaw(carol, f.program, f.teamB, allDay, "다음 날", List.of()).andExpect(status().isOk()).andExpect(jsonPath("$.late").value(true));
+
+        JsonNode board = json(mvc.perform(get(ADMIN_API + "/" + f.program + "/board").cookie(admin)).andExpect(status().isOk()));
+        JsonNode cells = board.path("teams").get(0).path("cells");
+        assertThat(cells.get(2).path("status").asText()).isEqualTo("SUBMITTED");
+        assertThat(cells.get(2).path("editedAfterDue").asBoolean()).isTrue();
+        assertThat(board.path("teams").get(1).path("cells").get(2).path("status").asText()).isEqualTo("LATE");
+    }
+
+    @Test
+    void allDayMilestonesKeepOnlyTheDateAndRejectReversedRanges() throws Exception {
+        Fixture f = fixture();
+        mvc.perform(post(ADMIN_API + "/" + f.program + "/milestones").cookie(admin).header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"시험·보강\",\"allDay\":true,\"startsAt\":\"2030-12-08T13:45:00\",\"dueAt\":\"2030-12-21T09:10:00\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.allDay").value(true))
+                .andExpect(jsonPath("$.startsAt").value("2030-12-08T00:00:00")).andExpect(jsonPath("$.dueAt").value("2030-12-21T00:00:00"));
+        mvc.perform(post(ADMIN_API + "/" + f.program + "/milestones").cookie(admin).header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"역전\",\"allDay\":true,\"startsAt\":\"2030-12-21T00:00:00\",\"dueAt\":\"2030-12-08T00:00:00\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get(API + "/" + f.program).cookie(alice)).andExpect(jsonPath("$.maxFileBytes").value(310L * 1024 * 1024))
+                .andExpect(jsonPath("$.maxRequestBytes").value(320L * 1024 * 1024));
+    }
+
+    @Test
+    void deletingASubmissionIsLockedForMembersOfClosedProgramsButNotForAdmins() throws Exception {
+        Fixture f = fixture();
+        submitRaw(alice, f.program, f.teamA, f.proposal, "계획", List.of(new MockMultipartFile("files", "a.txt", "text/plain", "a".getBytes()))).andExpect(status().isOk());
+        submitRaw(carol, f.program, f.teamB, f.final_, "최종", List.of()).andExpect(status().isOk());
+        String deleteA = API + "/" + f.program + "/teams/" + f.teamA + "/milestones/" + f.proposal + "/submission";
+        setOpen(f.program, false);
+        mvc.perform(delete(deleteA).cookie(alice).header("Origin", ORIGIN)).andExpect(status().isConflict());
+        mvc.perform(get(API + "/" + f.program + "/teams/" + f.teamA + "/submissions").cookie(alice)).andExpect(jsonPath("$.length()").value(1));
+        // 닫힌 프로그램은 다시 열면 고칠 수 있고, 지난 제출은 그대로다.
+        setOpen(f.program, true);
+        submitRaw(bob, f.program, f.teamA, f.proposal, "다시 열린 뒤", List.of()).andExpect(status().isOk()).andExpect(jsonPath("$.files.length()").value(1));
+        // 제출을 받지 않게 바뀐 일정의 제출도 팀원은 지울 수 없다.
+        mvc.perform(put(ADMIN_API + "/" + f.program + "/milestones/" + f.proposal).cookie(admin).header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"개발 계획서\",\"submittable\":false}")).andExpect(status().isOk());
+        mvc.perform(delete(deleteA).cookie(alice).header("Origin", ORIGIN)).andExpect(status().isConflict());
+        // 회장은 닫힌 프로그램에서도, 다른 팀의 제출도 지울 수 있다.
+        setOpen(f.program, false);
+        mvc.perform(delete(deleteA).cookie(admin).header("Origin", ORIGIN)).andExpect(status().isNoContent());
+        mvc.perform(delete(API + "/" + f.program + "/teams/" + f.teamB + "/milestones/" + f.final_ + "/submission").cookie(admin).header("Origin", ORIGIN))
+                .andExpect(status().isNoContent());
+        assertThat(new JdbcTemplate(dataSource).queryForObject("SELECT COUNT(*) FROM team_project_submission_files", Integer.class)).isZero();
+        // 다른 팀원이 아닌 회원은 여전히 403.
+        mvc.perform(delete(deleteA).cookie(carol).header("Origin", ORIGIN)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void oneRequestCanAddSeveralFilesAndRemoveSomeAndTextAndLinkLimitsHold() throws Exception {
+        Fixture f = fixture();
+        JsonNode first = json(submitRaw(alice, f.program, f.teamA, f.proposal, "v1", List.of(
+                new MockMultipartFile("files", "1.txt", "text/plain", "1".getBytes()),
+                new MockMultipartFile("files", "2.txt", "text/plain", "2".getBytes()),
+                new MockMultipartFile("files", "3.txt", "text/plain", "3".getBytes()))).andExpect(status().isOk()));
+        String removeId = String.valueOf(first.path("files").get(1).path("id").asLong());
+        JsonNode second = json(mvc.perform(multipartPut(bob, f.program, f.teamA, f.proposal)
+                .file(new MockMultipartFile("files", "4.bin", "application/octet-stream", "4".getBytes()))
+                .file(new MockMultipartFile("files", "5.bin", "application/octet-stream", "5".getBytes()))
+                .param("body", "v2").param("removeFileIds", removeId)).andExpect(status().isOk()));
+        assertThat(second.path("files")).extracting(node -> node.path("originalName").asText()).containsExactly("1.txt", "3.txt", "4.bin", "5.bin");
+        assertThat(new JdbcTemplate(dataSource).queryForObject("SELECT COUNT(*) FROM team_project_submission_files", Integer.class)).isEqualTo(4);
+
+        submitRaw(alice, f.program, f.teamA, f.final_, "x".repeat(20000), List.of()).andExpect(status().isOk());
+        submitRaw(alice, f.program, f.teamA, f.final_, "x".repeat(20001), List.of()).andExpect(status().isBadRequest());
+        String longest = "https://example.com/" + "a".repeat(2000 - "https://example.com/".length());
+        submitRaw(alice, f.program, f.teamA, f.final_, "링크", List.of(), longest).andExpect(status().isOk());
+        submitRaw(alice, f.program, f.teamA, f.final_, "링크", List.of(), longest + "a").andExpect(status().isBadRequest());
+    }
+
+    private void setOpen(long program, boolean open) throws Exception {
+        mvc.perform(put(ADMIN_API + "/" + program).cookie(admin).header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"2026 팀프\",\"description\":\"\",\"open\":" + open + "}")).andExpect(status().isOk());
+    }
+
     // ---- 헬퍼 ------------------------------------------------------------------------------
 
     private record Fixture(long program, long teamA, long teamB, long proposal, long final_, long noSubmit) {}
@@ -327,8 +458,8 @@ class TeamProjectIntegrationTest {
         addMember(program, teamA, "alice").andExpect(status().isCreated());
         addMember(program, teamA, "bob").andExpect(status().isCreated());
         addMember(program, teamB, "carol").andExpect(status().isCreated());
-        long proposal = createMilestone(program, "개발 계획서", null, LocalDateTime.now().minusHours(2), true);
-        long finalMilestone = createMilestone(program, "최종 결과물", LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(3), true);
+        long proposal = createMilestone(program, "개발 계획서", null, LocalDateTime.now(SEOUL).minusHours(2), true);
+        long finalMilestone = createMilestone(program, "최종 결과물", LocalDateTime.now(SEOUL).minusDays(1), LocalDateTime.now(SEOUL).plusDays(3), true);
         long noSubmit = createMilestone(program, "시험 기간", null, null, false);
         return new Fixture(program, teamA, teamB, proposal, finalMilestone, noSubmit);
     }
@@ -344,7 +475,11 @@ class TeamProjectIntegrationTest {
     }
 
     private long createMilestone(long program, String title, LocalDateTime start, LocalDateTime due, boolean submittable) throws Exception {
-        String body = "{\"title\":\"" + title + "\",\"description\":\"\",\"submittable\":" + submittable
+        return createMilestone(program, title, start, due, submittable, false);
+    }
+
+    private long createMilestone(long program, String title, LocalDateTime start, LocalDateTime due, boolean submittable, boolean allDay) throws Exception {
+        String body = "{\"title\":\"" + title + "\",\"description\":\"\",\"allDay\":" + allDay + ",\"submittable\":" + submittable
                 + (start == null ? "" : ",\"startsAt\":\"" + start + "\"") + (due == null ? "" : ",\"dueAt\":\"" + due + "\"") + "}";
         return json(mvc.perform(post(ADMIN_API + "/" + program + "/milestones").cookie(admin).header("Origin", ORIGIN)
                 .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isCreated())).path("id").asLong();

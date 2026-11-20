@@ -10,7 +10,7 @@ public final class TeamProjectDto {
     public record TeamProjectWrite(String title, String description, Boolean open) {}
 
     public record TeamProjectMilestoneWrite(String title, String description, LocalDateTime startsAt,
-                                            LocalDateTime dueAt, Boolean submittable) {}
+                                            LocalDateTime dueAt, Boolean allDay, Boolean submittable) {}
 
     public record TeamProjectMilestoneOrder(List<Long> ids) {}
 
@@ -22,7 +22,7 @@ public final class TeamProjectDto {
                                      Long myTeamId, String myTeamName) {}
 
     public record TeamProjectMilestoneView(Long id, String title, String description, LocalDateTime startsAt,
-                                           LocalDateTime dueAt, boolean submittable, int position) {}
+                                           LocalDateTime dueAt, boolean allDay, boolean submittable, int position) {}
 
     /** studentId 는 회장에게만 내려간다. */
     public record TeamProjectMemberView(String studentId, String name, String generation) {}
@@ -32,7 +32,7 @@ public final class TeamProjectDto {
 
     public record TeamProjectDetail(Long id, String title, String description, boolean open,
                                     List<TeamProjectMilestoneView> milestones, List<TeamProjectTeamView> teams,
-                                    Long myTeamId) {}
+                                    Long myTeamId, long maxFileBytes, long maxRequestBytes) {}
 
     public record TeamProjectFileView(Long id, String originalName, String mimeType, Long fileSize, String downloadUrl) {}
 
@@ -43,7 +43,7 @@ public final class TeamProjectDto {
 
     /** status: SUBMITTED(제출) / LATE(늦은 제출) / MISSING(미제출) */
     public record TeamProjectBoardCell(Long milestoneId, String status, LocalDateTime submittedAt,
-                                       LocalDateTime updatedAt) {}
+                                       LocalDateTime updatedAt, boolean editedAfterDue) {}
 
     public record TeamProjectBoardTeam(Long id, String name, String topic, int memberCount,
                                        List<TeamProjectBoardCell> cells) {}

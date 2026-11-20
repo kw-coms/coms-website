@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import PageHeading from '../components/PageHeading'
@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { SubmissionEditor, SubmissionView, StatusChip } from '../features/teamProjects/SubmissionParts'
 import {
-  milestoneDday, milestonePhase, milestoneWhen, nextMilestone, submissionStatus,
+  milestoneDday, milestonePhase, milestoneWhen, nextMilestone, submissionStatus, uploadErrorText,
 } from '../features/teamProjects/teamProjects'
 import {
   deleteSubmission, getTeamProject, listTeamProjects, listTeamSubmissions, saveSubmission,
@@ -16,8 +16,6 @@ import {
 } from '../services/teamProjectApi'
 import '../styles/site-pages.css'
 import '../styles/team-projects.css'
-
-const errorText = (cause: unknown) => cause instanceof Error ? cause.message : '요청을 처리하지 못했습니다.'
 
 function useNow(intervalMs = 60_000) {
   const [now, setNow] = useState(() => new Date())
@@ -38,7 +36,7 @@ function NextDeadline({ milestones, now }: { milestones: Milestone[]; now: Date 
       <h2 className="mt-1 break-words text-xl font-bold">{next.title}</h2>
       <p className="mt-1 text-sm text-[var(--app-muted)]">{next.submittable ? '마감 ' : ''}{milestoneWhen(next)}</p>
     </div>
-    {dday && <strong className="tp-dday text-3xl" aria-label={`디데이 ${dday}`}>{dday}</strong>}
+    {dday && <strong className="tp-dday text-3xl"><span aria-hidden="true">{dday}</span><span className="sr-only">디데이 {dday}</span></strong>}
   </section>
 }
 
@@ -59,7 +57,7 @@ function Timeline({ milestones, now, submissions }: { milestones: Milestone[]; n
         <div className="flex flex-wrap gap-2">
           {phase === 'active' && <span className="tp-chip" data-tone="accent">진행 중</span>}
           {next?.id === milestone.id && <span className="tp-chip" data-tone="accent">{dday === 'D-DAY' ? '오늘' : '다음'}</span>}
-          {milestone.submittable && submissions && <StatusChip status={submissionStatus(mine)} />}
+          {milestone.submittable && submissions && <StatusChip status={submissionStatus(mine, milestone, now)} />}
           {milestone.submittable && !submissions && <span className="tp-chip">제출 받음</span>}
           {!milestone.submittable && <span className="tp-chip">제출 없음</span>}
         </div>
@@ -68,11 +66,17 @@ function Timeline({ milestones, now, submissions }: { milestones: Milestone[]; n
   </ol>
 }
 
-function MilestoneSubmission({ program, team, milestone, submission }: { program: TeamProjectDetail; team: Team; milestone: Milestone; submission?: Submission }) {
+function MilestoneSubmission({ program, team, milestone, submission, now }: { program: TeamProjectDetail; team: Team; milestone: Milestone; submission?: Submission; now: Date }) {
   const client = useQueryClient()
   const [editing, setEditing] = useState(!submission)
+  const [progress, setProgress] = useState<number | null>(null)
+  const controller = useRef<AbortController | null>(null)
   const save = useMutation({
-    mutationFn: (draft: SubmissionDraft) => saveSubmission(program.id, team.id, milestone.id, draft),
+    mutationFn: (draft: SubmissionDraft) => {
+      controller.current = new AbortController()
+      setProgress(0)
+      return saveSubmission(program.id, team.id, milestone.id, draft, { onProgress: setProgress, signal: controller.current.signal }).finally(() => setProgress(null))
+    },
     onSuccess: async () => { await client.invalidateQueries({ queryKey: ['team-projects', 'submissions', program.id, team.id] }); showToast('제출을 저장했습니다.'); setEditing(false) },
   })
   const remove = useMutation({
@@ -84,7 +88,7 @@ function MilestoneSubmission({ program, team, milestone, submission }: { program
   return <article className="tp-card space-y-4" aria-label={`${milestone.title} 제출`}>
     <header className="flex flex-wrap items-center justify-between gap-2">
       <h3 className="min-w-0 break-words text-lg font-bold">{milestone.title}</h3>
-      <StatusChip status={submissionStatus(submission)} />
+      <StatusChip status={submissionStatus(submission, milestone, now)} />
     </header>
     <p className="text-sm text-[var(--app-muted)]">{milestone.dueAt ? `마감 ${milestoneWhen(milestone)} · 마감 후에도 제출할 수 있지만 늦은 제출로 표시됩니다.` : '마감 시각이 정해지지 않았습니다.'}</p>
     {!canEdit && <p role="status" className="text-sm font-semibold">이 프로그램은 마감되어 제출을 고칠 수 없습니다.</p>}
@@ -93,11 +97,12 @@ function MilestoneSubmission({ program, team, milestone, submission }: { program
       {canEdit && <button type="button" className="apple-action-secondary min-h-11 px-4 text-sm" onClick={() => setEditing(true)}>수정하기</button>}
     </>}
     {!submission && !canEdit && <p className="text-sm text-[var(--app-muted)]">제출한 내용이 없습니다.</p>}
-    {canEdit && editing && <SubmissionEditor key={`${submission?.id ?? 'new'}-${submission?.updatedAt ?? ''}`} title={milestone.title} submission={submission} busy={save.isPending || remove.isPending}
+    {canEdit && editing && <SubmissionEditor key={`${submission?.id ?? 'new'}-${submission?.updatedAt ?? ''}`} title={milestone.title} submission={submission} busy={save.isPending || remove.isPending} progress={progress} limits={program}
+      onCancelUpload={() => controller.current?.abort()}
       onSave={async draft => { try { await save.mutateAsync(draft); return true } catch { return false } }}
       onDelete={submission ? async () => { if (await confirmDialog({ title: '제출 삭제', message: `${milestone.title} 제출을 삭제할까요? 올린 파일도 함께 삭제됩니다.`, confirmText: '삭제', tone: 'danger' })) remove.mutate() } : undefined} />}
     {canEdit && editing && submission && <button type="button" className="tp-text-button" onClick={() => setEditing(false)}>수정 취소</button>}
-    {error && <p role="alert" className="text-sm text-[var(--app-danger)]">{errorText(error)}</p>}
+    {error && <p role="alert" className="text-sm text-[var(--app-danger)]">{uploadErrorText(error, program)}</p>}
   </article>
 }
 
@@ -139,11 +144,13 @@ function ProgramPage({ id }: { id: number }) {
         {program.milestones.length ? <Timeline milestones={program.milestones} now={now} submissions={program.myTeamId ? submissions.data : undefined} /> : <p className="tp-card text-sm">아직 등록된 일정이 없습니다.</p>}
       </section>
       <section aria-labelledby="tp-mine" className="space-y-4"><h2 id="tp-mine" className="text-xl font-bold">{myTeam ? `내 팀 · ${myTeam.name}` : '내 팀 제출'}</h2>
-        {!myTeam && <p className="tp-card text-sm leading-6">아직 배정된 팀이 없습니다. 팀 배정은 운영진이 합니다.</p>}
+        {!myTeam && (user?.role === 'ADMIN'
+          ? <p className="tp-card text-sm leading-6">회장 계정은 팀에 속해 있지 않습니다. 팀별 제출은 <Link to={`/admin?tab=team-projects&program=${program.id}`} className="font-semibold text-[var(--app-accent-text)] underline">관리 화면의 제출 현황</Link>에서 확인하세요.</p>
+          : <p className="tp-card text-sm leading-6">아직 배정된 팀이 없습니다. 팀 배정은 운영진이 합니다.</p>)}
         {myTeam && submissions.isPending && <p role="status">제출 내용을 불러오는 중…</p>}
         {myTeam && submissions.isError && <p role="alert" className="text-sm">제출 내용을 불러오지 못했습니다. <button type="button" className="underline" onClick={() => submissions.refetch()}>다시 불러오기</button></p>}
         {myTeam && submissions.data && (submittable.length
-          ? <div className="space-y-4">{submittable.map(milestone => <MilestoneSubmission key={milestone.id} program={program} team={myTeam} milestone={milestone} submission={submissions.data.find(item => item.milestoneId === milestone.id)} />)}</div>
+          ? <div className="space-y-4">{submittable.map(milestone => <MilestoneSubmission key={milestone.id} now={now} program={program} team={myTeam} milestone={milestone} submission={submissions.data.find(item => item.milestoneId === milestone.id)} />)}</div>
           : <p className="tp-card text-sm">제출을 받는 일정이 아직 없습니다.</p>)}
       </section>
       <section aria-labelledby="tp-teams" className="space-y-4"><h2 id="tp-teams" className="text-xl font-bold">참가 팀 {program.teams.length}팀</h2>

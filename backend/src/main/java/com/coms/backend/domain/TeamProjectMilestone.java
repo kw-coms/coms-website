@@ -24,6 +24,8 @@ public class TeamProjectMilestone {
     private LocalDateTime startsAt;
     @Column(name = "due_at")
     private LocalDateTime dueAt;
+    @Column(name = "all_day", nullable = false)
+    private boolean allDay;
     @Column(nullable = false)
     private boolean submittable;
     @Column(nullable = false)
@@ -40,6 +42,15 @@ public class TeamProjectMilestone {
     public void setStartsAt(LocalDateTime value) { startsAt = value; }
     public LocalDateTime getDueAt() { return dueAt; }
     public void setDueAt(LocalDateTime value) { dueAt = value; }
+    public boolean isAllDay() { return allDay; }
+    public void setAllDay(boolean value) { allDay = value; }
+
+    /** 마감 시각. 종일이면 그날의 마지막 순간(23:59:59.999999999)까지다. */
+    public LocalDateTime effectiveDue() {
+        if (dueAt == null) return null;
+        return allDay ? dueAt.toLocalDate().plusDays(1).atStartOfDay().minusNanos(1) : dueAt;
+    }
+
     public boolean isSubmittable() { return submittable; }
     public void setSubmittable(boolean value) { submittable = value; }
     public int getPosition() { return position; }
