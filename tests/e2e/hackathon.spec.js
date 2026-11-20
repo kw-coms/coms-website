@@ -28,7 +28,9 @@ for (const width of [320, 390, 1280]) {
     await expect(page.getByRole('heading', { name: 'COM’s 해커톤 2026', exact: true })).toBeVisible()
     await expect(page.locator('[data-members-gate]')).toHaveCount(0)
     await expect(page.locator('#wargether button[type="submit"]')).toBeDisabled()
-    await page.getByLabel('기수', { exact: true }).fill('42')
+    // '42기'처럼 '기'를 붙여 적어도 숫자만 남아 그대로 제출된다.
+    await page.getByLabel('기수', { exact: true }).fill('42기')
+    await expect(page.getByLabel('기수', { exact: true })).toHaveValue('42')
     await page.getByLabel('이름', { exact: true }).fill('홍길동')
     const form = page.getByRole('form', { name: 'wargether 채점' })
     for (const select of await form.locator('select').all()) await select.selectOption('20')
