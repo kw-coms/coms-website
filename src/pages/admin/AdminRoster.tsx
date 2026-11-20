@@ -32,6 +32,8 @@ export default function AdminRoster() {
   const [loadingRoster, setLoadingRoster] = useState(true)
   const [rosterError, setRosterError] = useState('')
   const [addForm, setAddForm] = useState({ mode: 'current', studentId: '', name: '', admissionYear: '', generation: '', phone: '', email: '', department: '' })
+  // 졸업생 폼에서 자동 채움된 쪽. 관리자가 직접 친 필드는 자동 계산으로 덮어쓰지 않는다.
+  const [autoFilled, setAutoFilled] = useState<'admissionYear' | 'generation' | null>(null)
   const [adding, setAdding] = useState(false)
   const [addResult, setAddResult] = useState('')
   const [addError, setAddError] = useState('')
@@ -154,6 +156,7 @@ export default function AdminRoster() {
           : `${addForm.name} (${addForm.generation}기)`
       setAddResult(`${label} 명부에 추가됐습니다.`)
       setAddForm((p) => ({ ...p, studentId: '', name: '', admissionYear: '', generation: '', phone: '', email: '', department: '' }))
+      setAutoFilled(null)
       await loadRoster()
     } catch (err) {
       setAddError(err.message || '추가 중 오류가 발생했습니다.')
@@ -250,28 +253,30 @@ export default function AdminRoster() {
 
   const handleAdmissionYearChange = (raw) => {
     const digits = raw.replace(/\D/g, '').slice(0, 2)
-    setAddForm((p) => {
-      if (digits.length === 2) {
-        const n = parseInt(digits, 10)
-        const fullYear = n <= currentYY ? 2000 + n : 1900 + n
-        if (fullYear >= GRAD_BASE_YEAR && fullYear <= thisYear) {
-          return { ...p, admissionYear: digits, generation: String(fullYear - GRAD_BASE_YEAR) }
-        }
-      }
-      return { ...p, admissionYear: digits }
-    })
+    const n = parseInt(digits, 10)
+    const fullYear = n <= currentYY ? 2000 + n : 1900 + n
+    const canFill = !addForm.generation || autoFilled === 'generation'
+    if (digits.length === 2 && canFill && fullYear >= GRAD_BASE_YEAR && fullYear <= thisYear) {
+      setAutoFilled('generation')
+      setAddForm((p) => ({ ...p, admissionYear: digits, generation: String(fullYear - GRAD_BASE_YEAR) }))
+      return
+    }
+    // 직접 입력한 값: 이 칸이 자동 채움이었다면 이제 수동 값이다.
+    if (autoFilled === 'admissionYear') setAutoFilled(null)
+    setAddForm((p) => ({ ...p, admissionYear: digits }))
   }
 
   const handleGenerationChange = (raw) => {
     const digits = raw.replace(/\D/g, '').slice(0, 2)
-    setAddForm((p) => {
-      const gen = parseInt(digits, 10)
-      if (!isNaN(gen) && gen > 0 && gen + GRAD_BASE_YEAR <= thisYear) {
-        const twoDigit = String(gen + GRAD_BASE_YEAR).slice(-2)
-        return { ...p, generation: digits, admissionYear: twoDigit }
-      }
-      return { ...p, generation: digits }
-    })
+    const gen = parseInt(digits, 10)
+    const canFill = !addForm.admissionYear || autoFilled === 'admissionYear'
+    if (canFill && !isNaN(gen) && gen > 0 && gen + GRAD_BASE_YEAR <= thisYear) {
+      setAutoFilled('admissionYear')
+      setAddForm((p) => ({ ...p, generation: digits, admissionYear: String(gen + GRAD_BASE_YEAR).slice(-2) }))
+      return
+    }
+    if (autoFilled === 'generation') setAutoFilled(null)
+    setAddForm((p) => ({ ...p, generation: digits }))
   }
 
   const inputCls = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-2 py-1 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
@@ -280,7 +285,7 @@ export default function AdminRoster() {
     <div className="space-y-6">
       <div className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">개별 회원 추가</p>
-        <p className="mt-1 text-xs text-[var(--theme-body-muted)]">명부에 직접 추가합니다. 재학생은 10자리 학번, 졸업생은 입학년도 끝 두자리 또는 기수로 추가합니다. 둘 중 하나 입력 시 나머지 자동 계산됩니다.</p>
+        <p className="mt-1 text-xs text-[var(--theme-body-muted)]">명부에 직접 추가합니다. 재학생은 10자리 학번, 졸업생은 입학년도 끝 두자리 또는 기수로 추가합니다. 둘 중 하나 입력 시 나머지가 자동 계산되며, 직접 고칠 수 있습니다. (예: 2학년 때 가입한 경우 기수를 직접 고치세요.)</p>
         <div className="mt-3 flex gap-1">
           {[{ id: 'current', label: '재학생' }, { id: 'graduate', label: '졸업생' }].map((m) => (
             <button

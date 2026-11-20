@@ -22,7 +22,7 @@ public record SignupRequest(
         ) String password,
         @Size(max = 100) String department,
         @Pattern(regexp = "\\d{1,3}", message = "기수는 숫자여야 합니다.") String generation,
-        @Size(max = 30) String phone,
+        @NotBlank @Size(max = 30) String phone,
         @Size(max = 2000) String aspiration,
         @Size(max = 500) String interests,
         @Size(max = 20) String signupType

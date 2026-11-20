@@ -528,6 +528,32 @@ class EligibleMemberServiceTest {
     }
 
     @Test
+    void explicitGenerationIsStoredIndependentlyAndUsedForSignupMatching() {
+        // 2005 입학이지만 2학년 때 가입해 기수는 40 (공식으로는 39).
+        eligibleMemberService.addGraduateSingle("박늦깎", "05", "40", "01011112222");
+
+        var roster = eligibleMemberService.listRoster();
+        assertThat(roster).singleElement().satisfies(m -> {
+            assertThat(m.generation()).isEqualTo("40");
+            assertThat(m.admissionYear()).isEqualTo(2005);
+        });
+
+        assertThat(eligibleMemberService.validateAndClaimGraduateSignup("박늦깎", "GENERATION", "40", "01011112222"))
+                .isNotBlank();
+        assertThat(eligibleMemberService.validateAndClaimGraduateSignup("박늦깎", "YEAR", "05", "01011112222"))
+                .isNotBlank();
+    }
+
+    @Test
+    void graduateSignupRejectsGenerationThatOnlyMatchesTheFormula() {
+        eligibleMemberService.addGraduateSingle("박늦깎", "05", "40", "01011112222");
+
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimGraduateSignup("박늦깎", "GENERATION", "39", "01011112222"))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
     void addGraduateSingleAcceptsGeneration() {
         // generation 53 → 1966+53=2019 ≤ 2019 → valid
         eligibleMemberService.addGraduateSingle("홍길동", null, "53");

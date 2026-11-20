@@ -44,4 +44,15 @@ class PasswordPolicyDtoTest {
         assertThat(violations)
                 .anySatisfy(violation -> assertThat(violation.getPropertyPath().toString()).isEqualTo("password"));
     }
+
+    @Test
+    void signupRequiresPhone() {
+        var violations = validator.validate(new SignupRequest(
+                "2024123456", "홍길동", null, null, "hong@example.com", "Password1!",
+                null, null, " ", null, null, null
+        ));
+
+        assertThat(violations)
+                .anySatisfy(violation -> assertThat(violation.getPropertyPath().toString()).isEqualTo("phone"));
+    }
 }
