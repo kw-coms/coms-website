@@ -114,6 +114,8 @@ public class HackathonEventService {
     public AdminHackathonEventResponse update(Long id, HackathonEventWrite write) {
         HackathonEvent event = lock(id);
         copyEvent(event, write);
+        // 종료 시각을 미래로 옮기는 등 완료가 아니게 되면 공개된 결과를 거둔다.
+        if (event.isResultsPublished() && status(event) != HackathonEventStatus.DONE) event.setResultsPublished(false);
         return adminDetail(events.saveAndFlush(event).getId());
     }
 
@@ -133,6 +135,7 @@ public class HackathonEventService {
         HackathonEvent event = lock(id);
         if (open && (!event.isPublished() || projects.countByEventId(id) == 0)) throw conflict("공개된 행사에 작품이 있어야 평가를 열 수 있습니다.");
         event.setOpen(open);
+        if (open) event.setResultsPublished(false);
         events.saveAndFlush(event);
         return open;
     }
@@ -143,13 +146,17 @@ public class HackathonEventService {
         HackathonEvent event = lock(id);
         if (resultsPublished && (!event.isPublished() || status(event) != HackathonEventStatus.DONE))
             throw conflict("완료된 행사만 결과를 공개할 수 있습니다. 평가를 닫고 개발 기간이 끝난 뒤에 공개해 주세요.");
+        if (resultsPublished && HackathonRanking.rank(projects.findByEventIdOrderByPositionAscIdAsc(id),
+                reviews.findByEventIdOrderByCreatedAtAscIdAsc(id)).isEmpty())
+            throw conflict("모든 팀에 졸업생 평가와 회장 평가가 있어야 결과를 공개할 수 있습니다.");
         event.setResultsPublished(resultsPublished);
         events.saveAndFlush(event);
         return resultsPublished;
     }
 
     private HackathonEventStatus status(HackathonEvent event) {
-        return HackathonEventStatus.of(event, LocalDateTime.now(clock.withZone(ZoneId.of("Asia/Seoul"))));
+        return HackathonEventStatus.of(event, LocalDateTime.now(clock.withZone(ZoneId.of("Asia/Seoul"))),
+                reviews.existsByEventId(event.getId()));
     }
 
     @Transactional

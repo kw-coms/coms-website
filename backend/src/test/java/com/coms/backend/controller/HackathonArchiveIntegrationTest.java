@@ -168,7 +168,12 @@ class HackathonArchiveIntegrationTest {
                 event(2026, 2, false, false, now.minusDays(9), now.minusDays(2))}) {
             setResults(id, true).andExpect(status().isConflict()).andExpect(jsonPath("$.message").value(NOT_DONE));
         }
+        long neverOpened = event(2025, 2, true, false, null, null);
+        setResults(neverOpened, true).andExpect(status().isConflict()).andExpect(jsonPath("$.message").value(NOT_DONE));
         long done = event(2025, 1, true, false, null, null);
+        project(done, "a", "A");
+        review(done, "a", "Ann", false, 10, 10, 10, 10, 10);
+        review(done, "a", "회장", true, 12, 12, 12, 12, 12);
         setResults(done, true).andExpect(status().isOk());
         setResults(done, false).andExpect(status().isOk());
         mvc.perform(put("/api/admin/hackathon/events/{id}/results-published", done).cookie(admin).header("Origin", ORIGIN)
@@ -212,8 +217,72 @@ class HackathonArchiveIntegrationTest {
         long done = event(2025, 2, true, false, null, null);
         project(done, "a", "A");
         review(done, "a", "Ann", false, 10, 10, 10, 10, 10);
-        setResults(done, true).andExpect(status().isOk());
-        mvc.perform(get("/api/hackathon/events/{id}", done)).andExpect(jsonPath("$.results.length()").value(0));
+        setResults(done, true).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("모든 팀에 졸업생 평가와 회장 평가가 있어야 결과를 공개할 수 있습니다."));
+        assertThat(events.findById(done).orElseThrow().isResultsPublished()).isFalse();
+    }
+
+    @Test
+    void eventsWithoutDatesAreUpcomingUntilOpenedThenDone() throws Exception {
+        long fresh = event(2027, 1, true, false, null, null);
+        long used = event(2026, 1, true, false, null, null);
+        project(used, "a", "A");
+        review(used, "a", "Ann", false, 10, 10, 10, 10, 10);
+        mvc.perform(get("/api/hackathon/events")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(fresh)).andExpect(jsonPath("$[0].status").value("UPCOMING"))
+                .andExpect(jsonPath("$[1].id").value(used)).andExpect(jsonPath("$[1].status").value("DONE"));
+    }
+
+    private long publishedResultsEvent() {
+        long done = event(2025, 2, true, false, now().minusDays(40), now().minusDays(33));
+        project(done, "p" + done, "A");
+        review(done, "p" + done, "Ann", false, 10, 10, 10, 10, 10);
+        review(done, "p" + done, "회장", true, 12, 12, 12, 12, 12);
+        new JdbcTemplate(dataSource).update("UPDATE hackathon_events SET results_published = TRUE WHERE id = ?", done);
+        return done;
+    }
+
+    private static final String LOCKED = "결과를 공개한 상태에서는 점수를 바꿀 수 없습니다. 결과 공개를 먼저 끄세요.";
+
+    @Test
+    void scoresCannotChangeWhileResultsArePublished() throws Exception {
+        long done = publishedResultsEvent();
+        long reviewId = reviews.findAll().stream().filter(r -> !r.isChair()).findFirst().orElseThrow().getId();
+        mvc.perform(put("/api/admin/hackathon/events/{id}/chair-reviews/p" + done, done).cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"themeFit\":1,\"creativity\":1,\"technology\":1,\"completeness\":1,\"practicality\":1,\"feedback\":\"\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value(LOCKED));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/admin/hackathon/events/{id}/reviews/{rid}", done, reviewId).cookie(admin).header("Origin", ORIGIN))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value(LOCKED));
+        assertThat(reviews.count()).isEqualTo(2);
+        setResults(done, false).andExpect(status().isOk());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/admin/hackathon/events/{id}/reviews/{rid}", done, reviewId).cookie(admin).header("Origin", ORIGIN))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void reopeningEvaluationOrMovingTheEndIntoTheFutureWithdrawsPublishedResults() throws Exception {
+        long reopened = publishedResultsEvent();
+        mvc.perform(put("/api/admin/hackathon/events/{id}/settings", reopened).cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"open\":true}")).andExpect(status().isOk());
+        assertThat(events.findById(reopened).orElseThrow().isResultsPublished()).isFalse();
+
+        long moved = publishedResultsEvent();
+        LocalDateTime start = now().minusDays(1);
+        String body = "{\"title\":\"연장\",\"year\":2025,\"semester\":2,\"startsAt\":\"" + start.withNano(0)
+                + "\",\"endsAt\":\"" + now().plusDays(2).withNano(0) + "\"}";
+        mvc.perform(put("/api/admin/hackathon/events/{id}", moved).cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.resultsPublished").value(false));
+
+        long edited = publishedResultsEvent();
+        mvc.perform(put("/api/admin/hackathon/events/{id}", edited).cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"제목만\",\"year\":2025,\"semester\":2,\"startsAt\":\""
+                        + now().minusDays(40).withNano(0) + "\",\"endsAt\":\"" + now().minusDays(33).withNano(0) + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.resultsPublished").value(true));
     }
 
     @Test

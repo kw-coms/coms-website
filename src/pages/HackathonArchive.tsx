@@ -27,8 +27,10 @@ export default function HackathonArchive() {
   useDocumentTitle('해커톤 아카이브')
   const events = useQuery({ queryKey: ['hackathon', 'events'], queryFn: listHackathonEvents, retry: 1, refetchOnWindowFocus: true })
   const list = events.data ?? []
-  const evaluating = list.filter(event => event.open)
-  const years = [...new Set(list.map(event => event.year))].sort((a, b) => b - a)
+  const evaluating = list.filter(event => event.open && event.status === 'REVIEWING')
+  const planned = list.filter(event => event.status === 'UPCOMING' || event.status === 'IN_PROGRESS')
+  const archived = list.filter(event => !evaluating.includes(event) && !planned.includes(event))
+  const years = [...new Set(archived.map(event => event.year))].sort((a, b) => b - a)
   return <div className="site-page"><main className="site-page-inner hackathon-page">
     <PageHeading>해커톤 아카이브</PageHeading>
     <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--app-muted)]">COM’s 해커톤의 기록입니다. 지난 행사의 작품과 자료, 공개된 결과를 언제든 다시 볼 수 있습니다.</p>
@@ -39,9 +41,13 @@ export default function HackathonArchive() {
       <h2 id="hackathon-now" className="text-lg font-bold">지금 평가할 수 있어요</h2>
       <div className="mt-3 grid gap-4">{evaluating.map(event => <EventCard key={event.id} event={event} now />)}</div>
     </section>}
+    {planned.length > 0 && <section aria-labelledby="hackathon-planned" className="mt-10">
+      <h2 id="hackathon-planned" className="text-2xl font-bold">진행 예정 · 진행 중</h2>
+      <ul className="mt-4 grid gap-4 sm:grid-cols-2">{planned.map(event => <li key={event.id} className="min-w-0"><EventCard event={event} /></li>)}</ul>
+    </section>}
     {years.map(year => <section key={year} aria-labelledby={`hackathon-year-${year}`} className="mt-10">
       <h2 id={`hackathon-year-${year}`} className="text-2xl font-bold">{year}년</h2>
-      <ul className="mt-4 grid gap-4 sm:grid-cols-2">{list.filter(event => event.year === year).map(event => <li key={event.id} className="min-w-0"><EventCard event={event} /></li>)}</ul>
+      <ul className="mt-4 grid gap-4 sm:grid-cols-2">{archived.filter(event => event.year === year).map(event => <li key={event.id} className="min-w-0"><EventCard event={event} /></li>)}</ul>
     </section>)}
   </main></div>
 }

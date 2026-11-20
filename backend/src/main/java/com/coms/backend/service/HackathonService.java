@@ -129,7 +129,7 @@ public class HackathonService {
 
     @Transactional
     public void deleteReview(Long eventId, Long id) {
-        events.lockById(eventId).orElseThrow(HackathonService::notFound);
+        requireScoresEditable(events.lockById(eventId).orElseThrow(HackathonService::notFound));
         HackathonReview review = reviews.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "평가를 찾을 수 없습니다."));
         if (!eventId.equals(review.getEventId())) throw notFound();
@@ -145,6 +145,7 @@ public class HackathonService {
     public HackathonReviewResponse saveChair(Long eventId, String projectId, HackathonScoresRequest request) {
         HackathonEvent event = events.lockById(eventId).orElseThrow(HackathonService::notFound);
         if (!event.isPublished()) throw new ResponseStatusException(HttpStatus.CONFLICT, "공개된 행사에만 회장 점수를 저장할 수 있습니다.");
+        requireScoresEditable(event);
         if (!projects.existsByEventIdAndId(eventId, projectId) || request == null) throw invalid();
         String feedback = checkedFeedback(request.feedback());
         int[] scores = checkedScores(request.themeFit(), request.creativity(), request.technology(),
@@ -175,8 +176,13 @@ public class HackathonService {
         if (open && (!event.isPublished() || projects.countByEventId(eventId) == 0))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "공개된 행사에 작품이 있어야 평가를 열 수 있습니다.");
         event.setOpen(open);
+        if (open) event.setResultsPublished(false);
         events.saveAndFlush(event);
         return open;
+    }
+
+    private static void requireScoresEditable(HackathonEvent event) {
+        if (event.isResultsPublished()) throw new ResponseStatusException(HttpStatus.CONFLICT, "결과를 공개한 상태에서는 점수를 바꿀 수 없습니다. 결과 공개를 먼저 끄세요.");
     }
 
     private static ResponseStatusException notFound() {

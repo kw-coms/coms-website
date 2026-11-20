@@ -3,6 +3,8 @@ package com.coms.backend.service;
 import com.coms.backend.domain.HackathonProject;
 import com.coms.backend.domain.HackathonReview;
 import com.coms.backend.dto.HackathonResultResponse;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -65,5 +67,6 @@ final class HackathonRanking {
         return keys.stream().mapToInt(key -> key.applyAsInt(review)).sum();
     }
 
-    private static double round(double value) { return Math.round(value * 100) / 100.0; }
+    /** 화면의 toFixed(2)와 같은 값: 이진 표현의 정확한 값을 소수 둘째 자리에서 반올림한다. */
+    static double round(double value) { return new BigDecimal(value).setScale(2, RoundingMode.HALF_UP).doubleValue(); }
 }

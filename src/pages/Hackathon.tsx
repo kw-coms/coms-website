@@ -40,10 +40,10 @@ function Results({ results }: { results: HackathonResult[] }) {
     <div role="region" aria-label="최종 순위표" tabIndex={0} className="mt-4 overflow-x-auto">
       <table className="hackathon-results w-full min-w-[720px] text-sm">
         <caption className="sr-only">해커톤 최종 순위</caption>
-        <thead><tr>{['순위', '팀', '최종 점수', '졸업생 평균', '회장 평가', ...CRITERIA.map(item => item.label)].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+        <thead><tr>{['순위', '팀', '최종 점수', '졸업생 평균', '회장 평가', ...CRITERIA.map(item => item.label)].map((label, index) => <th key={label} scope="col" className={index === 0 ? 'hackathon-sticky-rank' : index === 1 ? 'hackathon-sticky-team' : undefined}>{label}</th>)}</tr></thead>
         <tbody>{results.map(row => <tr key={row.projectId}>
-          <th scope="row">{row.rank}위</th>
-          <td><a href={`#${row.projectId}`} className="font-semibold underline">{row.title}</a><span className="block text-xs text-[var(--app-muted)]">{row.author}</span></td>
+          <th scope="row" className="hackathon-sticky-rank">{row.rank}위</th>
+          <td className="hackathon-sticky-team"><a href={`#${row.projectId}`} className="font-semibold underline">{row.title}</a><span className="block text-xs text-[var(--app-muted)]">{row.author}</span></td>
           <td className="font-bold">{scoreFormat(row.finalScore)}점</td>
           <td>{scoreFormat(row.alumniAverage)}점 <span className="text-xs text-[var(--app-muted)]">({row.alumniCount}명)</span></td>
           <td>{scoreFormat(row.chairScore)}점</td>
@@ -120,7 +120,7 @@ export default function Hackathon() {
         {event.rules && <p className="mt-4 whitespace-pre-wrap text-sm leading-7">{event.rules}</p>}
         <Materials materials={event.materials} title={event.title} />
       </section>
-      {event.resultsPublished && event.results.length > 0 && <Results results={event.results} />}
+      {event.resultsPublished && (event.results.length > 0 ? <Results results={event.results} /> : <p role="status" className="hackathon-intro mt-6 text-sm font-semibold">집계 중입니다. 결과가 정리되면 이곳에 순위가 표시됩니다.</p>)}
       {event.open && event.projects.length > 0 && <section className="hackathon-identity mt-6" aria-labelledby="hackathon-identity-title">
         <h2 id="hackathon-identity-title" className="text-lg font-bold">평가자 정보</h2>
         <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">기수와 이름으로 팀별 중복 평가를 확인합니다. 각 팀을 한 번씩 평가해 주세요. 입력 정보와 피드백은 운영진만 확인합니다.</p>

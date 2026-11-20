@@ -7,10 +7,10 @@ test.use({ serviceWorkers: 'block' })
 
 async function mockEvents(page, open = () => true) {
   await page.route('**/api/hackathon/events', route => route.fulfill({ json: [summary(legacyEvent), summary(futureEvent)] }))
-  await page.route('**/api/hackathon/events/1', route => route.fulfill({ json: { ...legacyEvent, open: open() } }))
+  await page.route('**/api/hackathon/events/1', route => route.fulfill({ json: { ...legacyEvent, open: open(), status: open() ? 'REVIEWING' : 'DONE' } }))
   await page.route('**/api/hackathon/events/2', route => route.fulfill({ json: futureEvent }))
   await page.route('**/api/admin/hackathon/events', route => route.fulfill({ json: [adminSummary(legacyEvent), adminSummary(futureEvent)] }))
-  await page.route('**/api/admin/hackathon/events/1', route => route.fulfill({ json: { ...legacyEvent, open: open() } }))
+  await page.route('**/api/admin/hackathon/events/1', route => route.fulfill({ json: { ...legacyEvent, open: open(), status: open() ? 'REVIEWING' : 'DONE' } }))
 }
 
 
@@ -59,6 +59,7 @@ test('duplicate errors preserve scores and a closed event disables submissions',
   await expect(form.locator('select').first()).toHaveValue('0')
   open = false
   await page.reload()
+  await expect(page.getByRole('status').filter({ hasText: '평가가 마감되었습니다' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'wargether', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '평가 제출', exact: true })).toHaveCount(0)
   await expect(page.locator('form')).toHaveCount(0)
@@ -250,8 +251,8 @@ for (const width of [320, 390, 1280]) test(`chair can publish an announcement be
 
 test('switching cached events clears unsaved team, material and chair drafts', async ({ page }) => {
   await mockAdminApis(page)
-  const first = { ...legacyEvent, open: false }
-  const second = { ...futureEvent, open: false }
+  const first = { ...legacyEvent, open: false, status: 'DONE' }
+  const second = { ...futureEvent, open: false, status: 'DONE' }
   const writes = []
   await page.route('**/api/admin/hackathon/events', route => route.fulfill({ json: [adminSummary(first), adminSummary(second)] }))
   await page.route(/\/api\/admin\/hackathon\/events\/\d+(?:\/.*)?$/, route => {

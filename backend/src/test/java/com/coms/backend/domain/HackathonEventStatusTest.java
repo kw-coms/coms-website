@@ -22,23 +22,24 @@ class HackathonEventStatusTest {
     @Test
     void boundariesAreInclusiveForTheDevelopmentPeriod() {
         HackathonEvent open = event(START, END, true);
-        assertThat(HackathonEventStatus.of(open, START.minusSeconds(1))).isEqualTo(UPCOMING);
-        assertThat(HackathonEventStatus.of(open, START)).isEqualTo(IN_PROGRESS);
-        assertThat(HackathonEventStatus.of(open, END)).isEqualTo(IN_PROGRESS);
-        assertThat(HackathonEventStatus.of(open, END.plusSeconds(1))).isEqualTo(REVIEWING);
+        assertThat(HackathonEventStatus.of(open, START.minusSeconds(1), false)).isEqualTo(UPCOMING);
+        assertThat(HackathonEventStatus.of(open, START, false)).isEqualTo(IN_PROGRESS);
+        assertThat(HackathonEventStatus.of(open, END, false)).isEqualTo(IN_PROGRESS);
+        assertThat(HackathonEventStatus.of(open, END.plusSeconds(1), false)).isEqualTo(REVIEWING);
     }
 
     @Test
     void afterThePeriodTheOpenFlagDecidesReviewingOrDone() {
-        assertThat(HackathonEventStatus.of(event(START, END, true), END.plusDays(30))).isEqualTo(REVIEWING);
-        assertThat(HackathonEventStatus.of(event(START, END, false), END.plusSeconds(1))).isEqualTo(DONE);
-        assertThat(HackathonEventStatus.of(event(START, END, false), START.minusDays(1))).isEqualTo(UPCOMING);
-        assertThat(HackathonEventStatus.of(event(START, END, false), START)).isEqualTo(IN_PROGRESS);
+        assertThat(HackathonEventStatus.of(event(START, END, true), END.plusDays(30), false)).isEqualTo(REVIEWING);
+        assertThat(HackathonEventStatus.of(event(START, END, false), END.plusSeconds(1), false)).isEqualTo(DONE);
+        assertThat(HackathonEventStatus.of(event(START, END, false), START.minusDays(1), false)).isEqualTo(UPCOMING);
+        assertThat(HackathonEventStatus.of(event(START, END, false), START, false)).isEqualTo(IN_PROGRESS);
     }
 
     @Test
-    void eventsWithoutDatesFollowTheOpenFlag() {
-        assertThat(HackathonEventStatus.of(event(null, null, true), START)).isEqualTo(REVIEWING);
-        assertThat(HackathonEventStatus.of(event(null, null, false), START)).isEqualTo(DONE);
+    void eventsWithoutDatesAreUpcomingUntilTheyHaveBeenOpened() {
+        assertThat(HackathonEventStatus.of(event(null, null, true), START, false)).isEqualTo(REVIEWING);
+        assertThat(HackathonEventStatus.of(event(null, null, false), START, false)).isEqualTo(UPCOMING);
+        assertThat(HackathonEventStatus.of(event(null, null, false), START, true)).isEqualTo(DONE);
     }
 }

@@ -44,3 +44,9 @@
 .hackathon-card:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
 .hackathon-card--now { border-inline-start: 4px solid var(--app-accent); }
 .hackathon-results th, .hackathon-results td { padding: 10px 12px; border-bottom: 1px solid var(--app-hairline); text-align: left; }
+
+.hackathon-results .hackathon-sticky-rank, .hackathon-results .hackathon-sticky-team {
+  position: sticky; z-index: 1; background: var(--app-surface-soft);
+}
+.hackathon-results .hackathon-sticky-rank { left: 0; width: 64px; min-width: 64px; }
+.hackathon-results .hackathon-sticky-team { left: 64px; min-width: 112px; box-shadow: 1px 0 0 var(--app-hairline); }

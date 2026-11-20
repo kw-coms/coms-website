@@ -4,6 +4,18 @@ export function evaluationPath(pathname) {
   return match ? `/hackathon/${match[1]}` : null
 }
 
+/** 인쇄물의 옛 링크(/hackathon/share)는 첫 행사로 보내되, 그 행사가 없거나 비공개면 아카이브로 보낸다. */
+export async function resolveTarget(pathname, fetchFn = fetch) {
+  const target = evaluationPath(pathname)
+  if (pathname !== '/hackathon/share') return target
+  try {
+    const response = await fetchFn('/api/hackathon/events/1', { headers: { Accept: 'application/json' } })
+    return response.ok ? target : '/hackathon'
+  } catch {
+    return '/hackathon'
+  }
+}
+
 export async function refreshWorker(registration, serviceWorker = navigator.serviceWorker, timeoutMs = 10000) {
   const previous = registration.active
   let timer, next, onStateChange, onControllerChange
@@ -40,7 +52,7 @@ export async function refreshWorker(registration, serviceWorker = navigator.serv
 if (typeof document !== 'undefined') {
   const status = document.getElementById('status')
   const fallback = document.getElementById('fallback')
-  const target = evaluationPath(location.pathname)
+  let target = evaluationPath(location.pathname)
   document.getElementById('evaluation-link').href = target || '/hackathon'
   async function open() {
     if (!target) {
@@ -51,6 +63,8 @@ if (typeof document !== 'undefined') {
     status.textContent = '평가 자료를 준비하고 있습니다.'
     fallback.hidden = true
     try {
+      target = await resolveTarget(location.pathname)
+      document.getElementById('evaluation-link').href = target
       if ('serviceWorker' in navigator) {
         const registration = await navigator.serviceWorker.getRegistration()
         if (registration) await refreshWorker(registration)
