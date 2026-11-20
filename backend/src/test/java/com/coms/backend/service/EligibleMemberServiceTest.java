@@ -391,23 +391,18 @@ class EligibleMemberServiceTest {
     }
 
     @Test
-    void rejectsSignupWhenRosterPhoneDoesNotMatch() throws Exception {
+    void signupDoesNotRequireTheRosterPhone() throws Exception {
+        // 명부 대조는 학번(또는 졸업생 기수/입학연도)과 이름만 본다. 명부 전화번호에 오타가 있어도
+        // (예: 끝자리가 빠진 10자리 010 번호) 본인이 가입할 수 있어야 한다.
         MockMultipartFile file = workbookFile(new String[]{"학번", "이름", "전화번호"},
                 new String[]{"2024123456", "홍길동", "010-1234-5678"});
         eligibleMemberService.importRoster(file);
+        eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, "01099998888");
+        eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, null);
 
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, "01099998888"))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
-                .isEqualTo(HttpStatus.FORBIDDEN.value());
-
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, null))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
-                .isEqualTo(HttpStatus.FORBIDDEN.value());
-
-        // Hyphen/format differences must not lock out the legitimate member.
-        eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, "01012345678");
+        eligibleMemberService.addGraduateSingle("김선배", null, "40", "0106418828");
+        assertThat(eligibleMemberService.validateAndClaimGraduateSignup("김선배", "GENERATION", "40", "01064188281"))
+                .isNotBlank();
     }
 
     @Test

@@ -175,7 +175,6 @@ public class EligibleMemberService {
         if (!member.getName().equals(normalizedName)) {
             throw invalidRoster();
         }
-        requirePhoneMatchWhenRosterHasPhone(member, request.phone());
         return preparedSignup(member, normalizedStudentId);
     }
 
@@ -194,7 +193,6 @@ public class EligibleMemberService {
         }
 
         EligibleMember member = matches.getFirst();
-        requirePhoneMatchWhenRosterHasPhone(member, request.phone());
         String accountId = normalize(member.getStudentId());
         if (accountId.isBlank()) {
             accountId = generateGraduateAccountId(member);
@@ -587,7 +585,6 @@ public class EligibleMemberService {
             if (!exact.get().getName().equals(normalizedName)) {
                 throw invalidRoster();
             }
-            requirePhoneMatchWhenRosterHasPhone(exact.get(), phone);
             return;
         }
 
@@ -608,7 +605,6 @@ public class EligibleMemberService {
                 && !normalizedStudentId.equals(match.getStudentId())) {
             throw invalidRoster();
         }
-        requirePhoneMatchWhenRosterHasPhone(match, phone);
         match.setStudentId(normalizedStudentId);
         eligibleMemberRepository.save(match);
     }
@@ -631,7 +627,6 @@ public class EligibleMemberService {
         }
 
         EligibleMember match = matches.getFirst();
-        requirePhoneMatchWhenRosterHasPhone(match, phone);
         String accountId = normalize(match.getStudentId());
         if (accountId.isBlank()) {
             accountId = generateGraduateAccountId(match);
@@ -941,13 +936,12 @@ public class EligibleMemberService {
      *
      * <ol>
      *   <li>파일의 이름이 명부 행의 이름과 다르면 — 학번으로 찾은 행은 이름을 대조하지 않으므로,
-     *       구글 폼에 오타난 학번 하나가 남의 행에 엉뚱한 번호를 박을 수 있다. 그러면
-     *       {@link #requirePhoneMatchWhenRosterHasPhone} 가 그 번호를 요구해 본인이 가입하지
-     *       못하고 일반 403 만 받는다. ensureDirectMemberRosterRow 도 같은 이유로 이름을 본다.</li>
+     *       구글 폼에 오타난 학번 하나가 남의 행에 엉뚱한 연락처를 박을 수 있다.
+     *       ensureDirectMemberRosterRow 도 같은 이유로 이름을 본다.</li>
      *   <li>번호 모양이 이상하면 — 학번이 전화번호 칸에 들어왔거나 두 번호가 한 칸에 붙은 경우.
-     *       한번 박히면 가입 때 그대로 요구된다.</li>
-     *   <li>이미 번호가 있으면 — 가져오기는 기존 값을 덮어쓰지 않는다. 빈 칸 판정은 가입 게이트와
-     *       같은 normalizePhone 기준이어야 "-" 같은 값이 양쪽에서 다르게 보이지 않는다.</li>
+     *       한번 박히면 명부 연락처로 그대로 남는다.</li>
+     *   <li>이미 번호가 있으면 — 가져오기는 기존 값을 덮어쓰지 않는다. 빈 칸 판정은 normalizePhone
+     *       기준이어야 "-" 같은 값이 양쪽에서 다르게 보이지 않는다.</li>
      *   <li>같은 이름+번호 행이 이미 있으면 — V6 의 uk_eligible_members_name_phone 때문에
      *       저장이 23505 로 터지고, 가져오기 전체가 롤백되며 어느 행 때문인지도 안 나온다.</li>
      * </ol>
@@ -1155,24 +1149,9 @@ public class EligibleMemberService {
         }
     }
 
-    /**
-     * When the roster row carries a phone number, the signup must present the same number.
-     * Student id + name pairs are semi-public (roster leaks, class lists), so without this an
-     * attacker could claim someone else's account slot with their own email. Mismatches reuse
-     * the generic roster error so the endpoint doesn't become a phone-number oracle.
-     */
-    private void requirePhoneMatchWhenRosterHasPhone(EligibleMember rosterEntry, String phone) {
-        String rosterPhone = normalizePhone(rosterEntry.getPhone());
-        if (rosterPhone.isBlank()) {
-            return;
-        }
-        if (!rosterPhone.equals(normalizePhone(phone))) {
-            throw invalidRoster();
-        }
-    }
 
     private ResponseStatusException invalidRoster() {
-        return new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번 또는 졸업생 인증 정보, 이름, 전화번호를 확인해주세요.");
+        return new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번 또는 졸업생 인증 정보와 이름을 확인해주세요.");
     }
 
     public record DeletedEligibleMemberSnapshot(

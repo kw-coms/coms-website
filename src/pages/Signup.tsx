@@ -403,7 +403,7 @@ export default function Signup({ onBack }: { onBack: () => void }) {
 
               <div className={fieldGridClass}>
                 <TextField id="department" label="학과" value={form.department} onChange={handleChange} placeholder="학과를 입력하세요" />
-                <TextField id="phone" label="전화번호" value={form.phone} onChange={handleChange} placeholder="01012345678 (하이픈 없이)" inputMode="tel" autoComplete="tel" hint="명부에 전화번호가 등록돼 있다면 같은 번호를 입력해야 가입할 수 있습니다. 하이픈 유무는 관계없습니다." />
+                <TextField id="phone" label="전화번호" value={form.phone} onChange={handleChange} placeholder="01012345678 (하이픈 없이)" inputMode="tel" autoComplete="tel" hint="연락용입니다. 하이픈 유무는 관계없습니다." />
               </div>
 
               <div className={fieldGridClass}>
