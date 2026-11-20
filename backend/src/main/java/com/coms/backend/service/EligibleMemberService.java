@@ -169,32 +169,26 @@ public class EligibleMemberService {
         // No ban check here. It used to run before the roster match, so anyone could ask whether
         // an arbitrary 학번 is banned without knowing anything else about that student, and it
         // ignored the ban's expiry. PendingSignupService checks the ban (expiry included) right
-        // after this method returns — i.e. only for a caller who matched name and phone.
+        // after this method returns — i.e. only for a caller who matched student id and name.
         EligibleMember member = eligibleMemberRepository.findByStudentId(normalizedStudentId)
                 .orElseThrow(() -> invalidRoster());
         if (!member.getName().equals(normalizedName)) {
             throw invalidRoster();
         }
-        requirePhoneMatchWhenRosterHasPhone(member, request.phone());
         return preparedSignup(member, normalizedStudentId);
     }
 
     private PreparedSignup prepareGraduateSignup(SignupRequest request, String normalizedName) {
-        int admissionYear = admissionYearFromGraduateVerification(
+        List<EligibleMember> matches = findGraduateMatches(
+                normalizedName,
                 request.graduateVerificationType(),
                 request.graduateVerificationValue()
         );
-        if (!isGraduate(admissionYear)) {
-            throw invalidRoster();
-        }
-
-        List<EligibleMember> matches = eligibleMemberRepository.findAllByNameAndAdmissionYear(normalizedName, admissionYear);
         if (matches.size() != 1) {
             throw invalidRoster();
         }
 
         EligibleMember member = matches.getFirst();
-        requirePhoneMatchWhenRosterHasPhone(member, request.phone());
         String accountId = normalize(member.getStudentId());
         if (accountId.isBlank()) {
             accountId = generateGraduateAccountId(member);
@@ -301,19 +295,24 @@ public class EligibleMemberService {
                                   String department, String email) {
         String normalizedName = normalize(name);
 
+        boolean hasYear = twoDigitYearStr != null && !twoDigitYearStr.isBlank();
         Integer admissionYear = null;
+        String explicitGeneration = null;
+        if (generationStr != null && !generationStr.isBlank()) {
+            String digits = normalizeGeneration(generationStr);
+            if (!digits.matches("\\d{1,3}")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "기수는 숫자여야 합니다.");
+            }
+            explicitGeneration = String.valueOf(Integer.parseInt(digits));
+        }
         if (twoDigitYearStr != null && !twoDigitYearStr.isBlank()) {
             String digits = normalizeGeneration(twoDigitYearStr);
             if (!digits.matches("\\d{2}")) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "입학연도는 2자리 숫자여야 합니다. (예: 19)");
             }
             admissionYear = resolveAdmissionYear(Integer.parseInt(digits));
-        } else if (generationStr != null && !generationStr.isBlank()) {
-            String digits = normalizeGeneration(generationStr);
-            if (!digits.matches("\\d{1,3}")) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "기수는 숫자여야 합니다.");
-            }
-            admissionYear = Integer.parseInt(digits) + FIRST_GENERATION_YEAR;
+        } else if (explicitGeneration != null) {
+            admissionYear = Integer.parseInt(explicitGeneration) + FIRST_GENERATION_YEAR;
         } else {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "입학연도 또는 기수를 입력해주세요.");
         }
@@ -322,13 +321,20 @@ public class EligibleMemberService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "졸업생 입학연도를 입력해주세요. (현재 연도 기준 7년 이전)");
         }
 
-        String generation = String.valueOf(admissionYear - FIRST_GENERATION_YEAR);
+        // 기수는 입학연도와 따로 정할 수 있다(2학년 가입 등). 명시값이 있으면 그것이 정답.
+        String generation = explicitGeneration != null
+                ? explicitGeneration
+                : String.valueOf(admissionYear - FIRST_GENERATION_YEAR);
         String verificationKey = verificationKey(normalizedName, admissionYear);
         String normalizedPhone = normalizePhone(phone);
         String normalizedDepartment = normalizeDepartment(department);
         String normalizedEmail = normalizeEmail(email);
 
         Optional<EligibleMember> existing = eligibleMemberRepository.findByVerificationKey(verificationKey);
+        if (existing.isEmpty() && explicitGeneration != null && !hasYear) {
+            // 기수만 준 경우: 늦게 가입한 사람(입학연도 != 기수+1966)의 기존 행을 기수로 찾는다.
+            existing = findGraduateByNameAndStoredGeneration(normalizedName, explicitGeneration);
+        }
         if (existing.isPresent()) {
             // 중복 등록은 무시하되 전달된 연락처와 학부/학과는 보강한다.
             if (!normalizedPhone.isBlank()) {
@@ -340,7 +346,11 @@ public class EligibleMemberService {
             if (normalizedEmail != null) {
                 existing.get().setEmail(normalizedEmail);
             }
-            if (!normalizedPhone.isBlank() || normalizedDepartment != null || normalizedEmail != null) {
+            if (explicitGeneration != null) {
+                existing.get().setGeneration(explicitGeneration);
+            }
+            if (!normalizedPhone.isBlank() || normalizedDepartment != null || normalizedEmail != null
+                    || explicitGeneration != null) {
                 eligibleMemberRepository.save(existing.get());
             }
             return;
@@ -587,7 +597,6 @@ public class EligibleMemberService {
             if (!exact.get().getName().equals(normalizedName)) {
                 throw invalidRoster();
             }
-            requirePhoneMatchWhenRosterHasPhone(exact.get(), phone);
             return;
         }
 
@@ -596,7 +605,10 @@ public class EligibleMemberService {
             throw invalidRoster();
         }
 
-        validateGraduateVerification(verificationType, verificationValue, admissionYear);
+        boolean byGeneration = "GENERATION".equals(normalize(verificationType).toUpperCase(Locale.ROOT));
+        if (!byGeneration) {
+            validateGraduateVerification(verificationType, verificationValue, admissionYear);
+        }
 
         List<EligibleMember> matches = eligibleMemberRepository.findAllByNameAndAdmissionYear(normalizedName, admissionYear);
         if (matches.size() != 1) {
@@ -604,11 +616,13 @@ public class EligibleMemberService {
         }
 
         EligibleMember match = matches.getFirst();
+        if (byGeneration && !storedOrDerivedGeneration(match, admissionYear).equals(generationValue(verificationValue))) {
+            throw invalidRoster();
+        }
         if (match.getStudentId() != null && !match.getStudentId().isBlank()
                 && !normalizedStudentId.equals(match.getStudentId())) {
             throw invalidRoster();
         }
-        requirePhoneMatchWhenRosterHasPhone(match, phone);
         match.setStudentId(normalizedStudentId);
         eligibleMemberRepository.save(match);
     }
@@ -620,18 +634,12 @@ public class EligibleMemberService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름은 한글 2~10자여야 합니다.");
         }
 
-        int admissionYear = admissionYearFromGraduateVerification(verificationType, verificationValue);
-        if (!isGraduate(admissionYear)) {
-            throw invalidRoster();
-        }
-
-        List<EligibleMember> matches = eligibleMemberRepository.findAllByNameAndAdmissionYear(normalizedName, admissionYear);
+        List<EligibleMember> matches = findGraduateMatches(normalizedName, verificationType, verificationValue);
         if (matches.size() != 1) {
             throw invalidRoster();
         }
 
         EligibleMember match = matches.getFirst();
-        requirePhoneMatchWhenRosterHasPhone(match, phone);
         String accountId = normalize(match.getStudentId());
         if (accountId.isBlank()) {
             accountId = generateGraduateAccountId(match);
@@ -713,6 +721,9 @@ public class EligibleMemberService {
                         : null;
 
                 Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
+                if (existing.isEmpty() && studentId.isBlank() && isGraduate(admissionYear)) {
+                    existing = findGraduateByNameAndStoredGeneration(name, generation);
+                }
                 if (existing.isPresent()) {
                     if (fillMissingPhone(existing.get(), name, phone)) {
                         phoneFilled++;
@@ -847,6 +858,9 @@ public class EligibleMemberService {
                         : null;
 
                 Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
+                if (existing.isEmpty() && studentId.isBlank() && isGraduate(admissionYear)) {
+                    existing = findGraduateByNameAndStoredGeneration(name, generation);
+                }
                 if (existing.isPresent()) {
                     if (fillMissingPhone(existing.get(), name, phone)) {
                         phoneFilled++;
@@ -941,13 +955,12 @@ public class EligibleMemberService {
      *
      * <ol>
      *   <li>파일의 이름이 명부 행의 이름과 다르면 — 학번으로 찾은 행은 이름을 대조하지 않으므로,
-     *       구글 폼에 오타난 학번 하나가 남의 행에 엉뚱한 번호를 박을 수 있다. 그러면
-     *       {@link #requirePhoneMatchWhenRosterHasPhone} 가 그 번호를 요구해 본인이 가입하지
-     *       못하고 일반 403 만 받는다. ensureDirectMemberRosterRow 도 같은 이유로 이름을 본다.</li>
+     *       구글 폼에 오타난 학번 하나가 남의 행에 엉뚱한 연락처를 박을 수 있다.
+     *       ensureDirectMemberRosterRow 도 같은 이유로 이름을 본다.</li>
      *   <li>번호 모양이 이상하면 — 학번이 전화번호 칸에 들어왔거나 두 번호가 한 칸에 붙은 경우.
-     *       한번 박히면 가입 때 그대로 요구된다.</li>
-     *   <li>이미 번호가 있으면 — 가져오기는 기존 값을 덮어쓰지 않는다. 빈 칸 판정은 가입 게이트와
-     *       같은 normalizePhone 기준이어야 "-" 같은 값이 양쪽에서 다르게 보이지 않는다.</li>
+     *       한번 박히면 명부 연락처로 그대로 남는다.</li>
+     *   <li>이미 번호가 있으면 — 가져오기는 기존 값을 덮어쓰지 않는다. 빈 칸 판정은 normalizePhone
+     *       기준이어야 "-" 같은 값이 양쪽에서 다르게 보이지 않는다.</li>
      *   <li>같은 이름+번호 행이 이미 있으면 — V6 의 uk_eligible_members_name_phone 때문에
      *       저장이 23505 로 터지고, 가져오기 전체가 롤백되며 어느 행 때문인지도 안 나온다.</li>
      * </ol>
@@ -1094,6 +1107,53 @@ public class EligibleMemberService {
         throw invalidRoster();
     }
 
+    /**
+     * 이름과 저장된 기수가 같은 졸업생 행. 입학연도가 공식과 달라도(2학년 가입 등) 같은 사람으로 본다.
+     * 같은 이름·기수의 졸업생이 둘 이상이면 누구인지 알 수 없으니 기존 행을 고르지 않는다.
+     */
+    private Optional<EligibleMember> findGraduateByNameAndStoredGeneration(String name, String generation) {
+        String wanted = generationValue(generation);
+        List<EligibleMember> rows = eligibleMemberRepository.findAllByName(normalize(name)).stream()
+                .filter(row -> row.getAdmissionYear() != null && isGraduate(row.getAdmissionYear())
+                        && GENERATION_PATTERN.matcher(normalizeGeneration(row.getGeneration())).matches()
+                        && generationValue(row.getGeneration()).equals(wanted))
+                .toList();
+        return rows.size() == 1 ? Optional.of(rows.getFirst()) : Optional.empty();
+    }
+
+    /** 졸업생 가입 매칭. 기수는 명부에 저장된 기수가 정답이라 공식(입학연도-1966)이 아니라 저장값으로 비교한다. */
+    private List<EligibleMember> findGraduateMatches(String normalizedName, String type, String value) {
+        int admissionYear = admissionYearFromGraduateVerification(type, value);
+        if (!"GENERATION".equals(normalize(type).toUpperCase(Locale.ROOT))) {
+            if (!isGraduate(admissionYear)) {
+                throw invalidRoster();
+            }
+            return eligibleMemberRepository.findAllByNameAndAdmissionYear(normalizedName, admissionYear);
+        }
+        String generation = generationValue(value);
+        return eligibleMemberRepository.findAllByName(normalizedName).stream()
+                .filter(row -> row.getAdmissionYear() != null
+                        || GENERATION_PATTERN.matcher(normalizeGeneration(row.getGeneration())).matches())
+                .filter(row -> {
+                    int rowYear = row.getAdmissionYear() != null ? row.getAdmissionYear() : admissionYear;
+                    return isGraduate(rowYear) && storedOrDerivedGeneration(row, rowYear).equals(generation);
+                })
+                .toList();
+    }
+
+    private String storedOrDerivedGeneration(EligibleMember member, int fallbackAdmissionYear) {
+        String stored = normalizeGeneration(member.getGeneration());
+        return generationValue(GENERATION_PATTERN.matcher(stored).matches()
+                ? stored
+                : String.valueOf(fallbackAdmissionYear - FIRST_GENERATION_YEAR));
+    }
+
+    /** "040" 과 "40" 을 같은 기수로 비교하기 위한 정규화. */
+    private String generationValue(String value) {
+        String digits = normalizeGeneration(value);
+        return GENERATION_PATTERN.matcher(digits).matches() ? String.valueOf(Integer.parseInt(digits)) : digits;
+    }
+
     private int admissionYearFromGraduateVerification(String type, String value) {
         String normalizedType = normalize(type).toUpperCase(Locale.ROOT);
         String normalizedValue = normalizeGeneration(value);
@@ -1155,24 +1215,9 @@ public class EligibleMemberService {
         }
     }
 
-    /**
-     * When the roster row carries a phone number, the signup must present the same number.
-     * Student id + name pairs are semi-public (roster leaks, class lists), so without this an
-     * attacker could claim someone else's account slot with their own email. Mismatches reuse
-     * the generic roster error so the endpoint doesn't become a phone-number oracle.
-     */
-    private void requirePhoneMatchWhenRosterHasPhone(EligibleMember rosterEntry, String phone) {
-        String rosterPhone = normalizePhone(rosterEntry.getPhone());
-        if (rosterPhone.isBlank()) {
-            return;
-        }
-        if (!rosterPhone.equals(normalizePhone(phone))) {
-            throw invalidRoster();
-        }
-    }
 
     private ResponseStatusException invalidRoster() {
-        return new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번 또는 졸업생 인증 정보, 이름, 전화번호를 확인해주세요.");
+        return new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번 또는 졸업생 인증 정보와 이름을 확인해주세요.");
     }
 
     public record DeletedEligibleMemberSnapshot(

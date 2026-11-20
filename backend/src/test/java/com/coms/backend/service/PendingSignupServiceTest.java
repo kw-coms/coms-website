@@ -145,6 +145,32 @@ class PendingSignupServiceTest {
     }
 
     @Test
+    @DisplayName("signup phone need not match the roster phone for a current student")
+    void currentStudentSignupSucceedsWithPhoneDifferentFromRoster() {
+        saveEligible("2026123459", "홍길동", "60", "01011111111", Member.Role.USER);
+
+        AuthResponse started = service.start(
+                currentStudentRequest("2026123459", "phone-b@example.com", "홍길동", "01022223333"), "198.51.100.20");
+
+        assertThat(started.studentId()).isEqualTo("2026123459");
+    }
+
+    @Test
+    @DisplayName("graduate signup by 기수 matches the stored 기수, not the admission-year formula")
+    void graduateSignupByGenerationUsesStoredGeneration() {
+        eligibleMemberService.addGraduateSingle("박늦깎", "05", "40", "01011112222");
+
+        AuthResponse started = service.start(graduateRequest("박늦깎", "GENERATION", "40", "grad-ok@example.com", "01099998888"),
+                "198.51.100.21");
+        assertThat(started.studentId()).isNotBlank();
+
+        assertThatThrownBy(() -> service.start(
+                graduateRequest("박늦깎", "GENERATION", "39", "grad-bad@example.com", "01099998888"), "198.51.100.22"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
     @DisplayName("concurrent confirmation creates only one member for one pending signup")
     void concurrentConfirmationCreatesOneMember() throws Exception {
         saveEligible("2026123457", "홍길동", "60", "01012345678", Member.Role.USER);
@@ -651,5 +677,10 @@ class PendingSignupServiceTest {
                 "보안,웹",
                 "CURRENT"
         );
+    }
+
+    private SignupRequest graduateRequest(String name, String type, String value, String email, String phone) {
+        return new SignupRequest(null, name, type, value, email, "Password1!", "컴퓨터공학과", null, phone,
+                null, null, "GRADUATE");
     }
 }

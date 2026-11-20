@@ -229,6 +229,8 @@ export default function Signup({ onBack }: { onBack: () => void }) {
 
     if (!form.email.trim()) return '이메일을 입력해주세요.'
     if (!form.email.includes('@')) return '올바른 이메일 형식이 아닙니다.'
+    if (!form.phone.trim()) return '전화번호를 입력해주세요.'
+    if (form.phone.replace(/\D/g, '').length < 9) return '전화번호를 정확히 입력해주세요.'
     if (!form.password) return '비밀번호를 입력해주세요.'
     if (/\s/.test(form.password)) return '비밀번호에 공백을 사용할 수 없습니다.'
     if (!PASSWORD_PATTERN.test(form.password)) return '비밀번호는 8자 이상, 영문·숫자·특수문자(!@#$ 등)를 모두 포함해야 합니다.'
@@ -403,7 +405,7 @@ export default function Signup({ onBack }: { onBack: () => void }) {
 
               <div className={fieldGridClass}>
                 <TextField id="department" label="학과" value={form.department} onChange={handleChange} placeholder="학과를 입력하세요" />
-                <TextField id="phone" label="전화번호" value={form.phone} onChange={handleChange} placeholder="01012345678 (하이픈 없이)" inputMode="tel" autoComplete="tel" hint="명부에 전화번호가 등록돼 있다면 같은 번호를 입력해야 가입할 수 있습니다. 하이픈 유무는 관계없습니다." />
+                <TextField id="phone" label="전화번호" value={form.phone} onChange={handleChange} placeholder="01012345678 (하이픈 없이)" inputMode="tel" autoComplete="tel" hint="필수 입력입니다. 하이픈 유무는 관계없습니다." />
               </div>
 
               <div className={fieldGridClass}>

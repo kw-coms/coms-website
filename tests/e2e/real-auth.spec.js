@@ -139,7 +139,7 @@ test.describe('real backend auth', () => {
     expect(transientMeCount).toBeGreaterThanOrEqual(2)
   })
 
-  test('fresh UI signup checks the roster phone, sends mail, verifies and logs in', async ({ page, request }) => {
+  test('fresh UI signup matches the roster by student id and name, sends mail, verifies and logs in', async ({ page, request }) => {
     // Seed an eligible-roster entry through the real admin API. The test uses
     // a separate API context so the signup page remains signed out.
     const studentId = `2026${String(Date.now()).slice(-6).padStart(6, '0')}`
@@ -169,16 +169,8 @@ test.describe('real backend auth', () => {
     await page.locator('#aspiration').fill('동아리 활동에 적극 참여하고 싶습니다.')
     // Current-student signup requires at least one interest selected.
     await page.getByRole('button', { name: '웹', exact: true }).click()
-    await expect(page.getByText('명부에 전화번호가 등록돼 있다면 같은 번호를 입력해야 가입할 수 있습니다.')).toBeVisible()
-
-    const rejectedSignup = page.waitForResponse(
-      (res) => res.url().includes('/api/auth/signup') && res.request().method() === 'POST',
-    )
-    await page.locator('#main-content button[type="submit"]').click()
-    expect((await rejectedSignup).status()).toBe(403)
-    await expect(page.getByText('명부에 등록된 학번 또는 졸업생 인증 정보, 이름, 전화번호를 확인해주세요.')).toBeVisible()
-
-    await page.locator('#phone').fill(phone)
+    // 명부 대조는 학번+이름만 본다. 명부와 다른 전화번호여도 가입이 진행돼야 한다.
+    await page.locator('#phone').fill('01099998888')
 
     const signupResponse = page.waitForResponse(
       (res) => res.url().includes('/api/auth/signup') && res.request().method() === 'POST',

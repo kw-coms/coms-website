@@ -391,23 +391,18 @@ class EligibleMemberServiceTest {
     }
 
     @Test
-    void rejectsSignupWhenRosterPhoneDoesNotMatch() throws Exception {
+    void signupDoesNotRequireTheRosterPhone() throws Exception {
+        // 명부 대조는 학번(또는 졸업생 기수/입학연도)과 이름만 본다. 명부 전화번호에 오타가 있어도
+        // (예: 끝자리가 빠진 10자리 010 번호) 본인이 가입할 수 있어야 한다.
         MockMultipartFile file = workbookFile(new String[]{"학번", "이름", "전화번호"},
                 new String[]{"2024123456", "홍길동", "010-1234-5678"});
         eligibleMemberService.importRoster(file);
+        eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, "01099998888");
+        eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, null);
 
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, "01099998888"))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
-                .isEqualTo(HttpStatus.FORBIDDEN.value());
-
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, null))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
-                .isEqualTo(HttpStatus.FORBIDDEN.value());
-
-        // Hyphen/format differences must not lock out the legitimate member.
-        eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, "01012345678");
+        eligibleMemberService.addGraduateSingle("김선배", null, "40", "0106418828");
+        assertThat(eligibleMemberService.validateAndClaimGraduateSignup("김선배", "GENERATION", "40", "01064188281"))
+                .isNotBlank();
     }
 
     @Test
@@ -530,6 +525,54 @@ class EligibleMemberServiceTest {
             // 학번이 없는 졸업생 행의 졸업 판정은 이 값에만 기댄다.
             assertThat(m.admissionYear()).isEqualTo(2019);
         });
+    }
+
+    @Test
+    void explicitGenerationIsStoredIndependentlyAndUsedForSignupMatching() {
+        // 2005 입학이지만 2학년 때 가입해 기수는 40 (공식으로는 39).
+        eligibleMemberService.addGraduateSingle("박늦깎", "05", "40", "01011112222");
+
+        var roster = eligibleMemberService.listRoster();
+        assertThat(roster).singleElement().satisfies(m -> {
+            assertThat(m.generation()).isEqualTo("40");
+            assertThat(m.admissionYear()).isEqualTo(2005);
+        });
+
+        assertThat(eligibleMemberService.validateAndClaimGraduateSignup("박늦깎", "GENERATION", "40", "01011112222"))
+                .isNotBlank();
+        assertThat(eligibleMemberService.validateAndClaimGraduateSignup("박늦깎", "YEAR", "05", "01011112222"))
+                .isNotBlank();
+    }
+
+    @Test
+    void graduateSignupRejectsGenerationThatOnlyMatchesTheFormula() {
+        eligibleMemberService.addGraduateSingle("박늦깎", "05", "40", "01011112222");
+
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimGraduateSignup("박늦깎", "GENERATION", "39", "01011112222"))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    void generationOnlyAddReusesExistingLateJoinerRow() {
+        eligibleMemberService.addGraduateSingle("박늦깎", "05", "40", "01011112222");
+        eligibleMemberService.addGraduateSingle("박늦깎", null, "40", "01033334444");
+        eligibleMemberService.addPendingByGeneration("박늦깎", "40", "01033334444");
+
+        assertThat(eligibleMemberService.listRoster()).hasSize(1);
+        assertThat(eligibleMemberService.validateAndClaimGraduateSignup("박늦깎", "GENERATION", "40", null))
+                .isNotBlank();
+    }
+
+    @Test
+    void generationClaimSkipsRowWithoutYearAndWithoutValidGeneration() {
+        EligibleMember blank = new EligibleMember();
+        blank.setName("박무명");
+        eligibleMemberRepository.saveAndFlush(blank);
+
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimGraduateSignup("박무명", "GENERATION", "40", null))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
     }
 
     @Test

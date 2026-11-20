@@ -26,4 +26,7 @@ public interface EligibleMemberRepository extends JpaRepository<EligibleMember, 
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<EligibleMember> findAllByNameAndAdmissionYear(String name, Integer admissionYear);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<EligibleMember> findAllByName(String name);
 }
