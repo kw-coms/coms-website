@@ -633,6 +633,32 @@ class PendingSignupServiceTest {
                 .isEqualTo(expected);
     }
 
+    @Test
+    @DisplayName("graduate row with a real 학번 signs up by 기수 and by 학번+이름, account id is the 학번")
+    void graduateWithStudentIdCanSignUpByGenerationAndByStudentId() {
+        eligibleMemberService.addGraduateSingle("김졸업", null, "50", "01011112222", null, null, "2015123456", null);
+
+        AuthResponse byGeneration = service.start(
+                graduateRequest("김졸업", "GENERATION", "50", "grad-gen@example.com", "01099998888"), "198.51.100.41");
+        assertThat(byGeneration.studentId()).isEqualTo("2015123456");
+        assertThat(service.confirm(byGeneration.studentId(), sentCode())).isTrue();
+        Member member = memberRepository.findByStudentId("2015123456").orElseThrow();
+        assertThat(member.getGeneration()).isEqualTo("50");
+
+        memberRepository.deleteAll();
+        pendingRepository.deleteAll();
+        AuthResponse byYear = service.start(
+                graduateRequest("김졸업", "YEAR", "15", "grad-year@example.com", "01099998888"), "198.51.100.42");
+        assertThat(byYear.studentId()).isEqualTo("2015123456");
+
+        memberRepository.deleteAll();
+        pendingRepository.deleteAll();
+        AuthResponse byStudentId = service.start(
+                new SignupRequest("2015123456", "김졸업", null, null, "grad-id@example.com", "Password1!", "컴퓨터공학과",
+                        null, "01099998888", null, null, "GRADUATE"), "198.51.100.43");
+        assertThat(byStudentId.studentId()).isEqualTo("2015123456");
+    }
+
     private EligibleMember saveEligible(String studentId, String name, String generation, String phone, Member.Role role) {
         EligibleMember eligible = new EligibleMember();
         eligible.setStudentId(studentId);

@@ -47,3 +47,6 @@ uploads/
 secrets/
 # Members-only photos, uploaded to the server by hand and mounted into coms-frontend (never commit)
 member-media/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
