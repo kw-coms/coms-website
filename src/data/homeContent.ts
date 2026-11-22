@@ -512,7 +512,7 @@ export const navGroups: NavGroup[] = [
       { id: 'officers', label: '역대 회장단', sub: 'Officers', path: '/officers', icon: Crown, auth: true, keywords: '회장 부회장 회장단 역대 임원 임기 대 기수' },
       { id: 'activities', label: '활동', sub: 'Activities', path: '/activities', icon: Sparkles, keywords: '세미나·스터디' },
       { id: 'projects', label: '프로젝트', sub: 'Projects', path: '/projects', icon: CircuitBoard, keywords: '실전 제작' },
-      { id: 'contact', label: '협업 제안', sub: 'Collaborate', path: '/contact', icon: HeartHandshake, keywords: '문의 공동 행사 연합 세미나' },
+      { id: 'contact', label: '협업 제안', sub: 'Collaborate', path: '/contact', icon: HeartHandshake, keywords: '문의 공동 행사 연합' },
       { id: 'sponsors', label: '후원', sub: 'Sponsors', path: '/sponsors', icon: HeartHandshake },
       { id: 'recruit', label: '지원하기', sub: 'Recruit', path: '/recruit', icon: Rocket, keywords: '지원 안내' },
     ],

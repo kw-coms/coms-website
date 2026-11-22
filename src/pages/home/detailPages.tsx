@@ -52,7 +52,7 @@ export function AboutPage() {
           </ul>
         </div>
       </section>}
-      nextSteps={[{ label: '지원하기', to: '/recruit' }, { label: '협업 제안', to: '/contact' }]}
+      nextSteps={[{ label: '지원하기', to: '/recruit' }, { label: '스터디 보기', to: '/study' }, { label: '협업 제안', to: '/contact' }]}
     />
   )
 }

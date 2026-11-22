@@ -117,20 +117,22 @@ function ActivityComposer({
         </div>
       </div>
 
-      <input
-        aria-label="제목"
-        value={activityForm.title}
-        onChange={(event) => setActivityForm((prev) => ({ ...prev, title: event.target.value }))}
-        maxLength={120}
-        placeholder="제목"
-        className="community-compose-title order-1 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm lg:col-start-1 lg:row-start-1"
-      />
-
-      <div className="order-2 lg:col-start-1 lg:row-start-2">
+      <div className="order-1 lg:col-start-1 lg:row-start-1">
         {!activityForm.description && <div className="mb-3 flex flex-wrap items-center gap-2" aria-label="글쓰기 양식">
           <span className="text-sm font-semibold">양식으로 시작</span>
           {activityTemplateOptions(false).map(template => <button key={template.name} type="button" className="apple-action-secondary min-h-10 px-3 text-sm" onClick={() => setActivityForm(prev => ({ ...prev, description: template.sections.map(section => '<p><strong>' + section + '</strong></p><p><br></p>').join('') }))}>{template.name}</button>)}
         </div>}
+        <input
+          aria-label="제목"
+          value={activityForm.title}
+          onChange={(event) => setActivityForm((prev) => ({ ...prev, title: event.target.value }))}
+          maxLength={120}
+          placeholder="제목"
+          className="community-compose-title w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm"
+        />
+      </div>
+
+      <div className="order-2 lg:col-start-1 lg:row-start-2">
         <RichTextComposer
           value={activityForm.description}
           onChange={(description) => setActivityForm((prev) => ({ ...prev, description }))}
