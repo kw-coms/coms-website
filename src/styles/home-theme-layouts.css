@@ -2,8 +2,12 @@
 .home-mode-bar > span,
 .home-mode-prompt,
 .home-mode-action-icon,
+.scene-opening__art,
 .home-mode-terminal-output,
 .home-mode-terminal-output > span,
+.home-mode-retro-directory,
+.home-mode-retro-directory > span,
+.home-mode-blueprint-drawing,
 .home-mode-blueprint-note {
 	display: none;
 }
@@ -26,6 +30,7 @@
 	}
 
 	& .scene-opening__art {
+		display: block;
 		grid-area: art;
 	}
 
@@ -108,11 +113,6 @@
 		box-shadow: none;
 	}
 
-	& .scene-opening__art :is(.scene-processor, .scene-opening__traces),
-	& .scene-opening__art::after {
-		display: none;
-	}
-
 	& .home-mode-terminal-output {
 		position: relative;
 		display: grid;
@@ -135,9 +135,8 @@
 		font-family: var(--cine-mono);
 	}
 
-	& .scene-members--today > .scene-inner {
-		max-width: 68rem;
-		border-radius: 0.5rem;
+	& .scene-opening__activities {
+		font-family: var(--cine-mono);
 	}
 
 	& .scene-members--today :is(.scene-notice--lead, .scene-hubcard, .scene-chip, .scene-members__icon) {
@@ -169,8 +168,16 @@
 	}
 }
 
-/* Retro: a desktop window with a monitor preview and a shelf of raised action tiles. */
+/* Retro: colorful desktop, window chrome, an inset folder list and an action toolbar. */
 :root[data-appearance-theme='retro'] {
+	& .scene.scene-opening {
+		background: var(--retro-desktop);
+	}
+
+	& .scene-opening__bg {
+		opacity: 0.2;
+	}
+
 	& .scene-opening__layout {
 		max-width: 66rem;
 		grid-template:
@@ -180,18 +187,19 @@
 			'art lede'
 			'actions actions'
 			'notice status' / minmax(0, 0.78fr) minmax(0, 1fr);
-		border-radius: 0.4rem;
-		box-shadow: 5px 5px 0 var(--app-hairline-strong);
+		padding: 0.25rem;
+		border-radius: 0;
+		box-shadow: var(--retro-bevel), 7px 8px rgb(0 0 0 / 24%);
 	}
 
 	& .home-mode-bar,
 	& .scene-members__header {
-		background: var(--app-accent);
-		color: var(--app-accent-on);
+		background: var(--retro-titlebar);
+		color: #fff;
 	}
 
 	& .home-mode-bar {
-		border-radius: 0.35rem 0.35rem 0 0;
+		border-radius: 0;
 	}
 
 	& .home-mode-bar__retro {
@@ -221,29 +229,46 @@
 	}
 
 	& .scene-opening__art {
-		min-height: 12rem;
+		min-height: 10rem;
 		aspect-ratio: auto;
 		align-self: stretch;
 		margin: 1.4rem;
-		border: 4px solid var(--app-hairline-strong);
-		border-radius: 0.6rem;
-		box-shadow: 0 4px 0 var(--app-hairline-strong);
+		border: 2px groove var(--retro-shadow);
+		border-radius: 0;
+		background: var(--app-surface-elevated);
+		box-shadow: inset 1px 1px var(--retro-shadow), inset -1px -1px var(--retro-highlight);
 	}
 
-	& .scene-opening__art :is(.scene-processor__plate, .scene-opening__traces) {
+	& .scene-opening__art::before {
 		display: none;
 	}
 
-	& .scene-processor {
-		inset: 12%;
-		width: auto;
-		aspect-ratio: auto;
-		transform: none;
+	& .home-mode-retro-directory {
+		display: grid;
+		gap: 0.2rem;
+		margin: 0.5rem;
+		color: var(--app-text);
+		font-size: 0.875rem;
 	}
 
-	& .scene-processor__mark {
-		top: 50%;
-		width: min(42%, 7rem);
+	& .home-mode-retro-directory > span {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.3rem 0.48rem;
+		border-bottom: 1px dotted var(--app-hairline-strong);
+	}
+
+	& .home-mode-retro-directory > span:first-child {
+		border: 0;
+		background: #ffec8b;
+		color: #1d2632;
+		font-weight: 700;
+	}
+
+	& .home-mode-retro-directory svg {
+		fill: #ffdb73;
+		color: #715414;
 	}
 
 	& .scene-opening .scene-actions {
@@ -260,8 +285,8 @@
 	& .scene-opening :is(.scene-btn, .scene-notice),
 	& .scene-members--today :is(.scene-notice--lead, .scene-hubcard, .scene-chip, .scene-members__icon) {
 		border: 1px solid var(--app-hairline-strong);
-		border-radius: 0.35rem;
-		box-shadow: inset 0 1px color-mix(in srgb, #fff 30%, transparent), 0 2px 0 var(--app-hairline-strong);
+		border-radius: 0;
+		box-shadow: var(--retro-bevel);
 	}
 
 	& .scene-opening .scene-btn {
@@ -284,28 +309,18 @@
 		margin: 0.8rem 1.4rem;
 	}
 
-	& .scene-opening .scene-typed {
-		min-height: 0;
+	& .scene-opening__activities {
 		grid-area: status;
 		margin: 0.8rem 1.4rem;
 	}
 
-	& .scene-opening__layout:not(:has(.scene-notice)) .scene-typed {
+	& .scene-opening__layout:not(:has(.scene-notice)) .scene-opening__activities {
 		grid-column: 1 / -1;
 	}
 
-	& .scene-members--today > .scene-inner {
-		--retro-window-pad: clamp(1.25rem, 3.4vw, 3rem);
-		max-width: 66rem;
-		padding: 0 var(--retro-window-pad) var(--retro-window-pad);
-		border-radius: 0.4rem;
-		box-shadow: 5px 5px 0 var(--app-hairline-strong);
-	}
-
 	& .scene-members__header {
-		margin-inline: calc(-1 * var(--retro-window-pad));
-		padding: 0.85rem var(--retro-window-pad);
-		border-radius: 0.35rem 0.35rem 0 0;
+		padding: 0.85rem clamp(1rem, 2.5vw, 1.65rem);
+		box-shadow: var(--retro-bevel);
 	}
 
 	& .scene-members__header :is(.scene-members__eyebrow, .scene-title) {
@@ -353,19 +368,18 @@
 		box-shadow: none;
 	}
 
-	& .scene-processor {
-		top: 50%;
-		width: min(68%, 21rem);
+	& .home-mode-blueprint-drawing {
+		position: absolute;
+		inset: 22% 16% 15%;
+		display: grid;
+		place-items: center;
+		border: 1px dashed color-mix(in srgb, var(--board-light) 55%, transparent);
+		color: var(--board-light);
 	}
 
-	& .scene-processor__plate {
-		--plate-color: transparent;
-		border-style: dashed;
-		box-shadow: none;
-	}
-
-	& .scene-processor__plate--top {
-		border-style: solid;
+	& .home-mode-blueprint-drawing svg {
+		width: min(52%, 7.5rem);
+		height: auto;
 	}
 
 	& .home-mode-blueprint-note {
@@ -392,8 +406,6 @@
 			'calendar calendar' auto / minmax(0, 1fr) minmax(12rem, 0.36fr);
 		gap: 0 1rem;
 		align-items: start;
-		border: 2px solid var(--app-hairline-strong);
-		border-radius: 0;
 	}
 
 	& .scene-members--today .scene-members__header {
@@ -519,7 +531,7 @@
 			margin: 0.8rem 1rem 1rem;
 		}
 
-		& .scene-opening :is(.scene-opening__semester, .scene-opening__lede, .scene-wordmark, .scene-notice, .scene-typed) {
+		& .scene-opening :is(.scene-opening__semester, .scene-opening__lede, .scene-wordmark, .scene-notice, .scene-opening__activities) {
 			margin-inline: 1rem;
 		}
 
@@ -532,7 +544,4 @@
 		min-height: 12rem;
 	}
 
-	:root[data-appearance-theme='blueprint'] .scene-processor {
-		width: min(50%, 16rem);
-	}
 }

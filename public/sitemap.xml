@@ -6,6 +6,7 @@
   <url><loc>https://coms.kw.ac.kr/activities</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://coms.kw.ac.kr/projects</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://coms.kw.ac.kr/study</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://coms.kw.ac.kr/opportunities</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
   <url><loc>https://coms.kw.ac.kr/study/web</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://coms.kw.ac.kr/study/arduino</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://coms.kw.ac.kr/study/c</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>

@@ -18,6 +18,7 @@ export const ADMIN_TABS: { id: string; label: string; group: AdminGroupId | null
   { id: 'ban', label: '차단 관리', group: 'people' },
   { id: 'recruit', label: '모집 관리', group: 'people' },
   { id: 'activities', label: '활동 관리', group: 'content' },
+  { id: 'external-opportunities', label: '외부 일정', group: 'content' },
   { id: 'community', label: '커뮤니티 관리', group: 'content' },
   { id: 'deleted-posts', label: '삭제 보관함', group: 'content' },
   { id: 'files', label: '파일 관리', group: 'content' },

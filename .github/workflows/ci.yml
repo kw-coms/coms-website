@@ -260,6 +260,7 @@ jobs:
           {
             echo "DB_PASSWORD=$(openssl rand -hex 16)"
             echo "JWT_SECRET=$(openssl rand -hex 48)"
+            echo "COMS_OPPORTUNITIES_ENABLED=false"
             # Lets the Circuit Lab check below create the first admin (and so a login to compile with).
             echo "BOOTSTRAP_SECRET=$(openssl rand -hex 24)"
             # The stack is served at http://127.0.0.1:3000 (E2E_STACK_URL). Trust it as the site's own origin, as

@@ -34,7 +34,10 @@ export default function HackathonArchive() {
   return <div className="site-page"><main className="site-page-inner hackathon-page">
     <PageHeading>해커톤 아카이브</PageHeading>
     <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--app-muted)]">COM’s 해커톤의 기록입니다. 지난 행사의 작품과 자료, 공개된 결과를 언제든 다시 볼 수 있습니다.</p>
-    <Link to="/forms?category=HACKATHON" className="apple-action-secondary mt-5 inline-flex min-h-11 items-center px-4 text-sm">해커톤 신청·수요조사</Link>
+    <div className="mt-5 flex flex-wrap gap-2">
+      <Link to="/forms?category=HACKATHON" className="apple-action-secondary inline-flex min-h-11 items-center px-4 text-sm">해커톤 신청·수요조사</Link>
+      <Link to="/opportunities?category=HACKATHON" className="apple-action-secondary inline-flex min-h-11 items-center px-4 text-sm">외부 해커톤 일정</Link>
+    </div>
     {events.isPending && <p role="status" className="mt-6">해커톤 기록을 불러오는 중…</p>}
     {events.isError && <p role="alert" className="mt-6">해커톤 기록을 불러오지 못했습니다. <button type="button" className="underline" onClick={() => events.refetch()}>다시 불러오기</button></p>}
     {events.isSuccess && list.length === 0 && <p className="mt-6 rounded-xl bg-[var(--app-surface-soft)] p-5">아직 공개된 해커톤이 없습니다.</p>}

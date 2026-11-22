@@ -1,10 +1,9 @@
 import { useEffect, useRef } from 'react'
-import { AppWindow, ArrowRight, BookOpen, DraftingCompass, FileText, Megaphone, Terminal } from 'lucide-react'
+import { AppWindow, ArrowRight, BookOpen, DraftingCompass, FileText, FolderOpen, Megaphone, Terminal } from 'lucide-react'
 import { experiencePills } from '../../../data/homeContent'
 import { SCREEN_ON_EVENT } from '../../../utils/screenOn'
 import HeroField from '../HeroField'
 import { cssVars } from './cssVars'
-import TypedLine from './TypedLine'
 
 const TICKER = Array.from({ length: 2 }, () => experiencePills.join('   ·   ') + '   ·   ').join('')
 
@@ -87,21 +86,25 @@ export default function Opening({ title, copy, semester, noticeTitle, onMore, on
               <span className="scene-notice__tag">공지</span>
             </button>
           )}
-          <TypedLine />
+          <ul className="scene-opening__activities" aria-label="주요 활동">
+            <li>정기 세미나</li>
+            <li>팀 프로젝트</li>
+            <li>부원 교류</li>
+          </ul>
         </div>
         <div className="scene-opening__art" aria-hidden="true">
           <div className="home-mode-terminal-output">
             <span className="home-mode-terminal-output__prompt" aria-hidden="true">$ ls activities</span>
             <span aria-hidden="true">세미나</span><span aria-hidden="true">스터디</span><span aria-hidden="true">팀 프로젝트</span>
           </div>
-          <div className="scene-opening__traces"><i /><i /><i /><i /></div>
-          <div className="scene-processor">
-            <span className="scene-processor__plate scene-processor__plate--base" />
-            <span className="scene-processor__plate scene-processor__plate--middle" />
-            <span className="scene-processor__plate scene-processor__plate--top" />
-            <span className="scene-processor__mark" />
+          <div className="home-mode-retro-directory">
+            <span aria-hidden="true">동아리 폴더</span>
+            <span aria-hidden="true"><FolderOpen size={17} /> 정기 세미나</span>
+            <span aria-hidden="true"><FolderOpen size={17} /> 팀 프로젝트</span>
+            <span aria-hidden="true"><FolderOpen size={17} /> 부원 교류</span>
           </div>
-          <span className="home-mode-blueprint-note" aria-hidden="true">동아리 로고</span>
+          <div className="home-mode-blueprint-drawing"><DraftingCompass size={112} strokeWidth={0.8} /></div>
+          <span className="home-mode-blueprint-note" aria-hidden="true">COM's 설계 도면</span>
         </div>
       </div>
 

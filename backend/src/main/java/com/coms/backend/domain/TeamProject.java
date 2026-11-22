@@ -20,6 +20,8 @@ public class TeamProject {
     private String description = "";
     @Column(nullable = false)
     private boolean open = true;
+    @Column(name = "allow_late_submissions", nullable = false)
+    private boolean allowLateSubmissions;
     @Column(name = "created_by", length = 50)
     private String createdBy;
     @Column(name = "created_at", nullable = false)
@@ -34,6 +36,8 @@ public class TeamProject {
     public void setDescription(String value) { description = value; }
     public boolean isOpen() { return open; }
     public void setOpen(boolean value) { open = value; }
+    public boolean isAllowLateSubmissions() { return allowLateSubmissions; }
+    public void setAllowLateSubmissions(boolean value) { allowLateSubmissions = value; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String value) { createdBy = value; }
     public LocalDateTime getCreatedAt() { return createdAt; }

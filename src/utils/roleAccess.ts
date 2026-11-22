@@ -93,6 +93,7 @@ function hasAny(permissions: PermissionSet, keys: PermissionKey[]) {
 // 운영 탭 ↔ 권한. 여기에 없는 탭은 회장 전용(회원/모집/명부/후원자/폰트/차단/로그 등).
 export const TAB_PERMISSIONS: Record<string, PermissionKey> = {
   activities: PERMISSIONS.activityWrite,
+  'external-opportunities': PERMISSIONS.activityWrite,
   projects: PERMISSIONS.projectWrite,
   'site-settings': PERMISSIONS.siteSettingsEdit,
   files: PERMISSIONS.archiveManage,

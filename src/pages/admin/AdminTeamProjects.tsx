@@ -6,16 +6,17 @@ import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { ListSearch } from '../../components/common/ListTools'
 import { StatusChip, SubmissionView } from '../../features/teamProjects/SubmissionParts'
 import {
-  formatWhen, isPeriod, milestoneWhen, STATUS_LABEL, toInputValue, toWriteValue,
+  formatWhen, isPeriod, milestoneWhen, submissionStatusLabel, toInputValue, toWriteValue,
 } from '../../features/teamProjects/teamProjects'
 import { matchesQuery } from '../../utils/listTools'
 import { listMembers } from '../../services/adminApi'
 import { queryKeys } from '../../services/queryKeys'
 import {
-  addTeamMember, createMilestone, createTeam, createTeamProject, deleteMilestone, deleteTeam, deleteTeamProject,
+  addTeamMember, classifyTeamSubmission, createMilestone, createTeam, createTeamProject, deleteMilestone, deleteTeam, deleteTeamProject,
   getTeamProject, getTeamProjectBoard, listTeamProjects, listTeamSubmissions, removeTeamMember, reorderMilestones,
   updateMilestone, updateTeam, updateTeamProject,
-  type BoardTeam, type Milestone, type MilestoneWrite, type Team, type TeamProjectDetail, type TeamWrite,
+  type BoardTeam, type Milestone, type MilestoneWrite, type Submission, type SubmissionTiming,
+  type Team, type TeamProjectDetail, type TeamProjectWrite, type TeamWrite,
 } from '../../services/teamProjectApi'
 import '../../styles/team-projects.css'
 
@@ -26,17 +27,20 @@ const primaryClass = 'apple-action-primary min-h-11 px-5 text-sm disabled:opacit
 /** Runs a write. A failure goes to `onError` (inside the form that asked) or, without one, to the top of the panel. */
 type Act = (work: () => Promise<unknown>, success: string, onError?: (message: string) => void) => Promise<boolean>
 
-function ProgramForm({ program, busy, save }: { program?: TeamProjectDetail; busy: boolean; save: (draft: { title: string; description: string; open: boolean }, onError: (message: string) => void) => Promise<boolean> }) {
+function ProgramForm({ program, busy, save }: { program?: TeamProjectDetail; busy: boolean; save: (draft: TeamProjectWrite, onError: (message: string) => void) => Promise<boolean> }) {
   const [formError, setFormError] = useState('')
   const [title, setTitle] = useState(program?.title ?? '')
   const [description, setDescription] = useState(program?.description ?? '')
   const [open, setOpen] = useState(program?.open ?? true)
-  const submit = async (event: FormEvent) => { event.preventDefault(); setFormError(''); await save({ title: title.trim(), description: description.trim(), open }, setFormError) }
+  const [allowLateSubmissions, setAllowLateSubmissions] = useState(program?.allowLateSubmissions ?? false)
+  const submit = async (event: FormEvent) => { event.preventDefault(); setFormError(''); await save({ title: title.trim(), description: description.trim(), open, allowLateSubmissions }, setFormError) }
   return <form onSubmit={submit} aria-label={program ? '프로그램 정보' : '새 팀프 만들기'} className="tp-card space-y-4">
     <h3 className="text-lg font-bold">{program ? '프로그램 정보' : '새 팀프 만들기'}</h3>
     <label className="block text-sm font-semibold">제목<input required maxLength={120} className="tp-input mt-2" value={title} onChange={event => setTitle(event.target.value)} placeholder="2026-2 팀 프로젝트" /></label>
     <label className="block text-sm font-semibold">설명<textarea maxLength={5000} rows={3} className="tp-input mt-2" value={description} onChange={event => setDescription(event.target.value)} /></label>
-    <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={open} onChange={event => setOpen(event.target.checked)} />진행 중 (끄면 마감되어 제출을 받지 않습니다)</label>
+    <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={open} onChange={event => setOpen(event.target.checked)} />진행 중</label>
+    <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={allowLateSubmissions} onChange={event => setAllowLateSubmissions(event.target.checked)} />프로그램 종료 후 제출 허용</label>
+    <p className="text-sm text-[var(--app-muted)]">종료 후에는 배정된 팀에서 제출을 받는 일정에 올릴 수 있습니다. 종료 후 처음 낸 결과물은 자동으로 늦은 제출이 됩니다.</p>
     {formError && <p role="alert" className="tp-field-error">{formError}</p>}
     <button disabled={busy || !title.trim()} className={primaryClass}>{program ? '저장' : '만들기'}</button>
   </form>
@@ -201,18 +205,47 @@ function TeamEditor({ program, team, busy, act }: { program: TeamProjectDetail; 
   </article>
 }
 
-function BoardSubmission({ programId, team, milestone }: { programId: number; team: BoardTeam; milestone: Milestone }) {
+function SubmissionTimingForm({ programId, submission, act, busy }: { programId: number; submission: Submission; act: Act; busy: boolean }) {
+  const current = submission.timing ?? 'AUTOMATIC'
+  const [timing, setTiming] = useState<SubmissionTiming>(current)
+  const [error, setError] = useState('')
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    setError('')
+    await act(() => classifyTeamSubmission(programId, submission.teamId, submission.milestoneId, timing),
+      '제출 분류를 저장했습니다.', setError)
+  }
+  return <form onSubmit={submit} className="space-y-2 border-t border-[var(--app-hairline)] pt-3">
+    <div className="flex flex-wrap items-end gap-2">
+      <label className="block text-sm font-semibold">제출 분류
+        <select className="tp-input mt-2" value={timing} disabled={busy} onChange={event => setTiming(event.target.value as SubmissionTiming)}>
+          <option value="AUTOMATIC">자동 (제출 시각과 프로그램 상태)</option>
+          <option value="ON_TIME">정시 제출</option>
+          <option value="LATE">늦은 제출</option>
+        </select>
+      </label>
+      <button className={actionClass} disabled={busy || timing === current}>분류 저장</button>
+    </div>
+    <p className="text-sm text-[var(--app-muted)]">실제 제출 시각은 유지됩니다.</p>
+    {error && <p role="alert" className="tp-field-error">{error}</p>}
+  </form>
+}
+
+function BoardSubmission({ programId, team, milestone, act, busy }: { programId: number; team: BoardTeam; milestone: Milestone; act: Act; busy: boolean }) {
   const submissions = useQuery({ queryKey: ['team-projects', 'submissions', programId, team.id], queryFn: () => listTeamSubmissions(programId, team.id) })
   const submission = submissions.data?.find(item => item.milestoneId === milestone.id)
   return <article className="tp-card space-y-3" aria-label={`${team.name} ${milestone.title} 제출 내용`} aria-live="polite">
     <h4 className="font-bold">{team.name} · {milestone.title}</h4>
     {submissions.isPending && <p role="status" className="text-sm">불러오는 중…</p>}
     {submissions.isError && <p role="alert" className="text-sm text-[var(--app-danger)]">제출 내용을 불러오지 못했습니다.</p>}
-    {submissions.data && (submission ? <SubmissionView submission={submission} /> : <p className="text-sm text-[var(--app-muted)]">아직 제출하지 않았습니다.</p>)}
+    {submissions.data && (submission ? <>
+      <SubmissionView submission={submission} />
+      <SubmissionTimingForm key={`${submission.id}:${submission.timing}`} programId={programId} submission={submission} act={act} busy={busy} />
+    </> : <p className="text-sm text-[var(--app-muted)]">아직 제출하지 않았습니다.</p>)}
   </article>
 }
 
-function Board({ programId }: { programId: number }) {
+function Board({ programId, act, busy }: { programId: number; act: Act; busy: boolean }) {
   const board = useQuery({ queryKey: ['team-projects', 'board', programId], queryFn: () => getTeamProjectBoard(programId) })
   const [selected, setSelected] = useState<{ teamId: number; milestoneId: number } | null>(null)
   const data = board.data
@@ -233,10 +266,11 @@ function Board({ programId }: { programId: number }) {
           {data.milestones.map(column => {
             const cell = row.cells.find(item => item.milestoneId === column.id)
             const pressed = selected?.teamId === row.id && selected.milestoneId === column.id
-            return <td key={column.id}><button type="button" className="tp-cell" aria-pressed={pressed} aria-label={`${row.name} ${column.title} ${STATUS_LABEL[cell?.status ?? 'MISSING']}${cell?.editedAfterDue ? ' 마감 후 수정' : ''}`} onClick={() => setSelected(pressed ? null : { teamId: row.id, milestoneId: column.id })}><StatusChip status={cell?.status ?? 'MISSING'} />{cell?.editedAfterDue && <small className="tp-edited">마감 후 수정</small>}</button></td>
+            const status = cell?.status ?? 'MISSING'
+            return <td key={column.id}><button type="button" className="tp-cell" aria-pressed={pressed} aria-label={`${row.name} ${column.title} ${submissionStatusLabel(status, cell?.timing)}${cell?.editedAfterDue ? ' 마감 후 수정' : ''}`} onClick={() => setSelected(pressed ? null : { teamId: row.id, milestoneId: column.id })}><StatusChip status={status} timing={cell?.timing} />{cell?.editedAfterDue && <small className="tp-edited">마감 후 수정</small>}</button></td>
           })}
         </tr>)}</tbody></table></div>)}
-    {team && milestone && <BoardSubmission key={`${team.id}:${milestone.id}`} programId={programId} team={team} milestone={milestone} />}
+    {team && milestone && <BoardSubmission key={`${team.id}:${milestone.id}`} programId={programId} team={team} milestone={milestone} act={act} busy={busy} />}
   </section>
 }
 
@@ -294,7 +328,7 @@ export default function AdminTeamProjects() {
         {program.teams.map(team => <TeamEditor key={team.id} program={program} team={team} busy={pending} act={act} />)}
         <TeamEditor program={program} busy={pending} act={act} />
       </section>
-      <Board programId={program.id} />
+      <Board programId={program.id} act={act} busy={pending} />
       <div className="border-t border-[var(--app-hairline)] pt-4"><button type="button" disabled={pending} className={`${actionClass} text-[var(--app-danger)]`} onClick={removeProgram}>이 팀프 삭제</button></div>
     </div>}
   </section>

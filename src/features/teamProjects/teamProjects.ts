@@ -1,4 +1,4 @@
-import type { BoardStatus, Milestone, Submission } from '../../services/teamProjectApi'
+import type { BoardStatus, Milestone, Submission, SubmissionTiming } from '../../services/teamProjectApi'
 
 // Every date the API carries is a Korea-time wall-clock string. All maths here runs on "wall-clock
 // milliseconds" (Date.UTC of those fields), and `now` is shifted into the same frame, so nothing
@@ -97,6 +97,10 @@ export function milestoneDday(milestone: Dated, now: Date): string | null {
 }
 
 export const STATUS_LABEL: Record<BoardStatus | 'PENDING', string> = { SUBMITTED: '제출', LATE: '늦은 제출', MISSING: '미제출', PENDING: '제출 전' }
+
+export function submissionStatusLabel(status: keyof typeof STATUS_LABEL, timing?: SubmissionTiming | null) {
+  return status === 'SUBMITTED' && timing === 'ON_TIME' ? '정시 제출' : STATUS_LABEL[status]
+}
 
 /** No submission yet reads "제출 전" until the due time has passed, then "미제출". */
 export function submissionStatus(submission: Submission | undefined, milestone: Dated, now: Date): BoardStatus | 'PENDING' {

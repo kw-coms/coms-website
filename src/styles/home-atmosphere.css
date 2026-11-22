@@ -105,154 +105,10 @@
 	}
 }
 
-/* A layered circuit board built around the club's existing mark. */
+/* Only alternate themes have a second hero pane. */
 .scene-opening__art {
-	--board-ink: #0b1526;
-	--board-light: color-mix(in srgb, var(--app-accent) 56%, #8adfff);
-	--board-edge: color-mix(in srgb, var(--board-light) 64%, #142d51);
 	position: relative;
-	aspect-ratio: 1.17;
 	overflow: hidden;
-	border: 1px solid color-mix(in srgb, var(--board-light) 43%, #142136);
-	border-radius: clamp(1rem, 2.4vw, 2rem);
-	background:
-		radial-gradient(ellipse at 65% 18%, color-mix(in srgb, var(--board-light) 23%, transparent), transparent 68%),
-		linear-gradient(142deg, #111e34, var(--board-ink) 56%, #142343);
-	box-shadow:
-		0 1.5rem 3rem color-mix(in srgb, #071125 30%, transparent),
-		0 0 0 0.5rem color-mix(in srgb, var(--board-light) 9%, transparent);
-}
-
-.scene-opening__art::before {
-	content: '';
-	position: absolute;
-	inset: 0;
-	background: radial-gradient(circle, color-mix(in srgb, var(--board-light) 40%, transparent) 1px, transparent 1.6px) 50% 50% / 17px 17px;
-	mask-image: radial-gradient(ellipse at 54% 46%, #000 18%, transparent 85%);
-}
-
-.scene-opening__art::after {
-	content: '';
-	position: absolute;
-	inset: 5%;
-	border: 1px solid color-mix(in srgb, var(--board-light) 22%, transparent);
-	border-radius: 0.6rem;
-	pointer-events: none;
-}
-
-.scene-opening__traces {
-	position: absolute;
-	inset: 0;
-	color: var(--board-edge);
-}
-
-.scene-opening__traces i {
-	position: absolute;
-	width: 29%;
-	height: 17%;
-	border: solid currentColor;
-	border-width: 1px 1px 0 0;
-	border-radius: 0 1rem 0 0;
-}
-
-.scene-opening__traces i::before {
-	content: '';
-	position: absolute;
-	top: -3px;
-	left: -2px;
-	width: 6px;
-	aspect-ratio: 1;
-	border-radius: 50%;
-	background: var(--board-light);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--board-light) 14%, transparent), 0 0 11px var(--board-light);
-}
-
-.scene-opening__traces i:nth-child(1) {
-	top: 23%;
-	left: 13%;
-}
-
-.scene-opening__traces i:nth-child(2) {
-	top: 33%;
-	left: 18%;
-	width: 22%;
-	opacity: 0.55;
-}
-
-.scene-opening__traces i:nth-child(3) {
-	right: 13%;
-	bottom: 23%;
-	transform: rotate(180deg);
-}
-
-.scene-opening__traces i:nth-child(4) {
-	right: 18%;
-	bottom: 33%;
-	width: 22%;
-	opacity: 0.55;
-	transform: rotate(180deg);
-}
-
-.scene-processor {
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	width: 67%;
-	aspect-ratio: 1;
-	perspective: 900px;
-	transform: translate3d(calc(-50% + var(--px, 0) * -12px), calc(-50% + var(--py, 0) * -8px + var(--hero-out, 0) * 12px), 0);
-	transition: transform 550ms var(--cine-ease);
-}
-
-.scene-processor__plate {
-	position: absolute;
-	top: var(--plate-top);
-	left: 50%;
-	width: var(--plate-width);
-	aspect-ratio: 1;
-	border: 2px solid var(--plate-edge);
-	border-radius: 12%;
-	background: var(--plate-color);
-	box-shadow: -0.4rem 0.4rem 0 var(--plate-side), -0.65rem 0.65rem 0.15rem var(--plate-side);
-	transform: translate(-50%, -50%) rotateX(57deg) rotateZ(-45deg);
-}
-
-.scene-processor__plate--base {
-	--plate-top: 65%;
-	--plate-width: 88%;
-	--plate-edge: var(--board-edge);
-	--plate-side: #0a1430;
-	--plate-color:
-		repeating-linear-gradient(90deg, transparent 0 12%, #102841 12% 13%),
-		repeating-linear-gradient(0deg, transparent 0 12%, #102841 12% 13%),
-		linear-gradient(45deg, #10213c, #214b75);
-}
-
-.scene-processor__plate--middle {
-	--plate-top: 57%;
-	--plate-width: 74%;
-	--plate-edge: color-mix(in srgb, var(--board-light) 76%, #fff);
-	--plate-side: color-mix(in srgb, var(--board-light) 36%, #0d1c43);
-	--plate-color: linear-gradient(135deg, #102241, color-mix(in srgb, var(--board-light) 34%, #1d2655));
-}
-
-.scene-processor__plate--top {
-	--plate-top: 48%;
-	--plate-width: 57%;
-	--plate-edge: color-mix(in srgb, var(--board-light) 50%, #fff);
-	--plate-side: color-mix(in srgb, var(--board-light) 52%, #0b173d);
-	--plate-color: linear-gradient(135deg, #193362, color-mix(in srgb, var(--board-light) 60%, #15254a));
-}
-
-.scene-processor__mark {
-	position: absolute;
-	top: 38%;
-	left: 50%;
-	width: 33%;
-	aspect-ratio: 333 / 368;
-	background: linear-gradient(125deg, #fff 18%, color-mix(in srgb, var(--board-light) 30%, #fff) 50%, var(--board-light));
-	mask: url('../assets/logos/COMs_logo_vec.svg') center / contain no-repeat;
-	transform: translate(-50%, -50%);
 }
 
 @property --sheen {
@@ -302,41 +158,6 @@
 	85%,
 	100% {
 		--sheen: 140;
-	}
-}
-
-/* The typed line under the opening copy. */
-.scene-typed {
-	min-height: 3.1em;
-	margin-top: 1rem;
-}
-
-.scene-typed__line {
-	margin: 0;
-	color: var(--app-muted);
-	font: 500 0.8125rem/1.55 var(--cine-mono);
-	letter-spacing: 0.04em;
-	word-break: keep-all;
-}
-
-.scene-typed__line b {
-	color: var(--app-text);
-	font-weight: 600;
-}
-
-.scene-typed__caret {
-	display: inline-block;
-	width: 0.55em;
-	height: 1.05em;
-	margin-left: 0.2em;
-	vertical-align: -0.18em;
-	background: var(--app-accent);
-	animation: caret-blink 1.05s steps(1) infinite;
-}
-
-@keyframes caret-blink {
-	50% {
-		opacity: 0;
 	}
 }
 
@@ -679,15 +500,6 @@
 
 /* ---- Small screens ----------------------------------------------------------------------------------------- */
 @media (max-width: 767px) {
-	.scene-opening__art {
-		aspect-ratio: 1.7;
-	}
-	.scene-processor {
-		width: 48%;
-	}
-	.scene-typed {
-		min-height: 2.55em;
-	}
 	.scene-bg__numeral {
 		font-size: 12rem;
 	}
@@ -722,10 +534,6 @@
 	}
 	.cine-ready .scene-wordmark.is-revealed {
 		animation: none;
-	}
-	.scene-processor {
-		transform: translate(-50%, -50%);
-		transition: none;
 	}
 	.scene-wordmark,
 	.scene-frame__media {
@@ -767,10 +575,6 @@
 	animation: none;
 }
 
-:root[data-perf='lite'] .scene-processor {
-	transform: translate(-50%, -50%);
-	transition: none;
-}
 
 :root[data-perf='lite'] .scene-wordmark,
 :root[data-perf='lite'] .scene-frame__media {

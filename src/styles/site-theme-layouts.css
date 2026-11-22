@@ -229,17 +229,19 @@
 /* Retro: desktop windows with distinct title bars, inset frames and beveled controls. */
 :root[data-appearance-theme='retro'] {
 	--site-theme-card-areas: 'head open' 'desc desc' 'images images' 'foot foot' 'more more' 'engagement engagement';
-	--retro-highlight: color-mix(in srgb, white 26%, var(--app-surface));
-	--retro-shadow: color-mix(in srgb, black 26%, var(--app-surface));
-	--retro-titlebar: linear-gradient(90deg, color-mix(in srgb, var(--preset-ink) 18%, var(--app-surface)), var(--app-surface-soft));
-	--retro-bevel: inset 1px 1px var(--retro-highlight), inset -1px -1px var(--retro-shadow);
+	--retro-highlight: color-mix(in srgb, white 55%, var(--app-surface));
+	--retro-shadow: color-mix(in srgb, black 48%, var(--app-surface));
+	--retro-titlebar: linear-gradient(95deg, #18285d, #235eab);
+	--retro-bevel: inset 1px 1px var(--retro-highlight), inset -1px -1px var(--retro-shadow), inset 2px 2px var(--app-surface);
 
 	& .apple-global-nav .apple-topbar {
+		background: var(--app-surface) !important;
+		border-bottom: 2px solid var(--retro-shadow) !important;
 		box-shadow: var(--retro-bevel);
 	}
 
 	& :is(.nav-group-btn, .nav-search, .nav-m-close, .nav-m-login, .apps-directory .apps-chip, .apps-directory .app-card-open) {
-		border-radius: 0.25rem;
+		border-radius: 0;
 		box-shadow: var(--retro-bevel);
 	}
 
@@ -249,12 +251,13 @@
 
 	& :is(.nav-col, .nav-m-section, .apple-board-shell, .apps-directory .site-head, .apps-directory-toolbar, .apps-directory .app-card-showcase) {
 		border: 1px solid var(--site-theme-rule);
-		border-radius: 0.35rem;
+		border-radius: 0;
 		box-shadow: var(--retro-bevel);
 	}
 
-	& :is(.nav-m-top, .apple-board-hero, .apps-directory .site-head) {
-		background: var(--retro-titlebar);
+	& :is(.nav-m-top, .apple-board-hero) {
+		background: linear-gradient(90deg, var(--app-surface-elevated), var(--app-surface-soft));
+		border-top: 0.27rem solid var(--preset-ink);
 		border-bottom-color: var(--site-theme-rule);
 	}
 
@@ -262,12 +265,24 @@
 		margin: 0.4rem 0.65rem 0.75rem;
 	}
 
-	& .apps-directory .site-head {
-		padding: clamp(1rem, 3vw, 1.85rem);
+	& .apps-directory {
+		background: linear-gradient(180deg, var(--retro-desktop) 0 19rem, var(--app-bg) 29rem);
 	}
 
-	& .apps-directory .site-head h1 {
-		font-family: Georgia, var(--apple-font-family);
+	& .apps-directory .site-page-inner {
+		padding: clamp(0.7rem, 2vw, 1.35rem);
+		background: var(--app-surface);
+		box-shadow: var(--retro-bevel);
+	}
+
+	& .apps-directory .site-head {
+		padding: clamp(1rem, 3vw, 1.85rem);
+		background: var(--retro-titlebar);
+		color: #fff;
+	}
+
+	& .apps-directory .site-head :is(h1, .site-head-lead) {
+		color: #fff;
 	}
 
 	& .apps-directory-toolbar {
@@ -275,8 +290,27 @@
 	}
 
 	& .apps-directory .apps-group-head {
-		padding-block-end: 0.45rem;
-		border-block-end: 3px double var(--site-theme-rule);
+		padding: 0.4rem 0.7rem;
+		background: #ffec8b;
+		color: #1d2632;
+		border-block-end: 1px solid var(--retro-shadow);
+	}
+
+	& .apps-directory .apps-group-head :is(h2, span) {
+		color: inherit;
+	}
+
+	& .apps-directory .apps-grid {
+		gap: 0.65rem;
+		padding: 0.65rem;
+		background: var(--app-surface-elevated);
+		box-shadow: inset 2px 2px var(--retro-shadow), inset -2px -2px var(--retro-highlight);
+	}
+
+	@media (min-width: 950px) {
+		& .apps-directory .apps-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
 	}
 
 	& .apps-directory .app-card-showcase {
@@ -301,6 +335,10 @@
 
 	& .apps-directory .app-card-head {
 		padding: 0.55rem 0.4rem 0.55rem 0.75rem;
+	}
+
+	& .apps-directory .app-card-head :is(.app-card-title, .app-card-title a, .app-card-eyebrow) {
+		color: #fff;
 	}
 
 	& .apps-directory .app-card-open {

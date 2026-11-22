@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { mockOptionalApis } from './visualSupport.js'
 
 // Runs in the `lite-visual` project (storageState pins the lite look).
-test('the lite opening keeps its title, actions, and illustration in the first desktop viewport', async ({ page }) => {
+test('the lite opening keeps its title, actions, and activity cues in the first desktop viewport', async ({ page }) => {
   await mockOptionalApis(page)
   await page.addInitScript(() => window.sessionStorage.setItem('coms.intro.played:v1', '1'))
   await page.goto('/')
@@ -11,7 +11,8 @@ test('the lite opening keeps its title, actions, and illustration in the first d
   await expect(opening.getByRole('heading', { level: 1 })).toBeInViewport({ ratio: 1 })
   await expect(opening.getByRole('button', { name: '동아리 소개' })).toBeInViewport({ ratio: 1 })
   await expect(opening.getByRole('button', { name: '지원하기' })).toBeInViewport({ ratio: 1 })
-  await expect(opening.locator('.scene-opening__art')).toBeInViewport({ ratio: 1 })
+  await expect(opening.getByRole('list', { name: '주요 활동' })).toBeInViewport({ ratio: 1 })
+  await expect(opening.locator('.scene-opening__art')).toBeHidden()
   await expect(opening.locator('.scene-opening__floor')).toBeHidden()
 })
 

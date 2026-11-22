@@ -13,7 +13,7 @@ export type AccentStrength = 'standard' | 'vivid'
 export const APPEARANCE_THEMES = [
   { value: 'standard', label: '기본', description: 'COM’s 기본 화면', lightAccent: DEFAULT_ACCENT, darkAccent: DEFAULT_ACCENT },
   { value: 'terminal', label: '터미널', description: '명령어 창과 디렉터리 목록', lightAccent: '#17653e', darkAccent: '#42e88e' },
-  { value: 'retro', label: '레트로', description: '클래식 데스크톱 창과 바로가기', lightAccent: '#9b4321', darkAccent: '#f2b568' },
+  { value: 'retro', label: '레트로', description: '청록색 데스크톱과 파일 탐색기', lightAccent: '#26539b', darkAccent: '#91c6ff' },
   { value: 'blueprint', label: '청사진', description: '제도 격자와 도면형 패널', lightAccent: '#245ebb', darkAccent: '#70b9fa' },
 ] as const
 

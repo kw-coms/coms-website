@@ -157,6 +157,7 @@ test('the admin tab sits in the content group and lists the terms', async ({ pag
   await expect(page.getByRole('article', { name: '71대 2026년' })).toContainText('가나다')
   await expect(page.getByRole('article', { name: '71대 2026년' })).toContainText('명부 미연결')
   await expect(page.getByRole('link', { name: '회원용 페이지' })).toHaveAttribute('href', '/officers')
+  await expect(page.getByRole('link', { name: '회원용 페이지' })).toHaveCSS('align-items', 'center')
 })
 
 test('bulk paste previews create / update / unchanged / invalid lines, then applies only the valid ones', async ({ page }) => {

@@ -66,9 +66,10 @@ test.describe('a visitor on the home page', () => {
   test('has a scene rail that scrolls to a scene', async ({ page }) => {
     const rail = page.getByRole('navigation', { name: '장면 이동' })
     await expect(rail.getByRole('button')).toHaveCount(6)
-    await rail.getByRole('button', { name: '04 프로젝트' }).click()
+    await expect(rail.getByRole('button', { name: '프로젝트' })).toBeVisible()
+    await rail.getByRole('button', { name: '프로젝트' }).click()
     await expect(page.locator('#projects')).toBeInViewport()
-    await expect(rail.getByRole('button', { name: '04 프로젝트' })).toHaveAttribute('aria-current', 'true')
+    await expect(rail.getByRole('button', { name: '프로젝트' })).toHaveAttribute('aria-current', 'true')
   })
 
   test('has no horizontal overflow at 1440 and 390', async ({ page }) => {
@@ -91,19 +92,13 @@ test.describe('a visitor on the home page', () => {
     expect(await page.locator('.scene-about__pin .cine-w').count()).toBe(8)
   })
 
-  test('types the three highlights for the eye and lists them once for a screen reader', async ({ page }) => {
+  test('shows readable Korean activity cues without a processor pane in the default hero', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/')
-    // The typing is hidden from assistive technology...
-    await expect(page.locator('.scene-typed__line')).toHaveAttribute('aria-hidden', 'true')
-    // ...and the three items are read once, as a plain list.
-    const items = await page.locator('.scene-typed ul.sr-only li').allTextContents()
-    expect(items).toHaveLength(3)
-    expect(items[0]).toContain('Weekly Seminar')
-    expect(items[1]).toContain('Team Project')
-    expect(items[2]).toContain('Campus Network')
-    // It really types: a moment later some of the first item is on screen.
-    await expect.poll(async () => (await page.locator('.scene-typed__line').textContent()).length).toBeGreaterThan(3)
+    const activities = page.getByRole('list', { name: '주요 활동' })
+    await expect(activities).toBeVisible()
+    await expect(activities.getByRole('listitem')).toHaveText(['정기 세미나', '팀 프로젝트', '부원 교류'])
+    await expect(page.locator('.scene-opening__art')).toBeHidden()
   })
 
   test('loops run only while their scene is on screen', async ({ page }) => {
@@ -285,12 +280,12 @@ for (const [label, setup] of [
       expect(await page.locator('.scene-about__pin').evaluate((el) => getComputedStyle(el).position)).toBe('static')
       // Straight from load, without scrolling an inch: nothing is left transparent, clipped or lowered.
       expect(await hiddenTextElements(page)).toEqual([])
-      // The opening keeps its static illustration and suppresses the moving backdrop.
-      await expect(page.locator('.scene-opening__art')).toBeVisible()
+      // The default opening has no illustration and suppresses the moving backdrop.
+      await expect(page.locator('.scene-opening__art')).toBeHidden()
       await expect(page.locator('.cine-grain')).toBeHidden()
       await expect(page.locator('.scene-opening__floor')).toBeHidden()
       await expect(page.locator('.scene-opening__ticker')).toBeHidden()
-      await expect(page.locator('.scene-typed__line')).toContainText('Weekly Seminar')
+      await expect(page.getByRole('list', { name: '주요 활동' })).toContainText('정기 세미나')
       // Numbers are finished figures, not mid-count.
       await expect(page.locator('#activities .scene-stats dt').first()).toContainText('01')
       expect(await overflow(page)).toBeLessThanOrEqual(0)

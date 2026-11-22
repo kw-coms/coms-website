@@ -97,10 +97,10 @@ export default function HomeView() {
     ? ['opening', 'members', 'about', 'activities', 'projects', 'recruit']
     : ['opening', 'about', 'activities', 'projects', 'members', 'recruit']
   const names: Record<SceneKey, string> = {
-    opening: '시작',
-    members: member ? '오늘' : '멤버',
-    about: '소개',
-    activities: '활동',
+    opening: '홈',
+    members: member ? '오늘의 COM’s' : '멤버 혜택',
+    about: '동아리 소개',
+    activities: '동아리 활동',
     projects: '프로젝트',
     recruit: '모집',
   }

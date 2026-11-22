@@ -116,7 +116,7 @@ public class TeamProjectService {
         return programs.findAllByOrderByIdDesc().stream().map(program -> {
             TeamProjectTeam team = mine.get(program.getId());
             return new TeamProjectSummary(program.getId(), program.getTitle(), program.getDescription(), program.isOpen(),
-                    team == null ? null : team.getId(), team == null ? null : team.getName());
+                    program.isAllowLateSubmissions(), team == null ? null : team.getId(), team == null ? null : team.getName());
         }).toList();
     }
 
@@ -139,6 +139,7 @@ public class TeamProjectService {
                             person == null ? null : person.getGeneration());
                 }).toList())).toList();
         return new TeamProjectDetail(program.getId(), program.getTitle(), program.getDescription(), program.isOpen(),
+                program.isAllowLateSubmissions(),
                 milestones.findByProgramIdOrderByPositionAscIdAsc(programId).stream().map(TeamProjectService::view).toList(),
                 teamViews, myTeamId, maxFileBytes, maxRequestBytes);
     }
@@ -149,22 +150,31 @@ public class TeamProjectService {
         program.setTitle(required(write == null ? null : write.title(), 120, "제목"));
         program.setDescription(optional(write.description(), 5000, "설명"));
         program.setOpen(write.open() == null || write.open());
+        program.setAllowLateSubmissions(Boolean.TRUE.equals(write.allowLateSubmissions()));
         program.setCreatedBy(actor);
         program.setCreatedAt(now());
         program.setUpdatedAt(now());
         programs.saveAndFlush(program);
-        return new TeamProjectSummary(program.getId(), program.getTitle(), program.getDescription(), program.isOpen(), null, null);
+        return new TeamProjectSummary(program.getId(), program.getTitle(), program.getDescription(), program.isOpen(),
+                program.isAllowLateSubmissions(), null, null);
     }
 
     @Transactional
     public TeamProjectSummary update(Long programId, TeamProjectWrite write) {
+        lockProgram(programId);
         TeamProject program = requireProgram(programId);
         program.setTitle(required(write == null ? null : write.title(), 120, "제목"));
+        if ((write.open() != null && write.open() != program.isOpen())
+                || (write.allowLateSubmissions() != null && write.allowLateSubmissions() != program.isAllowLateSubmissions())) {
+            lockAllTeams(programId);
+        }
         program.setDescription(optional(write.description(), 5000, "설명"));
         if (write.open() != null) program.setOpen(write.open());
+        if (write.allowLateSubmissions() != null) program.setAllowLateSubmissions(write.allowLateSubmissions());
         program.setUpdatedAt(now());
         programs.saveAndFlush(program);
-        return new TeamProjectSummary(program.getId(), program.getTitle(), program.getDescription(), program.isOpen(), null, null);
+        return new TeamProjectSummary(program.getId(), program.getTitle(), program.getDescription(), program.isOpen(),
+                program.isAllowLateSubmissions(), null, null);
     }
 
     @Transactional
@@ -329,9 +339,10 @@ public class TeamProjectService {
                 new TeamProjectBoardTeam(team.getId(), team.getName(), team.getTopic(), sizes.getOrDefault(team.getId(), 0L).intValue(),
                         columns.stream().map(column -> {
                             TeamProjectSubmission found = byCell.get(team.getId() + ":" + column.getId());
-                            if (found == null) return new TeamProjectBoardCell(column.getId(), "MISSING", null, null, false);
+                            if (found == null) return new TeamProjectBoardCell(column.getId(), "MISSING", null, null, false, null);
                             return new TeamProjectBoardCell(column.getId(), isLate(found, column) ? "LATE" : "SUBMITTED",
-                                    found.getSubmittedAt(), found.getUpdatedAt(), isAfterDue(found.getUpdatedAt(), column));
+                                    found.getSubmittedAt(), found.getUpdatedAt(), isAfterDue(found.getUpdatedAt(), column),
+                                    found.getTiming());
                         }).toList())).toList();
         return new TeamProjectBoard(columns.stream().map(TeamProjectService::view).toList(), rows);
     }
@@ -385,21 +396,23 @@ public class TeamProjectService {
         }
     }
 
-    /** 잠금 전 검사와 잠근 뒤 재검사가 같은 규칙을 쓰도록 한곳에 둔다. 팀원만, 제출을 받는 일정만, 열린 프로그램만. */
-    private TeamProjectMilestone requireSubmitter(Long programId, Long teamId, Long milestoneId, String viewer) {
+    private record SubmissionWindow(TeamProjectMilestone milestone, boolean afterClose) {}
+
+    /** 잠금 전과 잠근 뒤 모두 같은 회원·일정·접수 정책을 재확인한다. */
+    private SubmissionWindow requireSubmitter(Long programId, Long teamId, Long milestoneId, String viewer) {
         TeamProject program = requireProgram(programId);
         requireTeam(programId, teamId);
         TeamProjectMilestone milestone = requireMilestone(programId, milestoneId);
         if (!teamMembers.existsByTeamIdAndStudentId(teamId, viewer)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         if (!milestone.isSubmittable()) throw conflict("이 일정은 제출을 받지 않습니다.");
-        if (!program.isOpen()) throw conflict("마감된 프로그램에는 제출할 수 없습니다.");
-        return milestone;
+        if (!program.isOpen() && !program.isAllowLateSubmissions()) throw conflict("마감된 프로그램에는 제출할 수 없습니다.");
+        return new SubmissionWindow(milestone, !program.isOpen());
     }
 
     private TeamProjectSubmissionView attach(Long programId, Long teamId, Long milestoneId, Member actor, String text,
                                              List<String> urls, List<StoredUpload> incoming, List<Long> removeFileIds) {
         lockTeam(programId, teamId);   // 같은 팀의 제출·삭제·팀원 변경만 한 줄로 세운다
-        TeamProjectMilestone milestone = requireSubmitter(programId, teamId, milestoneId, actor.getStudentId());
+        SubmissionWindow window = requireSubmitter(programId, teamId, milestoneId, actor.getStudentId());
 
         TeamProjectSubmission submission = submissions.findByTeamIdAndMilestoneId(teamId, milestoneId).orElse(null);
         List<TeamProjectSubmissionFile> current = submission == null ? List.of()
@@ -420,6 +433,7 @@ public class TeamProjectService {
             submission.setSubmittedBy(actor.getStudentId());
             submission.setSubmittedByName(actor.getName());
             submission.setSubmittedAt(now);
+            submission.setSubmittedAfterClose(window.afterClose());
         }
         submission.setBody(text);
         submission.setUpdatedBy(actor.getStudentId());
@@ -453,6 +467,19 @@ public class TeamProjectService {
             throw conflict("다른 팀원이 방금 제출했습니다. 새로고침한 뒤 다시 시도해 주세요.");
         }
         deleteAfterCommit(removed.stream().map(TeamProjectSubmissionFile::getStoredName).toList());
+        return views(List.of(submission), Map.of(milestoneId, window.milestone()), programId).get(0);
+    }
+
+    @Transactional
+    public TeamProjectSubmissionView classifySubmission(Long programId, Long teamId, Long milestoneId,
+                                                        TeamProjectSubmission.Timing timing, String viewer) {
+        if (!isAdmin(viewer)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        if (timing == null) throw bad("제출 분류를 선택해 주세요.");
+        lockTeam(programId, teamId);
+        TeamProjectMilestone milestone = requireMilestone(programId, milestoneId);
+        TeamProjectSubmission submission = submissions.findByTeamIdAndMilestoneId(teamId, milestoneId)
+                .orElseThrow(() -> notFound("제출을 찾을 수 없습니다."));
+        submission.setTiming(timing);
         return views(List.of(submission), Map.of(milestoneId, milestone), programId).get(0);
     }
 
@@ -513,7 +540,7 @@ public class TeamProjectService {
                             "/api/team-projects/" + programId + "/teams/" + row.getTeamId() + "/milestones/" + row.getMilestoneId()
                                     + "/submission/files/" + file.getId())).toList(),
                     row.getSubmittedByName(), row.getSubmittedAt(), row.getUpdatedByName(), row.getUpdatedAt(),
-                    isAfterDue(row.getSubmittedAt(), milestone), isAfterDue(row.getUpdatedAt(), milestone));
+                    isLate(row, milestone), isAfterDue(row.getUpdatedAt(), milestone), row.getTiming());
         }).toList();
     }
 
@@ -523,7 +550,11 @@ public class TeamProjectService {
     }
 
     private static boolean isLate(TeamProjectSubmission submission, TeamProjectMilestone milestone) {
-        return isAfterDue(submission.getSubmittedAt(), milestone);
+        return switch (submission.getTiming()) {
+            case ON_TIME -> false;
+            case LATE -> true;
+            case AUTOMATIC -> submission.isSubmittedAfterClose() || isAfterDue(submission.getSubmittedAt(), milestone);
+        };
     }
 
     private static boolean isAfterDue(LocalDateTime at, TeamProjectMilestone milestone) {

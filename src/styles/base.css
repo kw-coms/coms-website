@@ -346,6 +346,19 @@ select {
 	box-shadow: 0 8px 22px color-mix(in srgb, var(--app-accent) 22%, transparent);
 }
 
+@layer components {
+	.apple-action-primary,
+	.apple-action-secondary {
+		align-items: center;
+		justify-content: center;
+	}
+
+	a:where(.apple-action-primary, .apple-action-secondary) {
+		display: inline-flex;
+		text-align: center;
+	}
+}
+
 .apple-action-primary {
 	border-radius: 9999px;
 	background: var(--app-accent);

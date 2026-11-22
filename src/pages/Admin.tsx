@@ -26,6 +26,7 @@ import AdminHackathon from './admin/AdminHackathon'
 import AdminTeamProjects from './admin/AdminTeamProjects'
 import AdminClubOfficers from './admin/AdminClubOfficers'
 import AdminClubForms from './admin/AdminClubForms'
+import AdminExternalOpportunities from './admin/AdminExternalOpportunities'
 import {
   adminTabsForRole,
   ROLE_LABELS,
@@ -193,6 +194,7 @@ export default function Admin({ onBack }: { onBack: () => void }) {
             )}
             {isSensitiveAdmin && resolvedActiveTab === 'roster' && <AdminRoster />}
             {canManageContent(permissions) && resolvedActiveTab === 'activities' && <AdminActivities />}
+            {canManageContent(permissions) && resolvedActiveTab === 'external-opportunities' && <AdminExternalOpportunities />}
             {canManageProjects(permissions) && resolvedActiveTab === 'projects' && <AdminAppCatalog />}
             {isSensitiveAdmin && resolvedActiveTab === 'club-forms' && <AdminClubForms />}
             {isSensitiveAdmin && resolvedActiveTab === 'hackathon' && <AdminHackathon />}

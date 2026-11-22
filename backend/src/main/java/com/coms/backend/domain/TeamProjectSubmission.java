@@ -2,6 +2,8 @@ package com.coms.backend.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -12,6 +14,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "team_project_submissions")
 public class TeamProjectSubmission {
+    public enum Timing { AUTOMATIC, ON_TIME, LATE }
+
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @Column(name = "program_id", nullable = false)
@@ -34,6 +38,11 @@ public class TeamProjectSubmission {
     private LocalDateTime submittedAt;
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+    @Column(name = "submitted_after_close", nullable = false)
+    private boolean submittedAfterClose;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 12)
+    private Timing timing = Timing.AUTOMATIC;
 
     public Long getId() { return id; }
     public Long getProgramId() { return programId; }
@@ -56,4 +65,8 @@ public class TeamProjectSubmission {
     public void setSubmittedAt(LocalDateTime value) { submittedAt = value; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime value) { updatedAt = value; }
+    public boolean isSubmittedAfterClose() { return submittedAfterClose; }
+    public void setSubmittedAfterClose(boolean value) { submittedAfterClose = value; }
+    public Timing getTiming() { return timing; }
+    public void setTiming(Timing value) { timing = value; }
 }

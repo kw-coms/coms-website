@@ -17,6 +17,11 @@ import {
 import '../styles/site-pages.css'
 import '../styles/team-projects.css'
 
+function ProgramStatus({ program }: { program: Pick<TeamProjectDetail, 'open' | 'allowLateSubmissions'> }) {
+  const label = program.open ? '진행 중' : program.allowLateSubmissions ? '늦은 제출 접수 중' : '마감'
+  return <span className="tp-chip" data-tone={program.open || program.allowLateSubmissions ? 'accent' : undefined}>{label}</span>
+}
+
 function useNow(intervalMs = 60_000) {
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -57,7 +62,7 @@ function Timeline({ milestones, now, submissions }: { milestones: Milestone[]; n
         <div className="flex flex-wrap gap-2">
           {phase === 'active' && <span className="tp-chip" data-tone="accent">진행 중</span>}
           {next?.id === milestone.id && <span className="tp-chip" data-tone="accent">{dday === 'D-DAY' ? '오늘' : '다음'}</span>}
-          {milestone.submittable && submissions && <StatusChip status={submissionStatus(mine, milestone, now)} />}
+          {milestone.submittable && submissions && <StatusChip status={submissionStatus(mine, milestone, now)} timing={mine?.timing} />}
           {milestone.submittable && !submissions && <span className="tp-chip">제출 받음</span>}
           {!milestone.submittable && <span className="tp-chip">제출 없음</span>}
         </div>
@@ -87,14 +92,15 @@ function MilestoneSubmission({ program, team, milestone, submission, now }: { pr
     onSettled: () => client.invalidateQueries({ queryKey: ['team-projects', 'submissions', program.id, team.id] }),
   })
   const error = save.error ?? remove.error
-  const canEdit = program.open
+  const canEdit = program.open || program.allowLateSubmissions
   return <article className="tp-card space-y-4" aria-label={`${milestone.title} 제출`}>
     <header className="flex flex-wrap items-center justify-between gap-2">
       <h3 className="min-w-0 break-words text-lg font-bold">{milestone.title}</h3>
-      <StatusChip status={submissionStatus(submission, milestone, now)} />
+      <StatusChip status={submissionStatus(submission, milestone, now)} timing={submission?.timing} />
     </header>
     <p className="text-sm text-[var(--app-muted)]">{milestone.dueAt ? `마감 ${milestoneWhen(milestone)} · 마감 후에도 제출할 수 있지만 늦은 제출로 표시됩니다.` : '마감 시각이 정해지지 않았습니다.'}</p>
     {!canEdit && <p role="status" className="text-sm font-semibold">이 프로그램은 마감되어 제출을 고칠 수 없습니다.</p>}
+    {!program.open && canEdit && <p role="status" className="text-sm font-semibold">프로그램 종료 후 처음 저장하는 제출물은 늦은 제출로 기록됩니다.</p>}
     {submission && !editing && <>
       <SubmissionView submission={submission} />
       {canEdit && <button type="button" className="apple-action-secondary min-h-11 px-4 text-sm" onClick={() => setEditing(true)}>수정하기</button>}
@@ -103,7 +109,7 @@ function MilestoneSubmission({ program, team, milestone, submission, now }: { pr
     {canEdit && editing && <SubmissionEditor key={`${submission?.id ?? 'new'}-${submission?.updatedAt ?? ''}`} title={milestone.title} submission={submission} busy={save.isPending || remove.isPending} progress={progress} limits={program}
       onCancelUpload={() => controller.current?.abort()}
       onSave={async draft => { try { await save.mutateAsync(draft); return true } catch { return false } }}
-      onDelete={submission ? async () => { if (await confirmDialog({ title: '제출 삭제', message: `${milestone.title} 제출을 삭제할까요? 올린 파일도 함께 삭제됩니다.`, confirmText: '삭제', tone: 'danger' })) remove.mutate() } : undefined} />}
+      onDelete={submission && program.open ? async () => { if (await confirmDialog({ title: '제출 삭제', message: `${milestone.title} 제출을 삭제할까요? 올린 파일도 함께 삭제됩니다.`, confirmText: '삭제', tone: 'danger' })) remove.mutate() } : undefined} />}
     {canEdit && editing && submission && <button type="button" className="tp-text-button" onClick={() => setEditing(false)}>수정 취소</button>}
     {error && <p role="alert" className="text-sm text-[var(--app-danger)]">{uploadErrorText(error, program)}</p>}
   </article>
@@ -138,7 +144,7 @@ function ProgramPage({ id }: { id: number }) {
     {detail.isError && <div role="alert" className="tp-card mt-6"><p>팀 프로젝트를 찾을 수 없습니다.</p><Link to="/team-projects" className="mt-3 inline-block underline">목록으로 돌아가기</Link></div>}
     {program && <div className="mt-6 space-y-8">
       <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2"><span className="tp-chip" data-tone={program.open ? 'accent' : undefined}>{program.open ? '진행 중' : '마감'}</span>
+        <div className="flex flex-wrap items-center gap-2"><ProgramStatus program={program} />
           {user?.role === 'ADMIN' && <Link to={`/admin?tab=team-projects&program=${program.id}`} className="tp-text-button">관리 화면</Link>}</div>
         {program.description && <p className="max-w-2xl whitespace-pre-wrap break-words text-base leading-7 text-[var(--app-muted)]">{program.description}</p>}
       </div>
@@ -175,7 +181,7 @@ function ProgramList() {
     {programs.data?.length === 0 && <p className="tp-card mt-6">진행 중인 팀 프로젝트가 아직 없습니다.</p>}
     <ul className="mt-6 grid list-none gap-4 p-0">{programs.data?.map(program => <li key={program.id}>
       <Link to={`/team-projects/${program.id}`} className="tp-card block" data-mine={program.myTeamId ? true : undefined}>
-        <div className="flex flex-wrap items-center gap-2"><h2 className="min-w-0 break-words text-xl font-bold">{program.title}</h2><span className="tp-chip" data-tone={program.open ? 'accent' : undefined}>{program.open ? '진행 중' : '마감'}</span>{program.myTeamName && <span className="tp-chip">내 팀 · {program.myTeamName}</span>}</div>
+        <div className="flex flex-wrap items-center gap-2"><h2 className="min-w-0 break-words text-xl font-bold">{program.title}</h2><ProgramStatus program={program} />{program.myTeamName && <span className="tp-chip">내 팀 · {program.myTeamName}</span>}</div>
         {program.description && <p className="mt-2 line-clamp-2 break-words text-sm leading-6 text-[var(--app-muted)]">{program.description}</p>}
       </Link>
     </li>)}</ul>

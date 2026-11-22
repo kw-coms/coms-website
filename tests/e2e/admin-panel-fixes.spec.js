@@ -64,7 +64,7 @@ test('an operator with just one tab permission sees only that group and recovers
   await page.goto('/admin?tab=members')
   await expect(page).toHaveURL(/\/admin\?tab=activities$/)
   const nav = page.getByRole('navigation', { name: '운영 패널 메뉴' })
-  await expect(nav.getByRole('tab')).toHaveText(['활동 관리'])
+  await expect(nav.getByRole('tab')).toHaveText(['활동 관리', '외부 일정'])
   await expect(nav.getByRole('tablist', { name: '콘텐츠' })).toBeVisible()
   for (const group of ['사람', '사이트', '시스템']) {
     await expect(nav.getByRole('tablist', { name: group })).toHaveCount(0)

@@ -95,31 +95,33 @@
 }
 
 :root[data-appearance-theme='retro'] {
-	--app-bg: #f6ebdb;
-	--app-surface: #fffaef;
-	--app-surface-soft: #f4e7d7;
-	--app-surface-elevated: #fffcf5;
-	--app-text: #36241c;
-	--app-muted: #684c3e;
-	--app-subtle: #765347;
-	--theme-glow-violet: #cc885e;
-	--preset-ink: #9b4321;
-	--preset-board: #322016;
-	--preset-signal: #ffc980;
-	--preset-corner: 1.25rem;
-	--preset-pattern: repeating-linear-gradient(135deg, var(--preset-line) 0 1px, transparent 1px 13px);
+	--app-bg: #e3f0ef;
+	--app-surface: #e4e8ee;
+	--app-surface-soft: #d6dce4;
+	--app-surface-elevated: #f7f9fb;
+	--app-text: #17263a;
+	--app-muted: #34485a;
+	--app-subtle: #405467;
+	--theme-glow-violet: #6c83ad;
+	--preset-ink: #234c90;
+	--retro-desktop: #147f82;
+	--preset-board: #233d55;
+	--preset-signal: #92cefa;
+	--preset-corner: 0;
+	--preset-pattern: radial-gradient(var(--preset-line) 1px, transparent 1px) 0 0 / 7px 7px;
 }
 
 :root[data-appearance-theme='retro'][data-theme-mode='dark'] {
-	--app-bg: #1b1410;
-	--app-surface: #281d15;
-	--app-surface-soft: #221810;
-	--app-surface-elevated: #33251b;
-	--app-text: #fff1dc;
-	--app-muted: #dec0a6;
-	--app-subtle: #ccac93;
-	--theme-glow-violet: #cf7954;
-	--preset-ink: #f2b568;
+	--app-bg: #122932;
+	--app-surface: #293b48;
+	--app-surface-soft: #21313d;
+	--app-surface-elevated: #344957;
+	--app-text: #f1f7fc;
+	--app-muted: #c3d6e4;
+	--app-subtle: #a6bfce;
+	--theme-glow-violet: #80acce;
+	--preset-ink: #91c6ff;
+	--retro-desktop: #176b70;
 }
 
 :root[data-appearance-theme='blueprint'] {
@@ -212,19 +214,6 @@
 			radial-gradient(ellipse at 66% 18%, color-mix(in srgb, var(--board-light) 22%, transparent), transparent 68%),
 			var(--board-ink);
 		box-shadow: 0 0 0 4px var(--preset-line);
-	}
-
-	& .scene-processor {
-		top: 48%;
-	}
-
-	& .scene-processor__plate {
-		--plate-side: color-mix(in srgb, var(--board-light) 28%, var(--board-ink));
-		--plate-color: linear-gradient(135deg, var(--board-ink), color-mix(in srgb, var(--board-light) 32%, var(--board-ink)));
-	}
-
-	& .scene-processor__plate--top {
-		--plate-color: linear-gradient(135deg, var(--board-ink), color-mix(in srgb, var(--board-light) 60%, var(--board-ink)));
 	}
 
 	& .apple-topbar,

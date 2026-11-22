@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { Paperclip, Plus, X } from 'lucide-react'
 import { apiUrl } from '../../services/apiClient'
-import type { Submission, SubmissionDraft } from '../../services/teamProjectApi'
-import { formatBytes, formatWhen, megabytes, STATUS_LABEL } from './teamProjects'
+import type { Submission, SubmissionDraft, SubmissionTiming } from '../../services/teamProjectApi'
+import { formatBytes, formatWhen, megabytes, STATUS_LABEL, submissionStatusLabel } from './teamProjects'
 
-export function StatusChip({ status }: { status: keyof typeof STATUS_LABEL }) {
-  return <span className="tp-chip" data-status={status}>{STATUS_LABEL[status]}</span>
+export function StatusChip({ status, timing }: { status: keyof typeof STATUS_LABEL; timing?: SubmissionTiming | null }) {
+  return <span className="tp-chip" data-status={status}>{submissionStatusLabel(status, timing)}</span>
 }
 
 /** A submission as read-only text: who sent it and when, the body, links, and files as attachments. */

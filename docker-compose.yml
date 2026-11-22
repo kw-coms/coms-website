@@ -58,6 +58,8 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      COMS_OPPORTUNITIES_ENABLED: ${COMS_OPPORTUNITIES_ENABLED:-true}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       DB_HOST: db
       DB_NAME: ${DB_NAME:-comsdb}
       DB_USER: ${DB_USER:-coms}

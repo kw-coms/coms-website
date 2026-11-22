@@ -35,6 +35,8 @@ test('datetime inputs are validated and the results toggle explains why it is di
   await mockAdminEvents(page, state)
   await page.goto('/admin?tab=hackathon&event=1')
   const admin = section(page)
+  await expect(admin.getByRole('link', { name: '팀 신청 양식 관리' })).toHaveCSS('align-items', 'center')
+  await expect(admin.getByRole('link', { name: '공개 페이지' })).toHaveCSS('align-items', 'center')
   const editor = admin.getByRole('form', { name: /행사 편집/ })
   await expect(editor.getByText('개발 시작 (한국 시간)')).toBeVisible()
   await editor.getByLabel('개발 시작 (한국 시간)').fill('2026-11-08T18:00')

@@ -426,6 +426,57 @@ class TeamProjectIntegrationTest {
     }
 
     @Test
+    void archivedLateSubmissionsRemainTeamOnlyAndAdminsCanSetTimingWithoutChangingTimestamps() throws Exception {
+        Fixture f = fixture();
+        setOpen(f.program, false);
+        submitRaw(alice, f.program, f.teamA, f.final_, "마감 뒤", List.of()).andExpect(status().isConflict());
+
+        mvc.perform(put(ADMIN_API + "/" + f.program).cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"title":"테스트 팀프","open":false,"allowLateSubmissions":true}
+                        """))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.open").value(false))
+                .andExpect(jsonPath("$.allowLateSubmissions").value(true));
+        mvc.perform(get(API + "/" + f.program).cookie(alice))
+                .andExpect(jsonPath("$.open").value(false)).andExpect(jsonPath("$.allowLateSubmissions").value(true));
+        submitRaw(carol, f.program, f.teamA, f.final_, "다른 팀", List.of()).andExpect(status().isForbidden());
+        submitRaw(alice, f.program, f.teamA, f.noSubmit, "제출 없는 일정", List.of()).andExpect(status().isConflict());
+
+        // The milestone itself is in the future, but the archive window controls the first submission.
+        submitRaw(alice, f.program, f.teamA, f.final_, "결과물", List.of())
+                .andExpect(status().isOk()).andExpect(jsonPath("$.late").value(true))
+                .andExpect(jsonPath("$.timing").value("AUTOMATIC"));
+        JsonNode first = json(mvc.perform(get(API + "/" + f.program + "/teams/" + f.teamA + "/submissions")
+                .cookie(alice)).andExpect(status().isOk())).get(0);
+        String submission = "/" + f.program + "/teams/" + f.teamA + "/milestones/" + f.final_ + "/submission";
+        String timingPath = ADMIN_API + submission + "/timing";
+        mvc.perform(delete(API + submission).cookie(alice).header("Origin", ORIGIN)).andExpect(status().isConflict());
+        mvc.perform(put(timingPath).cookie(alice).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"timing\":\"ON_TIME\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(put(timingPath).cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"timing\":\"ON_TIME\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.timing").value("ON_TIME"))
+                .andExpect(jsonPath("$.late").value(false))
+                .andExpect(jsonPath("$.submittedAt").value(first.path("submittedAt").asText()))
+                .andExpect(jsonPath("$.updatedAt").value(first.path("updatedAt").asText()));
+        mvc.perform(get(ADMIN_API + "/" + f.program + "/board").cookie(admin))
+                .andExpect(jsonPath("$.teams[0].cells[1].status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.teams[0].cells[1].timing").value("ON_TIME"));
+        mvc.perform(put(timingPath).cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"timing\":\"LATE\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.late").value(true));
+
+        setOpen(f.program, true);
+        mvc.perform(put(timingPath).cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"timing\":\"AUTOMATIC\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.late").value(true));
+        mvc.perform(get(API + "/" + f.program + "/teams/" + f.teamA + "/submissions").cookie(bob))
+                .andExpect(jsonPath("$[0].late").value(true)).andExpect(jsonPath("$[0].body").value("결과물"));
+    }
+
+    @Test
     void oneRequestCanAddSeveralFilesAndRemoveSomeAndTextAndLinkLimitsHold() throws Exception {
         Fixture f = fixture();
         JsonNode first = json(submitRaw(alice, f.program, f.teamA, f.proposal, "v1", List.of(

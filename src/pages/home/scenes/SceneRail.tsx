@@ -3,7 +3,7 @@ import { onSceneFrame } from '../../../hooks/useSceneProgress'
 
 export type RailItem = { id: string; label: string }
 
-// A thin index at the right edge (wide screens): where you are in the film and how much is left.
+// The labeled chapter index follows the scene at the middle of a wide screen.
 export default function SceneRail({ items }: { items: RailItem[] }) {
   const [active, setActive] = useState(items[0]?.id ?? '')
   const nav = useRef<HTMLElement | null>(null)
@@ -44,16 +44,14 @@ export default function SceneRail({ items }: { items: RailItem[] }) {
   return (
     <nav ref={nav} className="scene-rail" aria-label="장면 이동">
       <ol>
-        {items.map((item, i) => (
+        {items.map((item) => (
           <li key={item.id}>
             <button
               type="button"
               onClick={() => go(item.id)}
-              aria-label={`${String(i + 1).padStart(2, '0')} ${item.label}`}
               aria-current={active === item.id ? 'true' : undefined}
               className="scene-rail__item"
             >
-              <span className="scene-rail__num">{String(i + 1).padStart(2, '0')}</span>
               <span className="scene-rail__name">{item.label}</span>
               <span className="scene-rail__fill" aria-hidden="true" />
             </button>

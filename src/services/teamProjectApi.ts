@@ -1,6 +1,7 @@
 import { apiUrl, createApiError, renewSessionAfter401, request, requestNoContent, sessionGeneration, UPLOAD_TIMEOUT_MS } from './apiClient'
 
-export type TeamProjectSummary = { id: number; title: string; description: string; open: boolean; myTeamId: number | null; myTeamName: string | null }
+export type TeamProjectSummary = { id: number; title: string; description: string; open: boolean; allowLateSubmissions: boolean; myTeamId: number | null; myTeamName: string | null }
+export type TeamProjectWrite = { title: string; description: string; open: boolean; allowLateSubmissions: boolean }
 // Dates are Korea-time wall-clock strings ("2026-11-29T23:59:00"). allDay: only the date counts
 // (start 00:00, due until 23:59:59 of that day).
 export type Milestone = { id: number; title: string; description: string; startsAt: string | null; dueAt: string | null; allDay: boolean; submittable: boolean; position: number }
@@ -9,19 +10,20 @@ export type TeamMember = { studentId: string | null; name: string; generation: s
 export type Team = { id: number; name: string; topic: string; intro: string; members: TeamMember[] }
 export type TeamWrite = { name: string; topic: string; intro: string }
 export type TeamProjectDetail = {
-  id: number; title: string; description: string; open: boolean
+  id: number; title: string; description: string; open: boolean; allowLateSubmissions: boolean
   milestones: Milestone[]; teams: Team[]; myTeamId: number | null
   maxFileBytes: number; maxRequestBytes: number
 }
 export type SubmissionFile = { id: number; originalName: string; mimeType: string; fileSize: number; downloadUrl: string }
+export type SubmissionTiming = 'AUTOMATIC' | 'ON_TIME' | 'LATE'
 export type Submission = {
   id: number; teamId: number; milestoneId: number; body: string; links: string[]; files: SubmissionFile[]
   submittedByName: string; submittedAt: string; updatedByName: string; updatedAt: string
-  late: boolean; editedAfterDue: boolean
+  late: boolean; editedAfterDue: boolean; timing: SubmissionTiming
 }
 export type SubmissionDraft = { body: string; links: string[]; newFiles: File[]; removeFileIds: number[] }
 export type BoardStatus = 'SUBMITTED' | 'LATE' | 'MISSING'
-export type BoardCell = { milestoneId: number; status: BoardStatus; submittedAt: string | null; updatedAt: string | null; editedAfterDue: boolean }
+export type BoardCell = { milestoneId: number; status: BoardStatus; submittedAt: string | null; updatedAt: string | null; editedAfterDue: boolean; timing: SubmissionTiming | null }
 export type BoardTeam = { id: number; name: string; topic: string; memberCount: number; cells: BoardCell[] }
 export type Board = { milestones: Milestone[]; teams: BoardTeam[] }
 
@@ -75,12 +77,14 @@ export function saveSubmission(id: number, teamId: number, milestoneId: number, 
 export const deleteSubmission = (id: number, teamId: number, milestoneId: number): Promise<void> =>
   requestNoContent(submissionPath(id, teamId, milestoneId), { method: 'DELETE' })
 
-export const createTeamProject = (payload: { title: string; description: string; open: boolean }): Promise<TeamProjectSummary> =>
+export const createTeamProject = (payload: TeamProjectWrite): Promise<TeamProjectSummary> =>
   request('/api/admin/team-projects', json('POST', payload))
-export const updateTeamProject = (id: number, payload: { title: string; description: string; open: boolean }): Promise<TeamProjectSummary> =>
+export const updateTeamProject = (id: number, payload: TeamProjectWrite): Promise<TeamProjectSummary> =>
   request(adminPath(id), json('PUT', payload))
 export const deleteTeamProject = (id: number): Promise<void> => requestNoContent(adminPath(id), { method: 'DELETE' })
 export const getTeamProjectBoard = (id: number): Promise<Board> => request(`${adminPath(id)}/board`)
+export const classifyTeamSubmission = (id: number, teamId: number, milestoneId: number, timing: SubmissionTiming): Promise<Submission> =>
+  request(`${adminPath(id)}/teams/${teamId}/milestones/${milestoneId}/submission/timing`, json('PUT', { timing }))
 export const createMilestone = (id: number, payload: MilestoneWrite): Promise<Milestone> =>
   request(`${adminPath(id)}/milestones`, json('POST', payload))
 export const updateMilestone = (id: number, milestoneId: number, payload: MilestoneWrite): Promise<Milestone> =>

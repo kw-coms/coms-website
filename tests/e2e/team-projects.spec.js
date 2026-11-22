@@ -37,7 +37,9 @@ async function installFakeApi(page) {
   const submissionView = (s) => {
     const milestone = db.milestones.find(m => m.id === s.milestoneId)
     const due = dueOf(milestone)
-    return { ...s, late: Boolean(due && s.submittedAt > due), editedAfterDue: Boolean(due && s.updatedAt > due) }
+    const timing = s.timing ?? 'AUTOMATIC'
+    const late = timing === 'LATE' || (timing === 'AUTOMATIC' && Boolean(s.submittedAfterClose || (due && s.submittedAt > due)))
+    return { ...s, timing, late, editedAfterDue: Boolean(due && s.updatedAt > due) }
   }
   const normalize = (write) => write.allDay
     ? { ...write, startsAt: write.startsAt && `${write.startsAt.slice(0, 10)}T00:00:00`, dueAt: write.dueAt && `${write.dueAt.slice(0, 10)}T00:00:00` }
@@ -89,7 +91,7 @@ async function installFakeApi(page) {
           id: team.id, name: team.name, topic: team.topic, memberCount: db.members.filter(m => m.teamId === team.id).length,
           cells: columns.map(column => {
             const found = db.submissions.find(s => s.teamId === team.id && s.milestoneId === column.id)
-            return { milestoneId: column.id, status: !found ? 'MISSING' : submissionView(found).late ? 'LATE' : 'SUBMITTED', submittedAt: found?.submittedAt ?? null, updatedAt: found?.updatedAt ?? null, editedAfterDue: found ? submissionView(found).editedAfterDue : false }
+            return { milestoneId: column.id, status: !found ? 'MISSING' : submissionView(found).late ? 'LATE' : 'SUBMITTED', submittedAt: found?.submittedAt ?? null, updatedAt: found?.updatedAt ?? null, editedAfterDue: found ? submissionView(found).editedAfterDue : false, timing: found?.timing ?? null }
           }),
         })),
       })
@@ -97,9 +99,17 @@ async function installFakeApi(page) {
     if ((match = /^\/1\/teams\/(\d+)\/submissions$/.exec(path)) && method === 'GET') {
       return json(db.submissions.filter(s => s.teamId === Number(match[1])).map(submissionView))
     }
+    if ((match = /^\/1\/teams\/(\d+)\/milestones\/(\d+)\/submission\/timing$/.exec(path)) && method === 'PUT') {
+      if (!isAdmin()) return json({}, 403)
+      const target = db.submissions.find(s => s.teamId === Number(match[1]) && s.milestoneId === Number(match[2]))
+      if (!target) return json({}, 404)
+      target.timing = request.postDataJSON().timing
+      return json(submissionView(target))
+    }
     if ((match = /^\/1\/teams\/(\d+)\/milestones\/(\d+)\/submission$/.exec(path)) && method === 'PUT') {
       const teamId = Number(match[1]); const milestoneId = Number(match[2])
       if (myTeam()?.id !== teamId) return json({}, 403)
+      if (!db.program.open && !db.program.allowLateSubmissions) return json({ message: '마감된 프로그램입니다.' }, 409)
       const raw = request.postDataBuffer().toString('latin1') + '\r\n--'
       const files = [...raw.matchAll(/name="files"; filename="([^"]*)"/g)].map(m => m[1])
       if (db.uploadStatus) return route.fulfill({ status: db.uploadStatus, contentType: 'text/html', body: '<h1>413 Request Entity Too Large</h1>' })
@@ -110,6 +120,7 @@ async function installFakeApi(page) {
         id: previous?.id ?? id(), teamId, milestoneId, body: Buffer.from(field(raw, 'body'), 'latin1').toString('utf8'), links: all(raw, 'links'),
         files: [...(previous?.files ?? []).filter(file => !all(raw, 'removeFileIds').includes(String(file.id))), ...files.map(name => ({ id: id(), originalName: name, mimeType: 'application/octet-stream', fileSize: 12, downloadUrl: `/api/team-projects/1/teams/${teamId}/milestones/${milestoneId}/submission/files/${db.next}` }))],
         submittedByName: previous?.submittedByName ?? USERS[db.me].name, submittedAt: previous?.submittedAt ?? now, updatedByName: USERS[db.me].name, updatedAt: now,
+        timing: previous?.timing ?? 'AUTOMATIC', submittedAfterClose: previous?.submittedAfterClose ?? !db.program.open,
       }
       db.submissions = [...db.submissions.filter(s => s !== previous), saved]
       return json(submissionView(saved))
@@ -311,6 +322,40 @@ test('the status board marks edits made after the due time', async ({ page }) =>
   const cell = page.getByRole('button', { name: 'A팀 지난 과제 제출 마감 후 수정' })
   await expect(cell).toBeVisible()
   await expect(cell).toContainText('마감 후 수정')
+})
+
+test('a closed program can receive late work and the chair can change its classification', async ({ page }) => {
+  await mockAdminApis(page)
+  const db = await installFakeApi(page)
+  db.program = { id: 1, title: '팀프', description: '', open: false, allowLateSubmissions: false }
+  db.milestones = [{ id: 11, position: 0, title: '최종', description: '', startsAt: null, dueAt: stamp(1, '23:59:00'), allDay: false, submittable: true }]
+  db.teams = [{ id: 21, name: 'A팀', topic: '', intro: '' }]
+  db.members = [{ teamId: 21, studentId: USERS.hana.studentId }]
+
+  await page.goto('/admin?tab=team-projects&program=1')
+  const settings = page.getByRole('form', { name: '프로그램 정보' })
+  await settings.getByRole('checkbox', { name: '프로그램 종료 후 제출 허용' }).check()
+  await settings.getByRole('button', { name: '저장', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: '프로그램 정보를 저장했습니다.' })).toBeVisible()
+  expect(db.program.open).toBe(false)
+
+  db.me = 'hana'
+  await page.goto('/team-projects/1')
+  await expect(page.getByText('늦은 제출 접수 중', { exact: true })).toBeVisible()
+  const form = page.getByRole('form', { name: '최종 제출' })
+  await form.getByLabel('내용', { exact: true }).fill('종료 후 제출한 결과물')
+  await form.getByRole('button', { name: '제출하기' }).click()
+  await expect(page.getByRole('article', { name: '최종 제출' }).getByText('늦은 제출', { exact: true })).toBeVisible()
+  const submittedAt = db.submissions[0].submittedAt
+
+  db.me = 'admin'
+  await page.goto('/admin?tab=team-projects&program=1')
+  await page.getByRole('button', { name: 'A팀 최종 늦은 제출' }).click()
+  const detail = page.getByRole('article', { name: 'A팀 최종 제출 내용' })
+  await detail.getByLabel('제출 분류').selectOption('ON_TIME')
+  await detail.getByRole('button', { name: '분류 저장' }).click()
+  await expect(page.getByRole('button', { name: 'A팀 최종 정시 제출' })).toBeVisible()
+  expect(db.submissions[0].submittedAt).toBe(submittedAt)
 })
 
 test('an oversized upload rejected by the proxy names the real limit, and an upload can be cancelled', async ({ page }) => {

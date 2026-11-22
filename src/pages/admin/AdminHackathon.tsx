@@ -110,7 +110,13 @@ export default function AdminHackathon() {
   if (events.isPending) return <p role="status">해커톤 목록을 불러오는 중…</p>
   if (events.isError) return <div role="alert">해커톤 목록을 불러오지 못했습니다. <button onClick={() => events.refetch()} className={actionClass}>다시 불러오기</button></div>
   return <section className="space-y-6" aria-label="해커톤 평가 관리">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">해커톤 평가·행사 관리</h2><p className="mt-2 text-sm text-[var(--app-muted)]">행사별 글·팀·자료·평가를 관리합니다.</p></div><Link to={'/admin?tab=club-forms&category=HACKATHON&hackathon=' + eventId} className={actionClass}>팀 신청 양식 관리</Link>{event?.published && <Link to={eventPath(eventId)} className={actionClass}>공개 페이지</Link>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div><h2 className="text-xl font-bold">해커톤 평가·행사 관리</h2><p className="mt-2 text-sm text-[var(--app-muted)]">행사별 글·팀·자료·평가를 관리합니다.</p></div>
+      <div className="flex flex-wrap gap-2">
+        <Link to={'/admin?tab=club-forms&category=HACKATHON&hackathon=' + eventId} className={actionClass}>팀 신청 양식 관리</Link>
+        {event?.published && <Link to={eventPath(eventId)} className={actionClass}>공개 페이지</Link>}
+      </div>
+    </div>
     <div className="flex flex-wrap items-center gap-3"><label className="text-sm font-semibold">관리할 해커톤<select aria-label="관리할 해커톤" className={inputClass} value={events.data.some(item => item.id === eventId) ? eventId : ''} onChange={e => { setParams(previous => { previous.set('event', e.target.value); return previous }); setMessage(''); setError(''); setFormError(''); setEditingProject(null) }}><option value="" disabled>선택</option>{events.data.map(item => <option key={item.id} value={item.id}>{item.title}{item.published ? '' : ' · 초안'} · {STATUS_META[item.status].label}</option>)}</select></label><button type="button" className={actionClass} onClick={() => setNewEvent(value => !value)}>{newEvent ? '작성 닫기' : '새 해커톤 작성'}</button></div>
     {newEvent && <EventEditor busy={pending} error={formError} save={payload => act(async () => { const created = await createHackathonEvent(payload); setParams(previous => { previous.set('event', String(created.id)); return previous }); setNewEvent(false) }, '해커톤 초안을 만들었습니다.', true)} />}
     {message && <p role="status" className="text-sm">{message}</p>}

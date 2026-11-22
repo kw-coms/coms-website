@@ -6,6 +6,8 @@ import com.coms.backend.dto.TeamProjectDto.TeamProjectMemberView;
 import com.coms.backend.dto.TeamProjectDto.TeamProjectMilestoneOrder;
 import com.coms.backend.dto.TeamProjectDto.TeamProjectMilestoneView;
 import com.coms.backend.dto.TeamProjectDto.TeamProjectMilestoneWrite;
+import com.coms.backend.dto.TeamProjectDto.TeamProjectSubmissionTimingWrite;
+import com.coms.backend.dto.TeamProjectDto.TeamProjectSubmissionView;
 import com.coms.backend.dto.TeamProjectDto.TeamProjectSummary;
 import com.coms.backend.dto.TeamProjectDto.TeamProjectTeamView;
 import com.coms.backend.dto.TeamProjectDto.TeamProjectTeamWrite;
@@ -64,6 +66,17 @@ public class AdminTeamProjectController {
     @GetMapping("/{programId}/board")
     public TeamProjectBoard board(@PathVariable Long programId) {
         return service.board(programId);
+    }
+
+    @PutMapping("/{programId}/teams/{teamId}/milestones/{milestoneId}/submission/timing")
+    public TeamProjectSubmissionView classifySubmission(@PathVariable Long programId, @PathVariable Long teamId,
+            @PathVariable Long milestoneId, @RequestBody TeamProjectSubmissionTimingWrite request,
+            Authentication authentication) {
+        TeamProjectSubmissionView updated = service.classifySubmission(programId, teamId, milestoneId,
+                request == null ? null : request.timing(), authentication.getName());
+        auditLogService.record(authentication.getName(), "ADMIN_TEAM_PROJECT_SUBMISSION_TIMING", "TEAM_PROJECT_SUBMISSION",
+                String.valueOf(updated.id()), "timing=" + updated.timing(), null);
+        return updated;
     }
 
     @PostMapping("/{programId}/milestones")

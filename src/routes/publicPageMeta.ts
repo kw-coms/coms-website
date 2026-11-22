@@ -43,6 +43,11 @@ export const PUBLIC_PAGE_META: PublicPageMeta[] = [
     title: "스터디 | KW COM's",
     description: "웹, 아두이노, C, Java, Python까지. COM's 스터디 자료를 골라 순서대로 따라 해 보세요.",
   },
+  {
+    path: '/opportunities',
+    title: "외부 일정 | KW COM's",
+    description: '공식 출처의 해커톤, 코딩 대회, SSAFY·SW마에스트로·부트캠프 등 외부 일정을 확인하세요.',
+  },
   ...STUDIES.map((study) => ({
     path: `/study/${study.id}`,
     title: `${study.title} | KW COM's`,

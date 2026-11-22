@@ -67,6 +67,7 @@ const MonthlyCalendarPage = lazy(() => import('./pages/home/detailPages').then((
 const AppsPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.AppsPage })))
 const WorkDetailPage = lazy(() => import('./pages/WorkDetailPage'))
 const HackathonArchivePage = lazy(() => import('./pages/HackathonArchive'))
+const ExternalOpportunitiesPage = lazy(() => import('./pages/ExternalOpportunities'))
 const HackathonPage = lazy(() => import('./pages/Hackathon'))
 const TeamProjectsPage = lazy(() => import('./pages/TeamProjects'))
 const ClubFormsPage = lazy(() => import('./pages/ClubForms'))
@@ -227,6 +228,7 @@ function App() {
         <Route path="/study/:id/practice/:problemId" element={<ProblemPage />} />
         <Route path="/apps" element={<AppsPage />} />
         <Route path="/hackathon" element={<HackathonArchivePage />} />
+        <Route path="/opportunities" element={<ExternalOpportunitiesPage />} />
         <Route path="/hackathon/:eventId" element={<HackathonPage />} />
         <Route path="/officers" element={<RequireAuth><OfficersPage /></RequireAuth>} />
         <Route path="/forms" element={<RequireAuth><ClubFormsPage /></RequireAuth>} />
