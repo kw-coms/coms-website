@@ -48,6 +48,7 @@ export default function SceneRail({ items, calm }: { items: RailItem[]; calm: bo
             <button
               type="button"
               onClick={() => go(item.id)}
+              aria-label={item.label}
               aria-current={active === item.id ? 'true' : undefined}
               className="scene-rail__item"
             >
