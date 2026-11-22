@@ -8,8 +8,8 @@
 
 **배우고, 만들고, 성장하는 광운대학교 중앙 컴퓨터 학술동아리 COM's의 공식 웹사이트**
 
-동아리를 소개하는 홈페이지에서 시작해, 지금은 모집부터 공지·커뮤니티·출석·일정 조율·운영까지<br/>
-COM's의 한 학기를 통째로 굴리는 동아리 플랫폼이 되었습니다.
+동아리 소개와 신입 부원 모집, 공지와 커뮤니티, 팀 프로젝트 제출을 한곳에서 이용할 수 있습니다.<br/>
+운영진은 해커톤·활동·외부 일정을 관리할 수 있습니다.
 
 <a href="https://coms.kw.ac.kr"><img src="https://img.shields.io/badge/Website-coms.kw.ac.kr-0071e3?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Website" /></a>
 <a href="https://github.com/kw-coms/coms-website/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/kw-coms/coms-website/ci.yml?branch=main&style=for-the-badge&label=CI&logo=githubactions&logoColor=white" alt="CI" /></a>
@@ -19,6 +19,7 @@ COM's의 한 학기를 통째로 굴리는 동아리 플랫폼이 되었습니�
 <a href="https://coms.kw.ac.kr">웹사이트</a> ·
 <a href="https://coms.kw.ac.kr/apps">부원 작품</a> ·
 <a href="https://coms.kw.ac.kr/hackathon">해커톤 기록</a> ·
+<a href="https://coms.kw.ac.kr/opportunities">외부 일정</a> ·
 <a href="https://coms.kw.ac.kr/contact">협업 제안</a> ·
 <a href="https://coms.kw.ac.kr/recruit">지원하기</a> ·
 <a href="https://www.instagram.com/kw_coms">Instagram</a> ·
@@ -26,7 +27,7 @@ COM's의 한 학기를 통째로 굴리는 동아리 플랫폼이 되었습니�
 
 <br/><br/>
 
-<img src="docs/images/home.png" alt="COM's 웹사이트 메인 화면" width="100%" />
+<img src="docs/images/home.png" alt="동아리 소개와 지원하기 버튼, 장면 이동 메뉴가 보이는 COM's 홈" width="100%" />
 
 </div>
 
@@ -39,7 +40,8 @@ COM's는 광운대학교 학생들이 컴퓨터와 소프트웨어를 함께 공
 
 | 처음 오셨다면 | 동아리원이라면 | 운영을 맡고 있다면 |
 | --- | --- | --- |
-| [동아리 소개](https://coms.kw.ac.kr/about) · [스터디 자료](https://coms.kw.ac.kr/study) · [회로 Lab](https://coms.kw.ac.kr/lab/) | [신청·수요조사](https://coms.kw.ac.kr/forms) · [팀 프로젝트](https://coms.kw.ac.kr/team-projects) · [활동 기록](https://coms.kw.ac.kr/activity-log) | [해커톤 관리](https://coms.kw.ac.kr/admin?tab=hackathon) · [양식 관리](https://coms.kw.ac.kr/admin?tab=club-forms) · [활동 관리](https://coms.kw.ac.kr/admin?tab=activities) |
+| [동아리 소개](https://coms.kw.ac.kr/about) · [지원하기](https://coms.kw.ac.kr/recruit) | [팀 프로젝트](https://coms.kw.ac.kr/team-projects) · [신청·수요조사](https://coms.kw.ac.kr/forms) | [해커톤 관리](https://coms.kw.ac.kr/admin?tab=hackathon) · [양식 관리](https://coms.kw.ac.kr/admin?tab=club-forms) |
+| [외부 일정](https://coms.kw.ac.kr/opportunities) · [회로 Lab](https://coms.kw.ac.kr/lab/) | [활동 기록](https://coms.kw.ac.kr/activity-log) · [스터디 자료](https://coms.kw.ac.kr/study) | [외부 일정 검토](https://coms.kw.ac.kr/admin?tab=external-opportunities) · [활동 관리](https://coms.kw.ac.kr/admin?tab=activities) |
 
 <br/>
 
@@ -55,6 +57,7 @@ COM's는 광운대학교 학생들이 컴퓨터와 소프트웨어를 함께 공
 | 💛 | **후원자** | 동아리를 후원해 주신 분들을 등급별로 소개합니다. |
 | 🎲 | **뽑기** | 조 나누기, 발표 순서 정하기, 한 명 뽑기. 입력한 이름은 브라우저 밖으로 나가지 않습니다. |
 | 🏆 | **해커톤 아카이브·평가** | 행사별 작품, 자료와 결과를 모았습니다. 졸업생은 로그인 없이 기수와 이름을 적어 채점과 피드백을 남길 수 있습니다. |
+| 🗓️ | **외부 일정** | 운영진이 확인한 해커톤, 코딩 대회, 교육·부트캠프의 접수 기간과 공식 공고를 볼 수 있습니다. |
 | 🤝 | **협업 제안** | 공동 행사, 세미나, 프로젝트 제안을 보내고 이메일로 답변을 받을 수 있습니다. |
 
 ### 🙋 부원 — 동아리 생활에 필요한 도구

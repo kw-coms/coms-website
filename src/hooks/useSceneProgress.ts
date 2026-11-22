@@ -160,7 +160,7 @@ export function useSceneProgress() {
   }, [])
 }
 
-const REVEAL = '.cine-lines:not([data-cine-hold]), .cine-wipe, [data-cine]:not([data-cine-hold]), [data-rule]'
+const REVEAL = '.cine-lines:not([data-cine-hold]), .cine-wipe, [data-cine]:not([data-cine-hold]), [data-rule], [data-chapter-divider]'
 
 /**
  * Marks `.cine-root` ready (hidden states only apply once this ran, so the page reads without

@@ -72,6 +72,33 @@ test.describe('a visitor on the home page', () => {
     await expect(rail.getByRole('button', { name: '프로젝트' })).toHaveAttribute('aria-current', 'true')
   })
 
+  test('native wheel scroll reveals a chapter divider and a brief backdrop cue', async ({ page }) => {
+    const divider = page.locator('.scene-divider').first()
+    const about = page.locator('#about')
+    await expect(page.locator('.cine-root.cine-ready #opening h1')).toBeVisible()
+    await page.mouse.move(400, 400)
+    await page.mouse.wheel(0, 670)
+    await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(450)
+    await expect(divider).toHaveClass(/is-revealed/)
+    await expect.poll(() => divider.evaluate((el) => getComputedStyle(el, '::after').animationName))
+      .toBe('chapter-divider-entry')
+    await expect(about).toHaveClass(/is-onscreen/)
+    const backdrop = about.locator('.scene-bg')
+    await expect.poll(() => backdrop.evaluate((el) => getComputedStyle(el, '::after').animationName)).toBe('chapter-backdrop-entry')
+    await expect.poll(() => backdrop.evaluate((el) => getComputedStyle(el, '::after').animationIterationCount)).toBe('1')
+    await expect.poll(() => backdrop.evaluate((el) => getComputedStyle(el, '::after').opacity)).toBe('0')
+
+    const projects = page.getByRole('navigation', { name: '장면 이동' }).getByRole('button', { name: '프로젝트' })
+    await projects.focus()
+    await page.keyboard.press('Enter')
+    await expect(projects).toHaveAttribute('aria-current', 'true')
+    await expect(projects).toBeFocused()
+
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await expect.poll(() => divider.evaluate((el) => getComputedStyle(el, '::after').animationName)).toBe('none')
+    await expect.poll(() => backdrop.evaluate((el) => getComputedStyle(el, '::after').animationName)).toBe('none')
+  })
+
   test('has no horizontal overflow at 1440 and 390', async ({ page }) => {
     for (const [width, height] of [[1440, 900], [390, 844]]) {
       await page.setViewportSize({ width, height })

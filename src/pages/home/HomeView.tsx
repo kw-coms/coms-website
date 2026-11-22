@@ -6,6 +6,7 @@ import { defaultSiteSettings, getPublicSiteSettings } from '../../services/siteS
 import { scrollToTopInstant } from '../../utils/themeColors'
 import { isFullPageLink } from '../../utils/fullPageLink'
 import { useAuth } from '../../contexts/useAuth'
+import { useCalm } from '../../hooks/useCalm'
 import { useCineReveal, usePointerFx, useSceneProgress } from '../../hooks/useSceneProgress'
 import Opening from './scenes/Opening'
 import Manifesto from './scenes/Manifesto'
@@ -29,6 +30,7 @@ export default function HomeView() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const calm = useCalm()
   const member = Boolean(user)
   const latestNoticeQuery = useQuery({
     queryKey: LATEST_NOTICE_QUERY_KEY,
@@ -55,8 +57,7 @@ export default function HomeView() {
     if (!el) return
     const navHeight = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--apple-nav-height')) || 44
     const targetY = Math.max(0, window.scrollY + el.getBoundingClientRect().top - navHeight - 10)
-    const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
-    window.scrollTo({ top: targetY, behavior: motion.matches ? 'instant' : 'smooth' })
+    window.scrollTo({ top: targetY, behavior: calm ? 'instant' : 'smooth' })
   }
 
   const goPageTop = (to: To, options?: NavigateOptions) => {
@@ -142,7 +143,7 @@ export default function HomeView() {
           </Fragment>
         ))}
       </main>
-      <SceneRail items={railItems} />
+      <SceneRail items={railItems} calm={calm} />
     </div>
   )
 }

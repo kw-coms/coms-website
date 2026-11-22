@@ -4,7 +4,7 @@ import { onSceneFrame } from '../../../hooks/useSceneProgress'
 export type RailItem = { id: string; label: string }
 
 // The labeled chapter index follows the scene at the middle of a wide screen.
-export default function SceneRail({ items }: { items: RailItem[] }) {
+export default function SceneRail({ items, calm }: { items: RailItem[]; calm: boolean }) {
   const [active, setActive] = useState(items[0]?.id ?? '')
   const nav = useRef<HTMLElement | null>(null)
   const key = items.map((item) => item.id).join('|')
@@ -37,8 +37,7 @@ export default function SceneRail({ items }: { items: RailItem[] }) {
   }, [key])
 
   const go = (id: string) => {
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    document.getElementById(id)?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' })
+    document.getElementById(id)?.scrollIntoView({ behavior: calm ? 'instant' : 'smooth', block: 'start' })
   }
 
   return (

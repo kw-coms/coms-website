@@ -4,7 +4,7 @@ import { cssVars } from './cssVars'
 export default function Divider({ name, dir }: { name: string; dir: 1 | -1 }) {
   const text = Array.from({ length: 6 }, () => name).join('   —   ')
   return (
-    <div className="scene-divider" data-scene="divider" aria-hidden="true" style={cssVars({ '--dir': dir })}>
+    <div className="scene-divider" data-scene="divider" data-chapter-divider aria-hidden="true" style={cssVars({ '--dir': dir })}>
       <span className="scene-divider__text" data-t={text} />
     </div>
   )

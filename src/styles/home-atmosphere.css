@@ -214,14 +214,13 @@
 
 .scene-bg__wash {
 	position: absolute;
-	inset: -14vh 0;
+	inset: 0;
 	background: linear-gradient(
 		180deg,
 		color-mix(in srgb, var(--m-prev) var(--cine-wash), transparent) 0%,
 		color-mix(in srgb, var(--m-me) calc(var(--cine-wash) * 1.4), transparent) 50%,
 		color-mix(in srgb, var(--m-next) var(--cine-wash), transparent) 100%
 	);
-	transform: translate3d(0, calc((var(--p, 0.5) - 0.5) * -9vh), 0);
 }
 
 .scene-bg__glow {
@@ -236,22 +235,19 @@
 	--g: var(--m-me);
 	left: var(--ax, -20%);
 	top: var(--ay, 6%);
-	transform: translate3d(calc((var(--p, 0.5) - 0.5) * 26vw), calc((var(--p, 0.5) - 0.5) * -34vh), 0);
 }
 
 .scene-bg__glow--b {
 	--g: var(--m-next);
 	right: var(--bx, -24%);
 	bottom: var(--by, 4%);
-	transform: translate3d(calc((var(--p, 0.5) - 0.5) * -22vw), calc((var(--p, 0.5) - 0.5) * 28vh), 0);
 }
 
 .scene-bg__tex {
 	position: absolute;
-	inset: -60px 0;
+	inset: 0;
 	-webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
 	mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
-	transform: translate3d(0, calc((var(--p, 0.5) - 0.5) * 48px), 0);
 	--tex: color-mix(in srgb, var(--app-text) 11%, transparent);
 }
 
@@ -301,7 +297,7 @@
 	--ay: 4%;
 }
 
-/* A giant outlined numeral that drifts against the scroll. */
+/* The outline stays anchored behind the chapter content. */
 .scene-bg__numeral {
 	position: absolute;
 	top: 5vh;
@@ -312,29 +308,38 @@
 	-webkit-text-stroke: 1px color-mix(in srgb, var(--app-text) 10%, transparent);
 	-webkit-mask-image: linear-gradient(180deg, #000 25%, transparent 92%);
 	mask-image: linear-gradient(180deg, #000 25%, transparent 92%);
-	transform: translate3d(0, calc((var(--p, 0.5) - 0.5) * -34vh), 0);
 }
 
 .scene-bg__numeral::before {
 	content: attr(data-n);
 }
 
-/* The recruit finale: an accent wash rises from the bottom as the scene arrives. */
+/* The recruit finale has its own accent wash. */
 .scene-bg--recruit .scene-bg__glow--b {
 	--g: var(--app-accent);
 	right: 5%;
 	bottom: -30vmax;
 	width: 120vmax;
 	opacity: 0.7;
-	transform: translate3d(0, calc((1 - var(--p, 1)) * 34vh), 0);
 }
 
 /* ---- Dividers: large outlined scene names that slide with the scroll ---------------------------------- */
 .scene-divider {
+	position: relative;
 	overflow: hidden;
 	overflow: clip;
 	padding-block: clamp(0.5rem, 2vw, 1.5rem);
 	border-block: 1px solid var(--app-hairline);
+}
+
+.scene-divider::after {
+	content: '';
+	position: absolute;
+	inset: 0 0 auto;
+	height: 2px;
+	background: linear-gradient(calc(var(--dir) * 90deg), var(--app-accent), transparent 52%);
+	opacity: 0.36;
+	pointer-events: none;
 }
 
 .scene-divider__text {
@@ -342,13 +347,51 @@
 	white-space: nowrap;
 	font: 800 clamp(4.5rem, 13vw, 12rem) / 1.05 var(--apple-font-family);
 	letter-spacing: -0.04em;
-	transform: translate3d(calc(-36vw + (var(--p, 0.5) - 0.5) * var(--dir) * 70vw), 0, 0);
+	transform: translate3d(calc(-18vw + (var(--p, 0.5) - 0.5) * var(--dir) * 32vw), 0, 0);
 }
 
 .scene-divider__text::before {
 	content: attr(data-t);
 	color: transparent;
 	-webkit-text-stroke: 1px color-mix(in srgb, var(--app-text) 30%, transparent);
+}
+
+/* A chapter announces itself briefly, then its background stays still. */
+@media (prefers-reduced-motion: no-preference) {
+	:root:not([data-perf='lite']) .cine-ready .scene .cine-lines.scene-title .cine-m > span {
+		transform: translateY(9px);
+		transition-duration: 360ms;
+		transition-delay: calc(var(--i, 0) * 45ms);
+	}
+
+	:root:not([data-perf='lite']) .cine-ready .scene .cine-lines.scene-title.is-revealed .cine-m > span {
+		transform: none;
+	}
+
+	:root:not([data-perf='lite']) .cine-ready .scene-divider.is-revealed::after {
+		transform-origin: calc(50% - var(--dir) * 50%) center;
+		animation: chapter-divider-entry 360ms var(--cine-ease) both;
+	}
+
+	:root:not([data-perf='lite'], [data-appearance-theme='retro']) .cine-ready .scene.is-onscreen > .scene-bg::after {
+		content: '';
+		position: absolute;
+		inset: 0 0 auto;
+		height: clamp(7rem, 22vh, 12rem);
+		background: linear-gradient(180deg, color-mix(in srgb, var(--m-me) 18%, transparent), transparent);
+		animation: chapter-backdrop-entry 600ms ease-out both;
+	}
+}
+
+@keyframes chapter-divider-entry {
+	from { transform: scaleX(0.08); opacity: 0.18; }
+	45% { opacity: 0.9; }
+	to { transform: scaleX(1); opacity: 0.36; }
+}
+
+@keyframes chapter-backdrop-entry {
+	from { opacity: 1; }
+	to { opacity: 0; }
 }
 
 /* ---- Manifesto: the Club OS assembles as it arrives --------------------------------------------------- */
@@ -592,7 +635,7 @@
 }
 
 /* ---- Layers are promoted only while their scene is on screen ----------------------------------------- */
-.cine-ready .is-onscreen :is(.aurora, .floor__plane i, .scene-bg__glow, .scene-bg__numeral, .scene-divider__text, .scene-opening__ticker-run, .scene-recruit__marquee-run) {
+.cine-ready .is-onscreen :is(.aurora, .floor__plane i, .scene-divider__text, .scene-opening__ticker-run, .scene-recruit__marquee-run) {
 	will-change: transform;
 }
 

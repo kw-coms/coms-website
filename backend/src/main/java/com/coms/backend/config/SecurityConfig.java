@@ -114,8 +114,9 @@ public class SecurityConfig {
                 // 회장이 조정하는 권한(site_settings.edit / activity.write / project.write)로 열리는
                 // 관리 경로 — 로그인 경계만 URL 에 두고, 직급 판정은 컨트롤러의 @perm.has 가 맡는다.
                 auth.requestMatchers("/api/admin/site-settings", "/api/admin/club-room", "/api/admin/club-activity-categories/**",
-                        "/api/admin/club-project-categories/**", "/api/admin/recurring-schedules/**",
-                        "/api/admin/opportunities", "/api/admin/opportunities/**").authenticated();
+                        "/api/admin/club-project-categories/**", "/api/admin/recurring-schedules/**").authenticated();
+                // The controller enforces activity.write for every review and collection action.
+                auth.requestMatchers("/api/admin/opportunities", "/api/admin/opportunities/**").authenticated();
                 // community.moderate 권한으로 열리는 중재 화면(신고, 삭제 보관함).
                 auth.requestMatchers("/api/admin/community/**").authenticated();
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
