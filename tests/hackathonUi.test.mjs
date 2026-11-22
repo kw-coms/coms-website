@@ -116,7 +116,11 @@ await act(async () => {
   root.render(h(MemoryRouter, null, h(QueryClientProvider, { client: queryClient }, h(AdminHackathon), h(ConfirmHost))))
   await new Promise(setImmediate)
 })
-await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
+// The event and reviews start after the event list resolves. Let each React
+// update commit before checking the dependent queries.
+for (let attempt = 0; !host.textContent.includes('42기 홍길동') && attempt < 80; attempt++) {
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)) })
+}
 previousClient.clear()
 assert.match(host.textContent, /42기 홍길동/)
 const chairForm = host.querySelector('form[aria-label="chair-wargether 채점"]')
