@@ -314,6 +314,7 @@
 	}
 
 	& .apps-directory .app-card-showcase {
+		--retro-card-title: #1d3a71;
 		position: relative;
 		gap: 0;
 		padding: 0.125rem;
@@ -324,7 +325,7 @@
 		content: '';
 		grid-area: 1 / 1 / 2 / -1;
 		align-self: stretch;
-		background: var(--retro-titlebar);
+		background: var(--retro-card-title);
 		border-block-end: 1px solid var(--site-theme-rule);
 		pointer-events: none;
 	}
@@ -335,6 +336,7 @@
 
 	& .apps-directory .app-card-head {
 		padding: 0.55rem 0.4rem 0.55rem 0.75rem;
+		background: var(--retro-card-title);
 	}
 
 	& .apps-directory .app-card-head :is(.app-card-title, .app-card-title a, .app-card-eyebrow) {
