@@ -113,9 +113,18 @@ class CommunityTextService {
     }
 
     String stripHtml(String value) {
-        return value == null ? "" : value
-                .replaceAll("(?i)<br\\s*/?>", "\n")
-                .replaceAll("<[^>]+>", "")
+        if (value == null) return "";
+        String html = value.replaceAll("(?i)<br\\s*/?>", "\n");
+        StringBuilder plain = new StringBuilder(html.length());
+        int cursor = 0;
+        for (int start = html.indexOf('<'); start >= 0; start = html.indexOf('<', cursor)) {
+            int end = html.indexOf('>', start + 1);
+            if (end < 0) break;
+            // Keep an empty <> pair as literal text, just like the previous projection.
+            plain.append(html, cursor, end == start + 1 ? end + 1 : start);
+            cursor = end + 1;
+        }
+        return plain.append(html, cursor, html.length()).toString()
                 .replace("&nbsp;", " ")
                 .replace("&lt;", "<")
                 .replace("&gt;", ">")

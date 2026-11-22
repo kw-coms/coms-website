@@ -47,6 +47,14 @@ class CommunityTextServiceTest {
     }
 
     @Test
+    void stripsTagsWhilePreservingLineBreaksAndLiteralAngleBrackets() {
+        assertThat(text.stripHtml("<b>첫 줄</b><BR />둘째 줄 <><i>강조</i> &lt; 그대로 <열린 문장"))
+                .isEqualTo("첫 줄\n둘째 줄 <>강조 < 그대로 <열린 문장");
+        assertThat(text.stripHtml("<p><em>여러 태그</em></p> 마지막 글자 >"))
+                .isEqualTo("여러 태그 마지막 글자 >");
+    }
+
+    @Test
     void eachEntityIsUndoneOnce() {
         // What reads "&quot;" on the page is stored as "&amp;quot;". Undoing the ampersand first
         // let it join what followed into a new entity, and the preview showed a quotation mark.
