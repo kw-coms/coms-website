@@ -223,6 +223,8 @@ test.describe('home boot intro', () => {
         await mockOptionalApis(page)
         await page.goto('/', { waitUntil: 'domcontentloaded' })
 
+        const opening = page.locator('#opening')
+        const about = opening.getByRole('button', { name: '동아리 소개', exact: true })
         const skip = page.getByRole('button', { name: 'skip ›' })
         if (reducedMotion === 'reduce') await expect(skip).toHaveCount(0)
         else {
@@ -234,14 +236,14 @@ test.describe('home boot intro', () => {
         await expect(page.locator('html')).not.toHaveClass(/coms-boot/)
         await expect(page.locator('h1')).toContainText("COM's")
         await expect(page.locator('h1')).toBeInViewport()
-        await expect(page.getByRole('button', { name: '동아리 소개', exact: true })).toBeInViewport()
+        await expect(about).toBeInViewport()
         await expect(page.locator('.scene-opening__copy')).toHaveCSS('opacity', '1')
         expect(await page.evaluate(() => window.scrollY)).toBe(0)
         // The page under the intro takes clicks again.
-        await page.getByRole('button', { name: '지원하기', exact: true }).click()
+        await opening.getByRole('button', { name: '지원하기', exact: true }).click()
         await expect(page).toHaveURL(/\/recruit$/)
         await page.goBack()
-        await expect(page.getByRole('button', { name: '동아리 소개', exact: true })).toBeVisible()
+        await expect(about).toBeVisible()
 
         // Once per tab: coming back to the home page does not replay it.
         await page.reload()
