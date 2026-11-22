@@ -19,19 +19,19 @@ export function Led({ part }: PartProps) {
   useFrame(() => {
     const b = vis(part.id)?.led?.brightness ?? 0;
     const e = Math.sqrt(b); // perceptual: low PWM duty stays visibly dim, not off
-    mat.emissiveIntensity = e * 2.6;
-    die.emissiveIntensity = e * 4;
+    mat.emissiveIntensity = e * 1.8;
+    die.emissiveIntensity = e * 5.2;
     const g = glow.current;
     if (g) {
       g.visible = b > 0.02;
-      g.scale.setScalar(7 + e * 20);
-      (g.material as { opacity: number }).opacity = Math.min(1, 0.15 + e * 0.85);
+      g.scale.setScalar(5 + e * 14);
+      (g.material as { opacity: number }).opacity = e * 0.95;
     }
     const p = pool.current;
     if (p) {
       p.visible = b > 0.02;
-      p.scale.setScalar(10 + e * 22);
-      (p.material as { opacity: number }).opacity = Math.min(0.9, e * 0.8);
+      p.scale.setScalar(9 + e * 16);
+      (p.material as { opacity: number }).opacity = e * 0.62;
     }
   });
   return (
@@ -44,7 +44,7 @@ export function Led({ part }: PartProps) {
       <mesh position={[0.7, 5.6, 0]}><boxGeometry args={[0.35, 2.2, 1.3]} /><meshStandardMaterial color="#cfd3d6" metalness={0.85} roughness={0.3} /></mesh>
       <mesh position={[-0.7, 5.3, 0]}><boxGeometry args={[0.35, 1.6, 0.9]} /><meshStandardMaterial color="#cfd3d6" metalness={0.85} roughness={0.3} /></mesh>
       <mesh position={[-0.7, 6.3, 0]} material={die}><boxGeometry args={[0.9, 0.9, 0.9]} /></mesh>
-      <GlowSprite spriteRef={glow} position={[0, 7, 0]} color={color} />
+      <GlowSprite spriteRef={glow} position={[-0.7, 6.8, 0]} color={color} />
       <GlowPool poolRef={pool} color={color} />
     </group>
   );
@@ -58,15 +58,16 @@ export function RgbLed({ part }: PartProps) {
     const v = vis(part.id)?.rgb ?? { r: 0, g: 0, b: 0 };
     const m = Math.max(v.r, v.g, v.b);
     const e = Math.sqrt(m);
-    mat.current?.emissive.setRGB(v.r, v.g, v.b);
+    const color = m > 0 ? [v.r / m, v.g / m, v.b / m] as const : [0, 0, 0] as const;
+    mat.current?.emissive.setRGB(...color);
     if (mat.current) mat.current.emissiveIntensity = e * 2.4;
     const g = glow.current;
     if (g) {
       g.visible = m > 0.02;
       g.scale.setScalar(7 + e * 22);
       const gm = g.material as { opacity: number; color: { setRGB: (r: number, g: number, b: number) => void } };
-      gm.opacity = Math.min(1, 0.15 + e * 0.85);
-      gm.color.setRGB(v.r, v.g, v.b);
+      gm.opacity = e * 0.9;
+      gm.color.setRGB(...color);
     }
     const p = pool.current;
     if (p) {
@@ -74,7 +75,7 @@ export function RgbLed({ part }: PartProps) {
       p.scale.setScalar(10 + e * 24);
       const pm = p.material as unknown as { opacity: number; color: { setRGB: (r: number, g: number, b: number) => void } };
       pm.opacity = Math.min(0.9, e * 0.8);
-      pm.color.setRGB(v.r, v.g, v.b);
+      pm.color.setRGB(...color);
     }
   });
   return (

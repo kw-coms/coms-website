@@ -568,7 +568,10 @@ export class SimulationEngine {
         g: ledBrightness(this.opticalCurrents[`${part.id}:G`] ?? 0),
         b: ledBrightness(this.opticalCurrents[`${part.id}:B`] ?? 0),
       };
-      if (part.kind === 'arduino-uno') state.led = { brightness: part.id === this.unoId ? pins.D13?.duty ?? 0 : 0 };
+      if (part.kind === 'arduino-uno') {
+        const pin = pins.D13;
+        state.led = { brightness: part.id === this.unoId && pin?.mode === 'output' ? pin.duty : 0 };
+      }
       if (part.kind === 'servo') state.servo = {
         angle: this.powered(part.id, 'V+') ? this.mcu.servoAngle(this.unoPin(part.id, 'SIG') ?? '') : 0,
       };

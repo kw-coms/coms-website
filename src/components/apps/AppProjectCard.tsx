@@ -1,7 +1,9 @@
-import { ArrowUpRight, Download, FileText } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Download, FileText } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import WorkMetrics from './WorkMetrics'
 import { buildProjectStatusBadges } from '../../utils/appProjectStatus'
 import '../../styles/site-pages.css'
-import { projectFileHref, safeProjectLinkUrl } from '../../utils/appProjectUrls'
+import { projectAddressLabel, projectFileHref, projectImageHref, safeProjectLinkUrl } from '../../utils/appProjectUrls'
 
 const STATUS_TONE_CLASS = {
   ready: 'bg-[#e8f3ff] text-[var(--app-accent-text)]',
@@ -21,12 +23,6 @@ function formatFileSize(bytes) {
   return `${n}B`
 }
 
-/** The host only ("coms.kw.ac.kr"): the path is noise on a card, the link itself is the card. */
-function hostOf(url) {
-  if (typeof url !== 'string') return ''
-  return url.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').split(/[/?#]/)[0]
-}
-
 function fileLabel(file) {
   return file?.originalName || file?.name || '배포파일'
 }
@@ -38,6 +34,9 @@ type AppProject = {
   madeBy?: string
   linkUrl?: string
   displayUrl?: string
+  viewCount?: number
+  likeCount?: number
+  commentCount?: number
   files?: { id?: string | number; url?: string; originalName?: string; name?: string; size?: number; fileSize?: number }[]
   images?: { id: number; url: string }[]
   [key: string]: unknown
@@ -50,6 +49,8 @@ export default function AppProjectCard({
   interactive = true,
   className = '',
   testId,
+  detailTo,
+  editWork,
 }: {
   project: AppProject
   showStatusBadges?: boolean
@@ -58,13 +59,15 @@ export default function AppProjectCard({
   interactive?: boolean
   className?: string
   testId?: string
+  detailTo?: string
+  editWork?: () => void
 }) {
   const files = Array.isArray(project?.files) ? project.files : []
   const linkHref = safeProjectLinkUrl(project?.linkUrl)
   const hasLink = Boolean(linkHref)
   // Keep the whole card clickable only when there's nothing interactive nested
   // inside it (no embed button, no download files) — anchors can't wrap buttons.
-  const wholeCardLink = hasLink && interactive && files.length === 0 && !project.images?.length
+  const wholeCardLink = hasLink && interactive && !detailTo && files.length === 0 && !project.images?.length
   const CardTag = wholeCardLink ? 'a' : 'div'
   const cardProps = wholeCardLink
     ? { href: linkHref, target: '_blank', rel: 'noreferrer' }
@@ -75,7 +78,7 @@ export default function AppProjectCard({
   const notAnswering = hasLink && linkState === 'DOWN' && !showStatusBadges
 
   const title = project?.title || '입력 중인 작품'
-  const host = hostOf(project?.displayUrl)
+  const address = projectAddressLabel(project.linkUrl, project.displayUrl)
   const open = hasLink && (
     wholeCardLink ? (
       <span className="app-card-open">
@@ -100,11 +103,11 @@ export default function AppProjectCard({
     <CardTag
       {...cardProps}
       data-testid={testId}
-      className={`apple-product-panel app-card group text-left no-underline transition hover:-translate-y-0.5 ${project.images?.length ? 'app-card-with-images' : ''} ${className}`}
+      className={`apple-product-panel app-card group text-left no-underline transition hover:-translate-y-0.5 ${project.images?.length ? 'app-card-with-images' : ''} ${detailTo ? 'app-card-showcase' : ''} ${className}`}
     >
       <div className="app-card-head">
         <p className="app-card-eyebrow">{project?.eyebrow}</p>
-        <h3 className="app-card-title" title={title}>{title}</h3>
+        <h3 className="app-card-title" title={title}>{detailTo ? <Link to={detailTo}>{title}</Link> : title}</h3>
       </div>
       {open}
       {/* Fixed-size slots: every card is the same size however much text it carries. */}
@@ -117,10 +120,13 @@ export default function AppProjectCard({
           </span>
         )}
         {typeof project.madeBy === 'string' && project.madeBy.trim() && <span className="min-w-0 max-w-[60%] truncate" title={project.madeBy.trim()}>제작자 {project.madeBy.trim()}</span>}
-        {host && <span className="app-card-host">{host}</span>}
+        {address && <span className="app-card-host" title={address}>{address}</span>}
       </div>
       {project.images?.length ? <div className="app-card-images" aria-label="작품 사진">
-        {project.images.map((image, index) => <a key={image.id} href={image.url} target="_blank" rel="noreferrer" aria-label={`${title} ${index === 0 ? '대표 사진' : `스크린샷 ${index}`} 크게 보기`}><img src={image.url} alt="" loading="lazy" /></a>)}
+        {project.images.map((image, index) => {
+          const href = projectImageHref(image.url)
+          return href && <a key={image.id} href={href} target="_blank" rel="noreferrer" aria-label={title + ' 사진 ' + (index + 1) + ' 크게 보기'}><img src={href} alt="" loading="lazy" /></a>
+        })}
       </div> : null}
 
       {/* Always rendered: CSS reserves the row only where some card in the grid has files or badges. */}
@@ -168,6 +174,13 @@ export default function AppProjectCard({
           <span className="shrink-0 text-xs font-bold text-[var(--app-subtle)]">파일 {files.length}개</span>
         )}
       </div>
+      {detailTo && <div className="app-card-engagement">
+        <WorkMetrics work={project} />
+        <div className="app-card-links">
+          {editWork && <button type="button" onClick={editWork}>수정</button>}
+          <Link to={detailTo} aria-label={title + ' 상세·댓글'}>상세 <ArrowRight size={14} aria-hidden="true" /></Link>
+        </div>
+      </div>}
     </CardTag>
   )
 }

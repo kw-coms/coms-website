@@ -142,6 +142,7 @@ function ProgramPage({ id }: { id: number }) {
           {user?.role === 'ADMIN' && <Link to={`/admin?tab=team-projects&program=${program.id}`} className="tp-text-button">관리 화면</Link>}</div>
         {program.description && <p className="max-w-2xl whitespace-pre-wrap break-words text-base leading-7 text-[var(--app-muted)]">{program.description}</p>}
       </div>
+      <Link to="/forms?category=TEAM_PROJECT" className="tp-text-button">팀 프로젝트 신청·수요조사</Link>
       <NextDeadline milestones={program.milestones} now={now} />
       <section aria-labelledby="tp-schedule" className="space-y-4"><h2 id="tp-schedule" className="text-xl font-bold">일정</h2>
         {program.milestones.length ? <Timeline milestones={program.milestones} now={now} submissions={program.myTeamId ? submissions.data : undefined} /> : <p className="tp-card text-sm">아직 등록된 일정이 없습니다.</p>}
@@ -168,6 +169,7 @@ function ProgramList() {
   return <div className="site-page"><main className="site-page-inner tp-page">
     <PageHeading>팀 프로젝트</PageHeading>
     <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--app-muted)]">팀별 일정과 제출 현황을 확인하고, 내 팀의 결과물을 제출하세요.</p>
+    <Link to="/forms?category=TEAM_PROJECT" className="tp-text-button mt-4">팀 프로젝트 신청·수요조사</Link>
     {programs.isPending && <p role="status" className="mt-6">불러오는 중…</p>}
     {programs.isError && <p role="alert" className="mt-6 text-sm">목록을 불러오지 못했습니다. <button type="button" className="underline" onClick={() => programs.refetch()}>다시 불러오기</button></p>}
     {programs.data?.length === 0 && <p className="tp-card mt-6">진행 중인 팀 프로젝트가 아직 없습니다.</p>}

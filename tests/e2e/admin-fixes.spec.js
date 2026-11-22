@@ -21,14 +21,14 @@ test.describe('operator panel', () => {
     const nav = page.getByRole('navigation', { name: '운영 패널 메뉴' })
     for (const [group, tabs] of Object.entries({
       사람: ['회원 관리', '명부 인증', '권한 관리', '차단 관리', '모집 관리'],
-      콘텐츠: ['활동 관리', '커뮤니티 관리', '삭제 보관함', '파일 관리', '작품 관리', '해커톤 평가', '팀 프로젝트', '역대 회장단', '후원자'],
+      콘텐츠: ['활동 관리', '커뮤니티 관리', '삭제 보관함', '파일 관리', '작품 관리', '신청·수요조사', '해커톤 평가', '팀 프로젝트', '역대 회장단', '후원자'],
       사이트: ['사이트 문구', '폰트 관리', '수동 점검'],
       시스템: ['분석', '로그'],
     })) {
       const list = nav.getByRole('tablist', { name: group })
       await expect(list.getByRole('tab')).toHaveText(tabs)
     }
-    await expect(nav.getByRole('tab')).toHaveCount(20)
+    await expect(nav.getByRole('tab')).toHaveCount(21)
   })
 
   test('an officer sees only the headings that still hold a permitted tab', async ({ page }) => {

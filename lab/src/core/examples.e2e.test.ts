@@ -225,7 +225,16 @@ const v2Checks: Record<string, (run: SketchRun) => void> = {
   'transistor-motor': run => { expect(run.run(100).parts.motor?.motor?.rpm).toBeGreaterThan(0); expect(run.run(1100).parts.motor?.motor?.rpm).toBeLessThan(1); },
   'relay-lamp': run => { const on=run.run(100); expect(on.parts.r?.relay?.closed).toBe(true); expect(on.parts.bulb?.bulb?.brightness).toBeGreaterThan(.1); const off=run.run(1400); expect(off.parts.r?.relay?.closed).toBe(false); expect(off.parts.bulb?.bulb?.brightness).toBeLessThan(.1); },
   'shift-register-eight': run => { expect(Object.values(run.run(350).parts.ic?.ic?.outputs ?? {}).filter(Boolean).length).toBeGreaterThan(0); },
-  'timer-555-blink': run => { const states = new Set<number>(); run.run(3500, f => states.add(f.parts.ic?.ic?.outputs?.['3'] ?? 0)); expect(states.size).toBe(2); },
+  'timer-555-blink': run => {
+    const states = new Set<boolean>();
+    run.run(100);
+    run.run(3500, frame => {
+      const on = (frame.parts.led?.led?.brightness ?? 0) > .05;
+      states.add(on);
+      expect(on).toBe(frame.parts.ic?.ic?.outputs?.['3'] === 1);
+    });
+    expect(states).toEqual(new Set([false, true]));
+  },
   'rc-oscilloscope': run => { const trace = run.run(200).scopes?.scope; expect(trace?.channels[0]?.length).toBeGreaterThan(2); },
   'regulator-7805': run => { expect(run.run(100).parts.reg?.pinVolts?.OUT).toBeCloseTo(5, 1); },
   'tmp36-thermometer': run => { run.input('sensor','temperature',35); run.run(600); expect(Math.abs(Number(run.serial.trim().split('\n').at(-1)) - 35)).toBeLessThan(1); },

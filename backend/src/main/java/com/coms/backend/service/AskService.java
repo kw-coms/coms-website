@@ -107,6 +107,7 @@ public class AskService {
             globalDailyLimit.record("site");
         }
 
+        String topic = request.topic() == AskRequest.Topic.COLLABORATION ? "협업 제안" : "질문";
         String title = question.codePoints()
                 .filter(codePoint -> !Character.isISOControl(codePoint))
                 .limit(40)
@@ -116,14 +117,14 @@ public class AskService {
                 + "\n로그인 회원: " + (member == null ? "아니요" : "예")
                 + (member == null ? (name.isEmpty() ? "" : "\n이름: " + name)
                 : "\n이름: " + member.getName() + "\n학번: " + member.getStudentId())
-                + "\n질문 페이지: " + path + "\n접수 시각: " + KST_TIME.format(clock.instant())
-                + "\n\n[질문]\n" + question + "\n";
+                + "\n" + topic + " 페이지: " + path + "\n접수 시각: " + KST_TIME.format(clock.instant())
+                + "\n\n[" + topic + "]\n" + question + "\n";
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(inbox);
         message.setReplyTo(reply);
-        message.setSubject("[COM's 질문] " + title);
+        message.setSubject("[COM's " + topic + "] " + title);
         message.setText(body);
         try {
             mailSender.send(message);

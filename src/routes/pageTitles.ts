@@ -13,6 +13,7 @@ const MAX_DETAIL_LENGTH = 60
 // First match wins, so more specific paths come before their section prefix.
 const ROUTE_LABELS: Array<[pattern: RegExp, label: string | ((...groups: string[]) => string | null)]> = [
   [/^\/about$/, '동아리 소개'],
+  [/^\/contact$/, '협업 제안'],
   [/^\/activities$/, '활동'],
   [/^\/activity-log$/, '활동 기록'],
   [/^\/activity-events(\/[^/]+)?$/, '이벤트'],
@@ -25,6 +26,7 @@ const ROUTE_LABELS: Array<[pattern: RegExp, label: string | ((...groups: string[
   [/^\/study\/([^/]+)\/practice(?:\/[^/]+)?$/, (id) => { const study = findStudy(id); return study ? `${study.title} 실습 문제` : null }],
   [/^\/study\/([^/]+)$/, (id) => findStudy(id)?.title ?? null],
   [/^\/apps$/, '작품'],
+  [/^\/forms(?:\/[^/]+)?$/, '신청·수요조사'],
   [/^\/officers$/, '역대 회장단'],
   [/^\/team-projects(\/[^/]+)?$/, '팀 프로젝트'],
   [/^\/hackathon$/, '해커톤 아카이브'],

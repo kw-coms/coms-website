@@ -79,7 +79,7 @@ export default function HomeView() {
     },
     projects: {
       primary: { label: sectionStories.projects.primary, onClick: () => goPageTop('/projects') },
-      secondary: { label: sectionStories.projects.secondary, href: 'https://github.com/kw-coms' },
+      secondary: { label: '부원 작품 보기', onClick: () => goPageTop('/apps') },
     },
     recruit: {
       primary: { label: sectionStories.recruit.primary, onClick: () => goPageTop('/recruit') },

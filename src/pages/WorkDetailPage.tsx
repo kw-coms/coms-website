@@ -3,11 +3,11 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { ArrowLeft, ArrowUpRight, Download } from 'lucide-react'
 import PageHeading from '../components/PageHeading'
 import WorkComments from '../components/apps/WorkComments'
+import WorkMetrics from '../components/apps/WorkMetrics'
 import { useAuth } from '../contexts/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getClubProject, setClubProjectLike } from '../services/clubProjectApi'
-import { apiUrl } from '../services/apiClient'
-import { projectFileHref, safeProjectLinkUrl } from '../utils/appProjectUrls'
+import { projectAddressLabel, projectFileHref, projectImageHref, safeProjectLinkUrl } from '../utils/appProjectUrls'
 import { workViewerKey } from '../utils/workViewerKey'
 import '../styles/site-pages.css'
 
@@ -78,19 +78,17 @@ function WorkDetail({ workId }: { workId: number }) {
             <div className="mt-5"><PageHeading>{work.title}</PageHeading></div>
             {work.madeBy?.trim() && <p className="mt-3 min-w-0 break-words text-sm font-semibold text-[var(--app-muted)]">제작자 {work.madeBy.trim()}</p>}
             <p className="mt-4 whitespace-pre-wrap break-words text-base leading-7 text-[var(--app-text)]">{work.description}</p>
-            <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-[var(--app-muted)]" aria-label="작품 반응">
-              <span>조회 {Number(work.viewCount || 0).toLocaleString('ko-KR')}</span>
-              <span>추천 {Number(work.likeCount || 0).toLocaleString('ko-KR')}</span>
-              <span>댓글 {Number(work.commentCount || 0).toLocaleString('ko-KR')}</span>
+            <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-[var(--app-muted)]">
+              <WorkMetrics work={work} />
               {user ? (
                 <button type="button" aria-pressed={Boolean(work.likedByMe)} disabled={likePending} onClick={like} className="apple-action-secondary min-h-11 px-4 text-sm">{likePending ? '저장 중…' : work.likedByMe ? '추천 취소' : '추천하기'}</button>
               ) : !authLoading && <Link to="/login" state={{ from: location }} className="font-semibold text-[var(--app-accent-text)] underline">추천하려면 로그인</Link>}
             </div>
             {likeError && <p role="alert" className="mt-3 text-sm text-[var(--app-danger)]">{likeError}</p>}
-            {link && <a href={link} target="_blank" rel="noreferrer" className="apple-action-primary mt-6 inline-flex min-h-11 items-center gap-2 px-5 text-sm">작품 열기 <ArrowUpRight size={16} aria-hidden="true" /></a>}
+            {link && <div className="flex flex-wrap items-baseline gap-3"><a href={link} target="_blank" rel="noreferrer" className="apple-action-primary mt-6 inline-flex min-h-11 items-center gap-2 px-5 text-sm">작품 열기 <ArrowUpRight size={16} aria-hidden="true" /></a><span className="break-all text-sm text-[var(--app-muted)]">{projectAddressLabel(work.linkUrl)}</span></div>}
             {images.length > 0 && <section aria-label="작품 사진" className="mt-7 flex gap-3 overflow-x-auto">
               {images.map((image, index) => {
-                const href = /^\/api\/club-projects\/\d+\/images\/\d+$/.test(image.url || '') ? apiUrl(image.url) : null
+                const href = projectImageHref(image.url)
                 return href && <a key={image.id} href={href} target="_blank" rel="noreferrer" aria-label={`${work.title} 사진 ${index + 1} 크게 보기`} className="shrink-0"><img src={href} alt={`${work.title} 사진 ${index + 1}`} loading="lazy" className="h-36 w-52 rounded-xl border border-[var(--app-hairline)] object-cover sm:h-44 sm:w-64" /></a>
               })}
             </section>}

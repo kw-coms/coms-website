@@ -66,6 +66,8 @@ const WorkDetailPage = lazy(() => import('./pages/WorkDetailPage'))
 const HackathonArchivePage = lazy(() => import('./pages/HackathonArchive'))
 const HackathonPage = lazy(() => import('./pages/Hackathon'))
 const TeamProjectsPage = lazy(() => import('./pages/TeamProjects'))
+const ClubFormsPage = lazy(() => import('./pages/ClubForms'))
+const ContactPage = lazy(() => import('./pages/Contact'))
 const OfficersPage = lazy(() => import('./pages/Officers'))
 const StudyHubPage = lazy(() => import('./pages/study/StudyHubPage'))
 const StudyPage = lazy(() => import('./pages/study/StudyPage'))
@@ -194,6 +196,7 @@ function App() {
       <RouteErrorBoundary>
       <Routes location={location}>
         <Route path="/" element={<HomeView />} />
+        <Route path="/contact" element={<ContactPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/activities" element={<ActivitiesDetailPage />} />
         <Route path="/activity-log" element={<RequireAuth><ActivityLogPage /></RequireAuth>} />
@@ -214,6 +217,8 @@ function App() {
         <Route path="/hackathon" element={<HackathonArchivePage />} />
         <Route path="/hackathon/:eventId" element={<HackathonPage />} />
         <Route path="/officers" element={<RequireAuth><OfficersPage /></RequireAuth>} />
+        <Route path="/forms" element={<RequireAuth><ClubFormsPage /></RequireAuth>} />
+        <Route path="/forms/:id" element={<RequireAuth><ClubFormsPage /></RequireAuth>} />
         <Route path="/team-projects" element={<RequireAuth><TeamProjectsPage /></RequireAuth>} />
         <Route path="/team-projects/:programId" element={<RequireAuth><TeamProjectsPage /></RequireAuth>} />
         <Route path="/apps/:workId" element={<WorkDetailPage />} />

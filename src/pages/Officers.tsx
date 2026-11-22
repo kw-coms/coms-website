@@ -24,8 +24,8 @@ function Term({ term }: { term: TermView }) {
   const vices = term.officers.filter((officer) => officer.role === 'VICE_PRESIDENT')
   return <li className="of-term">
     <div className="of-term-head">
-      <span className="of-label">{term.label}</span>
-      <span className="of-year">{term.year}년</span>
+      <time className="of-year" dateTime={String(term.year)}>{term.year}년</time>
+      <span className="of-label">{term.label}{/^\d+대$/.test(term.label) ? ' 회장단' : ''}</span>
     </div>
     <dl className="of-roles">
       <Names title="회장" officers={presidents} />
@@ -44,7 +44,7 @@ export default function Officers() {
   const jump = (decade: number) => document.getElementById(`of-decade-${decade}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   return <div className="site-page"><main className="site-page-inner of-page">
     <PageHeading>역대 회장단</PageHeading>
-    <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--app-muted)]">COM'S를 이끌어 온 역대 회장과 부회장입니다. 이름, 연도, 임기로 찾아보세요.</p>
+    <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--app-muted)]">COM'S를 이끌어 온 회장과 부회장을 연도별로 모았습니다. 카드의 ‘대’는 회장단 임기이고, 이름 옆의 ‘기’는 개인의 가입 기수입니다.</p>
     <div className="of-tools">
       <ListSearch value={query} onChange={setQuery} label="회장단 검색" placeholder="이름·연도·임기(예: 52대)로 검색" />
       {terms.data && <p role="status" className="of-count">{searching ? `${filtered.length}개 임기가 검색되었습니다.` : `총 ${terms.data.length}개 임기`}</p>}

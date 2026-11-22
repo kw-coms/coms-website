@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+import { activityTemplateOptions } from '../../features/activityLog/activityTemplates'
 import { useEffect, useRef, useState } from 'react'
 import {
   createClubActivity,
@@ -147,7 +149,7 @@ export default function AdminActivities() {
       />
 
       <form onSubmit={submit} className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
-        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">활동 기록 등록</p>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold text-[var(--theme-body-dark)]">활동 기록 등록</h2><Link to="/activity-log" className="text-sm font-semibold text-[var(--app-accent-text)] underline">사진과 서식을 쓰는 활동 글쓰기</Link></div>
         <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">회원에게만 보이는 실제 활동 기록과 일정을 등록합니다. 사진 여러 장과 파일 첨부를 함께 올릴 수 있습니다.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
@@ -203,6 +205,10 @@ export default function AdminActivities() {
               ))}
             </select>
           </label>
+          {!form.description.trim() && <div className="flex flex-wrap items-center gap-2 md:col-span-2" aria-label="활동 글쓰기 양식">
+            <span className="text-sm font-semibold">양식으로 시작</span>
+            {activityTemplateOptions(form.kind === 'SCHEDULE').map(template => <button key={template.name} type="button" className="apple-action-secondary min-h-10 px-3 text-sm" onClick={() => setForm(prev => ({ ...prev, description: template.sections.join('\n\n') + '\n' }))}>{template.name}</button>)}
+          </div>}
           <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)] md:col-span-2">
             활동 내용
             <textarea

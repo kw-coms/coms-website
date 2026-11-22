@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ImagePlus, Paperclip } from 'lucide-react'
 import { createClubActivity, uploadClubActivityFile, uploadClubActivityImages } from '../../services/clubActivityApi'
 import { CLUB_ACTIVITIES_QUERY_KEY, normalizeRichTextForSubmit } from '../../shared/homeUi'
+import { activityTemplateOptions } from './activityTemplates'
 import { RichTextComposer } from '../../shared/RichText'
 
 function ActivityComposer({
@@ -126,6 +127,10 @@ function ActivityComposer({
       />
 
       <div className="order-2 lg:col-start-1 lg:row-start-2">
+        {!activityForm.description && <div className="mb-3 flex flex-wrap items-center gap-2" aria-label="글쓰기 양식">
+          <span className="text-sm font-semibold">양식으로 시작</span>
+          {activityTemplateOptions(false).map(template => <button key={template.name} type="button" className="apple-action-secondary min-h-10 px-3 text-sm" onClick={() => setActivityForm(prev => ({ ...prev, description: template.sections.map(section => '<p><strong>' + section + '</strong></p><p><br></p>').join('') }))}>{template.name}</button>)}
+        </div>}
         <RichTextComposer
           value={activityForm.description}
           onChange={(description) => setActivityForm((prev) => ({ ...prev, description }))}

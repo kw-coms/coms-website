@@ -269,7 +269,7 @@ export default function AdminTeamProjects() {
   if (programs.isPending) return <p role="status">팀프 목록을 불러오는 중…</p>
   if (programs.isError) return <div role="alert">팀프 목록을 불러오지 못했습니다. <button className={actionClass} onClick={() => programs.refetch()}>다시 불러오기</button></div>
   return <section className="space-y-6" aria-label="팀 프로젝트 관리">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">팀 프로젝트 관리</h2><p className="mt-2 text-sm text-[var(--app-muted)]">일정, 팀과 팀원, 제출 현황을 관리합니다.</p></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">팀 프로젝트 관리</h2><p className="mt-2 text-sm text-[var(--app-muted)]">일정, 팀과 팀원, 제출 현황을 관리합니다.</p></div><Link to="/admin?tab=club-forms&category=TEAM_PROJECT" className="tp-text-button">팀프 수요조사 양식</Link>
       {program && <Link to={`/team-projects/${program.id}`} className={actionClass}>회원용 페이지</Link>}</div>
     <div className="flex flex-wrap items-end gap-3">
       {programs.data.length > 0 && <label className="text-sm font-semibold">관리할 팀프<select aria-label="관리할 팀프" className="tp-input mt-2" value={programId} onChange={event => select(Number(event.target.value))}>{programs.data.map(item => <option key={item.id} value={item.id}>{item.title}{item.open ? '' : ' · 마감'}</option>)}</select></label>}

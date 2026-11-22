@@ -4,13 +4,14 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { CRITERIA, STATUS_META, summarizeHackathon } from '../../features/hackathon/hackathon'
 import HackathonScoreForm from '../../features/hackathon/HackathonScoreForm'
+import HackathonProjectEditor from './HackathonProjectEditor'
 import HackathonStatusBadge from '../../features/hackathon/HackathonStatusBadge'
 import {
   createHackathonEvent, createHackathonProject, deleteEventReview, deleteHackathonMaterial, deleteHackathonProject,
   getAdminHackathonEvent, listAdminHackathonEvents, listEventReviews, publishHackathonEvent,
   saveEventChairReview, setEventOpen, setEventResultsPublished, updateHackathonEvent, updateHackathonProject, uploadHackathonMaterial,
   type AdminHackathonEvent, type HackathonEventWrite, type HackathonMaterial, type HackathonProject,
-  type HackathonProjectWrite, type HackathonReview,
+  type HackathonReview,
 } from '../../services/hackathonApi'
 import '../../styles/hackathon.css'
 
@@ -47,30 +48,12 @@ function EventEditor({ event, busy, error, save }: { event?: AdminHackathonEvent
   </form>
 }
 
-function ProjectEditor({ project, busy, save }: { project?: HackathonProject; busy: boolean; save: (payload: HackathonProjectWrite) => Promise<boolean> }) {
-  const [draft, setDraft] = useState<HackathonProjectWrite>({ title: project?.title ?? '', author: project?.author ?? '', description: project?.description ?? '', github: project?.github ?? null, live: project?.live ?? null, position: project?.position })
-  const submit = async (e: FormEvent) => { e.preventDefault(); await save({ ...draft, title: draft.title.trim(), author: draft.author.trim(), description: draft.description.trim(), github: draft.github?.trim() || null, live: draft.live?.trim() || null }) }
-  return <form onSubmit={submit} aria-label={project ? `${project.title} 팀 편집` : '새 팀 등록'} className="grid gap-3 rounded-xl border border-[var(--app-hairline)] p-4">
-    <div className="grid gap-3 sm:grid-cols-2">
-      <label className="text-sm font-semibold">팀·작품 이름<input required maxLength={120} className={inputClass} value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} /></label>
-      <label className="text-sm font-semibold">팀·작성자<input required maxLength={200} className={inputClass} value={draft.author} onChange={e => setDraft({ ...draft, author: e.target.value })} /></label>
-    </div>
-    <label className="text-sm font-semibold">작품 소개<textarea required maxLength={5000} rows={3} className={inputClass} value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} /></label>
-    <div className="grid gap-3 sm:grid-cols-2">
-      <label className="text-sm font-semibold">GitHub 주소<input type="url" pattern="https?://.+" maxLength={2000} className={inputClass} value={draft.github ?? ''} onChange={e => setDraft({ ...draft, github: e.target.value })} placeholder="https://" /></label>
-      <label className="text-sm font-semibold">체험 주소<input type="url" pattern="https?://.+" maxLength={2000} className={inputClass} value={draft.live ?? ''} onChange={e => setDraft({ ...draft, live: e.target.value })} placeholder="https://" /></label>
-    </div>
-    {project && <label className="text-sm font-semibold">표시 순서<input type="number" min="0" max="9999" className={inputClass} value={draft.position ?? 0} onChange={e => setDraft({ ...draft, position: Number(e.target.value) })} /></label>}
-    <button disabled={busy || !draft.title.trim() || !draft.author.trim() || !draft.description.trim()} className="apple-action-primary min-h-11 px-5 text-sm disabled:opacity-50">{project ? '팀 정보 저장' : '팀 추가'}</button>
-  </form>
-}
-
 function MaterialEditor({ eventId, project, busy, save }: { eventId: number; project?: HackathonProject; busy: boolean; save: (file: File, projectId: string | null, kind: HackathonMaterial['kind'], label: string) => Promise<boolean> }) {
   const [file, setFile] = useState<File | null>(null)
   const [kind, setKind] = useState<HackathonMaterial['kind']>('other')
   const [label, setLabel] = useState('')
   const submit = async (e: FormEvent<HTMLFormElement>) => { e.preventDefault(); if (!file) return; const form = e.currentTarget; if (await save(file, project?.projectId ?? null, kind, label.trim())) { form.reset(); setFile(null); setKind('other'); setLabel('') } }
-  return <form onSubmit={submit} aria-label={`${project?.title ?? '행사'} 자료 올리기`} className="grid gap-3 rounded-xl border border-[var(--app-hairline)] p-4 sm:grid-cols-2">
+  return <form onSubmit={submit} aria-label={`${(project?.title || project?.teamName) ?? '행사'} 자료 올리기`} className="grid gap-3 rounded-xl border border-[var(--app-hairline)] p-4 sm:grid-cols-2">
     <label className="text-sm font-semibold">자료 파일<input required type="file" className={inputClass} onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>
     <label className="text-sm font-semibold">자료 종류<select className={inputClass} value={kind} onChange={e => setKind(e.target.value as HackathonMaterial['kind'])}>{materialKinds.map(value => <option key={value} value={value}>{({ proposal: '계획서', presentation: '발표 자료', video: '시연 영상', poster: '포스터', other: '기타 자료' })[value]}</option>)}</select></label>
     <label className="text-sm font-semibold">표시 이름<input maxLength={120} className={inputClass} value={label} onChange={e => setLabel(e.target.value)} placeholder="비우면 파일명 표시" /></label>
@@ -92,10 +75,11 @@ export default function AdminHackathon() {
   const [pending, setPending] = useState(false)
   const [removingId, setRemovingId] = useState<number | null>(null)
   const [newEvent, setNewEvent] = useState(false)
+  const [editingProject, setEditingProject] = useState<string | null>(null)
   const event = detail.data
   const guarded = Boolean(event?.open || reviews.isPending || reviews.isError || reviews.data?.length)
   const resultsBlocked = event && !event.resultsPublished ? (!event.published ? '결과 공개: 먼저 해커톤 글을 공개해 주세요.' : event.status !== 'DONE' ? `결과 공개: 완료 상태(평가 마감 + 개발 기간 종료)에서만 켤 수 있습니다. 지금은 '${STATUS_META[event.status].label}'입니다.` : '') : ''
-  const rows = event && reviews.data ? summarizeHackathon(reviews.data, event.projects) : []
+  const rows = event && reviews.data ? summarizeHackathon(reviews.data, event.projects.filter(project => project.published !== false)) : []
   const refresh = async () => {
     await Promise.all([
       client.invalidateQueries({ queryKey: ['admin', 'hackathon'] }),
@@ -126,8 +110,8 @@ export default function AdminHackathon() {
   if (events.isPending) return <p role="status">해커톤 목록을 불러오는 중…</p>
   if (events.isError) return <div role="alert">해커톤 목록을 불러오지 못했습니다. <button onClick={() => events.refetch()} className={actionClass}>다시 불러오기</button></div>
   return <section className="space-y-6" aria-label="해커톤 평가 관리">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">해커톤 평가·행사 관리</h2><p className="mt-2 text-sm text-[var(--app-muted)]">행사별 글·팀·자료·평가를 관리합니다.</p></div>{event?.published && <Link to={eventPath(eventId)} className={actionClass}>공개 페이지</Link>}</div>
-    <div className="flex flex-wrap items-center gap-3"><label className="text-sm font-semibold">관리할 해커톤<select aria-label="관리할 해커톤" className={inputClass} value={events.data.some(item => item.id === eventId) ? eventId : ''} onChange={e => { setParams(previous => { previous.set('event', e.target.value); return previous }); setMessage(''); setError(''); setFormError('') }}><option value="" disabled>선택</option>{events.data.map(item => <option key={item.id} value={item.id}>{item.title}{item.published ? '' : ' · 초안'} · {STATUS_META[item.status].label}</option>)}</select></label><button type="button" className={actionClass} onClick={() => setNewEvent(value => !value)}>{newEvent ? '작성 닫기' : '새 해커톤 작성'}</button></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">해커톤 평가·행사 관리</h2><p className="mt-2 text-sm text-[var(--app-muted)]">행사별 글·팀·자료·평가를 관리합니다.</p></div><Link to={'/admin?tab=club-forms&category=HACKATHON&hackathon=' + eventId} className={actionClass}>팀 신청 양식 관리</Link>{event?.published && <Link to={eventPath(eventId)} className={actionClass}>공개 페이지</Link>}</div>
+    <div className="flex flex-wrap items-center gap-3"><label className="text-sm font-semibold">관리할 해커톤<select aria-label="관리할 해커톤" className={inputClass} value={events.data.some(item => item.id === eventId) ? eventId : ''} onChange={e => { setParams(previous => { previous.set('event', e.target.value); return previous }); setMessage(''); setError(''); setFormError(''); setEditingProject(null) }}><option value="" disabled>선택</option>{events.data.map(item => <option key={item.id} value={item.id}>{item.title}{item.published ? '' : ' · 초안'} · {STATUS_META[item.status].label}</option>)}</select></label><button type="button" className={actionClass} onClick={() => setNewEvent(value => !value)}>{newEvent ? '작성 닫기' : '새 해커톤 작성'}</button></div>
     {newEvent && <EventEditor busy={pending} error={formError} save={payload => act(async () => { const created = await createHackathonEvent(payload); setParams(previous => { previous.set('event', String(created.id)); return previous }); setNewEvent(false) }, '해커톤 초안을 만들었습니다.', true)} />}
     {message && <p role="status" className="text-sm">{message}</p>}
     {error && <p role="alert" className="text-sm text-[var(--app-danger)]">{error}</p>}
@@ -136,7 +120,7 @@ export default function AdminHackathon() {
     {event && <div key={event.id} className="space-y-6">
       <div className="flex flex-wrap items-center gap-3"><strong>{event.published ? '공개 중' : '초안'} · {event.open ? '평가 접수 중' : '평가 마감'}</strong>
         <button type="button" disabled={pending || (event.published && (event.open || reviews.isPending || reviews.isError || Boolean(reviews.data?.length)))} className={actionClass} onClick={() => act(() => publishHackathonEvent(eventId, !event.published), event.published ? '공개를 중단했습니다.' : '해커톤 글을 공개했습니다.')}>{event.published ? '공개 중단' : '글 공개'}</button>
-        <button type="button" disabled={pending || (!event.open && (!event.published || !event.projects.length))} className={actionClass} onClick={() => act(() => setEventOpen(eventId, !event.open), event.open ? '평가를 마감했습니다.' : '평가를 열었습니다.')}>{event.open ? '평가 마감하기' : '평가 다시 열기'}</button>
+        <button type="button" disabled={pending || (!event.open && (!event.published || !event.projects.some(project => project.published !== false)))} className={actionClass} onClick={() => act(() => setEventOpen(eventId, !event.open), event.open ? '평가를 마감했습니다.' : '평가를 열었습니다.')}>{event.open ? '평가 마감하기' : '평가 다시 열기'}</button>
         <button type="button" className={actionClass} onClick={() => refresh()}>집계 새로고침</button>
         <HackathonStatusBadge status={event.status} />
         <button type="button" aria-pressed={event.resultsPublished} disabled={pending || Boolean(resultsBlocked)} aria-describedby={resultsBlocked ? 'hackathon-results-reason' : undefined} className={actionClass} onClick={() => act(() => setEventResultsPublished(eventId, !event.resultsPublished), event.resultsPublished ? '결과 공개를 중단했습니다.' : '결과를 공개했습니다.')}>{event.resultsPublished ? '결과 공개 중 · 비공개로 전환' : '결과 공개'}</button>
@@ -148,11 +132,11 @@ export default function AdminHackathon() {
         {!guarded && event.materials.length < 20 && <MaterialEditor eventId={eventId} busy={pending} save={(file, projectId, kind, label) => act(() => uploadHackathonMaterial(eventId, file, projectId, kind, label), '행사 자료를 올렸습니다.')} />}
       </section>
       <section className="space-y-4"><h3 className="text-lg font-bold">참가 팀</h3>{guarded && <p className="text-sm text-[var(--app-muted)]">평가 중이거나 제출된 평가가 있으면 팀과 자료 목록을 바꿀 수 없습니다. 소개와 링크는 수정할 수 있습니다.</p>}
-        {event.projects.map(project => <article key={project.projectId} className="space-y-4 rounded-xl border border-[var(--app-hairline)] p-4"><div className="flex flex-wrap items-center justify-between gap-3"><h4 className="font-bold">{project.title}</h4><button type="button" disabled={pending || guarded} className={actionClass} onClick={() => remove('팀 삭제', `${project.title} 팀을 삭제할까요?`, () => deleteHackathonProject(eventId, project.projectId))}>팀 삭제</button></div><ProjectEditor key={project.projectId} project={project} busy={pending} save={payload => act(() => updateHackathonProject(eventId, project.projectId, payload), `${project.title} 팀을 저장했습니다.`)} />
-          {project.materials.map(item => <div key={item.id} className="flex flex-wrap items-center gap-3 text-sm"><span>{item.label || item.originalName}</span>{event.published && <a href={item.url} target="_blank" rel="noreferrer" className="underline">열기</a>}<button type="button" disabled={pending || guarded} className={actionClass} onClick={() => remove('자료 삭제', `${item.originalName} 파일을 삭제할까요?`, () => deleteHackathonMaterial(eventId, item.id))}>삭제</button></div>)}
-          {!guarded && project.materials.length < 20 && <MaterialEditor eventId={eventId} project={project} busy={pending} save={(file, projectId, kind, label) => act(() => uploadHackathonMaterial(eventId, file, projectId, kind, label), `${project.title} 자료를 올렸습니다.`)} />}
+        {event.projects.map(project => <article key={project.projectId} className="space-y-4 rounded-xl border border-[var(--app-hairline)] p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><h4 className="break-words font-bold">{project.teamName || project.title}</h4><p className="mt-1 text-sm text-[var(--app-muted)]">{project.teamName && project.title && project.title !== project.teamName ? project.title + ' · ' : ''}{project.published === false ? '팀 초안' : '공개 작품'}</p></div><button type="button" className={actionClass} aria-expanded={editingProject === project.projectId} onClick={() => setEditingProject(editingProject === project.projectId ? null : project.projectId)}>{editingProject === project.projectId ? '편집 닫기' : '팀·작품 편집'}</button><button type="button" disabled={pending || guarded} className={actionClass} onClick={() => remove('팀 삭제', `${project.teamName || project.title} 팀을 삭제할까요?`, () => deleteHackathonProject(eventId, project.projectId))}>팀 삭제</button></div>{editingProject === project.projectId && <HackathonProjectEditor key={project.projectId} eventId={eventId} project={project} busy={pending} guarded={guarded} save={payload => act(() => updateHackathonProject(eventId, project.projectId, payload), `${project.teamName || project.title} 팀을 저장했습니다.`).then(ok => { if (ok) setEditingProject(null); return ok })} />}
+          {project.materials.map(item => <div key={item.id} className="flex flex-wrap items-center gap-3 text-sm"><span>{item.label || item.originalName}</span>{event.published && project.published !== false && <a href={item.url} target="_blank" rel="noreferrer" className="underline">열기</a>}<button type="button" disabled={pending || guarded} className={actionClass} onClick={() => remove('자료 삭제', `${item.originalName} 파일을 삭제할까요?`, () => deleteHackathonMaterial(eventId, item.id))}>삭제</button></div>)}
+          {!guarded && project.materials.length < 20 && <MaterialEditor eventId={eventId} project={project} busy={pending} save={(file, projectId, kind, label) => act(() => uploadHackathonMaterial(eventId, file, projectId, kind, label), `${project.teamName || project.title} 자료를 올렸습니다.`)} />}
         </article>)}
-        {!guarded && event.projects.length < 100 && <ProjectEditor busy={pending} save={payload => act(() => createHackathonProject(eventId, payload), '팀을 추가했습니다.')} />}
+        {!guarded && event.projects.length < 100 && <details className="hackathon-project"><summary className="cursor-pointer font-bold">새 팀 등록</summary><div className="mt-4"><HackathonProjectEditor eventId={eventId} busy={pending} guarded={guarded} save={payload => act(() => createHackathonProject(eventId, payload), '팀을 추가했습니다.')} /></div></details>}
       </section>
       {reviews.isPending && <p role="status">평가를 불러오는 중…</p>}
       {reviews.isError && <p role="alert">평가를 불러오지 못했습니다. <button type="button" className={actionClass} onClick={() => reviews.refetch()}>다시 불러오기</button></p>}

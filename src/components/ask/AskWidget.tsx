@@ -147,6 +147,7 @@ function AskDialog({ onClose, user, askEnabled, preview = false }: { onClose: ()
               {ASK_FAQS.map((faq, index) => <button key={faq.id} ref={index === 0 ? firstFaqRef : undefined} type="button" onClick={() => { if (preview) return; setSelectedFaq(faq); setStage('answer') }}>{faq.question}</button>)}
             </div>
             <button type="button" className="coms-ask-other" disabled={preview || !askEnabled} onClick={() => setStage('question')}>다른 질문 보내기</button>
+            {!preview && <Link to="/contact" onClick={onClose} className="coms-ask-source">행사·프로젝트 협업 제안</Link>}
             {!askEnabled && <p className="coms-ask-unavailable">지금은 이메일 문의를 받지 않고 있어요. 위 답변은 계속 확인할 수 있습니다.</p>}
           </div>}
           {stage === 'answer' && <div className="coms-ask-choices">

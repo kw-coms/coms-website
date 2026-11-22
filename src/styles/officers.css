@@ -57,8 +57,8 @@
   box-shadow: 0 0 0 4px var(--app-bg);
 }
 .of-term-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
-.of-label { font-size: 1.125rem; font-weight: 800; color: var(--app-accent-text); }
-.of-year { font-size: 0.875rem; font-weight: 600; color: var(--app-muted); font-variant-numeric: tabular-nums; }
+.of-label { font-size: 0.875rem; font-weight: 700; color: var(--app-accent-text); }
+.of-year { font-size: 1.125rem; font-weight: 800; color: var(--app-text); font-variant-numeric: tabular-nums; }
 .of-roles { display: grid; gap: 8px; margin: 0; }
 .of-role { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr); gap: 8px; align-items: baseline; }
 .of-role dt { font-size: 0.8125rem; font-weight: 700; color: var(--app-muted); }

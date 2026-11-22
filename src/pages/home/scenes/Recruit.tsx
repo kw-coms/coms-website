@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { sectionStories, visualDetails } from '../../../data/homeContent'
 import { JoinFlowVisual } from '../HomeVisuals'
 import { CineTitle, SceneActionRow, SceneStats, Slate, type SceneActions } from './parts'
@@ -23,6 +24,7 @@ export default function Recruit({ index, actions, backdrop }: { index: number; a
           <div>
             <p className="scene-lede" data-cine style={cssVars({ '--i': 2 })}>{story.body}</p>
             <SceneActionRow actions={actions} />
+            <Link to="/contact" className="mt-4 inline-flex min-h-11 items-center font-semibold text-[var(--app-accent-text)] underline">행사·프로젝트 협업 제안</Link>
             <SceneStats id="recruit" />
           </div>
           <div className="cine-wipe">

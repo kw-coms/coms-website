@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { ArrowUpRight, Copy } from 'lucide-react'
 import PageHeading from '../components/PageHeading'
 import { useAuth } from '../contexts/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getHackathonEvent, submitEventReview, type AlumniIdentity, type HackathonMaterial, type HackathonProject, type HackathonResult } from '../services/hackathonApi'
 import HackathonScoreForm from '../features/hackathon/HackathonScoreForm'
+import TeamWorkPanel from '../features/hackathon/TeamWorkPanel'
 import HackathonStatusBadge from '../features/hackathon/HackathonStatusBadge'
 import { CRITERIA, STATUS_META, formatPeriod, semesterLabel } from '../features/hackathon/hackathon'
 import { currentGeneration } from '../utils/roleAccess'
@@ -40,7 +41,7 @@ function Results({ results }: { results: HackathonResult[] }) {
     <div role="region" aria-label="최종 순위표" tabIndex={0} className="mt-4 overflow-x-auto">
       <table className="hackathon-results w-full min-w-[720px] text-sm">
         <caption className="sr-only">해커톤 최종 순위</caption>
-        <thead><tr>{['순위', '팀', '최종 점수', '졸업생 평균', '회장 평가', ...CRITERIA.map(item => item.label)].map((label, index) => <th key={label} scope="col" className={index === 0 ? 'hackathon-sticky-rank' : index === 1 ? 'hackathon-sticky-team' : undefined}>{label}</th>)}</tr></thead>
+        <thead><tr>{['순위', '작품', '최종 점수', '졸업생 평균', '회장 평가', ...CRITERIA.map(item => item.label)].map((label, index) => <th key={label} scope="col" className={index === 0 ? 'hackathon-sticky-rank' : index === 1 ? 'hackathon-sticky-team' : undefined}>{label}</th>)}</tr></thead>
         <tbody>{results.map(row => <tr key={row.projectId}>
           <th scope="row" className="hackathon-sticky-rank">{row.rank}위</th>
           <td className="hackathon-sticky-team"><a href={`#${row.projectId}`} className="font-semibold underline">{row.title}</a><span className="block text-xs text-[var(--app-muted)]">{row.author}</span></td>
@@ -61,8 +62,9 @@ function ProjectEvaluation({ project, eventId, identity, open }: { project: Hack
   const submitted = Boolean(identityKey && submittedFor === identityKey)
   return <article id={project.projectId} className="hackathon-project" aria-labelledby={`${project.projectId}-title`}>
     <header className="mb-5">
-      <p className="text-sm font-semibold text-[var(--app-muted)]">{project.author}</p>
+      {project.teamName && <p className="text-sm font-semibold text-[var(--app-accent-text)]">팀 · {project.teamName}</p>}
       <h2 id={`${project.projectId}-title`} className="mt-1 text-2xl font-bold">{project.title}</h2>
+      <p className="mt-1 text-sm text-[var(--app-muted)]">작성자 · {project.author}</p>
       <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--app-muted)]">{project.description}</p>
       <div className="mt-4 flex flex-wrap gap-2">
         {project.live && <a href={project.live} target="_blank" rel="noreferrer" className="apple-action-primary inline-flex min-h-11 items-center gap-1 px-4 text-sm">작품 체험 <ArrowUpRight size={14} aria-hidden="true" /></a>}
@@ -80,7 +82,8 @@ function ProjectEvaluation({ project, eventId, identity, open }: { project: Hack
 export default function Hackathon() {
   const { eventId: eventParam } = useParams()
   const eventId = eventParam !== undefined && /^[1-9]\d*$/.test(eventParam) ? Number(eventParam) : 0
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+  const location = useLocation()
   const [generation, setGeneration] = useState('')
   const [name, setName] = useState('')
   const [copied, setCopied] = useState(false)
@@ -107,11 +110,14 @@ export default function Hackathon() {
       {event.open ? <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--app-muted)]">선배님들의 경험으로 후배들의 작품을 살펴봐 주세요.<br />로그인 없이 기수와 이름만 입력하면 평가에 참여하실 수 있습니다.</p>
         : <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--app-muted)]">{STATUS_META[event.status].hint} 작품과 자료는 기록으로 계속 볼 수 있습니다.</p>}
       <div className="mt-5 flex flex-wrap gap-3">
+        <Link to={'/forms?category=HACKATHON&event=' + eventId} className="apple-action-secondary inline-flex min-h-11 items-center px-4 text-sm">팀 신청·수요조사</Link>
+        {!user && !loading && <Link to="/login" state={{ from: location }} className="apple-action-secondary inline-flex min-h-11 items-center px-4 text-sm">팀원 로그인</Link>}
         {event.open && <button type="button" className="apple-action-secondary inline-flex min-h-11 items-center gap-2 px-4 text-sm" onClick={async () => {
           try { await navigator.clipboard.writeText(`${window.location.origin}${link}`); setCopied(true); setCopyError(false) } catch { setCopied(false); setCopyError(true) }
         }}><Copy size={14} aria-hidden="true" />{copied ? '링크 복사됨' : '평가 링크 복사'}</button>}
         {user?.role === 'ADMIN' && <Link to={`/admin?tab=hackathon&event=${eventId}`} className="apple-action-secondary inline-flex min-h-11 items-center px-4 text-sm">평가 집계·회장 채점</Link>}
       </div>
+      {user && <TeamWorkPanel key={eventId + ":" + user.studentId} eventId={eventId} studentId={user.studentId} />}
       {copyError && <p role="alert" className="mt-3 break-all text-sm">자동 복사가 지원되지 않습니다. 주소를 길게 눌러 복사해 주세요: <a href={link} className="select-all text-[var(--app-accent-text)] underline">{window.location.origin}{link}</a></p>}
       <section className="hackathon-intro mt-8" aria-labelledby="hackathon-theme">
         <p className="text-sm font-semibold text-[var(--app-accent-text)]">이번 주제</p>

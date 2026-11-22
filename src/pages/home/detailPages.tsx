@@ -1,6 +1,6 @@
 import PageHeading from '../../components/PageHeading'
 import { useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, type LucideIcon } from 'lucide-react'
 import {
   aboutDetailCards,
@@ -18,6 +18,8 @@ import ClubEventSection from '../../features/clubEvent/ClubEventSection'
 import ActivityTimeline from '../../components/activities/ActivityTimeline'
 import ClubCalendarSection from '../../features/clubCalendar/ClubCalendarSection'
 import NextSteps, { type NextStep } from '../../components/NextSteps'
+import { usePermissions } from '../../contexts/usePermissions'
+import { canManageContent } from '../../utils/roleAccess'
 import { useScrollReveal } from '../../hooks/useScrollReveal'
 import '../../styles/site-pages.css'
 import { ClubOsVisual, LearningStackVisual, ProjectLabVisual } from './HomeVisuals'
@@ -35,7 +37,22 @@ export function AboutPage() {
       outputsTitle="COM's가 오래 가져가는 태도."
       outputsBody="잘하는 사람만 모이는 곳보다, 함께 성장하는 방식을 계속 만드는 곳을 지향합니다."
       outputs={aboutDetailPrinciples}
-      nextSteps={[{ label: '지원하기', to: '/recruit' }, { label: '스터디 보기', to: '/study' }]}
+      lead={<section className="coms-sec coms-sec-top" aria-labelledby="about-first-visit">
+        <div className="coms-sec-inner grid gap-6 md:grid-cols-[0.85fr_1fr]">
+          <div>
+            <h2 id="about-first-visit" className="coms-title">처음 오셨다면</h2>
+            <p className="coms-lede">관심 분야가 막 생겼다면 공개 스터디부터 둘러보세요. 스터디에서 다룬 주제를 팀 프로젝트와 해커톤에서 직접 만들어 볼 수 있습니다.</p>
+          </div>
+          <ul className="grid gap-3 self-center">
+            {[{ to: '/study', title: '스터디 자료', body: '웹, Python, Arduino 등 관심 있는 주제부터 시작하세요.' },
+              { to: '/activities', title: '동아리 활동', body: '정기 세미나, 스터디, 코드 리뷰가 어떻게 이어지는지 확인하세요.' },
+              { to: '/apps', title: '부원 작품', body: '부원들이 기획하고 배포한 앱과 게임을 열어 보세요.' }].map(item => <li key={item.to}>
+              <Link to={item.to} className="block rounded-xl border border-[var(--app-hairline)] bg-[var(--app-surface)] p-4 hover:border-[var(--app-accent-text)]"><strong className="text-[var(--app-accent-text)]">{item.title}</strong><span className="mt-1 block text-sm leading-6 text-[var(--app-muted)]">{item.body}</span></Link>
+            </li>)}
+          </ul>
+        </div>
+      </section>}
+      nextSteps={[{ label: '지원하기', to: '/recruit' }, { label: '협업 제안', to: '/contact' }]}
     />
   )
 }
@@ -220,6 +237,7 @@ export function DetailStoryPage({
 }
 
 export function ActivitiesDetailPage() {
+  const { permissions } = usePermissions()
   return (
     <DetailStoryPage
       title={(
@@ -237,7 +255,11 @@ export function ActivitiesDetailPage() {
       outputsTitle="활동에서 다루는 주제."
       outputsBody="웹 개발과 프로그래밍 기초부터 임베디드, 협업 도구, 대회 준비까지 다룹니다."
       outputs={activitiesDetailTopics}
-      lead={<ActivityTimeline />}
+      lead={<><ActivityTimeline /><div className="coms-sec-inner flex flex-wrap gap-3 py-6">
+        <Link to="/activity-log" className="apple-action-secondary inline-flex min-h-11 items-center px-4 text-sm">회원 활동 기록</Link>
+        <Link to="/forms" className="apple-action-secondary inline-flex min-h-11 items-center px-4 text-sm">신청·수요조사</Link>
+        {canManageContent(permissions) && <Link to="/admin?tab=activities" className="apple-action-primary inline-flex min-h-11 items-center px-4 text-sm">활동 추가·관리</Link>}
+      </div></>}
       className="activities-page"
     />
   )

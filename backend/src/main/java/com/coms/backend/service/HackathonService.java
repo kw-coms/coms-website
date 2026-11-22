@@ -61,7 +61,7 @@ public class HackathonService {
         if (request == null || request.projectId() == null) throw invalid();
         HackathonEvent visible = events.findById(eventId).orElseThrow(HackathonService::notFound);
         if (!visible.isPublished()) throw notFound();
-        if (!projects.existsByEventIdAndId(eventId, request.projectId())) {
+        if (!projects.existsByEventIdAndIdAndPublishedTrue(eventId, request.projectId())) {
             if (eventId == 1L) throw invalid();
             throw notFound();
         }
@@ -83,7 +83,7 @@ public class HackathonService {
                 if (state == null || !state.isOpen()) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "해커톤 평가가 마감되었습니다.");
                 }
-                if (!projects.existsByEventIdAndId(eventId, request.projectId())) throw notFound();
+                if (!projects.existsByEventIdAndIdAndPublishedTrue(eventId, request.projectId())) throw notFound();
                 if (reviews.existsByEventIdAndProjectIdAndGenerationAndNameKey(eventId, request.projectId(), generation, nameKey)) {
                     throw duplicate();
                 }
@@ -146,7 +146,7 @@ public class HackathonService {
         HackathonEvent event = events.lockById(eventId).orElseThrow(HackathonService::notFound);
         if (!event.isPublished()) throw new ResponseStatusException(HttpStatus.CONFLICT, "공개된 행사에만 회장 점수를 저장할 수 있습니다.");
         requireScoresEditable(event);
-        if (!projects.existsByEventIdAndId(eventId, projectId) || request == null) throw invalid();
+        if (!projects.existsByEventIdAndIdAndPublishedTrue(eventId, projectId) || request == null) throw invalid();
         String feedback = checkedFeedback(request.feedback());
         int[] scores = checkedScores(request.themeFit(), request.creativity(), request.technology(),
                 request.completeness(), request.practicality());
@@ -173,7 +173,7 @@ public class HackathonService {
     public boolean setOpen(Long eventId, Boolean open) {
         if (open == null) throw invalid();
         HackathonEvent event = events.lockById(eventId).orElseThrow(HackathonService::notFound);
-        if (open && (!event.isPublished() || projects.countByEventId(eventId) == 0))
+        if (open && (!event.isPublished() || projects.countByEventIdAndPublishedTrue(eventId) == 0))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "공개된 행사에 작품이 있어야 평가를 열 수 있습니다.");
         event.setOpen(open);
         if (open) event.setResultsPublished(false);

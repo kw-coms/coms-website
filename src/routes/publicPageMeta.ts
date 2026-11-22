@@ -24,6 +24,11 @@ export const PUBLIC_PAGE_META: PublicPageMeta[] = [
     description: "COM's는 광운대학교 학생들이 컴퓨터와 소프트웨어를 함께 공부하고, 실제 프로젝트로 연결하는 중앙 컴퓨터 학술동아리입니다.",
   },
   {
+    path: '/contact',
+    title: "협업 제안 | KW COM's",
+    description: "공동 행사, 세미나, 팀 프로젝트 등 광운대학교 COM's와 함께하고 싶은 일을 제안해 주세요.",
+  },
+  {
     path: '/activities',
     title: "활동 | KW COM's",
     description: '정기 세미나, 분야별 스터디, 코드 리뷰, 작은 제작 과제로 이어지는 COM\'s의 활동을 소개합니다.',

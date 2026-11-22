@@ -594,7 +594,7 @@ test('works show their creator and a readable detail discussion without requirin
   await page.goto('/apps')
   const card = page.locator('.app-card').filter({ hasText: '함께 만든 앱' })
   await expect(card).toContainText('제작자 김개발 · 이디자인')
-  await expect(card).toHaveAttribute('href', 'https://example.com/work')
+  await expect(card.getByRole('link', { name: '함께 만든 앱 열기' })).toHaveAttribute('href', 'https://example.com/work')
   await page.getByRole('link', { name: '함께 만든 앱 상세·댓글' }).click()
   await expect(page).toHaveURL(/\/apps\/72$/)
   await expect(page.getByRole('heading', { name: '함께 만든 앱' })).toBeVisible()
@@ -697,12 +697,12 @@ test('apps page marks an app whose link did not answer', async ({ page }) => {
   await page.goto('/apps')
   await expect(page.getByRole('heading', { name: "COM's 작품" })).toBeVisible()
   const dead = page.getByRole('link', { name: /죽은 앱.*열기/ })
-  await expect(dead).toContainText('지금 응답 없음')
+  await expect(page.locator('.app-card').filter({ has: dead })).toContainText('지금 응답 없음')
   // It still opens: the look can be minutes old.
   await expect(dead).toHaveAttribute('href', 'https://down.example/')
   await expect(page.getByText('지금 응답 없음')).toHaveCount(1)
   for (const name of [/열리는 앱.*열기/, /주소를 바꾼 앱.*열기/, /아직 안 본 앱.*열기/]) {
-    await expect(page.getByRole('link', { name })).not.toContainText('응답 없음')
+    await expect(page.locator('.app-card').filter({ has: page.getByRole('link', { name }) })).not.toContainText('응답 없음')
   }
 })
 
@@ -741,7 +741,7 @@ test('apps page does not ask guests for link status, members get it', async ({ p
   // Member: the call is made and the dot shows.
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   await page.goto('/apps')
-  await expect(page.getByRole('link', { name: /죽은 앱.*열기/ })).toContainText('지금 응답 없음')
+  await expect(page.locator('.app-card').filter({ hasText: '죽은 앱' })).toContainText('지금 응답 없음')
   expect(calls).toHaveLength(1)
 })
 
@@ -4063,8 +4063,8 @@ test('apps page renders DB-driven club projects grouped by category', async ({ p
   await expect(page.getByRole('heading', { name: '웹사이트', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: '앱', exact: true })).toBeVisible()
 
-  const portalCard = page.locator('a.apple-product-panel').filter({ hasText: "COM's 포털" })
-  await expect(portalCard).toHaveAttribute('href', 'https://portal.example.com/')
+  const portalCard = page.locator('.app-card').filter({ hasText: "COM's 포털" })
+  await expect(portalCard.getByRole('link', { name: "COM's 포털 열기" })).toHaveAttribute('href', 'https://portal.example.com/')
   await expect(portalCard.getByText('만든 사람')).toHaveCount(0)
   await expect(portalCard.getByText('열기')).toBeVisible()
 
@@ -4072,9 +4072,8 @@ test('apps page renders DB-driven club projects grouped by category', async ({ p
   await expect(attendCard.getByText('만든 사람')).toHaveCount(0)
   await expect(attendCard.getByText('attend.apk')).toBeVisible()
   await expect(attendCard.getByRole('link', { name: /다운로드/ })).toBeVisible()
-  await expect(page.locator('.site-stats')).toContainText('프로젝트')
-  await expect(page.locator('.site-stats')).toContainText('카테고리')
-  await expect(page.locator('.site-stats')).not.toContainText('만든 사람')
+  await expect(page.getByRole('status', { name: '검색 결과' })).toHaveText('2개')
+  await expect(portalCard.getByRole('list', { name: '작품 반응' })).toBeVisible()
 })
 
 test('apps page cards keep one size whatever the text length or section count', async ({ page }) => {
@@ -4126,7 +4125,7 @@ test('apps page cards keep one size whatever the text length or section count', 
       expect(overflow).toBeLessThanOrEqual(0)
       heights[`${files}-${viewport.width}`] = boxes[0].h
       // Every author is the same here: the old page showed a 만든 사람 stat in this case.
-      await expect(page.locator('.site-stats')).not.toContainText('만든 사람')
+      await expect(page.locator('.site-stats')).toHaveCount(0)
       await expect(page.locator('.app-card').filter({ hasText: '만든 사람' })).toHaveCount(0)
 
       if (files && viewport.width === 1280) {

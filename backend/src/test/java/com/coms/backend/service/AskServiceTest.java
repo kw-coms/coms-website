@@ -76,6 +76,18 @@ class AskServiceTest {
     }
 
     @Test
+    void collaborationUsesConfiguredInboxAndItsOwnSubject() {
+        var request = new AskRequest("연합 세미나\n제안 내용", "guest@example.com", "Guest", "", "/contact",
+                AskRequest.Topic.COLLABORATION);
+        service(true).send(request, null, "127.0.0.1");
+        ArgumentCaptor<SimpleMailMessage> captured = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(sender).send(captured.capture());
+        assertThat(captured.getValue().getTo()).containsExactly("inbox@example.com");
+        assertThat(captured.getValue().getSubject()).startsWith("[COM's 협업 제안]");
+        assertThat(captured.getValue().getText()).contains("협업 제안 페이지: /contact", "[협업 제안]");
+    }
+
+    @Test
     void memberDefaultsToAccountMailAndUsesOnlyAccountIdentity() {
         member();
         AskService service = service(true);

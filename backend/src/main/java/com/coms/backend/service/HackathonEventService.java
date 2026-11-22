@@ -13,6 +13,8 @@ import com.coms.backend.dto.HackathonMaterialResponse;
 import com.coms.backend.dto.HackathonProjectResponse;
 import com.coms.backend.dto.HackathonResultResponse;
 import com.coms.backend.dto.HackathonProjectWrite;
+import com.coms.backend.dto.HackathonTeamWork;
+import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.HackathonEventRepository;
 import com.coms.backend.repository.HackathonMaterialRepository;
 import com.coms.backend.repository.HackathonProjectRepository;
@@ -62,10 +64,11 @@ public class HackathonEventService {
     private final MediaUploadValidator validator;
     private final StorageService storage;
     private final Clock clock;
+    private final MemberRepository members;
 
     public HackathonEventService(HackathonEventRepository events, HackathonProjectRepository projects,
                                  HackathonMaterialRepository materials, HackathonReviewRepository reviews,
-                                 MediaUploadValidator validator, StorageService storage, Clock clock) {
+                                 MediaUploadValidator validator, StorageService storage, Clock clock, MemberRepository members) {
         this.events = events;
         this.projects = projects;
         this.materials = materials;
@@ -73,19 +76,20 @@ public class HackathonEventService {
         this.validator = validator;
         this.storage = storage;
         this.clock = clock;
+        this.members = members;
     }
 
     @Transactional(readOnly = true)
     public List<HackathonEventSummary> publicList() {
         return events.findByPublishedTrueOrderByYearDescSemesterDescIdDesc().stream()
-                .map(event -> HackathonEventSummary.from(event, status(event), (int) projects.countByEventId(event.getId()))).toList();
+                .map(event -> HackathonEventSummary.from(event, status(event), (int) projects.countByEventIdAndPublishedTrue(event.getId()))).toList();
     }
 
     @Transactional(readOnly = true)
     public HackathonEventResponse publicDetail(Long id) {
         HackathonEvent event = requirePublic(id);
         HackathonEventStatus status = status(event);
-        List<HackathonProject> eventProjects = projects.findByEventIdOrderByPositionAscIdAsc(id);
+        List<HackathonProject> eventProjects = projects.findByEventIdAndPublishedTrueOrderByPositionAscIdAsc(id);
         // 점수는 완료 + 결과 공개일 때만 내려간다. 평가자 이름·의견은 어떤 경우에도 내려가지 않는다.
         List<HackathonResultResponse> results = event.isResultsPublished() && status == HackathonEventStatus.DONE
                 ? HackathonRanking.rank(eventProjects, reviews.findByEventIdOrderByCreatedAtAscIdAsc(id)) : List.of();
@@ -133,7 +137,7 @@ public class HackathonEventService {
     public boolean setOpen(Long id, Boolean open) {
         if (open == null) throw invalid();
         HackathonEvent event = lock(id);
-        if (open && (!event.isPublished() || projects.countByEventId(id) == 0)) throw conflict("공개된 행사에 작품이 있어야 평가를 열 수 있습니다.");
+        if (open && (!event.isPublished() || projects.countByEventIdAndPublishedTrue(id) == 0)) throw conflict("공개된 행사에 작품이 있어야 평가를 열 수 있습니다.");
         event.setOpen(open);
         if (open) event.setResultsPublished(false);
         events.saveAndFlush(event);
@@ -146,7 +150,7 @@ public class HackathonEventService {
         HackathonEvent event = lock(id);
         if (resultsPublished && (!event.isPublished() || status(event) != HackathonEventStatus.DONE))
             throw conflict("완료된 행사만 결과를 공개할 수 있습니다. 평가를 닫고 개발 기간이 끝난 뒤에 공개해 주세요.");
-        if (resultsPublished && HackathonRanking.rank(projects.findByEventIdOrderByPositionAscIdAsc(id),
+        if (resultsPublished && HackathonRanking.rank(projects.findByEventIdAndPublishedTrueOrderByPositionAscIdAsc(id),
                 reviews.findByEventIdOrderByCreatedAtAscIdAsc(id)).isEmpty())
             throw conflict("모든 팀에 졸업생 평가와 회장 평가가 있어야 결과를 공개할 수 있습니다.");
         event.setResultsPublished(resultsPublished);
@@ -168,17 +172,53 @@ public class HackathonEventService {
         project.setId(UUID.randomUUID().toString());
         project.setEventId(eventId);
         copyProject(project, write, true);
-        projects.saveAndFlush(project);
-        return HackathonProjectResponse.from(project, List.of());
+        return HackathonProjectResponse.from(projects.saveAndFlush(project), List.of());
     }
 
     @Transactional
     public HackathonProjectResponse updateProject(Long eventId, String projectId, HackathonProjectWrite write) {
-        lock(eventId);
+        HackathonEvent event = lock(eventId);
         HackathonProject project = requireProject(eventId, projectId);
+        if (write != null && write.published() != null && write.published() != project.isPublished()) requireMutable(event);
+        if (write != null && write.version() != null) requireVersion(project, write.version());
         copyProject(project, write, false);
         projects.saveAndFlush(project);
         return HackathonProjectResponse.from(project, materials.findByEventIdOrderByIdAsc(eventId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> projectMembers(Long eventId, String projectId) {
+        return requireProject(eventId, projectId).getMemberIds().stream().sorted().toList();
+    }
+
+    @Transactional(readOnly = true)
+    public HackathonTeamWork teamWork(Long eventId, String studentId) {
+        HackathonEvent event = requirePublic(eventId);
+        List<HackathonProjectResponse> work = projects.findForMember(eventId, memberId(studentId)).stream()
+                .map(project -> HackathonProjectResponse.from(project, List.of())).toList();
+        return new HackathonTeamWork(isMutable(event), work);
+    }
+
+    @Transactional
+    public HackathonProjectResponse saveTeamWork(Long eventId, String projectId, String studentId, HackathonTeamWork.Write write) {
+        HackathonEvent event = lock(eventId);
+        if (!event.isPublished()) throw notFound();
+        HackathonProject project = requireProject(eventId, projectId);
+        if (!project.getMemberIds().contains(memberId(studentId))) throw notFound();
+        requireMutable(event);
+        if (write == null) throw invalid();
+        requireVersion(project, write.version());
+        copyWork(project, write.title(), write.author(), write.description(), write.github(), write.live());
+        return HackathonProjectResponse.from(projects.saveAndFlush(project), List.of());
+    }
+
+    private Long memberId(String studentId) {
+        return members.findByStudentId(studentId).orElseThrow(HackathonEventService::notFound).getId();
+    }
+
+    private static void requireVersion(HackathonProject project, Long version) {
+        if (version == null || project.getVersion() != version)
+            throw conflict("다른 사람이 먼저 저장했습니다. 작성한 내용을 복사한 뒤 페이지를 새로고침해 주세요.");
     }
 
     @Transactional
@@ -316,7 +356,10 @@ public class HackathonEventService {
 
     private HackathonMaterial requirePublicMaterial(Long eventId, Long materialId) {
         requirePublic(eventId);
-        return requireMaterial(eventId, materialId);
+        HackathonMaterial material = requireMaterial(eventId, materialId);
+        if (material.getProjectId() != null
+                && !projects.existsByEventIdAndIdAndPublishedTrue(eventId, material.getProjectId())) throw notFound();
+        return material;
     }
 
     private HackathonMaterial requireMaterial(Long eventId, Long materialId) {
@@ -341,8 +384,12 @@ public class HackathonEventService {
         return events.lockById(id).orElseThrow(HackathonEventService::notFound);
     }
 
+    private boolean isMutable(HackathonEvent event) {
+        return !event.isOpen() && !reviews.existsByEventId(event.getId());
+    }
+
     private void requireMutable(HackathonEvent event) {
-        if (event.isOpen() || reviews.existsByEventId(event.getId())) throw conflict("평가 중이거나 평가가 있는 행사의 작품과 자료는 변경할 수 없습니다.");
+        if (!isMutable(event)) throw conflict("평가 중이거나 평가가 있는 행사의 작품과 자료는 변경할 수 없습니다.");
     }
 
     private static void copyEvent(HackathonEvent event, HackathonEventWrite write) {
@@ -363,11 +410,18 @@ public class HackathonEventService {
 
     private void copyProject(HackathonProject project, HackathonProjectWrite write, boolean creating) {
         if (write == null) throw invalid();
-        project.setTitle(text(write.title(), 120, true));
-        project.setAuthor(text(write.author(), 200, true));
-        project.setDescription(multiline(write.description(), 5000, true));
-        project.setGithub(link(write.github()));
-        project.setLive(link(write.live()));
+        if (write.teamName() != null) project.setTeamName(text(write.teamName(), 120, false));
+        if (write.published() != null) project.setPublished(write.published());
+        if (!project.isPublished() && (project.getTeamName() == null || project.getTeamName().isBlank())) throw invalid();
+        copyWork(project, write.title(), write.author(), write.description(), write.github(), write.live());
+        if (write.memberIds() != null) {
+            List<Long> ids = write.memberIds();
+            if (ids.size() > 30 || ids.stream().anyMatch(id -> id == null || id <= 0)) throw invalid();
+            Set<Long> selected = Set.copyOf(ids);
+            if (members.findAllById(selected).size() != selected.size()) throw invalid();
+            project.getMemberIds().retainAll(selected);
+            project.getMemberIds().addAll(selected);
+        }
         Integer position = write.position() == null ? null : exactInt(write.position(), 0, 9999);
         if (position == null) {
             if (creating) {
@@ -377,6 +431,14 @@ public class HackathonEventService {
             } else position = project.getPosition();
         }
         project.setPosition(position);
+    }
+
+    private static void copyWork(HackathonProject project, String title, String author, String description, String github, String live) {
+        project.setTitle(text(title, 120, project.isPublished()));
+        project.setAuthor(text(author, 200, project.isPublished()));
+        project.setDescription(multiline(description, 5000, project.isPublished()));
+        project.setGithub(link(github));
+        project.setLive(link(live));
     }
 
     private static String link(String raw) {

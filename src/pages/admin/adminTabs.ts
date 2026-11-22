@@ -22,6 +22,7 @@ export const ADMIN_TABS: { id: string; label: string; group: AdminGroupId | null
   { id: 'deleted-posts', label: '삭제 보관함', group: 'content' },
   { id: 'files', label: '파일 관리', group: 'content' },
   { id: 'projects', label: '작품 관리', group: 'content' },
+  { id: 'club-forms', label: '신청·수요조사', group: 'content' },
   { id: 'hackathon', label: '해커톤 평가', group: 'content' },
   { id: 'team-projects', label: '팀 프로젝트', group: 'content' },
   { id: 'club-officers', label: '역대 회장단', group: 'content' },

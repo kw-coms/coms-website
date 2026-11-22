@@ -32,7 +32,7 @@ for (const width of [320, 1280]) {
     await expect(now).toHaveAttribute('href', '/hackathon/1')
     await expect(now).toContainText('평가 중')
     await expect(now).toContainText('11/8(일) 18:00 ~ 11/15(일) 04:00')
-    await expect(now).toContainText('참가 3팀')
+    await expect(now).toContainText('공개 작품 3개')
     const planned = page.getByRole('region', { name: '진행 예정 · 진행 중' }).locator('a.hackathon-card')
     await expect(planned).toHaveCount(2)
     await expect(planned.nth(0)).toContainText('시작 예정')

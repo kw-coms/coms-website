@@ -102,6 +102,7 @@
 	gap: 24px 48px;
 	align-items: end;
 }
+.site-head:not(:has(.site-stats)) { grid-template-columns: minmax(0, 1fr); }
 .site-head h1 {
 	margin: 0 0 12px;
 	font-size: clamp(34px, 5.4vw, 52px);
@@ -219,7 +220,7 @@
 	gap: 10px;
 	margin-bottom: 14px;
 }
-.apps-group-head h3 {
+.apps-group-head h2 {
 	margin: 0;
 	font-size: 22px;
 	font-weight: 800;
@@ -357,6 +358,48 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+
+.apple-product-panel.app-card-showcase {
+  grid-template-areas: 'head open' 'desc desc' 'foot foot' 'more more' 'engagement engagement';
+  grid-template-rows: auto 1fr auto auto auto;
+}
+.app-card-showcase.app-card-with-images {
+  grid-template-areas: 'head open' 'desc desc' 'foot foot' 'images images' 'more more' 'engagement engagement' !important;
+  grid-template-rows: auto 1fr auto auto auto auto !important;
+}
+.app-card-engagement {
+  grid-area: engagement;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2px 12px;
+  margin-top: 10px;
+  border-top: 1px solid var(--app-hairline);
+}
+.app-work-metrics, .app-card-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+.app-work-metrics { list-style: none; color: var(--app-muted); }
+.app-work-metrics li, .app-card-links a, .app-card-links button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.app-card-links a, .app-card-links button {
+  min-height: 40px;
+  color: var(--app-accent-text);
+  font-weight: 700;
+}
+.app-card-title a:hover, .app-card-links :is(a, button):hover { text-decoration: underline; }
+
 .app-card-more {
 	grid-area: more;
 	display: flex;

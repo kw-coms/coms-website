@@ -6,6 +6,7 @@ export type AskPayload = {
   name?: string
   honeypot: string
   pagePath: string
+  topic?: 'QUESTION' | 'COLLABORATION'
 }
 
 export function sendAsk(payload: AskPayload): Promise<void> {

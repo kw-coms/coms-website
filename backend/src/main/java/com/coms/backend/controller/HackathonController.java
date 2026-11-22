@@ -1,6 +1,11 @@
 package com.coms.backend.controller;
 
 import com.coms.backend.dto.HackathonReviewRequest;
+import com.coms.backend.dto.HackathonProjectResponse;
+import com.coms.backend.dto.HackathonTeamWork;
+import com.coms.backend.service.AuditLogService;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.PutMapping;
 import com.coms.backend.dto.HackathonEventResponse;
 import com.coms.backend.dto.HackathonEventSummary;
 import com.coms.backend.security.ClientIpResolver;
@@ -26,11 +31,13 @@ public class HackathonController {
     private final HackathonService service;
     private final HackathonEventService events;
     private final ClientIpResolver clientIpResolver;
+    private final AuditLogService audit;
 
-    public HackathonController(HackathonService service, HackathonEventService events, ClientIpResolver clientIpResolver) {
+    public HackathonController(HackathonService service, HackathonEventService events, ClientIpResolver clientIpResolver, AuditLogService audit) {
         this.service = service;
         this.events = events;
         this.clientIpResolver = clientIpResolver;
+        this.audit = audit;
     }
 
     @GetMapping
@@ -56,6 +63,19 @@ public class HackathonController {
             @RequestBody HackathonReviewRequest request, HttpServletRequest servletRequest) {
         String projectId = service.submit(eventId, request, clientIpResolver.resolve(servletRequest));
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("projectId", projectId));
+    }
+
+    @GetMapping("/team-work/{eventId}")
+    public HackathonTeamWork teamWork(@PathVariable Long eventId, Authentication authentication) {
+        return events.teamWork(eventId, authentication.getName());
+    }
+
+    @PutMapping("/team-work/{eventId}/{projectId}")
+    public HackathonProjectResponse saveTeamWork(@PathVariable Long eventId, @PathVariable String projectId,
+            Authentication authentication, @RequestBody HackathonTeamWork.Write write) {
+        HackathonProjectResponse saved = events.saveTeamWork(eventId, projectId, authentication.getName(), write);
+        audit.record(authentication.getName(), "HACKATHON_TEAM_WORK_SAVE", "HACKATHON_PROJECT", projectId, null, null);
+        return saved;
     }
 
     @GetMapping("/events/{eventId}/materials/{materialId}")

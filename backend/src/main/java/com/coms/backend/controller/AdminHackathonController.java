@@ -135,6 +135,11 @@ public class AdminHackathonController {
         return updated;
     }
 
+    @GetMapping("/events/{eventId}/projects/{projectId}/members")
+    public List<Long> projectMembers(@PathVariable Long eventId, @PathVariable String projectId) {
+        return events.projectMembers(eventId, projectId);
+    }
+
     @DeleteMapping("/events/{eventId}/projects/{projectId}")
     public ResponseEntity<Void> deleteProject(@PathVariable Long eventId, @PathVariable String projectId,
                                                Authentication authentication) {

@@ -18,12 +18,12 @@ test.describe('lock icons', () => {
     await nav(page).getByRole('button', { name: '멤버', exact: true }).click()
     const panel = page.locator('#nav-panel')
     const column = (name) => panel.getByRole('region', { name })
-    for (const label of ['공지', '커뮤니티', '자료실', '활동 기록', '월별 일정', '회지·인기투표', '팀 프로젝트']) {
+    for (const label of ['공지', '커뮤니티', '자료실', '활동 기록', '월별 일정', '회지·인기투표', '신청·수요조사', '팀 프로젝트']) {
       await expect(column('멤버').getByRole('button', { name: new RegExp(`^${label}`) }).locator(LOCK), label).toHaveCount(1)
     }
-    await expect(column('멤버').getByRole('button')).toHaveCount(8)
-    await expect(column('멤버').locator(LOCK)).toHaveCount(7)
-    await expect(column('멤버').getByRole('button', { name: '해커톤 평가' }).locator(LOCK)).toHaveCount(0)
+    await expect(column('멤버').getByRole('button')).toHaveCount(9)
+    await expect(column('멤버').locator(LOCK)).toHaveCount(8)
+    await expect(column('멤버').getByRole('button', { name: '해커톤' }).locator(LOCK)).toHaveCount(0)
     await expect(panel.getByRole('button', { name: '공지 (회원 전용)' })).toBeVisible()
     // Public entries have none.
     await expect(column('배움').locator(LOCK)).toHaveCount(0)
@@ -49,8 +49,8 @@ test.describe('lock icons', () => {
       await expect(menu.getByRole('button', { name: new RegExp(`^${label}`) }).locator(LOCK), label).toHaveCount(1)
     }
     await expect(menu.getByRole('button', { name: /^후원/ }).locator(LOCK)).toHaveCount(0)
-    await expect(section('멤버').locator(LOCK)).toHaveCount(7)
-    await expect(section('멤버').getByRole('button', { name: '해커톤 평가' }).locator(LOCK)).toHaveCount(0)
+    await expect(section('멤버').locator(LOCK)).toHaveCount(8)
+    await expect(section('멤버').getByRole('button', { name: '해커톤' }).locator(LOCK)).toHaveCount(0)
     const tools = section('도구')
     await expect(tools.locator(LOCK)).toHaveCount(3)
     await expect(tools.getByRole('button', { name: /^조 편성/ }).locator(LOCK)).toHaveCount(0)

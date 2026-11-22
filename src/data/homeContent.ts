@@ -512,6 +512,7 @@ export const navGroups: NavGroup[] = [
       { id: 'officers', label: '역대 회장단', sub: 'Officers', path: '/officers', icon: Crown, auth: true, keywords: '회장 부회장 회장단 역대 임원 임기 대 기수' },
       { id: 'activities', label: '활동', sub: 'Activities', path: '/activities', icon: Sparkles, keywords: '세미나·스터디' },
       { id: 'projects', label: '프로젝트', sub: 'Projects', path: '/projects', icon: CircuitBoard, keywords: '실전 제작' },
+      { id: 'contact', label: '협업 제안', sub: 'Collaborate', path: '/contact', icon: HeartHandshake, keywords: '문의 공동 행사 연합 세미나' },
       { id: 'sponsors', label: '후원', sub: 'Sponsors', path: '/sponsors', icon: HeartHandshake },
       { id: 'recruit', label: '지원하기', sub: 'Recruit', path: '/recruit', icon: Rocket, keywords: '지원 안내' },
     ],
@@ -536,8 +537,9 @@ export const navGroups: NavGroup[] = [
       fromActivityItem('activity-log'),
       fromActivityItem('monthly-calendar'),
       fromActivityItem('activity-events'),
+      { id: 'club-forms', label: '신청·수요조사', sub: 'Forms', path: '/forms', icon: ClipboardCheck, auth: true, keywords: '접수 설문 참가 신청' },
       { id: 'team-projects', label: '팀 프로젝트', sub: 'Team Projects', path: '/team-projects', icon: Users, auth: true, keywords: '팀프 팀 프로젝트 주제 선정 개발 계획서 중간 점검 최종 발표 제출' },
-      { id: 'hackathon', label: '해커톤 평가', sub: 'Hackathon', path: '/hackathon', icon: ClipboardCheck, keywords: '졸업생 투표 해커톤 평가 피드백 아카이브 기록 결과' },
+      { id: 'hackathon', label: '해커톤', sub: 'Hackathon', path: '/hackathon', icon: ClipboardCheck, keywords: '졸업생 투표 해커톤 평가 피드백 아카이브 기록 결과' },
     ],
   },
   {
