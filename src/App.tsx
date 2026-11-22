@@ -9,19 +9,22 @@ import { ToastHost } from './components/common/Toast'
 import { ConfirmHost } from './components/common/ConfirmDialog'
 import RouteErrorBoundary from './components/common/RouteErrorBoundary'
 import {
-  ACCENT_COLOR_KEY,
   ACCENT_STRENGTH_KEY,
+  APPEARANCE_THEME_KEY,
   FONT_SELECTION_KEY,
   INTRO_STYLE_KEY,
   THEME_MODE_KEY,
   forgetStoredValue,
-  getStoredAccentColor,
   getStoredAccentStrength,
+  getStoredAppearanceAccents,
+  getStoredAppearanceTheme,
   getStoredFontId,
   getStoredIntroStyle,
   getStoredThemeMode,
   getAccentTokens,
+  getAppearanceAccent,
   normalizeHex,
+  storeAppearanceAccent,
   storeValue,
 } from './utils/themeColors'
 import { ScrollToTop, RequireAuth, RequireAdmin } from './routes/guards'
@@ -84,7 +87,14 @@ function App() {
   const navigate = useNavigate()
   const location = useLocation()
   const [themeMode, setThemeMode] = useState(getStoredThemeMode)
-  const [accentColor, setAccentColor] = useState(getStoredAccentColor)
+  const [appearanceTheme, setAppearanceTheme] = useState(getStoredAppearanceTheme)
+  const [appearanceAccents, setAppearanceAccents] = useState(getStoredAppearanceAccents)
+  const accentColor = appearanceAccents[appearanceTheme] ?? getAppearanceAccent(appearanceTheme, themeMode)
+  const changeAccentColor = (value?: string) => {
+    const color = value === undefined ? undefined : normalizeHex(value)
+    setAppearanceAccents((current) => ({ ...current, [appearanceTheme]: color }))
+    storeAppearanceAccent(appearanceTheme, color)
+  }
   const [accentStrength, setAccentStrength] = useState(getStoredAccentStrength)
   const [introStyle, setIntroStyle] = useState(getStoredIntroStyle)
   const [introPreview, setIntroPreview] = useState(false)
@@ -118,18 +128,20 @@ function App() {
   useEffect(() => {
     const root = document.documentElement
     const mode = themeMode === 'dark' ? 'dark' : 'light'
-    const accent = normalizeHex(accentColor)
-
     root.dataset.themeMode = mode
+    root.dataset.appearanceTheme = appearanceTheme
     root.dataset.accentStrength = accentStrength
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', mode === 'dark' ? '#0f1115' : '#ffffff')
-    for (const [property, value] of Object.entries(getAccentTokens(accent, mode, accentStrength))) root.style.setProperty(property, value)
+    for (const [property, value] of Object.entries(getAccentTokens(accentColor, mode, accentStrength))) root.style.setProperty(property, value)
+    const chromeColor = appearanceTheme === 'standard'
+      ? (mode === 'dark' ? '#0f1115' : '#ffffff')
+      : getComputedStyle(root).getPropertyValue('--app-bg').trim()
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', chromeColor)
 
     storeValue(THEME_MODE_KEY, mode)
-    storeValue(ACCENT_COLOR_KEY, accent)
+    storeValue(APPEARANCE_THEME_KEY, appearanceTheme)
     storeValue(ACCENT_STRENGTH_KEY, accentStrength)
     storeValue(INTRO_STYLE_KEY, introStyle)
-  }, [accentColor, themeMode, accentStrength, introStyle])
+  }, [accentColor, appearanceTheme, themeMode, accentStrength, introStyle])
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined
@@ -243,8 +255,11 @@ function App() {
       </RouteErrorBoundary>
       </div>
       <AppearanceControl
+        appearanceTheme={appearanceTheme}
+        setAppearanceTheme={setAppearanceTheme}
         accentColor={accentColor}
-        setAccentColor={setAccentColor}
+        setAccentColor={changeAccentColor}
+        resetAccentColor={() => changeAccentColor()}
         themeMode={themeMode}
         setThemeMode={setThemeMode}
         introStyle={introStyle}

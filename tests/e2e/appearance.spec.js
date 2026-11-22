@@ -60,6 +60,43 @@ test('footer sitemap includes the Lab as a full-page link', async ({ page }) => 
 })
 
 test.describe('desktop popover', () => {
+  test('site theme stays selected across pages and remembers its own accent', async ({ page }) => {
+    await page.addInitScript(() => {
+      if (!localStorage.getItem('kwcoms-accent-color')) localStorage.setItem('kwcoms-accent-color', '#7440bc')
+    })
+    await page.goto('/activities')
+    const root = page.locator('html')
+    const accent = () => root.evaluate((element) => getComputedStyle(element).getPropertyValue('--app-accent').trim())
+    await openFromFooter(page)
+    const themes = dialog(page).getByRole('radiogroup', { name: '사이트 테마' })
+    const choice = (name) => themes.getByRole('radio', { name, exact: true })
+    await choice('기본').focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(choice('터미널')).toBeFocused()
+    await expect(choice('터미널')).toHaveAttribute('aria-checked', 'true')
+    await expect(root).toHaveAttribute('data-appearance-theme', 'terminal')
+    await expect.poll(accent).toBe('#42e88e')
+
+    await dialog(page).getByRole('button', { name: '라이트', exact: true }).click()
+    await expect(root).toHaveAttribute('data-theme-mode', 'light')
+    await expect.poll(accent).toBe('#17653e')
+    await dialog(page).getByLabel('커스텀 색상 선택').fill('#227a4a')
+    await expect.poll(accent).toBe('#227a4a')
+    await choice('기본').click()
+    await expect.poll(accent).toBe('#7440bc')
+    await choice('터미널').click()
+    await expect.poll(accent).toBe('#227a4a')
+
+    await page.goto('/apps')
+    await expect(root).toHaveAttribute('data-appearance-theme', 'terminal')
+    await expect(root).toHaveAttribute('data-theme-mode', 'light')
+    await expect.poll(accent).toBe('#227a4a')
+    await openFromFooter(page)
+    await expect(choice('터미널')).toHaveAttribute('aria-checked', 'true')
+    await dialog(page).getByRole('button', { name: 'Reset', exact: true }).click()
+    await expect.poll(accent).toBe('#17653e')
+  })
+
   test('remembers the selected intro and previews it without navigating', async ({ page }) => {
     await page.goto('/activities')
     await openFromFooter(page)

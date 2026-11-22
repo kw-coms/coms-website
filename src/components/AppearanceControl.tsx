@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore }
 import { Link, useLocation } from 'react-router-dom'
 import { Check, ChevronUp, Compass, Moon, Sun, X } from 'lucide-react'
 import { accentSwatches, navGroups } from '../data/homeContent'
-import { DEFAULT_ACCENT, normalizeHex, scrollToTopInstant, type IntroStyle, type AccentStrength } from '../utils/themeColors'
+import { APPEARANCE_THEMES, normalizeHex, scrollToTopInstant, type AppearanceTheme, type IntroStyle, type AccentStrength } from '../utils/themeColors'
 import { isFullPageLink } from '../utils/fullPageLink'
 import { useAuth } from '../contexts/useAuth'
 import MemberLock from './MemberLock'
@@ -44,6 +44,9 @@ export const OPEN_APPEARANCE_EVENT = 'coms:open-appearance'
 export default function AppearanceControl({
   accentColor,
   setAccentColor,
+  resetAccentColor,
+  appearanceTheme = 'standard',
+  setAppearanceTheme,
   themeMode,
   setThemeMode,
   introStyle = 'cinematic',
@@ -59,6 +62,9 @@ export default function AppearanceControl({
 }: {
   accentColor?: string
   setAccentColor: (value: string) => void
+  resetAccentColor: () => void
+  appearanceTheme: AppearanceTheme
+  setAppearanceTheme: (value: AppearanceTheme) => void
   themeMode?: string
   setThemeMode: (value: string) => void
   introStyle?: IntroStyle
@@ -74,6 +80,7 @@ export default function AppearanceControl({
 }) {
   const accent = normalizeHex(accentColor)
   const isDark = themeMode === 'dark'
+  const selectedTheme = APPEARANCE_THEMES.find((choice) => choice.value === appearanceTheme) ?? APPEARANCE_THEMES[0]
   const fontSelectValue = selectedFontId ? String(selectedFontId) : ''
   const perf = usePerfState()
   const { loading: authLoading } = useAuth()
@@ -240,8 +247,55 @@ export default function AppearanceControl({
                   </div>
 
                   <div className="mt-3 divide-y divide-[var(--app-hairline)]">
-                    <div role="group" aria-labelledby={`${dialogId}-mode`} className="flex flex-wrap items-center justify-between gap-2 pb-3">
-                      <span id={`${dialogId}-mode`} className={groupLabel}>테마</span>
+                    <div className="pb-3">
+                      <span id={`${dialogId}-site-theme`} className={groupLabel}>사이트 테마</span>
+                      <div
+                        role="radiogroup"
+                        aria-labelledby={`${dialogId}-site-theme`}
+                        className="mt-2 grid grid-cols-2 gap-2"
+                        onKeyDown={(event) => {
+                          const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
+                          if (!step) return
+                          event.preventDefault()
+                          const index = APPEARANCE_THEMES.indexOf(selectedTheme)
+                          const next = APPEARANCE_THEMES[(index + step + APPEARANCE_THEMES.length) % APPEARANCE_THEMES.length]
+                          setAppearanceTheme(next.value)
+                          event.currentTarget.querySelector<HTMLElement>(`[data-appearance-theme-choice="${next.value}"]`)?.focus()
+                        }}
+                      >
+                        {APPEARANCE_THEMES.map((choice) => {
+                          const active = selectedTheme.value === choice.value
+                          const choiceId = `${dialogId}-site-theme-${choice.value}`
+                          return (
+                            <button
+                              key={choice.value}
+                              type="button"
+                              role="radio"
+                              aria-checked={active}
+                              aria-labelledby={choiceId}
+                              aria-describedby={`${choiceId}-description`}
+                              tabIndex={active ? 0 : -1}
+                              data-appearance-theme-choice={choice.value}
+                              onClick={() => setAppearanceTheme(choice.value)}
+                              className={`flex min-h-11 min-w-0 items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs font-semibold text-[var(--app-text)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-text)] ${active ? 'border-[var(--app-accent-border)] bg-[var(--app-accent-soft)]' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] hover:bg-[var(--app-surface-soft)]'}`}
+                            >
+                              <span aria-hidden="true" className="flex h-6 w-8 shrink-0 flex-col justify-between rounded-sm border border-[var(--app-hairline-strong)] bg-[var(--app-surface-soft)] p-1">
+                                <span className="h-1 w-3/4 rounded-full" style={{ backgroundColor: isDark ? choice.darkAccent : choice.lightAccent }} />
+                                <span className="h-px w-full bg-[var(--app-muted)]" />
+                                <span className="h-px w-2/3 bg-[var(--app-muted)]" />
+                              </span>
+                              <span id={choiceId} className="whitespace-nowrap">{choice.label}</span>
+                              <span id={`${choiceId}-description`} hidden>{choice.description}</span>
+                              {active && <Check size={14} strokeWidth={2.5} className="ml-auto shrink-0" aria-hidden="true" />}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <p aria-hidden="true" className="mt-1.5 text-[11px] leading-4 text-[var(--app-muted)]">{selectedTheme.description}</p>
+                    </div>
+
+                    <div role="group" aria-labelledby={`${dialogId}-mode`} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                      <span id={`${dialogId}-mode`} className={groupLabel}>화면 밝기</span>
                       <div className={segment}>
                         {[{ value: 'light', label: '라이트', Icon: Sun }, { value: 'dark', label: '다크', Icon: Moon }].map(({ value, label, Icon }) => {
                           const active = (value === 'dark') === isDark
@@ -457,7 +511,7 @@ export default function AppearanceControl({
                         </label>
                         <button
                           type="button"
-                          onClick={() => setAccentColor(DEFAULT_ACCENT)}
+                          onClick={resetAccentColor}
                           className="min-h-11 rounded-full border border-[var(--app-hairline)] bg-transparent px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface)] hover:text-[var(--app-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 sm:min-h-9"
                         >
                           Reset

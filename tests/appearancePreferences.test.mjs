@@ -8,6 +8,21 @@ assert.equal(typeof preferences.getStoredAccentStrength, 'function')
 window.localStorage.clear()
 assert.equal(preferences.getStoredIntroStyle(), 'cinematic')
 assert.equal(preferences.getStoredAccentStrength(), 'standard')
+assert.equal(preferences.getStoredAppearanceTheme(), 'standard')
+
+for (const { value, lightAccent, darkAccent } of preferences.APPEARANCE_THEMES) {
+  window.localStorage.setItem(preferences.APPEARANCE_THEME_KEY, value)
+  assert.equal(preferences.getStoredAppearanceTheme(), value)
+  assert.equal(preferences.getAppearanceAccent(value, 'light'), lightAccent)
+  assert.equal(preferences.getAppearanceAccent(value, 'dark'), darkAccent)
+}
+window.localStorage.setItem(preferences.APPEARANCE_THEME_KEY, 'unknown')
+assert.equal(preferences.getStoredAppearanceTheme(), 'standard')
+window.localStorage.setItem(preferences.ACCENT_COLOR_KEY, '#8c4')
+preferences.storeAppearanceAccent('terminal', '#259557')
+assert.deepEqual(preferences.getStoredAppearanceAccents(), { standard: '#88cc44', terminal: '#259557' })
+preferences.storeAppearanceAccent('terminal', undefined)
+assert.deepEqual(preferences.getStoredAppearanceAccents(), { standard: '#88cc44' })
 
 for (const style of ['cinematic', 'legacy', 'off']) {
   window.localStorage.setItem(preferences.INTRO_STYLE_KEY, style)
@@ -27,6 +42,8 @@ Object.defineProperty(window, 'localStorage', { configurable: true, get() { thro
 try {
   assert.equal(preferences.getStoredIntroStyle(), 'cinematic')
   assert.equal(preferences.getStoredAccentStrength(), 'standard')
+  assert.equal(preferences.getStoredAppearanceTheme(), 'standard')
+  assert.deepEqual(preferences.getStoredAppearanceAccents(), {})
   assert.doesNotThrow(() => preferences.storeValue(preferences.INTRO_STYLE_KEY, 'legacy'))
 } finally {
   Object.defineProperty(window, 'localStorage', storage)

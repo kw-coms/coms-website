@@ -3,11 +3,22 @@ export const DEFAULT_ACCENT = '#0071e3'
 // visit, so it cannot tell a deliberate choice from that default; it is no longer read.
 export const THEME_MODE_KEY = 'kwcoms-theme-mode:v2'
 export const ACCENT_COLOR_KEY = 'kwcoms-accent-color'
+export const APPEARANCE_THEME_KEY = 'kwcoms-appearance-theme:v1'
 export const FONT_SELECTION_KEY = 'kwcoms-font-id'
 export const INTRO_STYLE_KEY = 'kwcoms-intro-style:v1'
 export const ACCENT_STRENGTH_KEY = 'kwcoms-accent-strength:v1'
 export type IntroStyle = 'cinematic' | 'legacy' | 'off'
 export type AccentStrength = 'standard' | 'vivid'
+
+export const APPEARANCE_THEMES = [
+  { value: 'standard', label: '기본', description: 'COM’s 기본 화면', lightAccent: DEFAULT_ACCENT, darkAccent: DEFAULT_ACCENT },
+  { value: 'terminal', label: '터미널', description: '녹색 글씨와 모노스페이스', lightAccent: '#17653e', darkAccent: '#42e88e' },
+  { value: 'retro', label: '레트로', description: '따뜻한 색의 빈티지 화면', lightAccent: '#9b4321', darkAccent: '#f2b568' },
+  { value: 'blueprint', label: '청사진', description: '푸른 격자와 제도선', lightAccent: '#245ebb', darkAccent: '#70b9fa' },
+] as const
+
+export type AppearanceTheme = (typeof APPEARANCE_THEMES)[number]['value']
+type AppearanceAccents = Partial<Record<AppearanceTheme, string>>
 
 // localStorage throws (not just returns null) when site data is blocked or storage is full.
 // Preferences are conveniences: on any failure fall back to the defaults instead of letting the
@@ -92,9 +103,33 @@ export function getStoredThemeMode() {
   }
 }
 
-export function getStoredAccentColor() {
-  if (typeof window === 'undefined') return DEFAULT_ACCENT
-  return normalizeHex(readStoredValue(ACCENT_COLOR_KEY) || DEFAULT_ACCENT)
+export function getStoredAppearanceTheme(): AppearanceTheme {
+  const stored = readStoredValue(APPEARANCE_THEME_KEY)
+  return APPEARANCE_THEMES.find(({ value }) => value === stored)?.value ?? 'standard'
+}
+
+export function getAppearanceAccent(theme: AppearanceTheme, mode: string) {
+  const design = APPEARANCE_THEMES.find(({ value }) => value === theme) ?? APPEARANCE_THEMES[0]
+  return mode === 'dark' ? design.darkAccent : design.lightAccent
+}
+
+function appearanceAccentKey(theme: AppearanceTheme) {
+  return theme === 'standard' ? ACCENT_COLOR_KEY : `kwcoms-appearance-accent:v1:${theme}`
+}
+
+export function getStoredAppearanceAccents(): AppearanceAccents {
+  const accents: AppearanceAccents = {}
+  for (const { value } of APPEARANCE_THEMES) {
+    const stored = readStoredValue(appearanceAccentKey(value))
+    if (stored) accents[value] = normalizeHex(stored)
+  }
+  return accents
+}
+
+export function storeAppearanceAccent(theme: AppearanceTheme, color: string | undefined) {
+  const key = appearanceAccentKey(theme)
+  if (color === undefined) forgetStoredValue(key)
+  else storeValue(key, color)
 }
 
 export function getStoredIntroStyle(): IntroStyle {

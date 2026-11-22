@@ -27,9 +27,13 @@ let previews = 0
 function Harness() {
   const [introStyle, setIntroStyle] = useState('cinematic')
   const [accentStrength, setAccentStrength] = useState('standard')
+  const [appearanceTheme, setAppearanceTheme] = useState('standard')
   return h(AppearanceControl, {
+    appearanceTheme,
+    setAppearanceTheme,
     accentColor: '#0071e3',
     setAccentColor: () => {},
+    resetAccentColor: () => {},
     themeMode: 'dark',
     setThemeMode: () => {},
     introStyle,

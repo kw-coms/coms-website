@@ -1,0 +1,191 @@
+/* Presentation presets compose with light/dark mode and the user's accent tokens. */
+:root[data-appearance-theme='terminal'] {
+	--app-bg: #eaf3ec;
+	--app-surface: #f8fcf8;
+	--app-surface-soft: #eaf4ec;
+	--app-surface-elevated: #fcfffc;
+	--app-text: #14291d;
+	--app-muted: #395646;
+	--app-subtle: #486451;
+	--theme-glow-violet: #70aa84;
+	--preset-ink: #17653e;
+	--preset-board: #10271b;
+	--preset-signal: #83e7aa;
+	--preset-corner: 0.55rem;
+	--preset-pattern: repeating-linear-gradient(0deg, var(--preset-line) 0 1px, transparent 1px 4px);
+}
+
+:root[data-appearance-theme='terminal'][data-theme-mode='dark'] {
+	--app-bg: #0b1510;
+	--app-surface: #112016;
+	--app-surface-soft: #0e1b13;
+	--app-surface-elevated: #1a2b20;
+	--app-text: #e4f9e9;
+	--app-muted: #acd0b8;
+	--app-subtle: #97b7a1;
+	--theme-glow-violet: #8adb9e;
+	--preset-ink: #85dba3;
+}
+
+:root[data-appearance-theme='retro'] {
+	--app-bg: #f6ebdb;
+	--app-surface: #fffaef;
+	--app-surface-soft: #f4e7d7;
+	--app-surface-elevated: #fffcf5;
+	--app-text: #36241c;
+	--app-muted: #684c3e;
+	--app-subtle: #765347;
+	--theme-glow-violet: #cc885e;
+	--preset-ink: #9b4321;
+	--preset-board: #322016;
+	--preset-signal: #ffc980;
+	--preset-corner: 1.25rem;
+	--preset-pattern: repeating-linear-gradient(135deg, var(--preset-line) 0 1px, transparent 1px 13px);
+}
+
+:root[data-appearance-theme='retro'][data-theme-mode='dark'] {
+	--app-bg: #1b1410;
+	--app-surface: #281d15;
+	--app-surface-soft: #221810;
+	--app-surface-elevated: #33251b;
+	--app-text: #fff1dc;
+	--app-muted: #dec0a6;
+	--app-subtle: #ccac93;
+	--theme-glow-violet: #cf7954;
+	--preset-ink: #f2b568;
+}
+
+:root[data-appearance-theme='blueprint'] {
+	--app-bg: #ecf4fc;
+	--app-surface: #f8fbff;
+	--app-surface-soft: #eaf2fa;
+	--app-surface-elevated: #fbfdff;
+	--app-text: #142b46;
+	--app-muted: #405a76;
+	--app-subtle: #4c6683;
+	--theme-glow-violet: #74a8d2;
+	--preset-ink: #245ebb;
+	--preset-board: #112941;
+	--preset-signal: #9bd7ff;
+	--preset-corner: 0.55rem;
+	--preset-pattern:
+		linear-gradient(var(--preset-line) 1px, transparent 1px) 0 0 / 20px 20px,
+		linear-gradient(90deg, var(--preset-line) 1px, transparent 1px) 0 0 / 20px 20px,
+		linear-gradient(var(--preset-line) 1px, transparent 1px) 0 0 / 80px 80px,
+		linear-gradient(90deg, var(--preset-line) 1px, transparent 1px) 0 0 / 80px 80px;
+}
+
+:root[data-appearance-theme='blueprint'][data-theme-mode='dark'] {
+	--app-bg: #0c1726;
+	--app-surface: #122136;
+	--app-surface-soft: #0f1d30;
+	--app-surface-elevated: #1a2d46;
+	--app-text: #ebf4ff;
+	--app-muted: #aec7e1;
+	--app-subtle: #97b4d4;
+	--theme-glow-violet: #669fda;
+	--preset-ink: #82b7ed;
+}
+
+:root:is([data-appearance-theme='terminal'], [data-appearance-theme='retro'], [data-appearance-theme='blueprint']) {
+	--app-hairline: color-mix(in srgb, var(--app-text) 16%, transparent);
+	--app-hairline-strong: color-mix(in srgb, var(--app-text) 30%, transparent);
+	--theme-body-mid: color-mix(in srgb, var(--app-text) 85%, var(--app-muted));
+	--theme-white: var(--app-surface);
+	--theme-surface-96: color-mix(in srgb, var(--app-surface) 96%, transparent);
+	--theme-surface-94: color-mix(in srgb, var(--app-surface) 94%, transparent);
+	--theme-surface-70: color-mix(in srgb, var(--app-surface) 70%, transparent);
+	--theme-border-soft: var(--app-hairline);
+	--preset-line: color-mix(in srgb, var(--preset-ink) 9%, transparent);
+
+	/* Older controls use white text on fills that follow the user's accent. */
+	& .text-white:is(
+		.bg-\[var\(--app-accent\)\],
+		.bg-\[var\(--app-brand\)\],
+		:is(.theme-home, .apple-route) :is(.bg-\[\#0071e3\], .bg-\[\#3b4890\])
+	) {
+		color: var(--app-accent-on);
+
+		&:is(
+			.hover\:bg-\[var\(--app-accent-hover\)\],
+			.hover\:bg-\[var\(--app-brand-strong\)\],
+			:is(.theme-home, .apple-route) :is(.hover\:bg-\[\#0077ed\], .hover\:bg-\[\#2d3a7a\])
+		):hover {
+			color: var(--app-accent-hover-on);
+		}
+	}
+
+	& .coms-page-backdrop,
+	& .site-page {
+		background:
+			linear-gradient(180deg, transparent, var(--app-bg) 34rem),
+			radial-gradient(60rem 24rem at 80% -8rem, var(--preset-line), transparent 74%),
+			var(--preset-pattern), var(--app-bg);
+	}
+
+	& .apple-board-hero {
+		background: linear-gradient(90deg, var(--app-surface) 24%, transparent), var(--preset-pattern), var(--app-surface);
+	}
+
+	& .scene-opening__bg {
+		background: var(--preset-pattern);
+	}
+
+	& .scene-opening__aurora,
+	& .coms-hero-field {
+		opacity: 0.45;
+	}
+
+	& .scene-opening__art {
+		--board-ink: var(--preset-board);
+		--board-light: var(--preset-signal);
+		--board-edge: color-mix(in srgb, var(--board-light) 58%, var(--board-ink));
+		border-radius: var(--preset-corner);
+		background:
+			radial-gradient(ellipse at 66% 18%, color-mix(in srgb, var(--board-light) 22%, transparent), transparent 68%),
+			var(--board-ink);
+		box-shadow: 0 0 0 4px var(--preset-line);
+	}
+
+	& .scene-processor {
+		top: 48%;
+	}
+
+	& .scene-processor__plate {
+		--plate-side: color-mix(in srgb, var(--board-light) 28%, var(--board-ink));
+		--plate-color: linear-gradient(135deg, var(--board-ink), color-mix(in srgb, var(--board-light) 32%, var(--board-ink)));
+	}
+
+	& .scene-processor__plate--top {
+		--plate-color: linear-gradient(135deg, var(--board-ink), color-mix(in srgb, var(--board-light) 60%, var(--board-ink)));
+	}
+
+	& .apple-topbar,
+	& .apple-mobile-tabs {
+		backdrop-filter: none;
+	}
+
+	& .apple-topbar {
+		box-shadow: inset 0 -1px var(--app-hairline);
+	}
+}
+
+:root[data-appearance-theme='terminal'] :is(.scene-wordmark, .coms-footer-wordmark) {
+	font-family: ui-monospace, Consolas, var(--apple-font-family);
+}
+
+:root[data-appearance-theme='terminal'] .scene-wordmark {
+	letter-spacing: -0.025em;
+}
+
+:root[data-appearance-theme='retro'] .scene-opening__art::before {
+	--board-line: color-mix(in srgb, var(--board-light) 10%, transparent);
+	background: repeating-linear-gradient(180deg, transparent 0 4px, var(--board-line) 4px 5px);
+}
+
+:root[data-appearance-theme='blueprint'] .scene-opening__art::before {
+	--board-line: color-mix(in srgb, var(--board-light) 18%, transparent);
+	background:
+		linear-gradient(var(--board-line) 1px, transparent 1px) 0 0 / 20px 20px,
+		linear-gradient(90deg, var(--board-line) 1px, transparent 1px) 0 0 / 20px 20px;
+}
