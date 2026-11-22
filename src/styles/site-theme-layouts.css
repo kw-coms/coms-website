@@ -219,6 +219,10 @@
 			grid-template-columns: minmax(8rem, 1fr) minmax(0, 1.5fr) minmax(12.5rem, 1fr);
 			padding: 0.75rem 1rem 0.4rem;
 		}
+
+		& .apps-directory .app-card-showcase:not(:has(.app-card-images, .app-card-more > *)) {
+			--site-theme-card-areas: 'head desc open' 'foot desc engagement';
+		}
 	}
 }
 
@@ -227,7 +231,7 @@
 	--site-theme-card-areas: 'head open' 'desc desc' 'images images' 'foot foot' 'more more' 'engagement engagement';
 	--retro-highlight: color-mix(in srgb, white 26%, var(--app-surface));
 	--retro-shadow: color-mix(in srgb, black 26%, var(--app-surface));
-	--retro-titlebar: linear-gradient(90deg, var(--site-theme-fill), var(--app-surface-soft));
+	--retro-titlebar: linear-gradient(90deg, color-mix(in srgb, var(--preset-ink) 18%, var(--app-surface)), var(--app-surface-soft));
 	--retro-bevel: inset 1px 1px var(--retro-highlight), inset -1px -1px var(--retro-shadow);
 
 	& .apple-global-nav .apple-topbar {
