@@ -41,7 +41,7 @@
 .study-page *::after { box-sizing: border-box; }
 /* The fixed top bar covers the first ~nav-height px: anchors and scroll-spy stop below it. */
 .study-page [id] { scroll-margin-top: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top) + 16px); }
-.study-page a { color: var(--accent-text); }
+.study-page :where(a:not(.apple-action-primary, .apple-action-secondary)) { color: var(--accent-text); }
 /* a link inside running text must not rely on colour alone (WCAG 1.4.1) */
 .study-page :is(p, li, .tip, .note, .warn, summary, .ans) a { text-decoration: underline; text-underline-offset: 2px; }
 .study-page code,

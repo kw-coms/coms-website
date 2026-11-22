@@ -18,7 +18,12 @@
 /* A quick settle on press for the primary/secondary action buttons. The
    theme-home variants already define their own :active depth press, so this
    only targets the non-home routes to avoid double transforms. */
-.apple-route .apple-action-primary,
+.apple-route .apple-action-primary {
+	transition:
+		transform 120ms cubic-bezier(0.22, 1, 0.36, 1),
+		box-shadow 120ms ease,
+		opacity 160ms ease;
+}
 .apple-route .apple-action-secondary {
 	transition:
 		background-color 160ms ease,
