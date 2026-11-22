@@ -177,7 +177,7 @@ export default function AppProjectCard({
       {detailTo && <div className="app-card-engagement">
         <WorkMetrics work={project} />
         <div className="app-card-links">
-          {editWork && <button type="button" onClick={editWork}>수정</button>}
+          {editWork && <button type="button" onClick={editWork}>작품 수정</button>}
           <Link to={detailTo} aria-label={title + ' 상세·댓글'}>상세 <ArrowRight size={14} aria-hidden="true" /></Link>
         </div>
       </div>}
