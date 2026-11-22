@@ -60,6 +60,42 @@ test('footer sitemap includes the Lab as a full-page link', async ({ page }) => 
 })
 
 test.describe('desktop popover', () => {
+  test('the themed home uses distinct command, desktop and drafting layouts', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/')
+    const opening = page.locator('#opening')
+    const wordmark = opening.getByRole('heading', { level: 1 })
+    const graphic = opening.locator('.scene-opening__art')
+    const marker = (theme) => opening.locator(`.home-mode-bar__${theme}`)
+    await expect(opening.locator('.home-mode-bar')).toBeHidden()
+    await openFromFooter(page)
+    const choose = (name) => dialog(page).getByRole('radiogroup', { name: '사이트 테마' }).getByRole('radio', { name, exact: true }).click()
+    const bounds = (locator) => locator.evaluate((element) => element.getBoundingClientRect().toJSON())
+
+    await choose('터미널')
+    await expect(marker('terminal')).toBeVisible()
+    await expect(marker('retro')).toBeHidden()
+    await expect(opening.locator('.home-mode-terminal-output')).toBeVisible()
+    expect((await bounds(wordmark)).x).toBeLessThan((await bounds(graphic)).x)
+    const intro = opening.getByRole('button', { name: '동아리 소개', exact: true })
+    const apply = opening.getByRole('button', { name: '지원하기', exact: true })
+    expect((await bounds(intro)).bottom).toBeLessThanOrEqual((await bounds(apply)).top)
+
+    await choose('레트로')
+    await expect(marker('retro')).toBeVisible()
+    await expect(opening.locator('.home-mode-terminal-output')).toBeHidden()
+    await expect(intro.locator('.home-mode-action-icon')).toBeVisible()
+    expect((await bounds(graphic)).bottom).toBeLessThanOrEqual((await bounds(intro)).top)
+
+    await choose('청사진')
+    await expect(marker('blueprint')).toBeVisible()
+    await expect(opening.locator('.home-mode-blueprint-note')).toBeVisible()
+    expect((await bounds(graphic)).x).toBeLessThan((await bounds(wordmark)).x)
+    await dialog(page).getByRole('button', { name: '화면 설정 닫기' }).click()
+    await intro.click()
+    await expect(page.locator('#about')).toBeInViewport()
+  })
+
   test('site theme stays selected across pages and remembers its own accent', async ({ page }) => {
     await page.addInitScript(() => {
       if (!localStorage.getItem('kwcoms-accent-color')) localStorage.setItem('kwcoms-accent-color', '#7440bc')

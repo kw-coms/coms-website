@@ -279,11 +279,12 @@ export default function AppearanceControl({
                               onClick={() => setAppearanceTheme(choice.value)}
                               className={`flex min-h-11 min-w-0 items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs font-semibold text-[var(--app-text)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-text)] ${active ? 'border-[var(--app-accent-border)] bg-[var(--app-accent-soft)]' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] hover:bg-[var(--app-surface-soft)]'}`}
                             >
-                              <span aria-hidden="true" className="flex h-6 w-8 shrink-0 flex-col justify-between rounded-sm border border-[var(--app-hairline-strong)] bg-[var(--app-surface-soft)] p-1">
-                                <span className="h-1 w-3/4 rounded-full" style={{ backgroundColor: isDark ? choice.darkAccent : choice.lightAccent }} />
-                                <span className="h-px w-full bg-[var(--app-muted)]" />
-                                <span className="h-px w-2/3 bg-[var(--app-muted)]" />
-                              </span>
+                              <span
+                                aria-hidden="true"
+                                className="appearance-theme-preview"
+                                data-theme-preview={choice.value}
+                                style={{ '--preview-accent': isDark ? choice.darkAccent : choice.lightAccent } as React.CSSProperties}
+                              />
                               <span id={choiceId} className="whitespace-nowrap">{choice.label}</span>
                               <span id={`${choiceId}-description`} hidden>{choice.description}</span>
                               {active && <Check size={14} strokeWidth={2.5} className="ml-auto shrink-0" aria-hidden="true" />}

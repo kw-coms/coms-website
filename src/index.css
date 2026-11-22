@@ -28,4 +28,6 @@
 @import "./styles/polish-misc.css";
 @import "./styles/nav-groups.css";
 @import "./styles/appearance-themes.css";
+@import "./styles/home-theme-layouts.css";
+@import "./styles/site-theme-layouts.css";
 @import "./styles/perf-lite.css";

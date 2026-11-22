@@ -1,0 +1,413 @@
+/* The alternate site themes keep the same controls and organize their surfaces differently. */
+:root:is([data-appearance-theme='terminal'], [data-appearance-theme='retro'], [data-appearance-theme='blueprint']) {
+	--site-theme-mono: ui-monospace, Consolas, var(--apple-font-family);
+	--site-theme-rule: color-mix(in srgb, var(--preset-ink) 40%, var(--app-surface));
+	--site-theme-fill: color-mix(in srgb, var(--preset-ink) 10%, var(--app-surface));
+
+	& .apple-global-nav .apple-topbar {
+		background: var(--site-theme-fill) !important;
+		border-bottom-color: var(--site-theme-rule) !important;
+		box-shadow: none;
+	}
+
+	& .nav-group-label::after {
+		display: none;
+	}
+
+	& .nav-group-btn:is(:hover, [aria-expanded='true'], [data-active='true']) {
+		background: var(--app-surface);
+		color: var(--app-text);
+	}
+
+	& :is(.apple-global-nav, .nav-m-overlay, .apps-directory) :focus-visible {
+		outline-color: var(--preset-ink);
+	}
+
+	& .apps-directory {
+		padding-block-start: calc(var(--apple-nav-height) + env(safe-area-inset-top) + clamp(1.25rem, 4vw, 2.25rem));
+	}
+
+	& .apps-directory-toolbar {
+		align-items: center;
+		padding: 0.75rem;
+	}
+
+	& .apps-directory :is(.apps-chip, input[type='search']) {
+		min-height: 2.75rem;
+		border-radius: 0.25rem;
+	}
+
+	& .apps-directory .apps-filter {
+		position: static;
+		background: none;
+		backdrop-filter: none;
+	}
+
+	& .apps-directory .app-card-showcase {
+		min-width: 0;
+		grid-template-areas: var(--site-theme-card-areas) !important;
+		grid-template-rows: none !important;
+	}
+
+	& .apps-directory .app-card-showcase:hover {
+		translate: none;
+	}
+
+	& .apps-directory :is(.app-card-title, .app-card-foot, .app-card-desc) {
+		height: auto;
+	}
+
+	& .apps-directory .app-card-title {
+		overflow: visible;
+		overflow-wrap: anywhere;
+		white-space: normal;
+	}
+
+	& .apps-directory .app-card-title a {
+		text-decoration: underline;
+		text-decoration-color: var(--site-theme-rule);
+		text-underline-offset: 0.19em;
+	}
+
+	& .apps-directory .app-card-open {
+		min-height: 2.75rem;
+		padding-inline: 0.65rem;
+		border: 1px solid var(--site-theme-rule);
+		border-radius: 0.25rem;
+		color: var(--preset-ink);
+	}
+
+	& .apps-directory .app-card-foot {
+		flex-wrap: wrap;
+		gap: 0.25rem 0.65rem;
+	}
+
+	& .apps-directory .app-card-engagement {
+		min-width: 0;
+	}
+
+	& .apps-directory .app-card-links :is(a, button) {
+		min-height: 2.75rem;
+		color: var(--preset-ink);
+	}
+
+	& .apps-directory .app-card-more:not(:has(*)) {
+		display: none;
+	}
+}
+
+/* Terminal: a compact, single-column directory with a stable action column on wide screens. */
+:root[data-appearance-theme='terminal'] {
+	--site-theme-card-areas: 'head open' 'desc desc' 'foot foot' 'images images' 'more more' 'engagement engagement';
+
+	& :is(.apple-topbar, .nav-panel, .nav-m-overlay, .apple-board-hero),
+	& .apps-directory :is(.site-head, .apps-group-head, .app-card-title, .app-card-host, .app-work-metrics) {
+		font-family: var(--site-theme-mono);
+	}
+
+	& .apple-global-nav .apple-topbar {
+		border-bottom-style: double;
+		border-bottom-width: 3px;
+	}
+
+	& :is(.nav-search, .nav-col, .nav-item, .nav-chip, .nav-m-close, .nav-m-login) {
+		border-radius: 0.125rem;
+	}
+
+	& :is(.nav-group-btn + .nav-group-btn, .apple-mobile-tab + .apple-mobile-tab) {
+		border-inline-start: 1px solid var(--app-hairline);
+	}
+
+	& :is(.nav-col, .nav-m-section) {
+		border-block-end: 1px dashed var(--site-theme-rule);
+	}
+
+	& :is(.apple-board-shell, .apple-board-minibar, .apple-control-strip) {
+		border-color: var(--site-theme-rule);
+		border-radius: 0;
+	}
+
+	& :is(.apple-board-hero, .apps-directory .site-head) {
+		border-inline-start: 0.25rem solid var(--preset-ink);
+		background: var(--app-surface-soft);
+	}
+
+	& .apps-directory {
+		background: var(--app-bg);
+	}
+
+	& .apps-directory .site-head {
+		padding: clamp(1rem, 3vw, 1.65rem);
+		border-block: 1px solid var(--site-theme-rule);
+		border-inline-end: 1px solid var(--site-theme-rule);
+	}
+
+	& .apps-directory .site-head h1 {
+		margin-bottom: 0.35rem;
+		font-size: clamp(1.625rem, 4vw, 2.5rem);
+		letter-spacing: -0.025em;
+	}
+
+	& .apps-directory-toolbar {
+		border: 1px dashed var(--site-theme-rule);
+	}
+
+	& .apps-directory-toolbar > [role='status'] {
+		margin-inline-start: auto;
+		font-family: var(--site-theme-mono);
+	}
+
+	& .apps-directory :is(.apps-group-head, .apps-grid) {
+		border: 1px solid var(--site-theme-rule);
+	}
+
+	& .apps-directory .apps-group-head {
+		justify-content: space-between;
+		margin: 0;
+		padding: 0.5rem 0.75rem;
+		border-bottom: 0;
+		background: var(--site-theme-fill);
+	}
+
+	& .apps-directory .apps-group-head h2 {
+		font-size: 1rem;
+	}
+
+	& .apps-directory .apps-grid {
+		display: block;
+	}
+
+	& .apps-directory .app-card-showcase {
+		gap: 0.125rem 0.75rem;
+		padding: 0.65rem 0.75rem 0.35rem;
+		border: 0;
+		border-radius: 0;
+	}
+
+	& .apps-directory .app-card-showcase + .app-card-showcase {
+		border-block-start: 1px dashed var(--site-theme-rule);
+	}
+
+	& .apps-directory .app-card-showcase:focus-within {
+		background: var(--app-surface-elevated);
+	}
+
+	& .apps-directory :is(.app-card-title, .app-card-desc, .app-card-foot, .app-card-images, .app-card-engagement) {
+		margin-top: 0.25rem;
+	}
+
+	& .apps-directory .app-card-title {
+		font-size: 1rem;
+	}
+
+	& .apps-directory :is(.app-card-eyebrow:empty, .app-card-foot:empty) {
+		display: none;
+	}
+
+	& .apps-directory .app-card-engagement {
+		border: 0;
+	}
+
+	& .apps-directory .app-card-open {
+		justify-self: end;
+		align-self: start;
+	}
+
+	@media (min-width: 768px) {
+		& .apps-directory .app-card-showcase {
+			--site-theme-card-areas: 'head desc open' 'foot foot .' 'images images .' 'more more engagement';
+			grid-template-columns: minmax(8rem, 1fr) minmax(0, 1.5fr) minmax(12.5rem, 1fr);
+			padding: 0.75rem 1rem 0.4rem;
+		}
+	}
+}
+
+/* Retro: desktop windows with distinct title bars, inset frames and beveled controls. */
+:root[data-appearance-theme='retro'] {
+	--site-theme-card-areas: 'head open' 'desc desc' 'images images' 'foot foot' 'more more' 'engagement engagement';
+	--retro-highlight: color-mix(in srgb, white 26%, var(--app-surface));
+	--retro-shadow: color-mix(in srgb, black 26%, var(--app-surface));
+	--retro-titlebar: linear-gradient(90deg, var(--site-theme-fill), var(--app-surface-soft));
+	--retro-bevel: inset 1px 1px var(--retro-highlight), inset -1px -1px var(--retro-shadow);
+
+	& .apple-global-nav .apple-topbar {
+		box-shadow: var(--retro-bevel);
+	}
+
+	& :is(.nav-group-btn, .nav-search, .nav-m-close, .nav-m-login, .apps-directory .apps-chip, .apps-directory .app-card-open) {
+		border-radius: 0.25rem;
+		box-shadow: var(--retro-bevel);
+	}
+
+	& :is(.nav-m-item[aria-current='page'], .nav-group-btn[data-active='true'], .apps-directory .apps-chip[aria-pressed='true']) {
+		box-shadow: inset 1px 1px var(--retro-shadow), inset -1px -1px var(--retro-highlight);
+	}
+
+	& :is(.nav-col, .nav-m-section, .apple-board-shell, .apps-directory .site-head, .apps-directory-toolbar, .apps-directory .app-card-showcase) {
+		border: 1px solid var(--site-theme-rule);
+		border-radius: 0.35rem;
+		box-shadow: var(--retro-bevel);
+	}
+
+	& :is(.nav-m-top, .apple-board-hero, .apps-directory .site-head) {
+		background: var(--retro-titlebar);
+		border-bottom-color: var(--site-theme-rule);
+	}
+
+	& .nav-m-section {
+		margin: 0.4rem 0.65rem 0.75rem;
+	}
+
+	& .apps-directory .site-head {
+		padding: clamp(1rem, 3vw, 1.85rem);
+	}
+
+	& .apps-directory .site-head h1 {
+		font-family: Georgia, var(--apple-font-family);
+	}
+
+	& .apps-directory-toolbar {
+		background: var(--app-surface);
+	}
+
+	& .apps-directory .apps-group-head {
+		padding-block-end: 0.45rem;
+		border-block-end: 3px double var(--site-theme-rule);
+	}
+
+	& .apps-directory .app-card-showcase {
+		position: relative;
+		gap: 0;
+		padding: 0.125rem;
+		background: var(--app-surface);
+	}
+
+	& .apps-directory .app-card-showcase::before {
+		content: '';
+		grid-area: 1 / 1 / 2 / -1;
+		align-self: stretch;
+		background: var(--retro-titlebar);
+		border-block-end: 1px solid var(--site-theme-rule);
+		pointer-events: none;
+	}
+
+	& .apps-directory :is(.app-card-head, .app-card-open) {
+		position: relative;
+	}
+
+	& .apps-directory .app-card-head {
+		padding: 0.55rem 0.4rem 0.55rem 0.75rem;
+	}
+
+	& .apps-directory .app-card-open {
+		align-self: center;
+		margin: 0.25rem 0.4rem 0.25rem 0;
+		background: var(--app-surface);
+	}
+
+	& .apps-directory :is(.app-card-desc, .app-card-foot, .app-card-images, .app-card-more, .app-card-engagement) {
+		margin-inline: 0.75rem;
+	}
+
+	& .apps-directory .app-card-engagement {
+		padding: 0.15rem 0.4rem;
+		border: 1px solid var(--app-hairline);
+		border-bottom: 0;
+		background: var(--app-surface-soft);
+	}
+}
+
+/* Blueprint: framed drawing sheets with technical labels and two reading columns. */
+:root[data-appearance-theme='blueprint'] {
+	--site-theme-card-areas: 'head open' 'desc desc' 'images images' 'foot foot' 'more more' 'engagement engagement';
+
+	& .apple-global-nav .apple-topbar {
+		border-bottom-style: double;
+		border-bottom-width: 3px;
+	}
+
+	& :is(.nav-search, .nav-chip, .nav-item, .nav-m-close, .nav-m-login, .apple-board-shell) {
+		border-radius: 0;
+	}
+
+	& .nav-cols {
+		gap: 1px;
+		border: 1px solid var(--site-theme-rule);
+		background: var(--site-theme-rule);
+	}
+
+	& .nav-col {
+		border-radius: 0;
+		background: var(--app-surface);
+	}
+
+	& :is(.nav-col-title, .nav-m-title, .apps-group-head) {
+		font-family: var(--site-theme-mono);
+	}
+
+	& .nav-m-section {
+		border-block-end: 1px solid var(--app-hairline);
+	}
+
+	& .apple-board-shell {
+		border-color: var(--site-theme-rule);
+	}
+
+	& :is(.apple-board-hero, .apps-directory .site-head) {
+		border-block-end: 3px double var(--site-theme-rule);
+		background: linear-gradient(90deg, var(--app-surface) 20%, transparent), var(--preset-pattern), var(--app-surface);
+	}
+
+	& .apps-directory .site-head {
+		padding: clamp(1rem, 3vw, 2rem);
+		border: 1px solid var(--site-theme-rule);
+		border-block-end: 3px double var(--site-theme-rule);
+	}
+
+	& :is(.apps-directory-toolbar, .apps-directory .apps-group) {
+		border: 1px solid var(--site-theme-rule);
+		background: var(--preset-pattern), var(--app-surface-soft);
+	}
+
+	& .apps-directory .apps-group-head {
+		justify-content: space-between;
+		margin: 0;
+		padding: 0.5rem 0.75rem;
+		border-block-end: 1px solid var(--site-theme-rule);
+		background: var(--site-theme-fill);
+	}
+
+	& .apps-directory .apps-group-head h2 {
+		font-size: 1.05rem;
+	}
+
+	& .apps-directory .apps-grid {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0.625rem;
+		padding: 0.625rem;
+	}
+
+	& .apps-directory .app-card-showcase {
+		padding: 0.75rem;
+		border: 1px solid var(--site-theme-rule);
+		border-radius: 0;
+	}
+
+	& .apps-directory .app-card-foot {
+		padding-block-start: 0.45rem;
+		border-block-start: 1px dashed var(--site-theme-rule);
+		font-family: var(--site-theme-mono);
+	}
+
+	& .apps-directory :is(.app-card-open, .app-card-images img) {
+		border-radius: 0;
+	}
+
+	@media (min-width: 760px) {
+		& .apps-directory .apps-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 1rem;
+			padding: 1rem;
+		}
+	}
+}

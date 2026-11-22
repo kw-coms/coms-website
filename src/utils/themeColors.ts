@@ -12,9 +12,9 @@ export type AccentStrength = 'standard' | 'vivid'
 
 export const APPEARANCE_THEMES = [
   { value: 'standard', label: '기본', description: 'COM’s 기본 화면', lightAccent: DEFAULT_ACCENT, darkAccent: DEFAULT_ACCENT },
-  { value: 'terminal', label: '터미널', description: '녹색 글씨와 모노스페이스', lightAccent: '#17653e', darkAccent: '#42e88e' },
-  { value: 'retro', label: '레트로', description: '따뜻한 색의 빈티지 화면', lightAccent: '#9b4321', darkAccent: '#f2b568' },
-  { value: 'blueprint', label: '청사진', description: '푸른 격자와 제도선', lightAccent: '#245ebb', darkAccent: '#70b9fa' },
+  { value: 'terminal', label: '터미널', description: '명령어 창과 디렉터리 목록', lightAccent: '#17653e', darkAccent: '#42e88e' },
+  { value: 'retro', label: '레트로', description: '클래식 데스크톱 창과 바로가기', lightAccent: '#9b4321', darkAccent: '#f2b568' },
+  { value: 'blueprint', label: '청사진', description: '제도 격자와 도면형 패널', lightAccent: '#245ebb', darkAccent: '#70b9fa' },
 ] as const
 
 export type AppearanceTheme = (typeof APPEARANCE_THEMES)[number]['value']

@@ -1,0 +1,538 @@
+.home-mode-bar,
+.home-mode-bar > span,
+.home-mode-prompt,
+.home-mode-action-icon,
+.home-mode-terminal-output,
+.home-mode-terminal-output > span,
+.home-mode-blueprint-note {
+	display: none;
+}
+
+:root:is([data-appearance-theme='terminal'], [data-appearance-theme='retro'], [data-appearance-theme='blueprint']) {
+	& .scene.scene-opening {
+		padding-block: clamp(1.5rem, 5vh, 3.75rem);
+	}
+
+	& .scene-opening__layout {
+		flex: 0 1 auto;
+		gap: 0;
+		margin-block: auto;
+		border: 1px solid var(--app-hairline-strong);
+		background: var(--app-surface);
+	}
+
+	& .scene-opening__copy {
+		grid-area: copy;
+	}
+
+	& .scene-opening__art {
+		grid-area: art;
+	}
+
+	& .scene-opening__ticker {
+		display: none;
+	}
+
+	& .home-mode-bar {
+		display: flex;
+		min-width: 0;
+		grid-area: bar;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.7rem clamp(1rem, 2.8vw, 2rem);
+		border-bottom: 1px solid var(--app-hairline-strong);
+		background: var(--app-surface-soft);
+		color: var(--app-text);
+		font-size: 0.86rem;
+		font-weight: 700;
+	}
+
+	& .home-mode-bar > span {
+		align-items: center;
+		gap: 0.55rem;
+	}
+}
+
+/* Terminal: a command pane beside its output, followed by a directory of member links. */
+:root[data-appearance-theme='terminal'] {
+	& .scene-opening__layout {
+		max-width: 68rem;
+		grid-template: 'bar bar' auto 'copy art' 1fr / minmax(0, 1.5fr) minmax(13rem, 0.75fr);
+		align-items: stretch;
+		border-radius: 0.5rem;
+	}
+
+	& .home-mode-bar {
+		border-radius: 0.45rem 0.45rem 0 0;
+		font-family: var(--cine-mono);
+	}
+
+	& .home-mode-bar__terminal {
+		display: inline-flex;
+	}
+
+	& .scene-opening__copy {
+		padding: clamp(1rem, 4vw, 3.5rem);
+	}
+
+	& .scene-wordmark {
+		font-size: calc(clamp(2.8rem, 7vw, 6.5rem) * var(--fit, 1));
+	}
+
+	& .scene-opening .scene-actions {
+		display: grid;
+		gap: 0.45rem;
+	}
+
+	& .scene-opening .scene-btn {
+		justify-content: start;
+		padding-inline: 0.85rem;
+		border-radius: 0.3rem;
+	}
+
+	& .home-mode-prompt {
+		display: inline;
+		font-family: var(--cine-mono);
+	}
+
+	& .home-mode-action-arrow {
+		margin-inline-start: auto;
+	}
+
+	& .scene-opening__art {
+		aspect-ratio: auto;
+		border: 0;
+		border-inline-start: 1px solid var(--app-hairline-strong);
+		border-radius: 0 0 0.45rem 0;
+		background: var(--preset-board);
+		box-shadow: none;
+	}
+
+	& .scene-opening__art :is(.scene-processor, .scene-opening__traces),
+	& .scene-opening__art::after {
+		display: none;
+	}
+
+	& .home-mode-terminal-output {
+		position: relative;
+		display: grid;
+		min-height: 100%;
+		align-content: center;
+		gap: 0.6rem;
+		padding: clamp(1rem, 3vw, 2.5rem);
+		color: var(--board-light);
+		font-size: 0.95rem;
+	}
+
+	& .home-mode-terminal-output > span {
+		display: block;
+	}
+
+	& .home-mode-terminal-output__prompt {
+		margin-bottom: 0.65rem;
+		padding-bottom: 0.85rem;
+		border-bottom: 1px solid var(--board-edge);
+		font-family: var(--cine-mono);
+	}
+
+	& .scene-members--today > .scene-inner {
+		max-width: 68rem;
+		border-radius: 0.5rem;
+	}
+
+	& .scene-members--today :is(.scene-notice--lead, .scene-hubcard, .scene-chip, .scene-members__icon) {
+		border-radius: 0.3rem;
+	}
+
+	& .scene-members--today .scene-hub {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0;
+		border-block-start: 1px solid var(--app-hairline-strong);
+	}
+
+	& .scene-members--today .scene-hubcard {
+		grid-template-columns: 2.5rem minmax(7rem, 0.4fr) minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.7rem 0.75rem;
+		border: 0;
+		border-bottom: 1px solid var(--app-hairline-strong);
+		background: var(--app-surface);
+	}
+
+	& .scene-members--today .scene-hubcard:hover {
+		background: var(--app-surface-soft);
+	}
+
+	& .scene-members--today .scene-hubcard :is(.scene-hubcard__title, .scene-hubcard__go) {
+		margin: 0;
+	}
+}
+
+/* Retro: a desktop window with a monitor preview and a shelf of raised action tiles. */
+:root[data-appearance-theme='retro'] {
+	& .scene-opening__layout {
+		max-width: 66rem;
+		grid-template:
+			'bar bar'
+			'art semester'
+			'art title'
+			'art lede'
+			'actions actions'
+			'notice status' / minmax(0, 0.78fr) minmax(0, 1fr);
+		border-radius: 0.4rem;
+		box-shadow: 5px 5px 0 var(--app-hairline-strong);
+	}
+
+	& .home-mode-bar,
+	& .scene-members__header {
+		background: var(--app-accent);
+		color: var(--app-accent-on);
+	}
+
+	& .home-mode-bar {
+		border-radius: 0.35rem 0.35rem 0 0;
+	}
+
+	& .home-mode-bar__retro {
+		display: inline-flex;
+	}
+
+	& .scene-opening__copy {
+		display: contents;
+	}
+
+	& .scene-opening__semester {
+		grid-area: semester;
+		align-self: end;
+		margin: 1.4rem 1.4rem 0.45rem;
+	}
+
+	& .scene-wordmark {
+		grid-area: title;
+		margin-inline: 1.4rem;
+		font-size: calc(clamp(2.8rem, 7vw, 6.5rem) * var(--fit, 1));
+	}
+
+	& .scene-opening__lede {
+		grid-area: lede;
+		align-self: start;
+		margin: 0.65rem 1.4rem 1.4rem;
+	}
+
+	& .scene-opening__art {
+		min-height: 12rem;
+		aspect-ratio: auto;
+		align-self: stretch;
+		margin: 1.4rem;
+		border: 4px solid var(--app-hairline-strong);
+		border-radius: 0.6rem;
+		box-shadow: 0 4px 0 var(--app-hairline-strong);
+	}
+
+	& .scene-opening__art :is(.scene-processor__plate, .scene-opening__traces) {
+		display: none;
+	}
+
+	& .scene-processor {
+		inset: 12%;
+		width: auto;
+		aspect-ratio: auto;
+		transform: none;
+	}
+
+	& .scene-processor__mark {
+		top: 50%;
+		width: min(42%, 7rem);
+	}
+
+	& .scene-opening .scene-actions {
+		display: grid;
+		grid-area: actions;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.65rem;
+		margin: 0;
+		padding: 0.85rem 1.4rem;
+		border-block: 1px solid var(--app-hairline-strong);
+		background: var(--app-surface-soft);
+	}
+
+	& .scene-opening :is(.scene-btn, .scene-notice),
+	& .scene-members--today :is(.scene-notice--lead, .scene-hubcard, .scene-chip, .scene-members__icon) {
+		border: 1px solid var(--app-hairline-strong);
+		border-radius: 0.35rem;
+		box-shadow: inset 0 1px color-mix(in srgb, #fff 30%, transparent), 0 2px 0 var(--app-hairline-strong);
+	}
+
+	& .scene-opening .scene-btn {
+		justify-content: start;
+		padding-inline: 0.75rem;
+	}
+
+	& .home-mode-action-icon {
+		display: block;
+		flex-shrink: 0;
+	}
+
+	& .home-mode-action-arrow {
+		display: none;
+	}
+
+	& .scene-opening .scene-notice {
+		min-width: 0;
+		grid-area: notice;
+		margin: 0.8rem 1.4rem;
+	}
+
+	& .scene-opening .scene-typed {
+		min-height: 0;
+		grid-area: status;
+		margin: 0.8rem 1.4rem;
+	}
+
+	& .scene-opening__layout:not(:has(.scene-notice)) .scene-typed {
+		grid-column: 1 / -1;
+	}
+
+	& .scene-members--today > .scene-inner {
+		--retro-window-pad: clamp(1.25rem, 3.4vw, 3rem);
+		max-width: 66rem;
+		padding: 0 var(--retro-window-pad) var(--retro-window-pad);
+		border-radius: 0.4rem;
+		box-shadow: 5px 5px 0 var(--app-hairline-strong);
+	}
+
+	& .scene-members__header {
+		margin-inline: calc(-1 * var(--retro-window-pad));
+		padding: 0.85rem var(--retro-window-pad);
+		border-radius: 0.35rem 0.35rem 0 0;
+	}
+
+	& .scene-members__header :is(.scene-members__eyebrow, .scene-title) {
+		color: inherit;
+	}
+
+	& .scene-members__header .scene-title {
+		font-size: clamp(1.65rem, 3.8vw, 2.65rem);
+	}
+}
+
+/* Blueprint: the drawing sits to the left on wide sheets, with coordinates and a notes panel. */
+:root[data-appearance-theme='blueprint'] {
+	& .scene-opening__layout {
+		max-width: 76rem;
+		grid-template: 'bar bar' auto 'art copy' 1fr / minmax(0, 1.18fr) minmax(0, 0.82fr);
+		align-items: stretch;
+		border: 2px solid var(--app-hairline-strong);
+	}
+
+	& .home-mode-bar {
+		border-bottom-style: double;
+	}
+
+	& .home-mode-bar__blueprint {
+		display: inline-flex;
+	}
+
+	& .scene-opening__copy {
+		align-self: center;
+		padding: clamp(1rem, 3vw, 3rem);
+	}
+
+	& .scene-wordmark {
+		font-size: calc(clamp(2.8rem, 7.2vw, 6.5rem) * var(--fit, 1));
+	}
+
+	& .scene-opening__art {
+		min-height: 18rem;
+		aspect-ratio: auto;
+		align-self: stretch;
+		border: 0;
+		border-inline-end: 1px solid var(--app-hairline-strong);
+		border-radius: 0;
+		box-shadow: none;
+	}
+
+	& .scene-processor {
+		top: 50%;
+		width: min(68%, 21rem);
+	}
+
+	& .scene-processor__plate {
+		--plate-color: transparent;
+		border-style: dashed;
+		box-shadow: none;
+	}
+
+	& .scene-processor__plate--top {
+		border-style: solid;
+	}
+
+	& .home-mode-blueprint-note {
+		position: absolute;
+		inset: 12% auto auto 8%;
+		display: block;
+		padding: 0 0.75rem 0.3rem 0;
+		border-bottom: 1px solid;
+		color: var(--board-light);
+		font-size: 0.75rem;
+	}
+
+	& .scene-opening .scene-btn {
+		border-radius: 0.1rem;
+	}
+
+	& .scene-members--today > .scene-inner {
+		display: grid;
+		grid-template:
+			'header header' auto
+			'notice notice' auto
+			'hub tools-title' min-content
+			'hub tools' 1fr
+			'calendar calendar' auto / minmax(0, 1fr) minmax(12rem, 0.36fr);
+		gap: 0 1rem;
+		align-items: start;
+		border: 2px solid var(--app-hairline-strong);
+		border-radius: 0;
+	}
+
+	& .scene-members--today .scene-members__header {
+		grid-area: header;
+	}
+
+	& .scene-members--today .scene-notice--lead {
+		grid-area: notice;
+	}
+
+	& .scene-members--today .scene-hub {
+		grid-area: hub;
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	& .scene-members--today .scene-members__tools-title {
+		grid-area: tools-title;
+		margin: 0;
+		padding-block: 0.6rem;
+		border-block-start: 1px solid var(--app-hairline-strong);
+	}
+
+	& .scene-members--today .scene-chips {
+		display: grid;
+		grid-area: tools;
+		gap: 0.4rem;
+		margin: 0;
+	}
+
+	& .scene-members--today .scene-chip {
+		width: 100%;
+	}
+
+	& .scene-members--today .scene-members__calendar {
+		grid-area: calendar;
+	}
+
+	& .scene-members--today :is(.scene-hubcard, .scene-notice--lead, .scene-chip, .scene-members__calendar) {
+		border-color: var(--app-hairline-strong);
+		border-radius: 0;
+	}
+
+	& .scene-members--today .scene-hubcard {
+		border-inline-start: 3px solid var(--app-accent-text);
+	}
+}
+
+@media (min-width: 800px) {
+	:root[data-appearance-theme='blueprint'] .scene-members--today .scene-hubcard {
+		grid-template: 'icon title go' auto 'icon body go' auto / auto minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 0.3rem 0.8rem;
+	}
+
+	:root[data-appearance-theme='blueprint'] .scene-hubcard .scene-members__icon {
+		grid-area: icon;
+	}
+
+	:root[data-appearance-theme='blueprint'] .scene-members--today .scene-hubcard__title {
+		grid-area: title;
+		margin: 0;
+	}
+
+	:root[data-appearance-theme='blueprint'] .scene-members--today .scene-hubcard__body {
+		grid-area: body;
+	}
+
+	:root[data-appearance-theme='blueprint'] .scene-members--today .scene-hubcard__go {
+		grid-area: go;
+		margin: 0;
+	}
+}
+
+@media (max-width: 799px) {
+	:root[data-appearance-theme='terminal'] .scene-members--today .scene-hubcard {
+		grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+		column-gap: 0.55rem;
+		row-gap: 0.15rem;
+	}
+
+	:root[data-appearance-theme='blueprint'] .scene-members--today > .scene-inner {
+		display: block;
+	}
+
+	:root[data-appearance-theme='blueprint'] .scene-members--today .scene-members__tools-title {
+		margin-top: 1.25rem;
+	}
+
+	:root[data-appearance-theme='blueprint'] .scene-members--today .scene-chips {
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+	}
+}
+
+@media (max-width: 767px) {
+	:root:is([data-appearance-theme='terminal'], [data-appearance-theme='blueprint']) .scene-opening__layout {
+		grid-template: 'bar' auto 'copy' auto 'art' auto / minmax(0, 1fr);
+	}
+
+	:root:is([data-appearance-theme='terminal'], [data-appearance-theme='blueprint']) .scene-opening__art {
+		border: 0;
+		border-top: 1px solid var(--app-hairline-strong);
+	}
+
+	:root[data-appearance-theme='terminal'] .home-mode-terminal-output {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem 0.75rem;
+	}
+
+	:root[data-appearance-theme='terminal'] .home-mode-terminal-output__prompt {
+		width: 100%;
+		margin-bottom: 0.15rem;
+		padding-bottom: 0.4rem;
+	}
+
+	:root[data-appearance-theme='retro'] {
+		& .scene-opening__layout {
+			grid-template: 'bar' 'semester' 'title' 'lede' 'actions' 'notice' 'status' 'art' / minmax(0, 1fr);
+		}
+
+		& .scene-opening__art {
+			min-height: 9rem;
+			margin: 0.8rem 1rem 1rem;
+		}
+
+		& .scene-opening :is(.scene-opening__semester, .scene-opening__lede, .scene-wordmark, .scene-notice, .scene-typed) {
+			margin-inline: 1rem;
+		}
+
+		& .scene-opening .scene-actions {
+			padding-inline: 1rem;
+		}
+	}
+
+	:root[data-appearance-theme='blueprint'] .scene-opening__art {
+		min-height: 12rem;
+	}
+
+	:root[data-appearance-theme='blueprint'] .scene-processor {
+		width: min(50%, 16rem);
+	}
+}

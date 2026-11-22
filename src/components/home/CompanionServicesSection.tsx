@@ -100,7 +100,7 @@ function ViewerProjects({ user }) {
   const shown = filter === 'all' ? foundGroups : foundGroups.filter((group) => group.key === filter)
 
   return (
-    <div className="site-page">
+    <div className="site-page apps-directory">
       <div className="site-page-inner">
         <div className="site-head">
           <div>
@@ -125,7 +125,7 @@ function ViewerProjects({ user }) {
           <p className="mt-8 text-sm font-medium text-[var(--app-muted)]">등록된 프로젝트가 아직 없습니다.</p>
         ) : (
           <>
-            <div role="group" aria-label="프로젝트 찾기" className="mt-6 flex flex-wrap items-center gap-3">
+            <div role="group" aria-label="프로젝트 찾기" className="apps-directory-toolbar mt-6 flex flex-wrap items-center gap-3">
               <div className="w-full min-w-0 sm:max-w-xs">
                 <ListSearch value={query} onChange={setQuery} placeholder="이름이나 설명으로 찾기" label="프로젝트 검색" />
               </div>
