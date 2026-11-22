@@ -285,9 +285,9 @@ for (const [label, setup] of [
       expect(await page.locator('.scene-about__pin').evaluate((el) => getComputedStyle(el).position)).toBe('static')
       // Straight from load, without scrolling an inch: nothing is left transparent, clipped or lowered.
       expect(await hiddenTextElements(page)).toEqual([])
-      // The grain, the cube, the floor and the ticker are off; the first highlight is shown typed out.
+      // The opening keeps its static illustration and suppresses the moving backdrop.
+      await expect(page.locator('.scene-opening__art')).toBeVisible()
       await expect(page.locator('.cine-grain')).toBeHidden()
-      await expect(page.locator('.scene-opening__cube')).toBeHidden()
       await expect(page.locator('.scene-opening__floor')).toBeHidden()
       await expect(page.locator('.scene-opening__ticker')).toBeHidden()
       await expect(page.locator('.scene-typed__line')).toContainText('Weekly Seminar')

@@ -36,6 +36,8 @@ const standard = preferences.getAccentTokens('#0071e3', 'dark', 'standard')
 assert.deepEqual(standard, {
   '--app-accent': '#0071e3',
   '--app-accent-hover': '#2485e7',
+  '--app-accent-on': '#ffffff',
+  '--app-accent-hover-on': '#000000',
   '--app-accent-soft': '#122b46',
   '--app-accent-text': '#4799eb',
   '--app-accent-border': 'color-mix(in srgb, #0071e3 42%, transparent)',
@@ -53,9 +55,14 @@ const luminance = (hex) => {
 }
 for (const theme of ['light', 'dark']) {
   for (const accent of ['#000000', '#ffffff', '#ffff00', '#0071e3', '#ff00ff', '#808080']) {
-    const text = preferences.getAccentTokens(accent, theme, 'vivid')['--app-accent-text']
+    const tokens = preferences.getAccentTokens(accent, theme, 'vivid')
+    const text = tokens['--app-accent-text']
     const values = [luminance(text), luminance(theme === 'dark' ? '#17191f' : '#ffffff')].sort((a, b) => b - a)
     assert.ok((values[0] + 0.05) / (values[1] + 0.05) >= 4.5, `${theme}/${accent}: vivid accent text remains readable`)
+    for (const background of ['--app-accent', '--app-accent-hover']) {
+      const contrast = [luminance(tokens[background]), luminance(tokens[`${background}-on`])].sort((a, b) => b - a)
+      assert.ok((contrast[0] + 0.05) / (contrast[1] + 0.05) >= 4.5, `${theme}/${accent}: ${background} label remains readable`)
+    }
   }
 }
 const buildConfig = readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8')

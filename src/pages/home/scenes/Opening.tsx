@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { Megaphone } from 'lucide-react'
+import { ArrowRight, Megaphone } from 'lucide-react'
 import { experiencePills } from '../../../data/homeContent'
-import { ghostActionBtnClass, solidActionBtnClass } from '../../../shared/homeUi'
 import { SCREEN_ON_EVENT } from '../../../utils/screenOn'
 import HeroField from '../HeroField'
 import { cssVars } from './cssVars'
@@ -13,17 +12,13 @@ type Props = {
   title: string
   copy: string
   semester: string
-  total: number
   noticeTitle: string | null
   onMore: () => void
   onApply: () => void
   onNotice: () => void
 }
 
-// Scene 1. The wordmark is the picture. Its letters rise once on load (after the boot intro, if
-// one is covering the page), and as the page scrolls away the wordmark sinks back and two
-// letterbox bars close (both read --hero-out from useSceneProgress).
-export default function Opening({ title, copy, semester, total, noticeTitle, onMore, onApply, onNotice }: Props) {
+export default function Opening({ title, copy, semester, noticeTitle, onMore, onApply, onNotice }: Props) {
   const wordmarkRef = useRef<HTMLHeadingElement | null>(null)
 
   useEffect(() => {
@@ -31,7 +26,7 @@ export default function Opening({ title, copy, semester, total, noticeTitle, onM
     if (!mark) return
     let timer = 0
     const show = () => mark.classList.add('is-revealed')
-    // While the intro covers the page the letters wait for it to open; never wait for long.
+    // Wait for the boot intro to clear before revealing the title.
     if (document.querySelector('[data-coms-intro]')) {
       window.addEventListener(SCREEN_ON_EVENT, show, { once: true })
       timer = window.setTimeout(show, 4500)
@@ -44,9 +39,7 @@ export default function Opening({ title, copy, semester, total, noticeTitle, onM
     }
   }, [])
 
-  const letters = Array.from(title)
-  // Longer titles (a site setting) shrink so the word still fits the screen.
-  const fit = Math.min(1, 6 / Math.max(1, letters.length))
+  const fit = Math.max(0.48, Math.min(1, 7 / Array.from(title).length))
 
   return (
     <section id="opening" data-scene="opening" className="scene scene-opening" aria-label="COM's">
@@ -60,58 +53,42 @@ export default function Opening({ title, copy, semester, total, noticeTitle, onM
           <div className="floor__plane"><i /></div>
         </div>
         <HeroField />
-        <div className="scene-opening__cube">
-          <div className="cube-rig">
-            <div className="cube">
-              <i /><i /><i /><i /><i /><i />
-            </div>
-            <div className="cube cube--inner">
-              <i /><i /><i /><i /><i /><i />
-            </div>
-          </div>
-        </div>
         <div className="scene-opening__vignette" />
       </div>
-      <span className="scene-opening__bar scene-opening__bar--top" aria-hidden="true" />
-      <span className="scene-opening__bar scene-opening__bar--bottom" aria-hidden="true" />
 
-      <p className="cine-hud scene-opening__tl">KW COM's<span className="scene-opening__tl-more"> · Kwangwoon Univ.</span></p>
-      <p className="cine-hud scene-opening__tr">Scene 01 / {String(total).padStart(2, '0')}</p>
-
-      <div className="scene-opening__stage">
-        <h1
-          ref={wordmarkRef}
-          data-cine-hold
-          aria-label={title}
-          className="cine-lines scene-wordmark"
-          style={cssVars({ '--fit': fit, '--len': letters.length })}
-        >
-          {letters.map((ch, i) => (
-            <span key={i} className="cine-m" aria-hidden="true" style={cssVars({ '--i': i * 0.6, '--k': i })}>
-              <span>{ch}</span>
-            </span>
-          ))}
-        </h1>
-      </div>
-
-      <div className="scene-opening__copy">
-        <p className="scene-opening__lede">{copy}</p>
-        <TypedLine />
-        <div className="scene-actions">
-          <button type="button" onClick={onMore} className={solidActionBtnClass}>더 알아보기</button>
-          <button type="button" onClick={onApply} className={ghostActionBtnClass}>지원하기</button>
+      <div className="scene-opening__layout">
+        <div className="scene-opening__copy">
+          <p className="cine-hud scene-opening__semester">{semester}</p>
+          <h1 ref={wordmarkRef} data-cine-hold className="cine-lines scene-wordmark" style={cssVars({ '--fit': fit })}>
+            <span className="cine-m"><span>{title}</span></span>
+          </h1>
+          <p className="scene-opening__lede">{copy}</p>
+          <div className="scene-actions">
+            <button type="button" onClick={onMore} className="apple-action-primary scene-btn">
+              동아리 소개 <ArrowRight size={17} aria-hidden="true" />
+            </button>
+            <button type="button" onClick={onApply} className="apple-action-secondary scene-btn">지원하기</button>
+          </div>
+          {noticeTitle && (
+            <button type="button" onClick={onNotice} className="scene-notice">
+              <Megaphone size={15} aria-hidden="true" />
+              <span className="scene-notice__title">{noticeTitle}</span>
+              <span className="scene-notice__tag">공지</span>
+            </button>
+          )}
+          <TypedLine />
         </div>
-        {noticeTitle && (
-          <button type="button" onClick={onNotice} className="scene-notice">
-            <Megaphone size={14} aria-hidden="true" />
-            <span className="scene-notice__title">{noticeTitle}</span>
-            <span className="scene-notice__tag">공지</span>
-          </button>
-        )}
+        <div className="scene-opening__art" aria-hidden="true">
+          <div className="scene-opening__traces"><i /><i /><i /><i /></div>
+          <div className="scene-processor">
+            <span className="scene-processor__plate scene-processor__plate--base" />
+            <span className="scene-processor__plate scene-processor__plate--middle" />
+            <span className="scene-processor__plate scene-processor__plate--top" />
+            <span className="scene-processor__mark" />
+          </div>
+        </div>
       </div>
 
-      <p className="cine-hud scene-opening__bl">{semester}</p>
-      <p className="cine-hud scene-opening__br" aria-hidden="true">Scroll<i /></p>
       <div className="scene-opening__ticker" data-ticker aria-hidden="true">
         <span className="scene-opening__ticker-run" data-t={TICKER} />
       </div>

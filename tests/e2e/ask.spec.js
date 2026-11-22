@@ -356,7 +356,7 @@ async function expectClearRightCorner(page, width) {
   })).toBeLessThanOrEqual(24)
   const overlaps = () => trigger.evaluate((element) => {
     const box = element.getBoundingClientRect()
-    return [...document.querySelectorAll('.coms-to-top.is-visible, .scene-rail, .scene-opening__br, .scene-opening__ticker, .apple-mobile-tabs, .appearance-actions, .coms-toast, .coms-perf-notice')].filter((other) => {
+    return [...document.querySelectorAll('.coms-to-top.is-visible, .scene-rail, .scene-opening__ticker, .apple-mobile-tabs, .appearance-actions, .coms-toast, .coms-perf-notice')].filter((other) => {
       const style = getComputedStyle(other)
       const rect = other.getBoundingClientRect()
       return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0

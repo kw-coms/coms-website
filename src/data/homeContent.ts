@@ -44,18 +44,22 @@ export const activityDetails = [
 export const projectDetails = [
   {
     title: 'COM\'s Official Website',
+    kind: '웹',
     description: '동아리 소개, 공지사항, 자료실, 커뮤니티를 담는 공식 웹사이트입니다. React, Vite, Tailwind CSS를 활용해 실제 서비스 형태로 개발합니다.',
   },
   {
     title: 'Arduino Basic Class',
+    kind: 'IoT',
     description: '아두이노를 처음 접하는 부원을 위해 회로 연결, 센서 입력, 간단한 제어 로직을 단계별로 익히는 교육형 프로젝트입니다.',
   },
   {
     title: 'Web Development Study',
+    kind: '웹',
     description: 'HTML, CSS, JavaScript, React를 기반으로 화면 설계와 컴포넌트 구현을 연습하고, 작은 기능을 직접 완성해 봅니다.',
   },
   {
     title: '자유 주제 제작',
+    kind: '자유 주제',
     description: '부원들이 관심 있는 아이디어를 팀으로 발전시켜 웹 서비스, 앱, 자동화 프로그램, 학습 도구 등 다양한 결과물을 제작합니다.',
   },
 ]

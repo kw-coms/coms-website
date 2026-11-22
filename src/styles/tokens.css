@@ -14,6 +14,8 @@
 	--app-hairline-strong: rgba(0, 0, 0, 0.16);
 	--app-accent: #0071e3;
 	--app-accent-hover: #0077ed;
+	--app-accent-on: #fff;
+	--app-accent-hover-on: #000;
 	--app-accent-soft: #e8f3ff;
 	--app-accent-text: #0066cc;
 	--app-accent-border: color-mix(in srgb, var(--app-accent) 42%, transparent);
@@ -56,6 +58,8 @@
 	--app-hairline-strong: rgba(255, 255, 255, 0.26);
 	--app-accent: #2997ff;
 	--app-accent-hover: #4aa8ff;
+	--app-accent-on: #000;
+	--app-accent-hover-on: #000;
 	--app-accent-soft: rgba(41, 151, 255, 0.16);
 	--app-accent-text: #6cb6ff;
 	--app-accent-border: color-mix(in srgb, var(--app-accent) 42%, transparent);

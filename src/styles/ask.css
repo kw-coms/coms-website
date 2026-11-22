@@ -104,11 +104,6 @@ body:has(.coms-tour, .coms-ask-backdrop[data-tour-preview='true'], .coms-quick, 
   bottom: calc(var(--coms-ask-bottom, max(1rem, env(safe-area-inset-bottom))) + 56px);
   visibility: var(--coms-ask-top-visibility, visible);
 }
-:root:has(.coms-ask-trigger) .scene-opening__br { margin-right: 7.5rem; }
-@media (max-width: 639px) {
-  :root:has(.coms-ask-trigger) .scene-opening__br { margin-right: 0; visibility: hidden; }
-}
-
 :root[data-perf='lite'] .coms-ask-root,
 :root[data-perf='lite'] .coms-ask-root *,
 :root[data-perf='lite'] .coms-ask-root *::before,

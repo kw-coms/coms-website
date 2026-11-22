@@ -1,4 +1,4 @@
-/* ===== Home, round two: layers, backdrops and scroll-linked motion ============ */
+/* ===== Home atmosphere: layers, backdrops and scroll-linked motion ============ */
 /* Everything here is decoration or motion on top of the scenes in home-scenes.css. It runs only
    in full mode: reduced motion and lite (see the end of the file) keep the still scenes. Loops
    pause when their scene leaves the screen (cinema-core.css). Only transform, opacity and
@@ -105,84 +105,156 @@
 	}
 }
 
-/* A wireframe cube behind and to the right of the wordmark; scrolling turns it and pushes it back. */
-.scene-opening__cube {
-	--cs: clamp(7rem, 12vw, 12.5rem);
-	position: absolute;
-	top: 19%;
-	right: 9vw;
-	width: var(--cs);
-	height: var(--cs);
-	perspective: 1100px;
+/* A layered circuit board built around the club's existing mark. */
+.scene-opening__art {
+	--board-ink: #0b1526;
+	--board-light: color-mix(in srgb, var(--app-accent) 56%, #8adfff);
+	--board-edge: color-mix(in srgb, var(--board-light) 64%, #142d51);
+	position: relative;
+	aspect-ratio: 1.17;
+	overflow: hidden;
+	border: 1px solid color-mix(in srgb, var(--board-light) 43%, #142136);
+	border-radius: clamp(1rem, 2.4vw, 2rem);
+	background:
+		radial-gradient(ellipse at 65% 18%, color-mix(in srgb, var(--board-light) 23%, transparent), transparent 68%),
+		linear-gradient(142deg, #111e34, var(--board-ink) 56%, #142343);
+	box-shadow:
+		0 1.5rem 3rem color-mix(in srgb, #071125 30%, transparent),
+		0 0 0 0.5rem color-mix(in srgb, var(--board-light) 9%, transparent);
 }
 
-.cube-rig {
-	width: 100%;
-	height: 100%;
-	transform-style: preserve-3d;
-	transform: translate3d(calc(var(--px, 0) * -22px), calc(var(--py, 0) * -14px + var(--hero-out, 0) * -70px), calc(var(--hero-out, 0) * -480px))
-		rotateY(calc(var(--hero-out, 0) * 220deg));
-	transition: transform 450ms var(--cine-ease);
-}
-
-.cube {
-	position: absolute;
-	inset: 0;
-	transform-style: preserve-3d;
-	transform: rotateX(-24deg) rotateY(30deg);
-	animation: cube-spin 38s linear infinite;
-}
-
-/* The inner cube: half the size, turning the other way. */
-.cube--inner {
-	inset: 25%;
-	--cs: calc(clamp(7rem, 12vw, 12.5rem) / 2);
-	animation-duration: 26s;
-	animation-direction: reverse;
-}
-
-.cube i {
+.scene-opening__art::before {
+	content: '';
 	position: absolute;
 	inset: 0;
-	border: 1px solid color-mix(in srgb, var(--app-accent) 72%, var(--app-text));
-	background: linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 16%, transparent), transparent 62%);
-	box-shadow: inset 0 0 28px color-mix(in srgb, var(--app-accent) 18%, transparent);
+	background: radial-gradient(circle, color-mix(in srgb, var(--board-light) 40%, transparent) 1px, transparent 1.6px) 50% 50% / 17px 17px;
+	mask-image: radial-gradient(ellipse at 54% 46%, #000 18%, transparent 85%);
 }
 
-.cube--inner i {
-	border-color: color-mix(in srgb, var(--theme-glow-violet) 70%, var(--app-text));
-	background: color-mix(in srgb, var(--theme-glow-violet) 12%, transparent);
-	box-shadow: none;
+.scene-opening__art::after {
+	content: '';
+	position: absolute;
+	inset: 5%;
+	border: 1px solid color-mix(in srgb, var(--board-light) 22%, transparent);
+	border-radius: 0.6rem;
+	pointer-events: none;
 }
 
-.cube i:nth-child(1) {
-	transform: translateZ(calc(var(--cs) / 2));
-}
-.cube i:nth-child(2) {
-	transform: rotateY(90deg) translateZ(calc(var(--cs) / 2));
-}
-.cube i:nth-child(3) {
-	transform: rotateY(180deg) translateZ(calc(var(--cs) / 2));
-}
-.cube i:nth-child(4) {
-	transform: rotateY(-90deg) translateZ(calc(var(--cs) / 2));
-}
-.cube i:nth-child(5) {
-	transform: rotateX(90deg) translateZ(calc(var(--cs) / 2));
-}
-.cube i:nth-child(6) {
-	transform: rotateX(-90deg) translateZ(calc(var(--cs) / 2));
+.scene-opening__traces {
+	position: absolute;
+	inset: 0;
+	color: var(--board-edge);
 }
 
-@keyframes cube-spin {
-	to {
-		transform: rotateX(-24deg) rotateY(390deg);
-	}
+.scene-opening__traces i {
+	position: absolute;
+	width: 29%;
+	height: 17%;
+	border: solid currentColor;
+	border-width: 1px 1px 0 0;
+	border-radius: 0 1rem 0 0;
 }
 
-/* The wordmark: a light sweeps across the letters every few seconds, and the word tilts a few degrees
-   with the pointer. Between sweeps every letter is the plain text colour, so contrast is AA throughout;
-   the highlight is lighter than the text in the dark theme and darker than the accent in the light theme, so it is at least 3:1 on the page for any accent a visitor picks. */
+.scene-opening__traces i::before {
+	content: '';
+	position: absolute;
+	top: -3px;
+	left: -2px;
+	width: 6px;
+	aspect-ratio: 1;
+	border-radius: 50%;
+	background: var(--board-light);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--board-light) 14%, transparent), 0 0 11px var(--board-light);
+}
+
+.scene-opening__traces i:nth-child(1) {
+	top: 23%;
+	left: 13%;
+}
+
+.scene-opening__traces i:nth-child(2) {
+	top: 33%;
+	left: 18%;
+	width: 22%;
+	opacity: 0.55;
+}
+
+.scene-opening__traces i:nth-child(3) {
+	right: 13%;
+	bottom: 23%;
+	transform: rotate(180deg);
+}
+
+.scene-opening__traces i:nth-child(4) {
+	right: 18%;
+	bottom: 33%;
+	width: 22%;
+	opacity: 0.55;
+	transform: rotate(180deg);
+}
+
+.scene-processor {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 67%;
+	aspect-ratio: 1;
+	perspective: 900px;
+	transform: translate3d(calc(-50% + var(--px, 0) * -12px), calc(-50% + var(--py, 0) * -8px + var(--hero-out, 0) * 12px), 0);
+	transition: transform 550ms var(--cine-ease);
+}
+
+.scene-processor__plate {
+	position: absolute;
+	top: var(--plate-top);
+	left: 50%;
+	width: var(--plate-width);
+	aspect-ratio: 1;
+	border: 2px solid var(--plate-edge);
+	border-radius: 12%;
+	background: var(--plate-color);
+	box-shadow: -0.4rem 0.4rem 0 var(--plate-side), -0.65rem 0.65rem 0.15rem var(--plate-side);
+	transform: translate(-50%, -50%) rotateX(57deg) rotateZ(-45deg);
+}
+
+.scene-processor__plate--base {
+	--plate-top: 65%;
+	--plate-width: 88%;
+	--plate-edge: var(--board-edge);
+	--plate-side: #0a1430;
+	--plate-color:
+		repeating-linear-gradient(90deg, transparent 0 12%, #102841 12% 13%),
+		repeating-linear-gradient(0deg, transparent 0 12%, #102841 12% 13%),
+		linear-gradient(45deg, #10213c, #214b75);
+}
+
+.scene-processor__plate--middle {
+	--plate-top: 57%;
+	--plate-width: 74%;
+	--plate-edge: color-mix(in srgb, var(--board-light) 76%, #fff);
+	--plate-side: color-mix(in srgb, var(--board-light) 36%, #0d1c43);
+	--plate-color: linear-gradient(135deg, #102241, color-mix(in srgb, var(--board-light) 34%, #1d2655));
+}
+
+.scene-processor__plate--top {
+	--plate-top: 48%;
+	--plate-width: 57%;
+	--plate-edge: color-mix(in srgb, var(--board-light) 50%, #fff);
+	--plate-side: color-mix(in srgb, var(--board-light) 52%, #0b173d);
+	--plate-color: linear-gradient(135deg, #193362, color-mix(in srgb, var(--board-light) 60%, #15254a));
+}
+
+.scene-processor__mark {
+	position: absolute;
+	top: 38%;
+	left: 50%;
+	width: 33%;
+	aspect-ratio: 333 / 368;
+	background: linear-gradient(125deg, #fff 18%, color-mix(in srgb, var(--board-light) 30%, #fff) 50%, var(--board-light));
+	mask: url('../assets/logos/COMs_logo_vec.svg') center / contain no-repeat;
+	transform: translate(-50%, -50%);
+}
+
 @property --sheen {
 	syntax: '<number>';
 	inherits: true;
@@ -202,7 +274,7 @@
 
 @supports (background-clip: text) or (-webkit-background-clip: text) {
 	.cine-ready .scene-wordmark.is-revealed .cine-m > span {
-		/* Two layers: the moving highlight over a top-to-bottom tone, so the letters have depth between sweeps. */
+		/* The moving highlight sits over a top-to-bottom tone. */
 		background-image:
 			linear-gradient(
 				100deg,
@@ -211,8 +283,6 @@
 				transparent calc(var(--sheen) * 1% + 14%)
 			),
 			linear-gradient(180deg, var(--app-text) 38%, color-mix(in srgb, var(--app-text) 70%, var(--app-accent)) 100%);
-		background-size: calc(var(--len) * 100%) 100%, 100% 100%;
-		background-position: calc(var(--k) * 100% / max(1, var(--len) - 1)) 0, 0 0;
 		background-repeat: no-repeat;
 		-webkit-background-clip: text;
 		background-clip: text;
@@ -238,7 +308,7 @@
 /* The typed line under the opening copy. */
 .scene-typed {
 	min-height: 3.1em;
-	margin-top: 1.25rem;
+	margin-top: 1rem;
 }
 
 .scene-typed__line {
@@ -272,9 +342,7 @@
 
 /* The ticker along the bottom edge. Its text is drawn by the pseudo-element (decoration, not content). */
 .scene-opening__ticker {
-	grid-column: 1 / -1;
-	grid-row: 5;
-	margin: 1rem calc(var(--cine-pad) * -1) -1.75rem;
+	margin: clamp(1.25rem, 5vh, 3.25rem) calc(var(--cine-pad) * -1) 0;
 	padding: 0.8rem 0;
 	overflow: hidden;
 	overflow: clip;
@@ -566,46 +634,6 @@
 	}
 }
 
-.scene-row__tag {
-	display: inline-block;
-	width: 4.5rem;
-	overflow: hidden;
-	overflow: clip;
-}
-
-/* At rest the tag is one word; on hover or focus it runs as a small marquee. */
-.scene-row__tagrun > [aria-hidden] {
-	display: none;
-}
-
-.scene-row:hover .scene-row__tag,
-.scene-row:focus-visible .scene-row__tag {
-	-webkit-mask-image: linear-gradient(90deg, #000 72%, transparent);
-	mask-image: linear-gradient(90deg, #000 72%, transparent);
-}
-
-.scene-row:hover .scene-row__tagrun > [aria-hidden],
-.scene-row:focus-visible .scene-row__tagrun > [aria-hidden] {
-	display: inline;
-}
-
-.scene-row__tagrun {
-	display: inline-flex;
-	gap: 1.5rem;
-	white-space: nowrap;
-}
-
-.scene-row:hover .scene-row__tagrun,
-.scene-row:focus-visible .scene-row__tagrun {
-	animation: tag-run 3.4s linear infinite;
-}
-
-@keyframes tag-run {
-	to {
-		transform: translate3d(-50%, 0, 0);
-	}
-}
-
 /* ---- Members: icons draw in, chips ripple ---------------------------------------------------------------- */
 .cine-ready .scene-hubcard > svg * {
 	stroke-dasharray: 100;
@@ -616,11 +644,6 @@
 
 .cine-ready li.is-revealed .scene-hubcard > svg * {
 	stroke-dashoffset: 0;
-}
-
-/* A member goes straight to the controls: their scene arrives faster. */
-.cine-ready .scene-members--today [data-cine] {
-	transition-delay: calc(var(--i, 0) * 35ms);
 }
 
 /* ---- Recruit: the title scales in as the scene arrives, a marquee under it ------------------------------ */
@@ -656,16 +679,14 @@
 
 /* ---- Small screens ----------------------------------------------------------------------------------------- */
 @media (max-width: 767px) {
-	.scene-opening__cube {
-		--cs: 6.5rem;
-		top: 13%;
-		right: 0.5rem;
+	.scene-opening__art {
+		aspect-ratio: 1.7;
 	}
-	.cube--inner {
-		--cs: 3.25rem;
+	.scene-processor {
+		width: 48%;
 	}
 	.scene-typed {
-		text-align: center;
+		min-height: 2.55em;
 	}
 	.scene-bg__numeral {
 		font-size: 12rem;
@@ -677,7 +698,6 @@
 
 /* ---- Reduced motion and lite: the still scenes. Static layers stay; nothing moves. ---------------------- */
 @media (prefers-reduced-motion: reduce) {
-	.scene-opening__cube,
 	.scene-opening__floor,
 	.scene-opening__ticker {
 		display: none;
@@ -689,7 +709,6 @@
 	.coms-mini *,
 	.coms-mini *::before,
 	.coms-mini *::after,
-	.scene-row__tagrun,
 	.scene-recruit__marquee-run {
 		animation: none;
 	}
@@ -703,6 +722,10 @@
 	}
 	.cine-ready .scene-wordmark.is-revealed {
 		animation: none;
+	}
+	.scene-processor {
+		transform: translate(-50%, -50%);
+		transition: none;
 	}
 	.scene-wordmark,
 	.scene-frame__media {
@@ -718,7 +741,6 @@
 	}
 }
 
-:root[data-perf='lite'] .scene-opening__cube,
 :root[data-perf='lite'] .scene-opening__floor,
 :root[data-perf='lite'] .scene-opening__ticker,
 :root[data-perf='lite'] .scene-recruit__marquee {
@@ -731,8 +753,7 @@
 :root[data-perf='lite'] .coms-visual *::after,
 :root[data-perf='lite'] .coms-mini *,
 :root[data-perf='lite'] .coms-mini *::before,
-:root[data-perf='lite'] .coms-mini *::after,
-:root[data-perf='lite'] .scene-row__tagrun {
+:root[data-perf='lite'] .coms-mini *::after {
 	animation: none;
 }
 
@@ -744,6 +765,11 @@
 
 :root[data-perf='lite'] .cine-ready .scene-wordmark.is-revealed {
 	animation: none;
+}
+
+:root[data-perf='lite'] .scene-processor {
+	transform: translate(-50%, -50%);
+	transition: none;
 }
 
 :root[data-perf='lite'] .scene-wordmark,

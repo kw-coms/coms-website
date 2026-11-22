@@ -204,7 +204,7 @@ export default function AskWidget() {
       const topButton = document.querySelector('.coms-to-top.is-visible')
       const keyboardOpen = keyboardInset > 120
       const stackHeight = topButton && !keyboardOpen ? topButton.getBoundingClientRect().height + 12 : 0
-      const obstacles = [...document.querySelectorAll('.appearance-actions, .scene-opening__br, .scene-opening__ticker, .scene-rail, .apple-mobile-tabs, .coms-toast, .coms-perf-notice')]
+      const obstacles = [...document.querySelectorAll('.appearance-actions, .scene-opening__ticker, .scene-rail, .apple-mobile-tabs, .coms-toast, .coms-perf-notice')]
         .filter((element) => {
           const style = getComputedStyle(element)
           return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0

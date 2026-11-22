@@ -1,7 +1,8 @@
 import PageHeading from '../components/PageHeading'
-import { ArrowLeft, CalendarDays, CheckCircle2, Mail, PenLine, Rocket, Users, X } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CheckCircle2, Mail, PenLine, Rocket, Users } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import RecruitFacts from '../components/RecruitFacts'
+import { RECRUIT_FACTS } from '../data/recruitFacts'
 import { getPublicSiteSettings } from '../services/siteSettingsApi'
 
 const recruitDetails = [
@@ -41,32 +42,30 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
       <button
         type="button"
         onClick={onBack}
-        className="apple-action-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"
+        className="apple-action-secondary inline-flex min-h-11 items-center gap-2 px-4 py-2 text-sm"
       >
-        <ArrowLeft size={15} />
+        <ArrowLeft size={15} aria-hidden="true" />
         이전 화면으로
       </button>
 
       <section className="apple-board-shell">
-        <div className="apple-board-hero flex items-start justify-between gap-4 px-6 py-8 sm:px-8 sm:py-10">
-          <div>
-            <PageHeading className="apple-display mt-4 text-4xl sm:text-6xl">COM&apos;s 신입 부원 모집 공지</PageHeading>
-            <p className="apple-copy mt-5 max-w-3xl text-base sm:text-lg">
-              {siteSettings?.recruitmentStatus || '광운대학교 중앙 컴퓨터 학술동아리에서 함께 배울 새 멤버를 기다립니다.'}
-            </p>
-          </div>
+        <div className="apple-board-hero px-6 py-8 sm:px-8 sm:py-10">
+          <PageHeading className="apple-display text-4xl sm:text-6xl">COM&apos;s 신입 부원 모집 공지</PageHeading>
+          <p className="apple-copy mt-4 max-w-3xl text-base sm:text-lg">
+            {siteSettings?.recruitmentStatus || RECRUIT_FACTS.headline}
+          </p>
           <button
             type="button"
-            onClick={onBack}
-            className="shrink-0 rounded-full border border-black/10 bg-white/80 p-2 text-[#1d1d1f] transition hover:bg-white"
-            aria-label="이전 화면으로"
+            onClick={onApply}
+            className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[var(--app-text)] px-5 py-3 text-base font-bold text-[var(--app-bg)] transition-colors hover:bg-[var(--theme-body-mid)]"
           >
-            <X size={20} />
+            <PenLine size={17} aria-hidden="true" />
+            지원서 작성하기
           </button>
         </div>
 
         <div className="grid gap-0 lg:grid-cols-[1fr_320px]">
-          <article className="space-y-8 p-6 sm:p-8">
+          <article className="min-w-0 space-y-8 p-5 sm:p-8">
             <div className="space-y-4">
               <div className="inline-flex items-center gap-2 text-sm font-bold text-[var(--app-accent-text)]">
                 <PenLine size={16} />
@@ -87,9 +86,9 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
 
             <div className="grid gap-3 md:grid-cols-3">
               {recruitDetails.map(({ title, icon: Icon, body }) => (
-                <div key={title} className="apple-soft-panel bg-[#f5f5f7] p-4">
-                  <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-[#e8f3ff] text-[var(--app-accent-text)]">
-                    <Icon size={19} />
+                <div key={title} className="apple-soft-panel p-4">
+                  <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-[var(--app-accent-soft)] text-[var(--app-text)]">
+                    <Icon size={19} aria-hidden="true" />
                   </div>
                   <h2 className="text-base font-black">{title}</h2>
                   <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
@@ -99,50 +98,36 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
               ))}
             </div>
 
-            <div className="rounded-lg border border-[var(--app-accent)]/20 bg-[#e8f3ff] p-5">
-              <h2 className="text-lg font-black text-[#1d1d1f]">지원 절차</h2>
-              <div className="mt-4 space-y-3">
+            <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-5">
+              <h2 className="text-lg font-black text-[var(--app-text)]">지원 절차</h2>
+              <ol className="mt-4 space-y-3">
                 {processSteps.map((step) => (
-                  <div key={step} className="flex gap-3 text-sm leading-6 text-[#6e6e73]">
-                    <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-[var(--app-accent-text)]" />
+                  <li key={step} className="flex gap-3 text-sm leading-6 text-[var(--app-muted)]">
+                    <CheckCircle2 size={17} aria-hidden="true" className="mt-0.5 shrink-0 text-[var(--app-accent-text)]" />
                     <span>{step}</span>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ol>
             </div>
           </article>
 
-          <aside className="flex flex-col justify-between gap-8 bg-[#f5f5f7] p-6 text-[#1d1d1f] sm:p-8">
-            <div className="space-y-6">
-              <div>
-                <p className="text-sm font-semibold text-[var(--app-accent-text)]">Welcome</p>
-                <p className="mt-4 text-sm leading-7 text-[#6e6e73]">
-                  COM&apos;s는 혼자서는 막막했던 공부를 함께 이어가는 공간입니다. 기초부터 차근차근 시작해도 좋고,
-                  이미 만든 것이 있다면 더 큰 프로젝트로 확장해도 좋습니다.
-                </p>
-              </div>
+          <aside className="min-w-0 space-y-6 border-t border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-5 sm:p-8 lg:border-t-0 lg:border-l">
+            <p className="text-sm leading-7 text-[var(--app-muted)]">
+              COM&apos;s는 혼자서는 막막했던 공부를 함께 이어가는 공간입니다. 기초부터 차근차근 시작해도 좋고,
+              이미 만든 것이 있다면 더 큰 프로젝트로 확장해도 좋습니다.
+            </p>
 
-              <div className="rounded-lg border border-black/10 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[#1d1d1f]">
-                  <Mail size={16} />
-                  문의
-                </div>
-                {contactLinks.map((link) => (
-                  <a key={`${link.label}-${link.href}`} href={link.href} className="mt-2 block break-all text-sm text-[var(--app-accent-text)] hover:text-[var(--app-accent-hover)]">
-                    {/^mail$/i.test(link.label) ? '메일로 문의' : link.label}
-                  </a>
-                ))}
-              </div>
+            <div className="apple-soft-panel p-4">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--app-text)]">
+                <Mail size={16} aria-hidden="true" />
+                문의
+              </h2>
+              {contactLinks.map((link) => (
+                <a key={`${link.label}-${link.href}`} href={link.href} className="mt-2 block wrap-anywhere text-sm text-[var(--app-text)] underline underline-offset-2">
+                  {/^mail$/i.test(link.label) ? '메일로 문의' : link.label}
+                </a>
+              ))}
             </div>
-
-            <button
-              type="button"
-              onClick={onApply}
-              className="apple-action-primary inline-flex w-full items-center justify-center gap-2 px-4 py-3 text-base"
-            >
-              <PenLine size={17} />
-              지원서 작성하기
-            </button>
           </aside>
         </div>
       </section>

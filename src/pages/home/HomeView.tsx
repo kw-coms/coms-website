@@ -2,7 +2,7 @@ import { Fragment, type ReactNode } from 'react'
 import { useNavigate, useLocation, type NavigateOptions, type To } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listNotices } from '../../services/noticeApi'
-import { getPublicSiteSettings } from '../../services/siteSettingsApi'
+import { defaultSiteSettings, getPublicSiteSettings } from '../../services/siteSettingsApi'
 import { scrollToTopInstant } from '../../utils/themeColors'
 import { isFullPageLink } from '../../utils/fullPageLink'
 import { useAuth } from '../../contexts/useAuth'
@@ -44,7 +44,7 @@ export default function HomeView() {
     queryKey: SITE_SETTINGS_QUERY_KEY,
     queryFn: getPublicSiteSettings,
   })
-  const siteSettings = siteSettingsQuery.data
+  const siteSettings = siteSettingsQuery.data ?? defaultSiteSettings
 
   useSceneProgress()
   usePointerFx()
@@ -55,7 +55,8 @@ export default function HomeView() {
     if (!el) return
     const navHeight = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--apple-nav-height')) || 44
     const targetY = Math.max(0, window.scrollY + el.getBoundingClientRect().top - navHeight - 10)
-    window.scrollTo({ top: targetY, behavior: 'smooth' })
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    window.scrollTo({ top: targetY, behavior: motion.matches ? 'instant' : 'smooth' })
   }
 
   const goPageTop = (to: To, options?: NavigateOptions) => {
@@ -115,10 +116,9 @@ export default function HomeView() {
     opening: (
       <Opening
         key="opening"
-        title={siteSettings?.homeHeroTitle || "COM's"}
-        copy={siteSettings?.homeHeroCopy || '배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.'}
-        semester={siteSettings?.semesterLabel || '2026 Semester Ready'}
-        total={order.length}
+        title={siteSettings.homeHeroTitle}
+        copy={siteSettings.homeHeroCopy}
+        semester={siteSettings.semesterLabel}
         noticeTitle={member ? latestNotice?.title ?? null : null}
         onMore={() => openPanel('about')}
         onApply={() => goPageTop('/recruit')}
@@ -128,7 +128,7 @@ export default function HomeView() {
     members: <Members key="members" index={number('members')} member={member} noticeTitle={latestNotice?.title ?? null} onGo={(path) => goPageTop(path)} backdrop={backdrop('members')} />,
     about: <Manifesto key="about" index={number('about')} actions={actions.about} backdrop={backdrop('about')} />,
     activities: <Activities key="activities" index={number('activities')} actions={actions.activities} onOpen={openPanel} backdrop={backdrop('activities')} />,
-    projects: <Projects key="projects" index={number('projects')} actions={actions.projects} onOpen={() => goPageTop('/projects')} backdrop={backdrop('projects')} />,
+    projects: <Projects key="projects" index={number('projects')} actions={actions.projects} backdrop={backdrop('projects')} />,
     recruit: <Recruit key="recruit" index={number('recruit')} actions={actions.recruit} backdrop={backdrop('recruit')} />,
   }
 

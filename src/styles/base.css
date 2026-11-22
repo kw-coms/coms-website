@@ -334,7 +334,7 @@ select {
 	transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
-.apple-chip:hover {
+.apple-chip:not(.apple-chip-active):hover {
 	color: var(--app-text);
 	background: var(--app-surface-elevated);
 }
@@ -342,56 +342,21 @@ select {
 .apple-chip-active {
 	border-color: var(--app-accent);
 	background: var(--app-accent);
-	color: #fff;
+	color: var(--app-accent-on);
 	box-shadow: 0 8px 22px color-mix(in srgb, var(--app-accent) 22%, transparent);
 }
 
 .apple-action-primary {
-	position: relative;
-	overflow: hidden;
 	border-radius: 9999px;
 	background: var(--app-accent);
-	color: #fff;
+	color: var(--app-accent-on);
 	font-weight: 700;
-	transition: background-color 160ms ease, transform 160ms ease, opacity 160ms ease;
-}
-
-/* Light sheen sweeps across the primary button on hover (Kakao-ish). */
-.apple-action-primary::after {
-	content: '';
-	position: absolute;
-	top: 0;
-	left: -150%;
-	height: 100%;
-	width: 60%;
-	background: linear-gradient(
-		100deg,
-		transparent,
-		rgba(255, 255, 255, 0.35),
-		transparent
-	);
-	transform: skewX(-18deg);
-	pointer-events: none;
-}
-
-.apple-action-primary:hover::after {
-	animation: btn-sheen 720ms ease;
-}
-
-@keyframes btn-sheen {
-	to {
-		left: 150%;
-	}
+	transition: transform 160ms ease, opacity 160ms ease;
 }
 
 .apple-action-primary:hover {
 	background: var(--app-accent-hover);
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.apple-action-primary:hover::after {
-		animation: none;
-	}
+	color: var(--app-accent-hover-on);
 }
 
 .apple-action-secondary {

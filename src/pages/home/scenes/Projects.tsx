@@ -1,17 +1,11 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { ArrowUpRight } from 'lucide-react'
 import { useCalm } from '../../../hooks/useCalm'
 import { projectDetails, sectionStories, visualDetails } from '../../../data/homeContent'
 import { ProjectLabVisual } from '../HomeVisuals'
 import { CineTitle, SceneActionRow, SceneStats, Slate, type SceneActions } from './parts'
 import { cssVars } from './cssVars'
 
-// What each row of projectDetails is, in the same order (the site's own three kinds of work).
-const KINDS = ['Web', 'IoT', 'Web', 'App']
-
-// Scene 4. The projects as an index: one full-width row each. A row opens to its description on
-// hover or focus; on touch screens, and with reduced motion or lite, every description is shown.
-export default function Projects({ index, actions, onOpen, backdrop }: { index: number; actions: SceneActions; onOpen: () => void; backdrop: ReactNode }) {
+export default function Projects({ index, actions, backdrop }: { index: number; actions: SceneActions; backdrop: ReactNode }) {
   const story = sectionStories.projects
   const grid = useRef<HTMLDivElement | null>(null)
   const calm = useCalm()
@@ -63,24 +57,20 @@ export default function Projects({ index, actions, onOpen, backdrop }: { index: 
         <div className="scene-projects__grid" ref={grid} data-active="0">
           <div className="scene-projects__list" data-scene="index">
             <span className="scene-projects__line" aria-hidden="true"><i /></span>
-          <ol className="scene-index" aria-label="프로젝트 목록">
-            {projectDetails.map((item, i) => (
-              <li key={item.title} data-cine="slide" style={cssVars({ '--i': i })}>
-                <button type="button" className="scene-row" onClick={onOpen}>
-                  <span className="cine-hud scene-row__num">{String(i + 1).padStart(2, '0')}</span>
-                  <span className="scene-row__title">{item.title}</span>
-                  <span className="cine-hud scene-row__tag">
-                    <span className="scene-row__tagrun">
-                      <span>{KINDS[i % KINDS.length]}</span>
-                      {[0, 1, 2].map((n) => <span key={n} aria-hidden="true">{KINDS[i % KINDS.length]}</span>)}
-                    </span>
-                  </span>
-                  <ArrowUpRight size={22} aria-hidden="true" className="scene-row__go" />
-                  <span className="scene-row__desc">{item.description}</span>
-                </button>
-              </li>
-            ))}
-          </ol>
+            <ol className="scene-index" aria-label="프로젝트 목록">
+              {projectDetails.map((item, i) => (
+                <li key={item.title} className="grid grid-cols-[1.75rem_minmax(0,1fr)] items-baseline gap-3 py-5 sm:grid-cols-[2.25rem_minmax(0,1fr)] sm:gap-4 sm:py-6" data-cine="slide" style={cssVars({ '--i': i })}>
+                  <span className="cine-hud" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                      <h3 className="scene-index__title min-w-0 wrap-anywhere">{item.title}</h3>
+                      <span className="cine-hud">{item.kind}</span>
+                    </div>
+                    <p className="mt-2 max-w-[40rem] text-base leading-relaxed text-[var(--cine-body)] [word-break:keep-all]">{item.description}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
           </div>
           <aside className="scene-projects__side">
             <div className="scene-projects__numerals" aria-hidden="true">
