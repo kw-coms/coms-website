@@ -5,6 +5,7 @@ import { csvCell } from '../pages/admin/auditLogCsv'
 
 export type Gathering = {
   id: number
+  opportunityId?: number | null
   title: string
   description?: string | null
   creatorName: string

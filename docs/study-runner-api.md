@@ -59,6 +59,8 @@ Authenticated `POST /study/api/club` accepts an `action` for private `battle-*` 
 
 Attach a `battleCode` to a numbered submission to enter it in a live room. The runner checks the participant, problem number, and server receipt time before queuing. An accepted result records that receipt time for the room. A result from a submission received within the match can arrive during the settling window. Battle drafts stay separate from practice drafts.
 
+The same authenticated club endpoint serves `tournament-*` actions. nginx forwards the verified role and encoded display name from the backend session check. Only the president can save, publish, or cancel a tournament. Send both `tournamentId` and `matchId` with a numbered submission for an assigned live match. A round allows 60 seconds for work already queued at the deadline, then advances winners by accepted receipt time or by the best case count and its receipt time. Tournament drafts use a separate editor key per match.
+
 `scripts/gen-numbered-judge.mjs` regenerates the runner bank after edits to COM’s study problems. To refresh the archive, pass the trusted DailyCoding catalog module from [`2b4fe3c9`](https://github.com/choijunhuk/dailycoding-final/blob/2b4fe3c9e93f3b7a05a5a9da6c80c2603f37c323/dailycoding-server/src/shared/problemCatalog.js). The browser archive contains statements and public examples. The runner image carries the separate case bank. Repository readers can inspect the source cases, so the practice results are not an anti-cheat guarantee for contests.
 
 ### Errors

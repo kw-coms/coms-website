@@ -1,0 +1,77 @@
+.club-tournaments { min-height: 100vh; color: var(--app-text); }
+.club-tournaments-inner { width: min(100% - 44px, 1180px); margin: auto; padding: 20px 0 90px; }
+.club-tournament-back { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; color: var(--app-muted); text-decoration: none; font-size: 14px; }
+.club-tournaments-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 40px 0 34px; }
+.club-tournaments-heading h1 { margin: 6px 0 12px; font-size: clamp(36px, 5vw, 58px); line-height: 1.14; letter-spacing: -.04em; }
+.club-tournaments-heading > svg { color: var(--app-accent-text); flex: none; }
+.club-tournaments-heading p { display: flex; align-items: center; gap: 8px; color: var(--app-muted); }
+.club-tournament-toolbar, .club-tournament-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0; }
+.club-tournaments button, .club-tournaments .club-tournament-primary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 9px 15px; border: 1px solid var(--app-hairline); border-radius: 9px; color: var(--app-text); background: var(--app-surface-soft); font-weight: 700; text-decoration: none; cursor: pointer; }
+.club-tournaments .club-tournament-primary { background: var(--app-accent); border-color: var(--app-accent); color: white; }
+.club-tournaments button:hover:not(:disabled) { border-color: var(--app-accent-border); }
+.club-tournaments button:disabled { opacity: .55; cursor: default; }
+.club-tournaments :is(a, button, input, select, textarea):focus-visible { outline: 2px solid var(--app-accent); outline-offset: 3px; }
+.club-tournament-search { display: grid; gap: 7px; width: min(100%, 360px); font-size: 14px; font-weight: 700; }
+.club-tournament-search input, .club-tournament-form :is(input, select, textarea) { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--app-hairline); border-radius: 9px; color: var(--app-text); background: var(--app-surface-soft); font-size: 16px; }
+.club-tournament-form textarea { resize: vertical; min-height: 110px; }
+.club-tournament-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0; }
+.club-tournament-filters button { min-height: 40px; border-radius: 999px; }
+.club-tournament-filters button[aria-current='true'] { background: var(--app-accent-soft); border-color: var(--app-accent-border); color: var(--app-accent-text); }
+.club-tournament-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.club-tournament-card, .club-tournament-panel, .club-tournament-match { background: var(--app-surface); border: 1px solid var(--app-hairline); border-radius: 18px; }
+.club-tournament-card { display: block; padding: 28px; min-width: 0; text-decoration: none; color: var(--app-text) !important; }
+.club-tournament-card:hover { border-color: var(--app-accent-border); transform: translateY(-2px); }
+.club-tournament-card h2 { margin: 16px 0; font-size: clamp(22px, 2.5vw, 29px); line-height: 1.3; }
+.club-tournament-card p { display: flex; align-items: center; gap: 9px; margin: 8px 0; font-size: 14px; color: var(--app-muted); }
+.club-tournament-card strong { display: block; margin-top: 16px; color: var(--app-accent-text); }
+.club-tournament-card-arrow { display: inline-flex; align-items: center; gap: 5px; margin-top: 23px; color: var(--app-accent-text); font-size: 14px; font-weight: 750; }
+.club-tournament-status { display: inline-flex; align-items: center; padding: 5px 10px; border-radius: 999px; color: var(--app-accent-text); background: var(--app-accent-soft); font-size: 12px; font-weight: 750; }
+.club-tournament-status[data-status='finished'], .club-tournament-status[data-status='cancelled'] { background: var(--app-surface-soft); color: var(--app-muted); }
+.club-tournament-status[data-status='running'] { color: var(--ok); }
+.club-tournament-empty { padding: 55px 20px; text-align: center; color: var(--app-muted); border: 1px dashed var(--app-hairline); border-radius: 18px; }
+.club-tournament-empty svg { display: block; margin: auto; }
+.club-tournament-panel { padding: clamp(22px, 3vw, 34px); margin: 22px 0; }
+.club-tournament-panel h2 { margin: 0 0 15px; font-size: 23px; }
+.club-tournament-panel h3 { margin: 30px 0 8px; font-size: 18px; }
+.club-tournament-panel p { color: var(--app-muted); line-height: 1.7; }
+.club-tournament-rules p { white-space: pre-wrap; color: var(--app-text); }
+.club-tournament-rules ul { padding-left: 20px; color: var(--app-muted); line-height: 1.8; }
+.club-tournament-form-grid, .club-tournament-problem-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.club-tournament-form-grid label, .club-tournament-problem-grid label { display: grid; align-content: start; gap: 7px; font-size: 14px; font-weight: 700; }
+.club-tournament-form-grid .wide { grid-column: 1 / -1; }
+.club-tournament-problem-grid small { color: var(--app-muted); font-weight: 450; }
+.club-tournament-form > button { margin-top: 26px; }
+.club-tournament-summary { display: flex; gap: 13px; align-items: center; flex-wrap: wrap; color: var(--app-muted); }
+.club-tournament-summary span { display: flex; align-items: center; gap: 6px; }
+.club-tournament-summary strong { color: var(--app-accent-text); }
+.club-tournament-participants { display: flex; flex-wrap: wrap; gap: 8px; }
+.club-tournament-participants span { padding: 8px 12px; border-radius: 9px; background: var(--app-surface-soft); }
+.club-tournament-section-head { display: grid; gap: 8px; margin: 43px 0 20px; }
+.club-tournament-section-head h2 { margin: 0; font-size: 25px; }
+.club-tournament-section-head p { margin: 0; color: var(--app-muted); font-size: 14px; }
+.club-tournament-rounds { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 18px; align-items: start; }
+.club-tournament-round { min-width: 0; }
+.club-tournament-round > header { display: grid; gap: 4px; margin-bottom: 14px; }
+.club-tournament-round > header span { font-weight: 800; font-size: 20px; }
+.club-tournament-round > header small { color: var(--app-muted); }
+.club-tournament-round-problem { font-size: 14px; color: var(--app-accent-text); }
+.club-tournament-matches { display: grid; gap: 12px; }
+.club-tournament-match { padding: 16px; border-radius: 13px; }
+.club-tournament-match[data-status='active'] { border-color: var(--app-accent-border); }
+.club-tournament-match-top { display: flex; justify-content: space-between; gap: 7px; font-size: 13px; color: var(--app-muted); }
+.club-tournament-players { display: grid; gap: 1px; margin: 15px 0; background: var(--app-hairline); border: 1px solid var(--app-hairline); border-radius: 9px; overflow: hidden; }
+.club-tournament-players span { display: block; padding: 11px 12px; background: var(--app-surface-soft); overflow-wrap: anywhere; }
+.club-tournament-players span[data-winner='true'] { color: var(--app-accent-text); font-weight: 800; }
+.club-tournament-result { display: block; margin: 0 0 12px; color: var(--app-muted); }
+.club-tournament-match .club-tournament-primary { width: 100%; }
+.club-tournament-notice { color: var(--app-accent-text); }
+.club-tournament-error { color: var(--app-danger); }
+@media (max-width: 720px) {
+  .club-tournaments-inner { width: min(100% - 28px, 1180px); padding-bottom: 60px; }
+  .club-tournaments-heading { margin: 25px 0; }
+  .club-tournaments-heading > svg { display: none; }
+  .club-tournaments-heading p { align-items: flex-start; }
+  .club-tournament-cards, .club-tournament-form-grid, .club-tournament-problem-grid { grid-template-columns: minmax(0, 1fr); }
+  .club-tournament-form-grid .wide { grid-column: auto; }
+  .club-tournament-card { padding: 22px; }
+}

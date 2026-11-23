@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, CalendarDays, CalendarRange, FolderOpen, RotateCcw, Settings2, Share2, Swords } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarDays, CalendarRange, FolderOpen, RotateCcw, Settings2, Share2, Swords, Trophy } from 'lucide-react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import MemberLock from '../../../components/MemberLock'
 import PageHeading from '../../../components/PageHeading'
@@ -90,6 +90,7 @@ export default function AlgorithmPage() {
         <Link to="/study"><ArrowLeft size={16} aria-hidden="true" />스터디 자료</Link>
         {user && <div className="judge-catalog-actions">
           <Link to="/study/algorithms/battles"><Swords size={16} aria-hidden="true" />친선 배틀</Link>
+          <Link to="/study/algorithms/tournaments"><Trophy size={16} aria-hidden="true" />알고리즘 대회</Link>
           <Link to="/study/algorithms/problem-sets"><FolderOpen size={16} aria-hidden="true" />문제집</Link>
           <Link to="/study/algorithms/settings" state={{ from: location.pathname + location.search }}><Settings2 size={16} aria-hidden="true" />코딩 설정</Link>
         </div>}

@@ -1,7 +1,7 @@
 import { matchesOutput } from './compare'
 export { matchesOutput } from './compare'
 import { compareOutput, type DiffLine } from '../playground/compare'
-import { MAX_CODE_BYTES, postRun, type Diagnostic } from '../playground/runner'
+import { MAX_CODE_BYTES, postRun, type Diagnostic, type TournamentSubmission } from '../playground/runner'
 import { runTests, type MultiRunOutput, type TestRun, type TestsResult } from './api'
 import { USER_MARKER, type ExCase, type ExLang, type Exercise } from './types'
 import { readJudgeProgress, type JudgeProgress } from './judgeProgress'
@@ -86,10 +86,10 @@ export function gradeOutput(exercise: Exercise, lang: ExLang, studentCode: strin
   return { passed, total: cases.length, solved: !compileError && passed === cases.length, cases: verdicts, diagnostics, compileError, stderr: output.stderr, timeMs: output.timeMs }
 }
 
-export async function gradeExercise(exercise: Exercise, lang: ExLang, studentCode: string, signal?: AbortSignal, number?: number, battleCode?: string): Promise<GradeResult> {
+export async function gradeExercise(exercise: Exercise, lang: ExLang, studentCode: string, signal?: AbortSignal, number?: number, battleCode?: string, tournament?: TournamentSubmission): Promise<GradeResult> {
   if (number !== undefined) {
     if (new TextEncoder().encode(studentCode).length > MAX_CODE_BYTES) return { kind: 'rejected', messageKo: '코드는 64KB 이하로 줄여 주세요.' }
-    const result = await postRun({ lang, code: studentCode, problemNumber: number, battleCode }, signal)
+    const result = await postRun({ lang, code: studentCode, problemNumber: number, battleCode, tournamentId: tournament?.tournamentId, matchId: tournament?.matchId }, signal)
     if (result.kind !== 'output') return result
     const judge = result.data.judge as (Partial<GradeReport> & { verdicts?: Verdict[] }) | undefined
     if (!judge || typeof judge.total !== 'number' || typeof judge.passed !== 'number' ||

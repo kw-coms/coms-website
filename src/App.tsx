@@ -77,6 +77,7 @@ const StudyHubPage = lazy(() => import('./pages/study/StudyHubPage'))
 const AlgorithmPage = lazy(() => import('./pages/study/exercises/AlgorithmPage'))
 const CodingSettingsPage = lazy(() => import('./pages/study/exercises/CodingSettingsPage'))
 const ClubBattlesPage = lazy(() => import('./pages/study/exercises/ClubBattlesPage'))
+const ClubTournamentsPage = lazy(() => import('./pages/study/exercises/ClubTournamentsPage'))
 const ClubProblemSetsPage = lazy(() => import('./pages/study/exercises/ClubProblemSetsPage'))
 const StudyPage = lazy(() => import('./pages/study/StudyPage'))
 const PracticeListPage = lazy(() => import('./pages/study/exercises/PracticeListPage'))
@@ -230,6 +231,7 @@ function App() {
         <Route path="/study/algorithms" element={<AlgorithmPage />} />
         <Route path="/study/algorithms/settings" element={<CodingSettingsPage />} />
         <Route path="/study/algorithms/battles" element={<ClubBattlesPage />} />
+        <Route path="/study/algorithms/tournaments/:id?" element={<ClubTournamentsPage />} />
         <Route path="/study/algorithms/problem-sets" element={<ClubProblemSetsPage />} />
         <Route path="/study/algorithms/:problemNumber" element={<ProblemPage />} />
         <Route path="/study/:id" element={<StudyPage />} />

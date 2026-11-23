@@ -12,6 +12,7 @@ import { createJudgeProgress } from './judge-progress.mjs';
 import { ClubError, createClubStore } from './club-store.mjs';
 import { createClubBattles } from './club-battles.mjs';
 import { createClubSocial } from './club-social.mjs';
+import { createClubTournaments } from './club-tournaments.mjs';
 
 export const MAX_BODY_BYTES = 112 * 1024;
 const MAX_CODE_BYTES = 64 * 1024;
@@ -35,6 +36,7 @@ export function clientIp(request, trustProxy = false) {
 }
 
 const CLIENT_KEY = /^[A-Za-z0-9_-]{1,64}$/;
+const TOURNAMENT_ID = /^[a-f0-9]{24}$/;
 // Behind nginx the member id arrives in X-Runner-Client (nginx sets it from auth_request_set and
 // overwrites anything the client sent). Without TRUST_PROXY (dev) the peer address is the key.
 export function clientKey(request, trustProxy = false) {
@@ -51,6 +53,11 @@ export function validateRequest(body) {
   if (typeof body.code !== 'string' || Buffer.byteLength(body.code, 'utf8') > MAX_CODE_BYTES) return '코드는 64 KB 이하의 문자열이어야 해요.';
   if (Object.hasOwn(body, 'battleCode') && (!Object.hasOwn(body, 'problemNumber') ||
       typeof body.battleCode !== 'string' || !/^[A-F0-9]{12}$/.test(body.battleCode))) return '배틀 제출에는 올바른 방 코드와 문제 번호가 필요해요.';
+  if (Object.hasOwn(body, 'tournamentId') || Object.hasOwn(body, 'matchId')) {
+    if (!Object.hasOwn(body, 'problemNumber') || Object.hasOwn(body, 'battleCode') ||
+        typeof body.tournamentId !== 'string' || !TOURNAMENT_ID.test(body.tournamentId) ||
+        typeof body.matchId !== 'string' || !TOURNAMENT_ID.test(body.matchId)) return '대회 제출에는 올바른 대회와 경기 번호가 필요해요.';
+  }
   if (Object.hasOwn(body, 'problemNumber')) {
     if (!Number.isSafeInteger(body.problemNumber) || body.problemNumber < 1 ||
         Object.hasOwn(body, 'stdin') || Object.hasOwn(body, 'tests')) return '문제 번호 제출에는 표준 입력이나 테스트 입력을 함께 보낼 수 없어요.';
@@ -105,7 +112,7 @@ export function createRunnerServer({
   denyList = { has: () => false },
   inflight = { begin() {}, end() {} },
   numberedProblems = {}, judgeProgress = null,
-  clubBattles = null, clubSocial = null,
+  clubBattles = null, clubSocial = null, clubTournaments = null,
 } = {}) {
   const heldKeys = new Set();
   const server = createServer({ maxHeaderSize: 16 * 1024 }, async (request, response) => {
@@ -157,7 +164,16 @@ export function createRunnerServer({
       if (path === '/study/api/club') {
         if (!key.startsWith('m:')) return send(401, { error: 'unauthorized', messageKo: '로그인한 동아리원만 이용할 수 있어요.' });
         const action = body?.action;
-        if (typeof action !== 'string' || !/^(battle|sets|vote)-[a-z]+$/.test(action)) return send(400, rejected('지원하지 않는 요청이에요.'));
+        if (typeof action !== 'string' || !/^(battle|sets|vote|tournament)-[a-z]+$/.test(action)) return send(400, rejected('지원하지 않는 요청이에요.'));
+        if (action.startsWith('tournament-')) {
+          if (!clubTournaments) return send(503, rejected('대회 기능을 잠시 이용할 수 없어요.'));
+          const encoded = request.headers['x-runner-name'];
+          const displayName = typeof encoded === 'string' && /^[A-Za-z0-9_-]{1,256}$/.test(encoded)
+            ? Buffer.from(encoded, 'base64url').toString('utf8') : null;
+          return send(200, await clubTournaments.handle(key, body, {
+            canManage: request.headers['x-runner-role'] === 'ADMIN', displayName,
+          }));
+        }
         const service = action.startsWith('battle-') ? clubBattles : clubSocial;
         if (!service) return send(503, rejected('모임 기능을 잠시 이용할 수 없어요.'));
         return send(200, await service.handle(key, body));
@@ -172,6 +188,10 @@ export function createRunnerServer({
       if (body.battleCode) {
         if (!clubBattles) return send(503, rejected('배틀 제출을 잠시 이용할 수 없어요.'));
         await clubBattles.assertSubmission(key, body.battleCode, body.problemNumber, receivedAt);
+      }
+      if (body.tournamentId) {
+        if (!clubTournaments || !key.startsWith('m:')) return send(403, rejected('대회 참가자만 제출할 수 있어요.'));
+        await clubTournaments.assertSubmission(key, body.tournamentId, body.matchId, body.problemNumber, receivedAt);
       }
       // One in-flight request per member: a single member cannot fill the queue.
       if (heldKeys.has(key)) { response.setHeader('Retry-After', '20'); return send(429, { error: 'busy', messageKo: '이전 실행이 끝난 뒤에 다시 시도해 주세요.' }); }
@@ -197,6 +217,10 @@ export function createRunnerServer({
       if (result !== null && numbered) {
         const judge = gradeNumberedOutput(numbered, result);
         if (judge.solved && body.battleCode) await clubBattles.recordAccepted(key, body.battleCode, body.problemNumber, receivedAt);
+        if (body.tournamentId && !judge.compileError) {
+          await clubTournaments.recordResult(key, body.tournamentId, body.matchId, body.problemNumber, receivedAt,
+            { passed: judge.passed, solved: judge.solved });
+        }
         const progress = judgeProgress && key.startsWith('m:')
           ? judge.solved
             ? await judgeProgress.recordSolved(key, body.problemNumber)
@@ -288,6 +312,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const clubSocial = createClubSocial({ numberedProblems, judgeProgress, store: createClubStore({
     directory: clubDirectory, filename: 'social.json', initial: () => ({ version: 1, sets: [], votes: [] }),
   }) });
+  const clubTournaments = createClubTournaments({ numberedProblems, store: createClubStore({
+    directory: clubDirectory, filename: 'tournaments.json', initial: () => ({ version: 1, events: [] }),
+  }) });
   // A record left behind means the previous process died mid-job (OOM, SIGKILL, crash): blame its client.
   const crashed = inflight?.recover();
   if (crashed) {
@@ -295,7 +322,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     log({ event: 'recovered-inflight', client: keyHash(crashed.clientKey), jobId: crashed.jobId, startedAt: crashed.startedAt });
   }
   server = createRunnerServer({
-    denyList, inflight, numberedProblems, judgeProgress, clubBattles, clubSocial,
+    denyList, inflight, numberedProblems, judgeProgress, clubBattles, clubSocial, clubTournaments,
     onFatal({ key } = {}) {
       if (exiting) return;
       exiting = true;

@@ -42,6 +42,11 @@ public class GatheringController {
         return ResponseEntity.ok(gatheringService.list(authentication.getName()));
     }
 
+    @GetMapping("/opportunities")
+    public ResponseEntity<List<GatheringResponse>> listOpenOpportunityGatherings(Authentication authentication) {
+        return ResponseEntity.ok(gatheringService.listOpenOpportunityGatherings(authentication.getName()));
+    }
+
     @PostMapping
     public ResponseEntity<GatheringDetailResponse> createGathering(@Valid @RequestBody GatheringRequest request,
                                                                    Authentication authentication) {

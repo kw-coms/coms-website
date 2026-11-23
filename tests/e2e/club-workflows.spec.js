@@ -154,9 +154,39 @@ test('an operator reviews a collected notice before it appears in the public sch
   await page.goto('/opportunities')
   await expect(page.getByRole('heading', { name: '가상 교육 일정' })).toBeVisible()
   await expect(page.getByText('2099-12-20 18:00', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('일정 상태').getByText('신청 마감 전')).toBeVisible()
+  await page.getByRole('group', { name: '일정 진행 상태' }).getByRole('button', { name: '진행 중' }).click()
+  await expect(page.getByRole('heading', { name: '가상 교육 일정' })).toBeVisible()
+  await page.getByRole('group', { name: '일정 진행 상태' }).getByRole('button', { name: '시작 전' }).click()
+  await expect(page.getByText('조건에 맞는 공개 일정이 없습니다.')).toBeVisible()
+  await page.getByRole('group', { name: '일정 진행 상태' }).getByRole('button', { name: '상태 전체' }).click()
+  await page.getByRole('searchbox', { name: '일정 검색' }).fill('예시 교육 기관')
+  await expect(page.getByRole('heading', { name: '가상 교육 일정' })).toBeVisible()
+  await page.getByRole('searchbox', { name: '일정 검색' }).fill('없는 일정')
+  await expect(page.getByText('조건에 맞는 공개 일정이 없습니다.')).toBeVisible()
+  await page.getByRole('searchbox', { name: '일정 검색' }).fill('')
+  await page.getByRole('combobox', { name: '정렬' }).selectOption('newest')
+  await expect(page.getByRole('heading', { name: '가상 교육 일정' })).toBeVisible()
   await expect(page.getByRole('link', { name: '가상 교육 일정 공식 공고 (새 탭)' })).toHaveAttribute('href', notice.sourceUrl)
   await page.getByRole('group', { name: '일정 종류' }).getByRole('button', { name: '코딩 대회' }).click()
   await expect(page.getByRole('heading', { name: '가상 교육 일정' })).toHaveCount(0)
   await expect(page.getByText('이 종류에 공개된 일정이 없습니다.')).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('public opportunities stay ordered by time across different categories', async ({ page }) => {
+  await mockOptionalApis(page)
+  const common = { applicationStart: null, applicationEnd: null, publishedAt: '2026-11-20T00:00:00Z' }
+  await page.route('**/api/opportunities', route => route.fulfill({ json: [
+    { ...common, id: 1, category: 'HACKATHON', title: '내년 해커톤', sourceName: '주최 A', sourceUrl: 'https://example.com/one', eventStart: '2099-12-10', eventEnd: '2099-12-11' },
+    { ...common, id: 2, category: 'CONTEST', title: '먼저 열리는 대회', sourceName: '주최 B', sourceUrl: 'https://example.com/two', eventStart: '2099-11-10', eventEnd: '2099-11-11' },
+    { ...common, id: 3, category: 'TRAINING', title: '진행 중인 교육', sourceName: '주최 C', sourceUrl: 'https://example.com/three', eventStart: '2020-01-01', eventEnd: '2100-01-01' },
+  ] }))
+  await page.goto('/opportunities')
+  await expect(page.locator('main ul > li > h3')).toHaveText(['진행 중인 교육', '먼저 열리는 대회', '내년 해커톤'])
+  await page.getByRole('group', { name: '일정 종류' }).getByRole('button', { name: '해커톤' }).click()
+  await expect(page.locator('main ul > li > h3')).toHaveText(['내년 해커톤'])
+  await page.getByRole('group', { name: '일정 종류' }).getByRole('button', { name: '전체', exact: true }).click()
+  await page.getByRole('group', { name: '일정 진행 상태' }).getByRole('button', { name: '진행 중' }).click()
+  await expect(page.locator('main ul > li > h3')).toHaveText(['진행 중인 교육'])
 })
