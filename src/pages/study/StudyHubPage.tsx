@@ -1,7 +1,7 @@
 import PageHeading from '../../components/PageHeading'
 import { lazy, Suspense, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CircuitBoard, Coffee } from 'lucide-react'
+import { ArrowRight, CircuitBoard, Code2, Coffee } from 'lucide-react'
 import { STUDIES } from './studies'
 import { readProgress } from './exercises/progress'
 import './study.css'
@@ -55,6 +55,11 @@ export default function StudyHubPage() {
           </div>
           <Suspense fallback={<div className="study-overview" data-reserve={hasProgress || undefined} aria-hidden="true" />}><StudyHubOverview reserveResume={hasProgress} /></Suspense>
         </div>
+        <Link to="/study/algorithms" className="study-overview-resume study-algorithm-link">
+          <Code2 size={18} aria-hidden="true" />
+          <span><b>알고리즘 문제</b> 오늘의 문제 · 주간 문제</span>
+          <ArrowRight size={16} aria-hidden="true" />
+        </Link>
         <ul className="study-hub-grid">
           {STUDIES.map((study) => {
             const done = savedDone(study.progressKey)

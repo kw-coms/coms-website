@@ -53,6 +53,16 @@
 .ex-recommend p { margin: 0 0 2px; font-size: 12.5px; font-weight: 600; color: var(--app-muted); }
 .ex-recommend a { color: var(--app-text); text-decoration: none; }
 .ex-recommend a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.algorithm-challenges { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; }
+.algorithm-challenge:first-child { border-color: var(--app-accent-border); background: var(--app-accent-soft); }
+.algorithm-card-head, .algorithm-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
+.algorithm-challenge .algorithm-card-head h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; }
+.algorithm-card-head > span, .study-page .algorithm-schedule { font-size: 13px; color: var(--app-muted); }
+.algorithm-challenge h3 { font-size: clamp(22px, 3vw, 28px); line-height: 1.3; margin: 12px 0 0; }
+.algorithm-card-foot a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid var(--app-accent-border); border-radius: 10px; background: var(--app-surface); font-size: 14px; font-weight: 700; text-decoration: none; }
+.algorithm-card-foot a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.study-page .algorithm-schedule { margin: 12px 0 32px; }
+#algorithm-list { font-size: 21px; font-weight: 750; }
 /* Study-body surfaces reuse the quiz box language: --surface fill, --line border, --radius. */
 .study-page .ex-inline { margin: 28px 0 8px; padding: 12px 16px 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 .study-page .ex-inline-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 8px; }

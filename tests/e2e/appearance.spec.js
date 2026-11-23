@@ -18,12 +18,62 @@ const openFromFooter = async (page) => {
   await expect(trigger(page)).toHaveAttribute('aria-controls', (await dialog(page).getAttribute('id')) ?? '')
 }
 
+test('home layout switches independently of the site theme and survives reload', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('.scenes-main')).toBeVisible()
+  await openFromFooter(page)
+  const layouts = dialog(page).getByRole('radiogroup', { name: '홈 구성' })
+  await layouts.getByRole('radio', { name: '한눈에 보기' }).click()
+  await expect(page.getByRole('navigation', { name: '홈 한눈에 보기' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: '홈 한눈에 보기' }).getByRole('link', { name: '알고리즘 문제' })).toHaveAttribute('href', '/study/algorithms')
+  await dialog(page).getByRole('radiogroup', { name: '사이트 테마' }).getByRole('radio', { name: '청사진' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-appearance-theme', 'blueprint')
+  await page.reload()
+  await expect(page.getByRole('navigation', { name: '홈 한눈에 보기' })).toBeVisible()
+  await expect(page.locator('html')).toHaveAttribute('data-appearance-theme', 'blueprint')
+  await openFromFooter(page)
+  await layouts.getByRole('radio', { name: '스크롤형' }).click()
+  await expect(page.locator('.scenes-main')).toBeVisible()
+})
+
+test('home layout can change for this tab when storage rejects writes', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = Storage.prototype.setItem
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'kwcoms-home-layout:v1') throw new DOMException('Quota exceeded', 'QuotaExceededError')
+      return original.call(this, key, value)
+    }
+  })
+  await page.goto('/')
+  await openFromFooter(page)
+  await dialog(page).getByRole('radio', { name: '한눈에 보기' }).click()
+  await expect(page.getByRole('navigation', { name: '홈 한눈에 보기' })).toBeVisible()
+})
+
+test('compact home keeps public links and member links follow authentication', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('kwcoms-home-layout:v1', 'compact'))
+  await page.goto('/#activities')
+  const compact = page.locator('.compact-home')
+  await expect(page.locator('#activities')).toBeInViewport()
+  await expect(compact.getByRole('link', { name: '스터디 자료' })).toHaveAttribute('href', '/study')
+  await expect(compact.getByRole('link', { name: '커뮤니티' })).toHaveCount(0)
+  await expect(compact.getByRole('link', { name: '문의하기' })).toHaveAttribute('href', '/contact')
+  await mockAdminApis(page)
+  await page.reload()
+  await expect(compact.getByRole('link', { name: '커뮤니티' })).toHaveAttribute('href', '/community')
+  await expect(compact.getByRole('link', { name: '월별 일정' })).toHaveAttribute('href', '/monthly-calendar')
+  await expect(compact.getByRole('link', { name: '공지사항 보기' })).toHaveAttribute('href', '/notices')
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.getByRole('navigation', { name: '홈 한눈에 보기' })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0)
+})
+
 test('footer has the four Korean sitemap groups and keeps external destinations', async ({ page }) => {
   await page.goto('/activities')
   const sitemap = page.getByRole('navigation', { name: '사이트맵' })
   await expect(sitemap.getByRole('heading')).toHaveText(['동아리', '배움', '멤버', '도구'])
   const paths = await sitemap.getByRole('link').evaluateAll((links) => links.map((link) => link.getAttribute('href')))
-  expect(paths).toEqual(['/about', '/officers', '/activities', '/projects', '/contact', '/sponsors', '/recruit', '/study', '/lab/', '/opportunities', '/notices', '/community', '/resources', '/activity-log', '/monthly-calendar', '/activity-events', '/forms', '/team-projects', '/hackathon', '/gatherings', '/meet', '/attendance', '/draw', '/apps'])
+  expect(paths).toEqual(['/about', '/officers', '/activities', '/projects', '/contact', '/sponsors', '/recruit', '/study', '/study/algorithms', '/lab/', '/opportunities', '/notices', '/community', '/resources', '/activity-log', '/monthly-calendar', '/activity-events', '/forms', '/team-projects', '/hackathon', '/gatherings', '/meet', '/attendance', '/draw', '/apps'])
   await expect(sitemap.getByRole('link', { name: '해커톤' }).locator('[data-member-lock]')).toHaveCount(0)
   await expect(sitemap.getByRole('link', { name: /^역대 회장단/ }).locator('[data-member-lock]')).toHaveCount(1)
   await expect(sitemap.getByRole('link', { name: /^팀 프로젝트/ }).locator('[data-member-lock]')).toHaveCount(1)

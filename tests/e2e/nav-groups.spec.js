@@ -13,6 +13,7 @@ const ROUTES = [
   ['동아리', '소개', '/about'],
   ['동아리', '활동', '/activities'],
   ['배움', '스터디 자료', '/study'],
+  ['배움', '알고리즘 문제', '/study/algorithms'],
   ['배움', '외부 일정', '/opportunities'],
   ['동아리', '프로젝트', '/projects'],
   ['동아리', '지원하기', '/recruit'],
@@ -49,6 +50,8 @@ test.describe('desktop panel', () => {
     await expect(panel(page)).toBeVisible()
     // Focus moves to the first entry of the opened group, and Tab goes on in column order.
     await expect(entry(panel(page), '스터디 자료')).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(entry(panel(page), '알고리즘 문제')).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(entry(panel(page), '회로 Lab')).toBeFocused()
     await page.keyboard.press('Tab')

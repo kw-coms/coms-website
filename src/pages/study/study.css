@@ -656,6 +656,8 @@
 .study-overview-resume b { font-weight: 800; margin-right: 4px; }
 .study-overview-resume:hover { background: var(--app-accent-border); }
 .study-overview-resume:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+.study-algorithm-link { min-height: 48px; margin-bottom: 16px; }
+.study-algorithm-link span { flex: 1; white-space: normal; }
 
 /* Five subject cards on a 6-column grid (3 + 2 wide). */
 .study-hub-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
