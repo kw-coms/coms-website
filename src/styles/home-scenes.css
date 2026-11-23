@@ -222,6 +222,16 @@
 	background: var(--app-accent-text);
 }
 
+.scene-opening .scene-notice {
+	min-height: 2.75rem;
+	margin-top: 1.1rem;
+	text-align: start;
+}
+
+.scene-opening .scene-notice > svg {
+	flex-shrink: 0;
+}
+
 .scene-notice {
 	display: inline-flex;
 	max-width: 100%;

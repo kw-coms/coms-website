@@ -63,6 +63,22 @@ test.describe('a visitor on the home page', () => {
     }
   })
 
+  test('shows the public recruitment notice on the opening screen without loading member notices', async ({ page }) => {
+    const memberNoticeRequests = []
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/api/notices') memberNoticeRequests.push(request)
+    })
+    for (const [width, height] of [[1280, 720], [390, 844]]) {
+      await page.setViewportSize({ width, height })
+      await page.goto('/')
+      const notice = page.locator('#opening').getByRole('button', { name: '공지 모집 일정 및 지원 안내' })
+      await expect(notice).toBeInViewport({ ratio: 1 })
+      await notice.click()
+      await expect(page).toHaveURL(/\/recruit-notice$/)
+    }
+    expect(memberNoticeRequests).toHaveLength(0)
+  })
+
   test('opens a compact home index, jumps to a scene, and dismisses', async ({ page }) => {
     const rail = page.getByRole('navigation', { name: '장면 이동' })
     const toggle = rail.getByRole('button', { name: '홈 목차' })
@@ -393,11 +409,15 @@ test('a member\'s latest-notice buttons appear after a slow notices response', a
     await route.fulfill({ json: [{ id: 3, title: '늦게 도착한 공지', content: '', category: 'GENERAL', createdAt: '2026-11-01T10:00:00' }] })
   })
   await page.goto('/')
+  const openingNotice = page.locator('#opening').getByRole('button', { name: '공지 늦게 도착한 공지' })
+  await expect(openingNotice).toBeInViewport({ ratio: 1 })
   const lead = page.locator('.scene-notice--lead')
   await expect(lead).toBeAttached({ timeout: 8000 })
   await lead.scrollIntoViewIfNeeded()
   await expect(lead).toHaveCSS('opacity', '1')
-  await expect(page.locator('.scene-notice').first()).toHaveCSS('opacity', '1')
+  await expect(openingNotice).toHaveCSS('opacity', '1')
+  await openingNotice.click()
+  await expect(page).toHaveURL(/\/notices\/3$/)
 })
 
 // The rail names the scene under the middle of the viewport, scrolling down and back up, with the
