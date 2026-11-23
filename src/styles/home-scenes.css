@@ -961,9 +961,9 @@
 
 @media (min-width: 1024px) {
 	.scenes {
-		--scene-rail-width: 7.15rem;
-		--scene-rail-offset: 1.1rem;
-		--scene-rail-clearance: calc(var(--scene-rail-width) + var(--scene-rail-offset) + 0.75rem);
+		--scene-rail-width: 2.75rem;
+		--scene-rail-offset: 0.55rem;
+		--scene-rail-clearance: calc(var(--scene-rail-width) + var(--scene-rail-offset) + 0.25rem);
 	}
 
 	.scene:not(.scene-opening) {
@@ -984,76 +984,66 @@
 		right: var(--scene-rail-offset);
 		z-index: 30;
 		display: grid;
-		justify-items: end;
+		justify-items: center;
+		gap: 0.4rem;
 		width: var(--scene-rail-width);
-		padding: 0.2rem 0.85rem 0.55rem 0.15rem;
 		transform: translateY(-50%);
-		border: 1px solid var(--app-hairline-strong);
-		border-radius: 0.625rem;
-		background: var(--app-surface-elevated);
-		color: var(--app-text);
+	}
+	.scene-rail__markers {
+		width: 100%;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.scene-rail__marker {
+		display: grid;
+		width: 100%;
+		min-height: 1.5rem;
+		place-items: center end;
+		padding-inline: 0.45rem;
+		border-radius: 0.25rem;
+		color: var(--app-muted);
+		cursor: pointer;
+	}
+	.scene-rail__marker:is([data-passed], [aria-current='true']) {
+		color: var(--app-accent-text);
+	}
+	.scene-rail__marker span {
+		width: 0.75rem;
+		height: 2px;
+		border-radius: 999px;
+		background: currentColor;
+	}
+	.scene-rail__marker[aria-current='true'] span {
+		position: relative;
+		width: 1.8rem;
+		height: 3px;
+		background: var(--app-hairline-strong);
+	}
+	.scene-rail__marker[aria-current='true'] span::after {
+		content: '';
+		position: absolute;
+		inset: 0 auto 0 0;
+		min-width: 4px;
+		width: calc(var(--rail-p, 0) * 100%);
+		border-radius: inherit;
+		background: currentColor;
+	}
+	.scene-rail__marker:hover span {
+		background: var(--app-text);
 	}
 	.scene-rail__trigger {
 		display: grid;
-		justify-items: end;
-		gap: 0.28rem;
-		width: 100%;
-		min-height: 2.75rem;
-		padding: 0.4rem 0.45rem;
-		border: 1px solid transparent;
-		border-radius: 0.35rem;
-		background: transparent;
+		width: 2.2rem;
+		min-height: 2.2rem;
+		place-items: center;
+		border: 1px solid var(--app-hairline-strong);
+		border-radius: 0.45rem;
+		background: var(--app-surface-elevated);
 		color: var(--app-text);
-		font: 650 0.8125rem/1.25 var(--apple-font-family);
 		cursor: pointer;
 	}
-	.scene-rail__caption {
-		display: flex;
-		align-items: center;
-		gap: 0.22rem;
-		font-size: 0.75rem;
-		font-weight: 550;
-	}
-	.scene-rail__current {
-		white-space: nowrap;
-	}
-	.scene-rail__trigger[aria-expanded='true'] svg {
-		transform: rotate(180deg);
-	}
-	.scene-rail__progress {
-		margin: 0 0.45rem;
-		color: var(--app-accent-text);
-		font: 650 0.75rem/1.2 var(--apple-font-family);
-		font-variant-numeric: tabular-nums;
-	}
-	.scene-rail__progress-track {
-		position: absolute;
-		inset: 0.6rem 0.48rem 0.6rem auto;
-		width: 2px;
-		border-radius: 2px;
-		background: var(--app-hairline-strong);
-	}
-	.scene-rail__progress-track::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		border-radius: inherit;
-		background: currentColor;
-		transform: scaleY(var(--rail-page-progress));
-		transform-origin: top;
-	}
-	.scene-rail__progress-track::after {
-		content: '';
-		position: absolute;
-		top: calc(var(--rail-page-progress) * 100%);
-		left: 50%;
-		width: 5px;
-		height: 5px;
-		transform: translate(-50%, -50%);
-		border-radius: 50%;
-		background: currentColor;
-	}
-	.scene-rail ol:not([hidden]) {
+	.scene-rail__menu:not([hidden]) {
 		position: absolute;
 		inset: 50% calc(100% + 0.55rem) auto auto;
 		display: grid;
@@ -1086,6 +1076,7 @@
 	}
 
 	.scene-rail__trigger:hover,
+	.scene-rail__trigger[aria-expanded='true'],
 	.scene-rail__item:hover,
 	.scene-rail__item[aria-current='true'] {
 		border-color: var(--app-hairline-strong);
@@ -1093,26 +1084,7 @@
 		color: var(--app-text);
 	}
 
-	.scene-rail__fill {
-		display: none;
-	}
-	.scene-rail__item[aria-current='true'] .scene-rail__fill {
-		position: absolute;
-		inset: auto 0.55rem 0.29rem;
-		display: block;
-		height: 2px;
-		background: var(--app-hairline-strong);
-		overflow: hidden;
-		overflow: clip;
-	}
-	.scene-rail__item[aria-current='true'] .scene-rail__fill::after {
-		content: '';
-		position: absolute;
-		inset: 0;
-		background: var(--app-accent);
-		transform-origin: left;
-		transform: scaleX(var(--rail-p, 0));
-	}
+	.scene-rail__marker:focus-visible,
 	.scene-rail__trigger:focus-visible,
 	.scene-rail__item:focus-visible {
 		outline: 2px solid var(--app-accent);
