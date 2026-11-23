@@ -22,6 +22,8 @@ import { numberedLanguages } from './judgeLanguages'
 import WebWorkspace from './WebWorkspace'
 import { JudgeTierBadge } from './JudgeTierBadge'
 import ProblemHelp from './ProblemHelp'
+import ClubVote from './ClubVote'
+import ClubBattleBanner from './ClubBattleBanner'
 import { shareJudgeResult, useJudgeProgress } from './judgeProgress'
 import '../study.css'
 import './exercises.css'
@@ -75,18 +77,20 @@ function OutputBox({ title, value }: { title: string; value: string }) {
   return <div className="ex-output-box"><strong>{title}</strong><pre>{value || '(없음)'}</pre></div>
 }
 
-function ProblemBackLink({ studyId, fromAlgorithms }: { studyId: string; fromAlgorithms: boolean }) {
-  return <nav className="ex-back">{fromAlgorithms
+function ProblemBackLink({ studyId, fromAlgorithms, battleLink }: { studyId: string; fromAlgorithms: boolean; battleLink?: string }) {
+  return <nav className="ex-back">{battleLink ? <Link to={battleLink}>← 배틀로 돌아가기</Link> : fromAlgorithms
     ? <Link to="/study/algorithms">← 알고리즘 문제 목록</Link>
     : <Link to={`/study/${studyId}/practice`}>← 실습 문제 목록</Link>}
   </nav>
 }
 
-function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: string; problem: Exercise | WebExercise; fromAlgorithms: boolean; number?: number }) {
+function ProblemBody({ studyId, problem, fromAlgorithms, number, battleCode }: { studyId: string; problem: Exercise | WebExercise; fromAlgorithms: boolean; number?: number; battleCode?: string }) {
   useDocumentTitle(problem.title)
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
+  const battleLink = battleCode ? `/study/algorithms/battles?room=${battleCode}` : undefined
+  const draftKey = battleCode ? `${problem.id}:battle:${battleCode}:${user.studentId}` : problem.id
   const [settings] = useState(() => readCodingSettings(user?.studentId))
   const progress = useProgress()
   const judgeProgress = useJudgeProgress(number !== undefined)
@@ -96,8 +100,8 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
     .sort((a, b) => Number(b === studyId) - Number(a === studyId) ||
       Number(problem.langs.includes(b)) - Number(problem.langs.includes(a)))
   const [initialContext] = useState(() => {
-    const share = decodeShareHash(location.hash)
-    return { saved: readProgress()[problem.id]?.code ?? {}, share, sharedLang: share ? langs[share.index] : undefined }
+    const share = battleCode ? null : decodeShareHash(location.hash)
+    return { saved: readProgress()[draftKey]?.code ?? {}, share, sharedLang: share ? langs[share.index] : undefined }
   })
   const [lang, setLang] = useState<ExLang>(() => initialContext.sharedLang ?? chooseCodingLanguage(
     langs, number === undefined ? studyId : new URLSearchParams(location.search).get('lang'), settings.preferredLanguage, studyId,
@@ -141,12 +145,12 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
   const updateCode = (value: string) => {
     codeRef.current = { ...codeRef.current, [lang]: value }
     setCodeByLang(codeRef.current)
-    if (!shared || lang !== sharedLang) scheduleSaveCode(problem.id, lang, value)
+    if (!shared || lang !== sharedLang) scheduleSaveCode(draftKey, lang, value)
   }
   const dropSharedHash = () => { if (location.hash.startsWith('#pg=')) history.replaceState(history.state, '', location.pathname + location.search) }
   const leaveShared = (keep: boolean) => {
     const value = keep ? codeRef.current[lang] ?? '' : initialContext.saved[lang] ?? (!web ? problemStarter(problem, lang, settings) : '')
-    if (keep) saveCode(problem.id, lang, value)
+    if (keep) saveCode(draftKey, lang, value)
     codeRef.current = { ...codeRef.current, [lang]: value }
     setCodeByLang(codeRef.current)
     editorRef.current?.setValue(value)
@@ -183,7 +187,7 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
     editorRef.current?.clearDiagnostics()
     const controller = new AbortController(); abortRef.current = controller
     try {
-      const result = await gradeExercise(problem, lang, codeRef.current[lang] ?? '', controller.signal, number)
+      const result = await gradeExercise(problem, lang, codeRef.current[lang] ?? '', controller.signal, number, battleCode)
       if (!finish('grade', result)) return
       if (result.kind === 'graded') {
         setGrade(result.grade)
@@ -193,7 +197,7 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
       }
     } catch (error) { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : '채점에 실패했어요.') }
     finally { setBusy(false); abortRef.current = null }
-  }, [web, busy, countdown, problem, lang, number])
+  }, [web, busy, countdown, problem, lang, number, battleCode])
   const revealSolution = () => {
     if (!solved && !record?.viewed && !window.confirm('스스로 풀어 보는 게 실력이 늘어요. 그래도 볼까요?')) return
     markViewed(problem.id)
@@ -214,7 +218,7 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
     setCodeByLang(codeRef.current)
     editorRef.current?.setValue(starter)
     editorRef.current?.clearDiagnostics()
-    saveCode(problem.id, lang, starter)
+    saveCode(draftKey, lang, starter)
     setGrade(null); setSingle(null)
   }
   const share = () => {
@@ -239,20 +243,28 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
   const login = () => navigate('/login', { state: { from: { pathname: location.pathname, search: location.search, hash: location.hash } } })
 
   return <main className="study-page ex-page judge-problem">
-    <ProblemBackLink studyId={studyId} fromAlgorithms={fromAlgorithms} />
+    <ProblemBackLink studyId={studyId} fromAlgorithms={fromAlgorithms} battleLink={battleLink} />
+    {battleCode && <ClubBattleBanner code={battleCode} />}
     <header className="ex-head"><div><p className="ex-eyebrow">{number === undefined ? '실습 문제' : `문제 ${number}번`}</p><PageHeading>{problem.title}</PageHeading><div className="ex-meta"><JudgeTierBadge problem={problem} />{number === undefined && <span>{LEVEL_NAME[problem.level - 1]}</span>}{problem.topics.map((topic) => <span key={topic}>{topic}</span>)}</div></div></header>
     <nav className="judge-mobile-nav" aria-label="문제 화면 이동">
       <a href="#judge-statement">문제 설명</a><a href="#judge-workspace">코드 작성</a><a href="#judge-results">실행 결과</a>
-      {number !== undefined && <a href="#judge-help">힌트·질문</a>}
+      {number !== undefined && !battleCode && <a href="#judge-help">힌트·질문</a>}
     </nav>
     <div className="ex-columns">
       <section id="judge-statement" className="ex-panel ex-statement" aria-label="문제 설명">
         <MiniMarkdown text={problem.statement} />
         {!web && <>{problem.inputSpec && <section className="ex-spec"><h2>입력</h2><MiniMarkdown text={problem.inputSpec} /></section>}{problem.outputSpec && <section className="ex-spec"><h2>출력</h2><MiniMarkdown text={problem.outputSpec} /></section>}
           <section className="ex-examples"><h2>예제</h2>{problem.examples.map((example, index) => <div className="ex-example" key={index}><h3>예제 {index + 1}</h3><OutputBox title="입력" value={example.stdin} /><button type="button" onClick={() => void navigator.clipboard.writeText(example.stdin)}>입력 복사</button><OutputBox title="출력" value={example.expected} /><button type="button" onClick={() => void navigator.clipboard.writeText(example.expected)}>출력 복사</button>{example.explain && <p>{example.explain}</p>}</div>)}</section></>}
-        {number !== undefined ? <ProblemHelp number={number} title={problem.title} hints={problem.hints} />
-          : problem.hints.length > 0 && <section className="ex-hints"><h2>힌트</h2>{problem.hints.slice(0, shownHints).map((hint, index) => <div key={index}><MiniMarkdown text={hint} /></div>)}{shownHints < problem.hints.length && <button type="button" onClick={() => setShownHints((count) => count + 1)}>힌트 하나 보기</button>}</section>}
-        {(web || problem.solution[lang]) && <section className="ex-solution"><button type="button" onClick={revealSolution}>답 보기</button>{showSolution && <div><h2>참고 답안</h2>{web ? <><h3>HTML</h3><SolutionEditor lang="html" code={problem.solution.html} /><h3>CSS</h3><SolutionEditor lang="css" code={problem.solution.css} /><h3>JavaScript</h3><SolutionEditor lang="js" code={problem.solution.js} /></> : <SolutionEditor lang={lang} code={problem.solution[lang] ?? ''} />}{problem.explain && <MiniMarkdown text={problem.explain} />}</div>}</section>}
+        {number !== undefined && !battleCode && <>
+          <div className="judge-practice-tools">
+            <Link className="judge-tools-link" to={`/study/algorithms/problem-sets?problem=${number}`}>문제집에 담기</Link>
+            <ClubVote number={number} solved={(grade?.progress ?? judgeProgress)?.solved.includes(number) ?? solved} />
+          </div>
+          <ProblemHelp number={number} title={problem.title} hints={problem.hints} />
+        </>}
+        {number === undefined &&
+          (problem.hints.length > 0 && <section className="ex-hints"><h2>힌트</h2>{problem.hints.slice(0, shownHints).map((hint, index) => <div key={index}><MiniMarkdown text={hint} /></div>)}{shownHints < problem.hints.length && <button type="button" onClick={() => setShownHints((count) => count + 1)}>힌트 하나 보기</button>}</section>)}
+        {!battleCode && (web || problem.solution[lang]) && <section className="ex-solution"><button type="button" onClick={revealSolution}>답 보기</button>{showSolution && <div><h2>참고 답안</h2>{web ? <><h3>HTML</h3><SolutionEditor lang="html" code={problem.solution.html} /><h3>CSS</h3><SolutionEditor lang="css" code={problem.solution.css} /><h3>JavaScript</h3><SolutionEditor lang="js" code={problem.solution.js} /></> : <SolutionEditor lang={lang} code={problem.solution[lang] ?? ''} />}{problem.explain && <MiniMarkdown text={problem.explain} />}</div>}</section>}
       </section>
       <section id="judge-workspace" className="ex-panel ex-workspace" aria-label="코드 작성 및 채점">
         {web ? <WebWorkspace exercise={problem} onSolved={() => setSolved(true)} /> : <>
@@ -260,10 +272,10 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
           {shared && lang === sharedLang && <div className="ex-shared" role="region" aria-label="공유된 코드"><p>공유된 코드를 보고 있어요. 내 코드는 그대로 보관됩니다.</p><button type="button" onClick={() => leaveShared(false)}>내 코드로 돌아가기</button><button type="button" onClick={() => leaveShared(true)}>이 코드로 저장</button></div>}
           <div className="judge-editor-tools">
             <strong>{LANG_NAMES[lang]} 코드</strong>
-            {number !== undefined && <a className="judge-tools-link" href="#judge-help">힌트·질문</a>}
+            {number !== undefined && !battleCode && <a className="judge-tools-link" href="#judge-help">힌트·질문</a>}
             <Link className="judge-tools-link" to="/study/algorithms/settings" state={{ from: location.pathname + location.search + location.hash }}><Settings2 size={16} aria-hidden="true" />코딩 설정</Link>
           </div>
-          <div className="ex-actions"><button type="button" onClick={() => void run()} disabled={busy || countdown > 0}>실행</button><button type="button" className="ex-primary" onClick={() => void submit()} disabled={busy || countdown > 0}>제출</button><span className="ex-actions-gap" aria-hidden="true" /><button type="button" className="ex-quiet" onClick={reset} disabled={busy}>초기화</button><button type="button" className="ex-quiet" onClick={share}>내 풀이 공유</button></div>
+          <div className="ex-actions"><button type="button" onClick={() => void run()} disabled={busy || countdown > 0}>실행</button><button type="button" className="ex-primary" onClick={() => void submit()} disabled={busy || countdown > 0}>{battleCode ? '배틀 제출' : '제출'}</button><span className="ex-actions-gap" aria-hidden="true" /><button type="button" className="ex-quiet" onClick={reset} disabled={busy}>초기화</button>{!battleCode && <button type="button" className="ex-quiet" onClick={share}>내 풀이 공유</button>}</div>
           <CodePane key={lang} lang={lang} initial={currentCode} appearance={settings.appearance} editorRef={editorRef} onChange={updateCode} onRun={() => void run()} onSubmit={() => void submit()} />
           <label className="ex-stdin">직접 실행 입력 (stdin)<textarea value={stdin} onChange={(event) => setStdin(event.target.value)} rows={3} /></label>
           <p className="ex-shortcuts">⌘/Ctrl+Enter 실행 · ⌘/Ctrl+Shift+Enter 제출</p>
@@ -279,7 +291,7 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
           {number !== undefined && (grade?.progress ?? judgeProgress)?.solved.includes(number) && <button type="button" className="judge-share" onClick={() => void shareAchievement()}>해결 성취 공유하기</button>}
         </>}
         {web && <span id="judge-results" className="judge-result-anchor" aria-hidden="true" />}
-        {solved && (fromAlgorithms
+        {battleLink ? <Link className="ex-next" to={battleLink}>배틀 현황 보기</Link> : solved && (fromAlgorithms
           ? <Link className="ex-next" to="/study/algorithms">과제 확인 →</Link>
           : next && <Link className="ex-next" to={exercisePath(studyId, next.id)}>다음 문제 →</Link>)}
       </section>
@@ -292,6 +304,7 @@ export default function ProblemPage() {
   const { search } = useLocation()
   const params = new URLSearchParams(search)
   const numbered = problemNumber === undefined ? undefined : findNumberedExercise(problemNumber)
+  const battleCode = params.get('battle') ?? undefined
   const fromAlgorithms = Boolean(numbered) || params.get('from') === 'algorithms'
   const { user, loading, authError } = useAuth()
   const problem = numbered?.problem ?? findExercise(problemId ?? '')
@@ -299,7 +312,8 @@ export default function ProblemPage() {
     ? numberedLanguages(numbered.problem).find((lang) => lang === params.get('lang'))
       ?? (numberedLanguages(numbered.problem).includes('python') ? 'python' : numbered.problem.langs[0])
     : id
-  if (!studyId || !problem || (!numbered && !exercisesFor(studyId).some((item) => item.id === problem.id))) return <NotFoundPage />
+  if (!studyId || !problem || (battleCode !== undefined && (!numbered || !/^[A-F0-9]{12}$/.test(battleCode))) ||
+      (!numbered && !exercisesFor(studyId).some((item) => item.id === problem.id))) return <NotFoundPage />
   if (loading) return <main className="study-page ex-page"><p className="study-loading" role="status">불러오는 중...</p></main>
   // ponytail: UI-only gate. Problem statements and starter code are still in the public JS bundle (problems/*).
   // Upgrade path: serve problems from an authenticated API.
@@ -309,5 +323,5 @@ export default function ProblemPage() {
     <header className="ex-head"><div>{numbered && <p className="ex-eyebrow">문제 {numbered.number}번</p>}<PageHeading>{problem.title}</PageHeading></div></header>
     <MembersGate heading="h2" title="문제 풀이는 동아리원만 할 수 있어요">문제 설명과 코드 편집기는 로그인한 동아리원에게만 열려요.</MembersGate>
   </main>
-  return <ProblemBody key={`${user.studentId}:${problem.id}:${studyId}`} studyId={studyId} problem={problem} fromAlgorithms={fromAlgorithms} number={numbered?.number} />
+  return <ProblemBody key={`${user.studentId}:${problem.id}:${studyId}:${battleCode ?? ''}`} studyId={studyId} problem={problem} fromAlgorithms={fromAlgorithms} number={numbered?.number} battleCode={battleCode} />
 }

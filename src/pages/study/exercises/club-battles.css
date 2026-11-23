@@ -1,0 +1,115 @@
+.club-battles {
+  min-height: 100vh;
+  color: var(--app-text);
+}
+.club-battles-inner {
+  width: min(100% - 48px, 1160px);
+  margin-inline: auto;
+  padding: 20px 0 88px;
+}
+.club-battles-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--app-muted);
+  font-size: 14px;
+  text-decoration: none;
+}
+.club-battles-heading { margin: 38px 0 38px; }
+.club-battles-heading h1 {
+  margin: 0;
+  font-size: clamp(36px, 5.5vw, 62px);
+  line-height: 1.12;
+  letter-spacing: -.04em;
+}
+.club-battles-heading > p {
+  margin: 14px 0 0;
+  color: var(--app-muted);
+  font-size: 17px;
+}
+.club-battles-entry { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.club-battles-entry > section,
+.club-battle-room {
+  min-width: 0;
+  padding: clamp(24px, 3vw, 36px);
+  border: 1px solid var(--app-hairline);
+  border-radius: 18px;
+  background: var(--app-surface);
+}
+.club-battles-icon { color: var(--app-accent-text); }
+.club-battles-entry h2,
+.club-battle-room h2 { margin: 18px 0 20px; font-size: clamp(23px, 2.6vw, 31px); line-height: 1.3; }
+.club-battles-entry p { color: var(--app-muted); font-size: 14px; line-height: 1.65; }
+.club-battles-entry label { display: grid; gap: 8px; margin: 22px 0 0; font-size: 13px; font-weight: 750; color: var(--app-muted); }
+.club-battles-entry :is(input, select) {
+  width: 100%;
+  min-height: 47px;
+  padding: 8px 12px;
+  border: 1px solid var(--app-hairline);
+  border-radius: 9px;
+  color: var(--app-text);
+  background: var(--app-surface-soft);
+  font-size: 16px;
+}
+.club-battles-selected { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.club-battles-selected span:first-child { color: var(--app-text); }
+.club-battles-entry button,
+.club-battle-room button,
+.club-battle-room-actions a {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 9px 14px;
+  border: 1px solid var(--app-hairline);
+  border-radius: 9px;
+  color: var(--app-text);
+  background: var(--app-surface-soft);
+  font-size: 14px;
+  font-weight: 750;
+  text-decoration: none;
+}
+.club-battles-entry button { margin-top: 24px; }
+.club-battles-entry .club-battle-primary,
+.club-battle-room-actions .club-battle-primary { color: white; border-color: var(--app-accent); background: var(--app-accent); }
+.club-battles :is(a, button, input, select):focus-visible { outline: 2px solid var(--app-accent); outline-offset: 3px; }
+.club-battles button:disabled { opacity: .6; cursor: wait; }
+.club-battle-alert { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; margin-bottom: 22px; border: 1px solid #d87d68; border-radius: 10px; color: var(--app-text); }
+.club-battle-alert p { margin: 0; }
+.club-battle-alert button { min-height: 40px; padding: 6px 10px; color: var(--app-text); }
+.club-battle-notice { color: var(--app-accent-text); }
+.club-battle-room-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.club-battle-room-heading h2 { margin: 5px 0; }
+.club-battle-room-heading p:last-child { margin: 0; color: var(--app-muted); }
+.club-battle-status { margin: 0; color: var(--app-accent-text); font-size: 14px; font-weight: 750; }
+.club-battle-timer { display: inline-flex; align-items: center; gap: 8px; font: 800 32px/1 var(--study-mono); font-variant-numeric: tabular-nums; }
+.club-battle-outcome { font-size: 27px; }
+.club-battle-outcome[data-result='win'] { color: var(--ok); }
+.club-battle-players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 26px 0; }
+.club-battle-players > div { display: flex; justify-content: space-between; gap: 14px; padding: 18px 20px; border: 1px solid var(--app-hairline); border-radius: 11px; }
+.club-battle-players span { color: var(--app-muted); }
+.club-battle-invite { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid var(--app-hairline); }
+.club-battle-invite strong { margin-left: 10px; font-family: var(--study-mono); letter-spacing: .08em; }
+.club-battle-room-actions { display: flex; gap: 10px; }
+.club-battle-note { margin-bottom: 0; color: var(--app-muted); font-size: 13px; }
+.club-battles-history { margin-top: 48px; }
+.club-battles-history h2 { font-size: 22px; }
+.club-battles-history ul { list-style: none; padding: 0; border-top: 1px solid var(--app-hairline); }
+.club-battles-history li { border-bottom: 1px solid var(--app-hairline); }
+.club-battles-history button { display: flex; align-items: center; width: 100%; min-height: 64px; gap: 16px; color: var(--app-text); text-align: left; }
+.club-battles-history button > span { flex: 1; }
+.club-battles-history small { color: var(--app-muted); }
+@media (max-width: 760px) {
+  .club-battles-entry { grid-template-columns: minmax(0, 1fr); }
+  .club-battle-room-heading { align-items: flex-start; flex-wrap: wrap; }
+}
+@media (max-width: 520px) {
+  .club-battles-inner { width: min(100% - 32px, 1160px); }
+  .club-battles-heading { margin: 22px 0 28px; }
+  .club-battles-heading > p { font-size: 15px; }
+  .club-battle-players { grid-template-columns: minmax(0, 1fr); }
+  .club-battle-invite { align-items: flex-start; flex-direction: column; }
+  .club-battles-history button { flex-wrap: wrap; }
+}

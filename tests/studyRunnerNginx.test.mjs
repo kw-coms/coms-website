@@ -33,6 +33,13 @@ for (const part of [
   /security-headers-common\.conf/, /proxy_hide_header X-Content-Type-Options/,
 ]) assert.match(run, part)
 assert.match(block('location @study_unauthorized {'), /return 401 .*"error":"unauthorized".*messageKo/)
+const club = block('location = /study/api/club {')
+for (const part of [
+  /limit_req zone=study_club_ip\b/, /limit_req zone=study_club\b/, /auth_request \/lab\/_auth;/,
+  /auth_request_set \$club_client \$upstream_http_x_member_id;/, /proxy_set_header X-Runner-Client \$club_client;/,
+  /proxy_pass http:\/\/unix:\/run\/coms-study\/run\.sock:\/study\/api\/club;/,
+]) assert.match(club, part)
+assert.doesNotMatch(club, /limit_req zone=study_pre/)
 assert.match(block('location @study_rate_limited {'), /return 429 .*"error":"rate-limited".*messageKo/)
 for (const named of ['location @study_unauthorized {', 'location @study_rate_limited {', 'location ^~ /study/api/ {']) {
   assert.match(block(named), /security-headers-common\.conf/, `${named} sends the shared security headers (nosniff, HSTS)`)

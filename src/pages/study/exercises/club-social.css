@@ -1,0 +1,49 @@
+.club-sets-page, .club-vote { --club-line: var(--app-hairline); color: var(--app-text); }
+.club-sets-inner { width: min(100% - 40px, 1180px); margin-inline: auto; padding: 44px 0 72px; }
+.club-sets-page :is(a, button, input, select):focus-visible, .club-vote :is(button, select):focus-visible { outline: 2px solid var(--app-accent); outline-offset: 3px; }
+.club-sets-back { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; text-decoration: none; }
+.club-sets-heading { margin: 30px 0 34px; }
+.club-sets-heading p, .club-sets-editor > p, .club-sets-list > p { color: var(--app-muted); }
+.club-sets-grid { display: grid; grid-template-columns: minmax(230px, 310px) minmax(0, 1fr); gap: 28px; align-items: start; }
+.club-sets-list, .club-sets-editor, .club-vote { border: 1px solid var(--club-line); border-radius: 18px; background: var(--app-surface); }
+.club-sets-list { padding: 22px; }
+.club-sets-list-title { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.club-sets-list-title h2, .club-sets-editor h2 { margin: 0; font-size: 22px; }
+.club-sets-list ul, .club-sets-problems { list-style: none; margin: 18px 0 0; padding: 0; }
+.club-sets-list li + li { border-top: 1px solid var(--club-line); }
+.club-sets-list li button { display: grid; width: 100%; gap: 3px; justify-content: stretch; justify-items: start; padding: 12px 4px; text-align: left; background: transparent; border: 0; border-radius: 8px; cursor: pointer; color: var(--app-text); }
+.club-sets-list li button[aria-current] { color: var(--app-accent-text); }
+.club-sets-list li small { color: var(--app-muted); }
+.club-sets-editor { padding: clamp(20px, 3vw, 32px); }
+.club-sets-editor label { display: grid; gap: 7px; margin-top: 20px; font-size: 14px; font-weight: 700; }
+.club-sets-editor input:not([type='checkbox']) { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--club-line); border-radius: 9px; background: var(--app-surface-soft); color: var(--app-text); }
+.club-sets-add { display: flex; align-items: end; gap: 10px; }
+.club-sets-add label { flex: 1; }
+.club-sets-editor .club-sets-share { display: flex; align-items: center; gap: 9px; font-weight: 550; }
+.club-sets-editor h3 { margin: 30px 0 0; font-size: 16px; }
+.club-sets-problems { border-top: 1px solid var(--club-line); }
+.club-sets-problems li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; border-bottom: 1px solid var(--club-line); }
+.club-sets-problems a { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; text-decoration: none; }
+.club-sets-problems a span { color: var(--app-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.club-sets-problems a strong { font-size: 15px; }
+.club-sets-page button, .club-vote button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--club-line); border-radius: 9px; background: var(--app-surface-soft); color: var(--app-text); cursor: pointer; font-weight: 650; }
+.club-sets-page button:hover:not(:disabled), .club-vote button:hover:not(:disabled) { border-color: var(--app-accent-border); background: var(--app-accent-soft); }
+.club-sets-page button:disabled, .club-vote button:disabled { opacity: .55; cursor: default; }
+.club-sets-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.club-sets-actions .club-sets-primary, .club-vote-form button { background: var(--app-accent); color: white; border-color: var(--app-accent); }
+.club-sets-copy { margin-top: 12px; }
+.club-sets-page [role='alert'], .club-vote [role='alert'] { color: #e76c6c; }
+
+.club-vote { margin-top: 26px; padding: 22px; }
+.club-vote-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.club-vote-head h2 { margin: 0; font-size: 20px; }
+.club-vote-head p, .club-vote > p { margin: 8px 0; color: var(--app-muted); font-size: 14px; }
+.club-vote-form { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.club-vote-form label { display: grid; flex: 1 1 190px; gap: 6px; font-size: 13px; font-weight: 650; }
+.club-vote-form select { min-height: 40px; padding: 8px 11px; border: 1px solid var(--club-line); border-radius: 9px; background: var(--app-surface-soft); color: var(--app-text); }
+@media (max-width: 720px) {
+  .club-sets-inner { width: min(100% - 28px, 1180px); }
+  .club-sets-grid { grid-template-columns: 1fr; gap: 16px; }
+  .club-sets-list { padding: 16px; }
+  .club-sets-editor { padding: 18px; }
+}
