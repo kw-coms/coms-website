@@ -108,14 +108,7 @@ jobs:
         run: REQUIRE_DIST=1 node --import tsx tests/backdropFilterBuild.test.mjs
 
       - name: Install Playwright browser
-        run: |
-          # Retain calibrated CJK fonts when a package mirror is unavailable.
-          if [ -f /etc/apt/apt-mirrors.txt ]; then
-            printf '%s\tpriority:1\n%s\tpriority:2\n' 'https://mirrors.edge.kernel.org/ubuntu/' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
-          fi
-          fc-match :lang=ko
-          npx playwright install --with-deps chromium
-          fc-match :lang=ko
+        run: bash scripts/ci-install-chromium.sh
 
       - name: Smoke test
         run: npm run smoke
@@ -497,11 +490,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser for the stack e2e
-        run: |
-          if [ -f /etc/apt/apt-mirrors.txt ]; then
-            printf '%s\tpriority:1\n%s\tpriority:2\n' 'https://mirrors.edge.kernel.org/ubuntu/' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
-          fi
-          npx playwright install --with-deps chromium
+        run: bash scripts/ci-install-chromium.sh
 
       # "직접 해보기" in a real browser against the real frontend container, backend and runner (nothing mocked).
       # The runner allows a member ten runs a minute and the step above used them up: start a fresh minute.
@@ -602,11 +591,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: |
-          if [ -f /etc/apt/apt-mirrors.txt ]; then
-            printf '%s\tpriority:1\n%s\tpriority:2\n' 'https://mirrors.edge.kernel.org/ubuntu/' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
-          fi
-          npx playwright install --with-deps chromium
+        run: bash scripts/ci-install-chromium.sh
 
       - name: Backend-auth e2e
         run: npm run test:e2e:backend
