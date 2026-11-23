@@ -2,17 +2,17 @@ import { useEffect, useRef } from 'react'
 import { hexToRgb, mixHex, normalizeHex } from '../../utils/themeColors'
 import { SCREEN_ON_EVENT, type ScreenOnDetail } from '../../utils/screenOn'
 import { getPerfState, subscribePerf } from '../../utils/perfMode'
+import { CIRCUIT_LIFETIME, createCircuitTrace, paintCircuitTrace, type CircuitTrace } from './heroCircuit'
 
 /**
  * The home hero's backdrop: the screen's own pixel grid, kept alive. Every few seconds a
  * band of light crosses the dots on a diagonal, a slow swell drifts under it, short signals
- * run along the rows and columns like traffic on a board, and the dots near the pointer
- * brighten. When the boot intro switches the screen on (ComsIntro fires SCREEN_ON_EVENT) the
+ * run along the rows and columns like traffic on a board, and the pointer sends short
+ * currents around grid-aligned turns. When the intro switches the screen on, the
  * grid flares once from that line and settles.
  *
  * Decorative only: aria-hidden, no pointer events, and it stops drawing while the hero is
- * off screen. Under reduced motion nothing plays by itself: the grid is still, it answers the
- * pointer with light, and it glows once when the screen comes on.
+ * off screen. Reduced motion and lite mode keep the grid still.
  */
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
@@ -28,6 +28,8 @@ const SURGE = 1500 // ms the switch-on flare takes to settle
 const SWEEP_EVERY = 14000 // ms between the bands of light that cross the grid
 const SWEEP_TIME = 5200 // ms one crossing takes
 const SWEEP_WIDTH = 150 // px, half the band
+const TRACE_INTERVAL = 68
+const MAX_TRACES = 4
 
 type Signal = { path: Int32Array; born: number; speed: number }
 
@@ -41,10 +43,12 @@ export default function HeroField() {
 
     // Lite mode (no hardware graphics acceleration) holds the grid still, like reduced motion,
     // and also stops answering the pointer. It can switch on while the page is open.
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    let lite = getPerfState().mode === 'lite'
-    let calm = reduced || lite
+    const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const needsStillGrid = () => motionPreference.matches || getPerfState().mode === 'lite'
+    let calm = needsStillGrid()
     const root = document.documentElement
+    const usesCircuits = () => typeof Path2D !== 'undefined'
+      && (root.dataset.appearanceTheme ?? 'standard') === 'standard'
 
     // Colours follow the live theme: pale dots on the dark stage, ink dots on the light one,
     // and the accent for whatever is lit.
@@ -108,13 +112,23 @@ export default function HeroField() {
     let still: HTMLCanvasElement | null = null
     let rate = 1
     const signals: Signal[] = []
+    const circuits: CircuitTrace[] = []
     let nextSignal = 0
+    let circuitAnchor: readonly [number, number] | null = null
+    let lastCircuitAt = -Infinity
+
+    const clearCircuits = () => {
+      circuits.length = 0
+      circuitAnchor = null
+      lastCircuitAt = -Infinity
+    }
 
     const build = () => {
       W = canvas.clientWidth
       H = canvas.clientHeight
       // Signals are stored as cell indices, which mean nothing on a grid of another size.
       signals.length = 0
+      clearCircuits()
       if (W < 2 || H < 2) return
       // The dots are a pixel or two across, so a sharper bitmap than this only costs fill rate.
       const dpr = Math.min(1.5, window.devicePixelRatio || 1)
@@ -211,11 +225,11 @@ export default function HeroField() {
 
     const frame = (now: number) => {
       raf = 0
-      if (!visible) {
+      if (!visible || document.hidden) {
         running = false
         return
       }
-      const lively = !halved && (surgeAt >= 0 || nearTarget === 1 || near > 0.01)
+      const lively = !halved && (surgeAt >= 0 || nearTarget === 1 || near > 0.01 || circuits.length > 0)
       if (now - drawnAt < (lively ? 12 : 30)) {
         raf = requestAnimationFrame(frame)
         return
@@ -334,6 +348,11 @@ export default function HeroField() {
         }
       }
       ctx.globalAlpha = 1
+      for (let i = circuits.length - 1; i >= 0; i--) {
+        const trace = circuits[i]
+        if (now - trace.born >= CIRCUIT_LIFETIME) circuits.splice(i, 1)
+        else paintCircuitTrace(ctx, trace, now, step, lit, hot)
+      }
       cost += (performance.now() - began - cost) * 0.08
       if (cost > 7) halved = true
 
@@ -345,7 +364,7 @@ export default function HeroField() {
       raf = requestAnimationFrame(frame)
     }
     const kick = () => {
-      if (running || !visible) return
+      if (running || !visible || document.hidden) return
       running = true
       raf = requestAnimationFrame(frame)
     }
@@ -354,8 +373,25 @@ export default function HeroField() {
     build()
     kick()
 
+    const emitCircuit = (now: number) => {
+      if (!usesCircuits() || cols < 2 || rows < 2 || now - lastCircuitAt < TRACE_INTERVAL) return
+      const col = Math.max(0, Math.min(cols - 1, Math.round((tx - ox) / step)))
+      const row = Math.max(0, Math.min(rows - 1, Math.round((ty - oy) / step)))
+      const cell = [col, row] as const
+      // The first movement enters from the edge nearest the pointer.
+      const start = circuitAnchor ?? [Math.max(0, Math.min(cols - 1, col + (col >= cols / 2 ? 4 : -4))), row]
+      if (Math.abs(start[0] - col) + Math.abs(start[1] - row) < 2) {
+        circuitAnchor ??= cell
+        return
+      }
+      circuitAnchor = cell
+      lastCircuitAt = now
+      if (circuits.length >= MAX_TRACES) circuits.shift()
+      circuits.push(createCircuitTrace(start, cell, [cols, rows], step, [ox, oy], now))
+    }
+
     const onPointer = (event: PointerEvent) => {
-      if (event.pointerType === 'touch' || lite) return
+      if (event.pointerType === 'touch' || calm || !visible || document.hidden) return
       const rect = canvas.getBoundingClientRect()
       tx = event.clientX - rect.left
       ty = event.clientY - rect.top
@@ -365,13 +401,17 @@ export default function HeroField() {
         py = ty
       }
       nearTarget = inside ? 1 : 0
-      if (inside) kick()
+      if (inside) {
+        emitCircuit(performance.now())
+        kick()
+      } else circuitAnchor = null
     }
     const onPointerGone = () => {
       nearTarget = 0
+      circuitAnchor = null
     }
     const onScreenOn = (event: Event) => {
-      if (lite) return
+      if (calm || !visible || document.hidden) return
       const y = (event as CustomEvent<ScreenOnDetail>).detail?.y
       const rect = canvas.getBoundingClientRect()
       surgeY = typeof y === 'number' ? y - rect.top : rect.height / 2
@@ -384,20 +424,35 @@ export default function HeroField() {
       kick()
     }
 
-    const unsubscribePerf = subscribePerf(() => {
-      lite = getPerfState().mode === 'lite'
-      calm = reduced || lite
-      if (lite) {
+    const syncMotion = () => {
+      calm = needsStillGrid()
+      if (calm) {
+        near = 0
         nearTarget = 0
         surgeAt = -1
+        clearCircuits()
       }
       kick()
-    })
+    }
+    const unsubscribePerf = subscribePerf(syncMotion)
+    const syncVisibility = () => {
+      if (visible && !document.hidden) kick()
+      else {
+        cancelAnimationFrame(raf)
+        raf = 0
+        running = false
+        near = 0
+        nearTarget = 0
+        clearCircuits()
+      }
+    }
 
     window.addEventListener('pointermove', onPointer, { passive: true })
     document.documentElement.addEventListener('pointerleave', onPointerGone)
     window.addEventListener('blur', onPointerGone)
     window.addEventListener(SCREEN_ON_EVENT, onScreenOn)
+    motionPreference.addEventListener('change', syncMotion)
+    document.addEventListener('visibilitychange', syncVisibility)
     const sizes =
       typeof ResizeObserver === 'undefined'
         ? null
@@ -406,12 +461,13 @@ export default function HeroField() {
           })
     sizes?.observe(canvas)
     const themes = new MutationObserver(() => {
+      if (circuits.length > 0 && !usesCircuits()) clearCircuits()
       if (themeKeyNow() !== themeKey) refresh()
     })
-    themes.observe(root, { attributes: true, attributeFilter: ['data-theme-mode', 'style'] })
+    themes.observe(root, { attributes: true, attributeFilter: ['data-appearance-theme', 'data-theme-mode', 'style'] })
     const views = new IntersectionObserver((entries) => {
       visible = entries.some((entry) => entry.isIntersecting)
-      if (visible) kick()
+      syncVisibility()
     })
     views.observe(canvas)
 
@@ -421,6 +477,8 @@ export default function HeroField() {
       document.documentElement.removeEventListener('pointerleave', onPointerGone)
       window.removeEventListener('blur', onPointerGone)
       window.removeEventListener(SCREEN_ON_EVENT, onScreenOn)
+      motionPreference.removeEventListener('change', syncMotion)
+      document.removeEventListener('visibilitychange', syncVisibility)
       unsubscribePerf()
       sizes?.disconnect()
       themes.disconnect()

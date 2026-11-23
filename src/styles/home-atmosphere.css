@@ -255,6 +255,23 @@
 	background: radial-gradient(circle, var(--tex) 1px, transparent 1.5px) 0 0 / 28px 28px;
 }
 
+.scene-bg__logo,
+.scene-divider__signal {
+	display: none;
+}
+
+:root:not([data-appearance-theme='terminal'], [data-appearance-theme='retro'], [data-appearance-theme='blueprint']) .scene-bg__logo {
+	position: absolute;
+	top: clamp(9rem, 24vh, 16rem);
+	right: clamp(1.5rem, 12vw, 13rem);
+	display: block;
+	width: clamp(7rem, 23vw, 20rem);
+	aspect-ratio: 333 / 368;
+	background: var(--app-text);
+	mask: var(--scene-logo) center / contain no-repeat;
+	opacity: 0.085;
+}
+
 .scene-bg--activities .scene-bg__tex {
 	background: repeating-linear-gradient(135deg, var(--tex) 0 1px, transparent 1px 16px);
 }
@@ -371,6 +388,44 @@
 	:root:not([data-perf='lite']) .cine-ready .scene-divider.is-revealed::after {
 		transform-origin: calc(50% - var(--dir) * 50%) center;
 		animation: chapter-divider-entry 360ms var(--cine-ease) both;
+	}
+
+	:root:not([data-perf='lite'], [data-appearance-theme='terminal'], [data-appearance-theme='retro'], [data-appearance-theme='blueprint']) {
+		& .cine-ready .scene-divider.is-onscreen .scene-divider__signal {
+			position: absolute;
+			z-index: 1;
+			inset: 0 0 auto;
+			display: block;
+			height: 2px;
+			transform: translateX(calc((var(--p, 0) - 1) * 100% * var(--dir))) scaleX(var(--dir));
+			opacity: min(1, var(--p, 0) * 9, (1 - var(--p, 0)) * 9);
+			pointer-events: none;
+			background:
+				linear-gradient(90deg, transparent, var(--app-text)) right center / 5px 2px no-repeat,
+				linear-gradient(90deg, transparent, var(--app-accent), var(--app-accent-text)) right center / clamp(3rem, 17vw, 13rem) 2px no-repeat;
+		}
+
+		& .scene-about.is-onscreen .scene-bg__tex {
+			inset-block: -2.5rem;
+			transform: translateY(calc((0.5 - var(--p, 0.5)) * 4rem));
+		}
+
+		& .scene-about.is-onscreen .scene-bg__logo {
+			transform: translate3d(0, calc((0.5 - var(--p, 0.5)) * 16vh), 0)
+				scale(calc(1.04 - var(--p, 0.5) * 0.08));
+		}
+
+		& .scene-activities :is(.coms-mini-chip, .coms-mini-rail i) {
+			animation: none;
+		}
+
+		& .cine-ready .scene-activities .scene-frame__media.is-revealed .coms-mini-rail i {
+			animation: coms-rail 1050ms linear 250ms 1 both;
+		}
+
+		& .cine-ready .scene-activities .scene-frame__media.is-revealed .coms-mini-chip {
+			animation: coms-node 480ms ease-in-out calc(250ms + var(--i) * 345ms) 1 both;
+		}
 	}
 
 	:root:not([data-perf='lite'], [data-appearance-theme='retro']) .cine-ready .scene.is-onscreen > .scene-bg::after {
