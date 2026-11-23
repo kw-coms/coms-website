@@ -247,6 +247,30 @@
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 }
+/* Let adjacent one-project categories share a row while retaining their headings. */
+@media (min-width: 641px) {
+	:root[data-appearance-theme='standard'] .apps-catalog {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 44px 12px;
+	}
+	:root[data-appearance-theme='standard'] .apps-catalog > .apps-group {
+		grid-column: 1 / -1;
+		min-width: 0;
+		margin-top: 0;
+	}
+	:root[data-appearance-theme='standard'] .apps-catalog > .apps-group[data-single-project] {
+		grid-column: auto;
+	}
+	:root[data-appearance-theme='standard'] .apps-group[data-single-project] .apps-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+@media (min-width: 1024px) {
+	:root[data-appearance-theme='standard'] .apps-catalog {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
 
 /* ---- Apps: one card --------------------------------------------------------------- */
 .apple-product-panel.app-card {

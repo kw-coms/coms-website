@@ -151,9 +151,9 @@ function ViewerProjects({ user }) {
                 <button type="button" onClick={() => { setQuery(''); setFilter('all') }} className="apple-action-secondary min-h-11 px-4 text-sm">검색 지우기</button>
               </div>
             )}
-            <div className={`mt-8${projects.some((project) => project.files?.length) ? ' apps-has-files' : ''}`}>
+            <div className={`apps-catalog mt-8${projects.some((project) => project.files?.length) ? ' apps-has-files' : ''}`}>
               {shown.map((group) => (
-                <section key={group.key} className="apps-group">
+                <section key={group.key} className="apps-group" data-single-project={group.projects.length === 1 || undefined}>
                   <div className="apps-group-head">
                     <h2>{group.name}</h2>
                     <span>{group.projects.length}개</span>

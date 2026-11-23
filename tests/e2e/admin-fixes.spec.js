@@ -29,6 +29,10 @@ test.describe('operator panel', () => {
       await expect(list.getByRole('tab')).toHaveText(tabs)
     }
     await expect(nav.getByRole('tab')).toHaveCount(22)
+    await expect(nav).toHaveCSS('overflow-y', 'auto')
+    const logs = nav.getByRole('tab', { name: '로그' })
+    await logs.scrollIntoViewIfNeeded()
+    await expect(logs).toBeInViewport({ ratio: 1 })
   })
 
   test('an officer sees only the headings that still hold a permitted tab', async ({ page }) => {

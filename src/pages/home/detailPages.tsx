@@ -1,9 +1,8 @@
 import PageHeading from '../../components/PageHeading'
 import { useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookOpen, Check, Code2, GitPullRequest, type LucideIcon } from 'lucide-react'
 import {
-  aboutDetailCards,
   aboutDetailPrinciples,
   activitiesDetailCards,
   activitiesDetailFlow,
@@ -22,38 +21,71 @@ import { usePermissions } from '../../contexts/usePermissions'
 import { canManageContent } from '../../utils/roleAccess'
 import { useScrollReveal } from '../../hooks/useScrollReveal'
 import '../../styles/site-pages.css'
-import { ClubOsVisual, LearningStackVisual, ProjectLabVisual } from './HomeVisuals'
+import ClubWorkFeature from './ClubWorkFeature'
+import { LearningStackVisual, ProjectLabVisual } from './HomeVisuals'
 
 const DETAIL_TITLE_MIN_FIT = 0.74
 
+const ABOUT_ACTIVITIES = [
+  { title: '세미나와 스터디', body: '프로그래밍 기초부터 웹 개발, 알고리즘, Arduino까지 함께 실습합니다.', to: '/activities', label: '활동 살펴보기', icon: BookOpen },
+  { title: '팀 프로젝트와 해커톤', body: '주제를 정하고 역할을 나눠 웹 서비스, 앱, 실습 도구를 만듭니다.', to: '/projects', label: '프로젝트 살펴보기', icon: Code2 },
+  { title: '코드 리뷰와 공유', body: '서로의 코드를 읽고 배운 점을 정리합니다. 완성한 결과물은 부원 작품에서 볼 수 있습니다.', to: '/apps', label: '부원 작품 보기', icon: GitPullRequest },
+]
+
 export function AboutPage() {
   return (
-    <DetailStoryPage
-      title="함께 배우고, 바로 만듭니다."
-      body="COM's는 광운대학교 학생들이 컴퓨터와 소프트웨어를 함께 공부하고, 실제 프로젝트로 연결하는 중앙 컴퓨터 학술동아리입니다."
-      visual={<ClubOsVisual title="Club OS" subtitle="Study · Build · Share" rows={['학습 로드맵', '프로젝트 트랙', '커뮤니티 로그']} />}
-      cardsTitle="공부하고, 만들고, 나눕니다."
-      cards={aboutDetailCards}
-      outputsTitle="COM's가 오래 가져가는 태도."
-      outputsBody="잘하는 사람만 모이는 곳보다, 함께 성장하는 방식을 계속 만드는 곳을 지향합니다."
-      outputs={aboutDetailPrinciples}
-      lead={<section className="coms-sec coms-sec-top" aria-labelledby="about-first-visit">
-        <div className="coms-sec-inner grid gap-6 md:grid-cols-[0.85fr_1fr]">
-          <div>
-            <h2 id="about-first-visit" className="coms-title">처음 오셨다면</h2>
-            <p className="coms-lede">관심 분야가 막 생겼다면 공개 스터디부터 둘러보세요. 스터디에서 다룬 주제를 팀 프로젝트와 해커톤에서 직접 만들어 볼 수 있습니다.</p>
+    <div className="about-story apple-detail-page theme-home">
+      <main className="about-story__main apple-detail-main">
+        <section className="about-story__hero">
+          <div className="about-story__inner about-story__hero-grid">
+            <div className="about-story__intro">
+              <PageHeading className="about-story__title"><span>함께 배우고,</span>{' '}<span>바로 만듭니다.</span></PageHeading>
+              <p>COM’s는 광운대학교 중앙 컴퓨터 학술동아리입니다. 관심 있는 주제를 함께 공부하고, 배운 내용을 실제로 쓸 수 있는 프로젝트로 만듭니다.</p>
+              <Link to="/recruit" className="apple-action-primary about-story__button">지원하기 <ArrowRight size={17} aria-hidden="true" /></Link>
+            </div>
+            <section className="about-story__activities" aria-labelledby="about-activities">
+              <h2 id="about-activities">COM’s에서 하는 일</h2>
+              <ol role="list">
+                {ABOUT_ACTIVITIES.map(({ title, body, to, label, icon: Icon }) => (
+                  <li key={to}>
+                    <Icon size={22} aria-hidden="true" />
+                    <div>
+                      <h3>{title}</h3>
+                      <p>{body}</p>
+                      <Link to={to}>{label} <ArrowRight size={14} aria-hidden="true" /></Link>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
           </div>
-          <ul className="grid gap-3 self-center">
-            {[{ to: '/study', title: '스터디 자료', body: '웹, Python, Arduino 등 관심 있는 주제부터 시작하세요.' },
-              { to: '/activities', title: '동아리 활동', body: '정기 세미나, 스터디, 코드 리뷰가 어떻게 이어지는지 확인하세요.' },
-              { to: '/apps', title: '부원 작품', body: '부원들이 기획하고 배포한 앱과 게임을 열어 보세요.' }].map(item => <li key={item.to}>
-              <Link to={item.to} className="block rounded-xl border border-[var(--app-hairline)] bg-[var(--app-surface)] p-4 hover:border-[var(--app-accent-text)]"><strong className="text-[var(--app-accent-text)]">{item.title}</strong><span className="mt-1 block text-sm leading-6 text-[var(--app-muted)]">{item.body}</span></Link>
-            </li>)}
-          </ul>
-        </div>
-      </section>}
-      nextSteps={[{ label: '지원하기', to: '/recruit' }, { label: '스터디 보기', to: '/study' }, { label: '협업 제안', to: '/contact' }]}
-    />
+        </section>
+
+        <section className="about-story__inner about-story__work" aria-labelledby="about-work">
+          <div>
+            <h2 id="about-work">코드로 LED에<br />불을 켜 보는 곳</h2>
+            <p>COM’s의 Circuit Lab에서는 아두이노에 저항과 LED를 연결하고, 작성한 코드를 실행해 회로가 어떻게 동작하는지 브라우저에서 확인할 수 있습니다.</p>
+          </div>
+          <ClubWorkFeature />
+        </section>
+
+        <section className="about-story__start" aria-labelledby="about-first-visit">
+          <div className="about-story__inner about-story__start-grid">
+            <div>
+              <h2 id="about-first-visit">처음 오셨다면</h2>
+              <p>공개 스터디 자료에서 관심 있는 주제를 하나 골라 첫 실습을 시작해 보세요.</p>
+              <Link to="/study" className="apple-action-secondary about-story__button">스터디 자료 열기 <ArrowRight size={17} aria-hidden="true" /></Link>
+            </div>
+            <ul aria-label="COM’s가 지향하는 방식">
+              {aboutDetailPrinciples.map(item => (
+                <li key={item}><Check size={19} aria-hidden="true" /><span>{item}</span></li>
+              ))}
+            </ul>
+          </div>
+        </section>
+        <NextSteps steps={[{ label: '지원하기', to: '/recruit' }, { label: '해커톤 아카이브', to: '/hackathon' }, { label: '협업 제안', to: '/contact' }]} />
+      </main>
+    </div>
   )
 }
 

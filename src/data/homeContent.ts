@@ -275,27 +275,6 @@ export const sectionStories = {
   },
 }
 
-export const aboutDetailCards = [
-  {
-    title: 'Study',
-    eyebrow: '기초에서 확장까지',
-    body: '처음 배우는 사람도 따라올 수 있도록 정기 세미나와 스터디를 운영하고, 각자의 속도에 맞춰 실습과 리뷰를 이어갑니다.',
-    icon: Binary,
-  },
-  {
-    title: 'Build',
-    eyebrow: '아이디어를 실제 결과물로',
-    body: '웹, 임베디드, 자동화, 동아리 서비스처럼 손에 잡히는 프로젝트를 기획하고 직접 구현합니다.',
-    icon: CircuitBoard,
-  },
-  {
-    title: 'Share',
-    eyebrow: '경험이 다음 사람에게',
-    body: '선후배가 배운 것과 시행착오를 공유하면서 커뮤니티 안에 오래 남는 학습 기록을 만듭니다.',
-    icon: Sparkles,
-  },
-]
-
 export const aboutDetailPrinciples = [
   '처음 시작하는 사람도 편하게 질문할 수 있는 분위기',
   '작게 만들고 빠르게 공유하며 개선하는 제작 문화',

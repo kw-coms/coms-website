@@ -11,7 +11,7 @@ export type SceneActions = {
 /** The slate in the corner of a scene: "SCENE 02 · ABOUT". Text is kept in its own case; CSS sets it in capitals. */
 export function Slate({ index, name }: { index: number; name: string }) {
   return (
-    <p className="cine-hud scene-slate" data-cine>
+    <p className="cine-hud scene-slate" data-cine aria-hidden="true">
       Scene {String(index).padStart(2, '0')} · {name}
     </p>
   )

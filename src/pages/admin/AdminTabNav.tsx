@@ -41,7 +41,7 @@ export default function AdminTabNav({ visibleTabs, activeId, onSelect }: {
   )
 
   return (
-    <nav aria-label="운영 패널 메뉴" data-testid="admin-nav" className="space-y-3 lg:sticky lg:top-24 lg:self-start">
+    <nav aria-label="운영 패널 메뉴" data-testid="admin-nav" className="space-y-3 lg:sticky lg:top-24 lg:max-h-[calc(100dvh-7rem)] lg:self-start lg:overflow-y-auto lg:p-1">
       {overview && <div role="tablist" aria-label="요약" className="flex flex-col">{renderTab(overview)}</div>}
 
       <div role="group" aria-label="운영 메뉴 분류" className="flex flex-wrap gap-2 lg:hidden">

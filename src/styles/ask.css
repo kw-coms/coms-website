@@ -80,6 +80,8 @@ body:has(.coms-tour, .coms-ask-backdrop[data-tour-preview='true'], .coms-quick, 
 .coms-ask-trigger:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
 
 @media (max-width: 639px) {
+  .coms-ask-trigger { padding: 0; }
+  .coms-ask-trigger span { display: none; }
   .coms-ask-panel { left: 1rem; right: 1rem; width: auto; }
 }
 

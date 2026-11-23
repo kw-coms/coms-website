@@ -119,12 +119,13 @@ test.describe('a visitor on the home page', () => {
     expect(await page.locator('.scene-about__pin .cine-w').count()).toBe(8)
   })
 
-  test('shows readable Korean activity cues without a processor pane in the default hero', async ({ page }) => {
+  test('shows Korean activity cues and a linked Circuit Lab example in the default hero', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/')
     const activities = page.getByRole('list', { name: '주요 활동' })
     await expect(activities).toBeVisible()
     await expect(activities.getByRole('listitem')).toHaveText(['정기 세미나', '팀 프로젝트', '부원 교류'])
+    await expect(page.locator('#opening').getByRole('link', { name: /Circuit Lab/ })).toHaveAttribute('href', '/lab/')
     await expect(page.locator('.scene-opening__art')).toBeHidden()
   })
 
@@ -178,25 +179,18 @@ test.describe('a visitor on the home page', () => {
     await expect(figure.locator('[aria-hidden]')).toHaveText('01')
   })
 
-  test('every divider band covers the full width at both ends of its travel', async ({ page }) => {
+  test('standard dividers are thin full-width rules without repeated chapter words', async ({ page }) => {
     for (const [width, height] of [[1440, 900], [390, 844], [1920, 1080]]) {
       await page.setViewportSize({ width, height })
       await page.goto('/')
-      await expect(page.locator('.scene-divider')).toHaveCount(5)
-      const gaps = await page.evaluate(() => {
-        const bad = []
-        for (const band of document.querySelectorAll('.scene-divider')) {
-          const text = band.querySelector('.scene-divider__text')
-          for (const p of [0, 1]) {
-            band.style.setProperty('--p', String(p))
-            const r = text.getBoundingClientRect()
-            if (r.left > 0.5 || r.right < window.innerWidth - 0.5) bad.push(`${text.dataset.t.slice(0, 8)} p=${p} ${Math.round(r.left)}..${Math.round(r.right)}`)
-          }
-          band.style.removeProperty('--p')
-        }
-        return bad
-      })
-      expect(gaps, `${width}px`).toEqual([])
+      const dividers = page.locator('.scene-divider')
+      await expect(dividers).toHaveCount(5)
+      await expect(dividers.first().locator('.scene-divider__text')).toBeHidden()
+      for (const divider of await dividers.all()) {
+        const bounds = await divider.boundingBox()
+        expect(bounds.width, `${width}px`).toBeGreaterThanOrEqual(width - 1)
+        expect(bounds.height).toBeLessThanOrEqual(3)
+      }
     }
   })
 
@@ -253,10 +247,11 @@ test.describe('a visitor on the home page', () => {
     await expect.poll(() => page.locator('#opening').evaluate((el) => el.style.getPropertyValue('--px'))).toBe('')
   })
 
-  test('has a divider band between scenes and a backdrop in each later scene', async ({ page }) => {
+  test('keeps each backdrop without displaying decorative chapter numbers', async ({ page }) => {
     await expect(page.locator('.scene-divider')).toHaveCount(5)
     for (const id of ['about', 'activities', 'projects', 'members', 'recruit']) {
-      await expect(page.locator(`#${id} .scene-bg__numeral`)).toHaveCount(1)
+      await expect(page.locator(`#${id} .scene-bg`)).toHaveCount(1)
+      await expect(page.locator(`#${id} .scene-bg__numeral`)).toBeHidden()
     }
   })
 
@@ -307,7 +302,8 @@ for (const [label, setup] of [
       expect(await page.locator('.scene-about__pin').evaluate((el) => getComputedStyle(el).position)).toBe('static')
       // Straight from load, without scrolling an inch: nothing is left transparent, clipped or lowered.
       expect(await hiddenTextElements(page)).toEqual([])
-      // The default opening has no illustration and suppresses the moving backdrop.
+      // The default opening shows a still preview and suppresses the moving backdrop.
+      await expect(page.locator('#opening').getByRole('link', { name: /Circuit Lab/ })).toBeVisible()
       await expect(page.locator('.scene-opening__art')).toBeHidden()
       await expect(page.locator('.cine-grain')).toBeHidden()
       await expect(page.locator('.scene-opening__floor')).toBeHidden()

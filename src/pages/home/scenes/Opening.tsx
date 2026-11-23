@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { AppWindow, ArrowRight, BookOpen, DraftingCompass, FileText, FolderOpen, Megaphone, Terminal } from 'lucide-react'
 import { experiencePills } from '../../../data/homeContent'
 import { SCREEN_ON_EVENT } from '../../../utils/screenOn'
+import ClubWorkFeature from '../ClubWorkFeature'
 import HeroField from '../HeroField'
 import { cssVars } from './cssVars'
 
@@ -9,8 +10,8 @@ const TICKER = Array.from({ length: 2 }, () => experiencePills.join('   ·   ') 
 
 type Props = {
   title: string
-  copy: string
-  semester: string
+  copy: string | null
+  semester: string | null
   noticeTitle: string | null
   onMore: () => void
   onApply: () => void
@@ -62,11 +63,13 @@ export default function Opening({ title, copy, semester, noticeTitle, onMore, on
           <span className="home-mode-bar__blueprint" aria-hidden="true"><DraftingCompass size={17} /> COM's 구조도</span>
         </div>
         <div className="scene-opening__copy">
-          <p className="cine-hud scene-opening__semester">{semester}</p>
+          {semester && <p className="cine-hud scene-opening__semester">{semester}</p>}
           <h1 ref={wordmarkRef} data-cine-hold className="cine-lines scene-wordmark" style={cssVars({ '--fit': fit })}>
             <span className="cine-m"><span>{title}</span></span>
           </h1>
-          <p className="scene-opening__lede">{copy}</p>
+          <p className="scene-opening__lede">
+            {copy ?? <><strong>배운 걸 직접 만들어 봅니다.</strong> 광운대학교 중앙 컴퓨터 학술동아리</>}
+          </p>
           <div className="scene-actions">
             <button type="button" onClick={onMore} className="apple-action-primary scene-btn">
               <span className="home-mode-prompt" aria-hidden="true">$</span>
@@ -91,6 +94,9 @@ export default function Opening({ title, copy, semester, noticeTitle, onMore, on
             <li>팀 프로젝트</li>
             <li>부원 교류</li>
           </ul>
+        </div>
+        <div className="scene-opening__feature">
+          <ClubWorkFeature priority />
         </div>
         <div className="scene-opening__art" aria-hidden="true">
           <div className="home-mode-terminal-output">

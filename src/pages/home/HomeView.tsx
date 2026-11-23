@@ -118,8 +118,8 @@ export default function HomeView() {
       <Opening
         key="opening"
         title={siteSettings.homeHeroTitle}
-        copy={siteSettings.homeHeroCopy}
-        semester={siteSettings.semesterLabel}
+        copy={siteSettings.homeHeroCopy === defaultSiteSettings.homeHeroCopy ? null : siteSettings.homeHeroCopy}
+        semester={siteSettings.semesterLabel === defaultSiteSettings.semesterLabel ? null : siteSettings.semesterLabel}
         noticeTitle={member ? latestNotice?.title ?? null : null}
         onMore={() => openPanel('about')}
         onApply={() => goPageTop('/recruit')}

@@ -4076,6 +4076,9 @@ test('apps page renders DB-driven club projects grouped by category', async ({ p
   await expect(attendCard.getByRole('link', { name: /다운로드/ })).toBeVisible()
   await expect(page.getByRole('status', { name: '검색 결과' })).toHaveText('2개')
   await expect(portalCard.getByRole('list', { name: '작품 반응' })).toBeVisible()
+  const [portalBox, attendBox] = await Promise.all([portalCard.boundingBox(), attendCard.boundingBox()])
+  expect(Math.abs(portalBox.y - attendBox.y)).toBeLessThanOrEqual(1)
+  expect(attendBox.x).toBeGreaterThan(portalBox.x)
 })
 
 test('apps page cards keep one size whatever the text length or section count', async ({ page }) => {
