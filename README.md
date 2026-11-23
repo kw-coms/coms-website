@@ -27,7 +27,7 @@
 
 <br/><br/>
 
-<img src="docs/images/home.png" alt="픽셀 배경 위의 COM's 워드마크와 동아리 소개·지원 버튼이 보이는 홈" width="100%" />
+<img src="docs/images/home.png" alt="가운데의 COM's 워드마크와 소개·지원 버튼, 오른쪽의 스크롤 진행 표시가 보이는 홈" width="100%" />
 
 </div>
 
@@ -264,6 +264,8 @@ npm ci && npm run dev          # 프론트엔드 → http://localhost:3000
 ```
 
 환경 변수, 테스트, Docker 실행, 배포, 운영 메모는 **[개발 가이드](docs/DEVELOPMENT.md)**에 정리되어 있습니다.
+
+후속 디자인 작업은 **[한눈에 보기 홈 인수인계](docs/design/specs/compact-home.md)**에서 이어갈 수 있습니다.
 
 - 브랜치·커밋 규칙과 올리기 전 검사: **[기여 안내](CONTRIBUTING.md)**
 - 보안 취약점은 공개 이슈 대신 **[보안 제보 안내](SECURITY.md)**를 따라 주세요.

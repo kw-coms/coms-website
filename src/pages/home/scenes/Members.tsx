@@ -54,7 +54,7 @@ export default function Members({ index, member, noticeTitle, onGo, backdrop }: 
             const Icon = HUB_ICONS[i % HUB_ICONS.length]
             return (
               <li key={item.title} data-cine={member ? undefined : ''} style={member ? undefined : cssVars({ '--i': i })}>
-                <article className="scene-hubcard" data-rule={member ? undefined : ''}>
+                <article className="scene-hubcard" data-rule>
                   {member ? <span className="scene-members__icon"><Icon size={19} aria-hidden="true" /></span> : <Icon size={20} aria-hidden="true" />}
                   <h3 className="scene-hubcard__title">
                     <button type="button" className="scene-hubcard__link" onClick={() => onGo(item.route)}>
