@@ -6,8 +6,7 @@ import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
 // depend on how fast the worker installs. The tour does not depend on the worker: keep it off here.
 test.use({ serviceWorkers: 'block' })
 
-// The site tour ("튜토리얼"): a guest tour and a member tour, each starting by itself once on
-// the home page and on request from the footer, quick jump and the mobile menu.
+// Members get a first-visit tour. Anyone can start a tour from the footer, quick jump or mobile menu.
 //
 // Self-starting is off in automated browsers (navigator.webdriver) so it cannot cover other
 // specs' pages; these tests switch it back on with the same localStorage key the app reads.
@@ -43,25 +42,23 @@ const homeSettled = async (page) => {
 const noHorizontalOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
 
 test.describe('starting', () => {
-  test('starts by itself on the first visit to "/", once', async ({ page }) => {
+  test('leaves the first guest visit clear and still opens from the footer', async ({ page }) => {
     await mockOptionalApis(page)
     await skipIntro(page)
     await forceAuto(page)
     await page.goto('/')
+    await homeSettled(page)
+    await neverAppears(page)
+    await footerStart(page).click()
     await expect(tour(page)).toBeVisible({ timeout: 10_000 })
     await expect(tour(page)).toContainText("COM's는 이런 동아리예요")
     await expect(tour(page)).toContainText('1 / 7')
     await page.keyboard.press('Escape')
     await expect(tour(page)).toHaveCount(0)
-
-    // A second visit (the flag is in localStorage) stays quiet.
-    await page.reload()
-    await homeSettled(page)
-    await neverAppears(page)
   })
 
   test('never starts by itself on a deep link', async ({ page }) => {
-    await mockOptionalApis(page)
+    await asMember(page)
     await skipIntro(page)
     await forceAuto(page)
     await page.goto('/about')
@@ -70,7 +67,7 @@ test.describe('starting', () => {
   })
 
   test('does not start by itself in an automated browser unless asked to', async ({ page }) => {
-    await mockOptionalApis(page)
+    await asMember(page)
     await skipIntro(page)
     await page.goto('/')
     await homeSettled(page)
@@ -78,7 +75,7 @@ test.describe('starting', () => {
   })
 
   test('self-start waits while a dialog is open, then starts', async ({ page }) => {
-    await mockOptionalApis(page)
+    await asMember(page)
     await skipIntro(page)
     await forceAuto(page)
     // A modal that is there from the first paint, as an open confirmation would be.
@@ -100,7 +97,7 @@ test.describe('starting', () => {
   })
 
   test('a reload does not start it again when localStorage cannot be written', async ({ page }) => {
-    await mockOptionalApis(page)
+    await asMember(page)
     await skipIntro(page)
     await forceAuto(page)
     await page.addInitScript(() => {

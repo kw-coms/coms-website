@@ -27,7 +27,7 @@
 
 <br/><br/>
 
-<img src="docs/images/home.png" alt="동아리 소개와 Circuit Lab LED 예제 회로가 함께 보이는 COM's 홈" width="100%" />
+<img src="docs/images/home.png" alt="픽셀 배경 위의 COM's 워드마크와 동아리 소개·지원 버튼이 보이는 홈" width="100%" />
 
 </div>
 
@@ -116,7 +116,7 @@ COM's는 광운대학교 학생들이 컴퓨터와 소프트웨어를 함께 공
 <details>
 <summary><b>📱 모바일 화면 보기</b></summary>
 <br/>
-<p align="center"><img src="docs/images/mobile-home.png" alt="모바일에서 동아리 소개와 Circuit Lab 예제가 보이는 COM's 홈" width="320" /></p>
+<p align="center"><img src="docs/images/mobile-home.png" alt="휴대전화에서 COM's 워드마크와 동아리 소개·지원 버튼이 보이는 홈" width="320" /></p>
 </details>
 
 <br/>

@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { onSceneFrame } from '../../../hooks/useSceneProgress'
 
 export type RailItem = { id: string; label: string }
 
-// The labeled chapter index follows the scene at the middle of a wide screen.
+// Keep the chapter index behind a single button and highlight the scene on screen.
 export default function SceneRail({ items, calm }: { items: RailItem[]; calm: boolean }) {
   const [active, setActive] = useState(items[0]?.id ?? '')
+  const [open, setOpen] = useState(false)
   const nav = useRef<HTMLElement | null>(null)
+  const trigger = useRef<HTMLButtonElement | null>(null)
+  const listId = useId()
   const key = items.map((item) => item.id).join('|')
 
   useEffect(() => {
@@ -36,13 +40,36 @@ export default function SceneRail({ items, calm }: { items: RailItem[]; calm: bo
     })
   }, [key])
 
+  useEffect(() => {
+    if (!open) return
+    const dismiss = (event: PointerEvent) => {
+      if (event.target instanceof Node && !nav.current?.contains(event.target)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', dismiss)
+    return () => document.removeEventListener('pointerdown', dismiss)
+  }, [open])
+
+  const close = () => {
+    setOpen(false)
+    trigger.current?.focus({ preventScroll: true })
+  }
+
   const go = (id: string) => {
+    close()
     document.getElementById(id)?.scrollIntoView({ behavior: calm ? 'instant' : 'smooth', block: 'start' })
   }
 
   return (
-    <nav ref={nav} className="scene-rail" aria-label="장면 이동">
-      <ol>
+    <nav ref={nav} className="scene-rail" aria-label="장면 이동" onKeyDown={(event) => {
+      if (event.key !== 'Escape' || !open) return
+      event.stopPropagation()
+      close()
+    }}>
+      <button ref={trigger} type="button" className="scene-rail__trigger" aria-controls={listId}
+        aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        홈 목차 <ChevronDown size={16} aria-hidden="true" />
+      </button>
+      <ol id={listId} hidden={!open}>
         {items.map((item) => (
           <li key={item.id}>
             <button

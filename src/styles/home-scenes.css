@@ -885,44 +885,65 @@
 }
 
 @media (min-width: 1024px) {
-	.scenes-main .scene {
-		padding-inline-end: max(var(--cine-pad), 8rem);
-	}
-
 	.scene-rail {
 		position: fixed;
-		top: 50%;
-		right: 0.85rem;
+		top: calc(var(--apple-nav-height, 44px) + 0.9rem);
+		right: 1.1rem;
 		z-index: 30;
 		display: block;
-		transform: translateY(-50%);
 	}
-	.scene-rail ol {
+	.scene-rail__trigger {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		min-height: 2.75rem;
+		padding: 0.45rem 0.75rem;
+		border: 1px solid var(--app-hairline-strong);
+		border-radius: 0.5rem;
+		background: var(--app-surface-elevated);
+		color: var(--app-text);
+		font: 650 0.8125rem/1.25 var(--apple-font-family);
+		cursor: pointer;
+	}
+	.scene-rail__trigger[aria-expanded='true'] svg {
+		transform: rotate(180deg);
+	}
+	.scene-rail ol:not([hidden]) {
+		position: absolute;
+		inset: calc(100% + 0.45rem) 0 auto auto;
 		display: grid;
-		gap: 0.28rem;
+		gap: 0.15rem;
+		width: 11.5rem;
+		max-height: calc(100dvh - var(--apple-nav-height, 44px) - 6rem);
 		margin: 0;
-		padding: 0;
+		padding: 0.35rem;
+		overflow-y: auto;
+		border: 1px solid var(--app-hairline-strong);
+		border-radius: 0.625rem;
+		background: var(--app-surface-elevated);
+		box-shadow: 0 16px 42px rgb(0 0 0 / 0.18);
 		list-style: none;
 	}
 	.scene-rail__item {
 		position: relative;
 		display: block;
-		width: 6.45rem;
-		min-height: 2.5rem;
-		padding: 0.42rem 0.52rem;
+		width: 100%;
+		min-height: 2.75rem;
+		padding: 0.45rem 0.65rem;
 		border: 1px solid transparent;
 		border-radius: 0.4rem;
-		background: color-mix(in srgb, var(--app-surface) 93%, transparent);
-		color: var(--app-muted);
-		font: 600 0.8125rem/1.2 var(--apple-font-family);
+		background: transparent;
+		color: var(--app-text);
+		font: 600 0.875rem/1.25 var(--apple-font-family);
 		text-align: left;
 		cursor: pointer;
 	}
 
+	.scene-rail__trigger:hover,
 	.scene-rail__item:hover,
 	.scene-rail__item[aria-current='true'] {
 		border-color: var(--app-hairline-strong);
-		background: var(--app-surface-elevated);
+		background: var(--app-surface-soft);
 		color: var(--app-text);
 	}
 
@@ -946,6 +967,7 @@
 		transform-origin: left;
 		transform: scaleX(var(--rail-p, 0));
 	}
+	.scene-rail__trigger:focus-visible,
 	.scene-rail__item:focus-visible {
 		outline: 2px solid var(--app-accent);
 		outline-offset: 2px;

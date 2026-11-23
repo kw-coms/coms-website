@@ -182,6 +182,7 @@ test('keyboard focus stays in the dialog and Escape restores the opener', async 
   await mockOptionalApis(page)
   await page.route('**/api/site-settings', (route) => route.fulfill({ json: { askEnabled: true } }))
   await page.goto('/about')
+  await expect(page.getByRole('button', { name: '로그인', exact: true })).toBeEnabled()
   const opener = page.getByRole('button', { name: '질문하기' })
   await opener.focus()
   await page.keyboard.press('Enter')

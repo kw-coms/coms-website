@@ -136,6 +136,7 @@ export default function HomeView() {
   return (
     <div className="theme-home cine-root scenes relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
       <div className="cine-grain" aria-hidden="true" />
+      <SceneRail items={railItems} calm={calm} />
       <main className="apple-home-main scenes-main relative overflow-x-clip">{order.map((key, i) => (
           <Fragment key={key}>
             {i > 0 && <Divider name={dividerNames[key]} dir={i % 2 ? 1 : -1} />}
@@ -143,7 +144,6 @@ export default function HomeView() {
           </Fragment>
         ))}
       </main>
-      <SceneRail items={railItems} calm={calm} />
     </div>
   )
 }

@@ -63,13 +63,27 @@ test.describe('a visitor on the home page', () => {
     }
   })
 
-  test('has a scene rail that scrolls to a scene', async ({ page }) => {
+  test('opens a compact home index, jumps to a scene, and dismisses', async ({ page }) => {
     const rail = page.getByRole('navigation', { name: '장면 이동' })
-    await expect(rail.getByRole('button')).toHaveCount(6)
-    await expect(rail.getByRole('button', { name: '프로젝트' })).toBeVisible()
-    await rail.getByRole('button', { name: '프로젝트' }).click()
+    const toggle = rail.getByRole('button', { name: '홈 목차' })
+    const list = rail.getByRole('list')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(list).toBeHidden()
+    await toggle.click()
+    await expect(list.getByRole('button')).toHaveCount(6)
+    await expect(list.getByRole('button', { name: '모집' })).toBeVisible()
+    await list.getByRole('button', { name: '프로젝트' }).click()
     await expect(page.locator('#projects')).toBeInViewport()
-    await expect(rail.getByRole('button', { name: '프로젝트' })).toHaveAttribute('aria-current', 'true')
+    await expect(list).toBeHidden()
+    await expect(toggle).toBeFocused()
+    await toggle.click()
+    await expect(list.getByRole('button', { name: '프로젝트' })).toHaveAttribute('aria-current', 'true')
+    await page.keyboard.press('Escape')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(toggle).toBeFocused()
+    await toggle.click()
+    await page.mouse.click(48, 180)
+    await expect(list).toBeHidden()
   })
 
   test('native wheel scroll reveals a chapter divider and a brief backdrop cue', async ({ page }) => {
@@ -88,11 +102,16 @@ test.describe('a visitor on the home page', () => {
     await expect.poll(() => backdrop.evaluate((el) => getComputedStyle(el, '::after').animationIterationCount)).toBe('1')
     await expect.poll(() => backdrop.evaluate((el) => getComputedStyle(el, '::after').opacity)).toBe('0')
 
-    const projects = page.getByRole('navigation', { name: '장면 이동' }).getByRole('button', { name: '프로젝트' })
+    const rail = page.getByRole('navigation', { name: '장면 이동' })
+    const toggle = rail.getByRole('button', { name: '홈 목차' })
+    await toggle.focus()
+    await page.keyboard.press('Enter')
+    const projects = rail.getByRole('button', { name: '프로젝트' })
     await projects.focus()
     await page.keyboard.press('Enter')
+    await expect(toggle).toBeFocused()
+    await page.keyboard.press('Enter')
     await expect(projects).toHaveAttribute('aria-current', 'true')
-    await expect(projects).toBeFocused()
 
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await expect.poll(() => divider.evaluate((el) => getComputedStyle(el, '::after').animationName)).toBe('none')
@@ -119,13 +138,16 @@ test.describe('a visitor on the home page', () => {
     expect(await page.locator('.scene-about__pin .cine-w').count()).toBe(8)
   })
 
-  test('shows Korean activity cues and a linked Circuit Lab example in the default hero', async ({ page }) => {
+  test('restores the original wordmark and wireframe accent with Korean activity cues', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/')
     const activities = page.getByRole('list', { name: '주요 활동' })
     await expect(activities).toBeVisible()
     await expect(activities.getByRole('listitem')).toHaveText(['정기 세미나', '팀 프로젝트', '부원 교류'])
-    await expect(page.locator('#opening').getByRole('link', { name: /Circuit Lab/ })).toHaveAttribute('href', '/lab/')
+    const opening = page.locator('#opening')
+    await expect(opening.getByRole('heading', { name: "COM's" })).toBeVisible()
+    await expect(opening.locator('.scene-opening__cube')).toBeVisible()
+    await expect(opening.getByRole('img')).toHaveCount(0)
     await expect(page.locator('.scene-opening__art')).toBeHidden()
   })
 
@@ -302,8 +324,9 @@ for (const [label, setup] of [
       expect(await page.locator('.scene-about__pin').evaluate((el) => getComputedStyle(el).position)).toBe('static')
       // Straight from load, without scrolling an inch: nothing is left transparent, clipped or lowered.
       expect(await hiddenTextElements(page)).toEqual([])
-      // The default opening shows a still preview and suppresses the moving backdrop.
-      await expect(page.locator('#opening').getByRole('link', { name: /Circuit Lab/ })).toBeVisible()
+      // The default opening keeps the wordmark and pauses the decorative effects.
+      await expect(page.locator('#opening').getByRole('heading', { name: "COM's" })).toBeVisible()
+      await expect(page.locator('.scene-opening__cube')).toBeHidden()
       await expect(page.locator('.scene-opening__art')).toBeHidden()
       await expect(page.locator('.cine-grain')).toBeHidden()
       await expect(page.locator('.scene-opening__floor')).toBeHidden()
@@ -355,7 +378,10 @@ for (const [width, height] of [[1440, 900], [1280, 720]]) {
       await skipIntro(page)
       await page.goto('/')
       const rail = page.getByRole('navigation', { name: '장면 이동' })
-      await expect(rail.getByRole('button')).toHaveCount(6)
+      await rail.getByRole('button', { name: '홈 목차' }).click()
+      const chapters = rail.getByRole('list').getByRole('button')
+      await expect(chapters).toHaveCount(6)
+      if (who === 'member') await expect(chapters.nth(1)).toHaveAccessibleName('오늘의 COM’s')
       const ids = await page.locator('main > section').evaluateAll((els) => els.map((el) => el.id))
       const total = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)
       const stops = []
@@ -372,7 +398,7 @@ for (const [width, height] of [[1440, 900], [1280, 720]]) {
         if (!expected) continue
         seen.add(expected)
         const index = ids.indexOf(expected)
-        await expect(rail.getByRole('button').nth(index), `y=${y} scene ${expected}`).toHaveAttribute('aria-current', 'true')
+        await expect(chapters.nth(index), `y=${y} scene ${expected}`).toHaveAttribute('aria-current', 'true')
         await expect(rail.locator('[aria-current="true"]')).toHaveCount(1)
       }
       expect([...seen].sort()).toEqual([...ids].sort())

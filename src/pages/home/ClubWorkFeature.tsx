@@ -1,13 +1,13 @@
 import { ArrowUpRight } from 'lucide-react'
 import circuitExample from '../../assets/circuit-lab-led-example.jpg'
 
-export default function ClubWorkFeature({ priority = false }: { priority?: boolean }) {
+export default function ClubWorkFeature() {
   return (
     <a href="/lab/" className="club-work-feature">
       <figure>
         <div className="club-work-feature__picture">
           <img src={circuitExample} alt="Circuit Lab의 아두이노와 브레드보드로 구성한 LED 예제 회로"
-            width={1152} height={591} loading={priority ? 'eager' : 'lazy'} decoding="async" />
+            width={1152} height={591} loading="lazy" decoding="async" />
         </div>
         <figcaption className="club-work-feature__caption">
           <div>

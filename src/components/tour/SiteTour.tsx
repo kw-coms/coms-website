@@ -38,9 +38,9 @@ const SETTLED_POLLS = 3
 const MANUAL_WAIT_POLLS = 40
 
 /**
- * Mounted once, outside the page's Suspense. Starts the tour by itself once for a first-time
- * visitor on "/" (a guest tour or a member tour, each remembered on its own), and on request
- * from the footer, quick jump and the mobile menu. It never opens over another dialog: it waits.
+ * Mounted once, outside the page's Suspense. Starts the member tour once on the home page.
+ * Visitors and members can also start their tour from the footer, quick jump or mobile menu.
+ * It waits for other dialogs to close first.
  */
 export default function SiteTour() {
   const { user, loading } = useAuth()
@@ -48,16 +48,16 @@ export default function SiteTour() {
   const [kind, setKind] = useState<TourKind | null>(null)
   const forWho: TourKind = user ? 'member' : 'guest'
 
-  // First visit: only on the home page, only once the intro and the hero have settled and
-  // nothing else is open. Deep links and every other page never start it.
+  // Let visitors browse the home page first. Only signed-in members get a first-visit tour,
+  // after the intro and hero settle on the home page and any dialog has closed.
   useEffect(() => {
-    if (loading || pathname !== '/' || !autoStartAllowed() || hasSeenTour(forWho)) return undefined
+    if (loading || forWho !== 'member' || pathname !== '/' || !autoStartAllowed() || hasSeenTour('member')) return undefined
     let settled = 0
     const id = window.setInterval(() => {
       settled = !homeStillSettling() && !blockingUiOpen() && document.visibilityState === 'visible' ? settled + 1 : 0
       if (settled < SETTLED_POLLS) return
       window.clearInterval(id)
-      setKind((current) => current ?? forWho)
+      setKind((current) => current ?? 'member')
     }, AUTO_POLL_MS)
     return () => window.clearInterval(id)
   }, [loading, pathname, forWho])
