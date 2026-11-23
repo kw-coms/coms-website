@@ -5,7 +5,8 @@
 }
 
 .judge-catalog .ex-container { max-width: 1320px; padding: 32px 28px 88px; }
-.judge-catalog-back { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.judge-catalog-back { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0 12px; }
+.judge-catalog-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0 12px; }
 .judge-catalog-back a { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; color: var(--app-muted); text-decoration: none; }
 .judge-catalog-back a:hover { color: var(--app-text); }
 

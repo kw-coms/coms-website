@@ -46,6 +46,10 @@
 .judge-editor-tools > strong { margin-inline-end: auto; font-size: 15px; }
 .judge-problem .judge-tools-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 6px 10px; border: 1px solid var(--app-hairline); border-radius: 9px; color: var(--app-text); font-size: 13px; font-weight: 650; text-decoration: none; }
 .judge-problem .judge-tools-link:hover { background: var(--app-surface-soft); }
+.judge-practice-tools { display: grid; gap: 16px; margin-top: 24px; }
+.judge-practice-tools > a { justify-self: start; }
+.judge-battle-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 14px 24px 0; padding: 12px 16px; border: 1px solid var(--app-accent-border); border-radius: 12px; background: var(--app-accent-soft); font-size: 14px; }
+.judge-battle-banner [role="timer"] { font-size: 20px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .judge-mobile-nav { display: none; }
 .judge-result-anchor { scroll-margin-top: 112px; }
 .judge-result-empty { margin: 18px 0 0; padding: 16px; border: 1px dashed var(--app-hairline); border-radius: 10px; color: var(--app-muted); font-size: 14px; }

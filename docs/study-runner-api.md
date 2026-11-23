@@ -53,6 +53,12 @@ Submit a numbered problem with `lang`, `code`, and an integer `problemNumber`. O
 
 Authenticated `GET /study/api/progress` returns `solved` (problem numbers), `solvedToday`, and `streak` for the authenticated member. Dates use Korean standard time. First solves are stored in the existing runner state volume. A numbered submission also returns the member's latest `progress`. The achievement-sharing control shares a summary and problem link.
 
+### Club problem features
+
+Authenticated `POST /study/api/club` accepts an `action` for private `battle-*` rooms, `sets-*` problem collections, and `vote-*` difficulty votes. nginx supplies the member identity. The runner stores room, collection, and vote state in its existing private state volume. Only the collection owner can edit sharing, and only members with a verified solve can vote on that problem.
+
+Attach a `battleCode` to a numbered submission to enter it in a live room. The runner checks the participant, problem number, and server receipt time before queuing. An accepted result records that receipt time for the room. A result from a submission received within the match can arrive during the settling window. Battle drafts stay separate from practice drafts.
+
 `scripts/gen-numbered-judge.mjs` regenerates the runner bank after edits to COM’s study problems. To refresh the archive, pass the trusted DailyCoding catalog module from [`2b4fe3c9`](https://github.com/choijunhuk/dailycoding-final/blob/2b4fe3c9e93f3b7a05a5a9da6c80c2603f37c323/dailycoding-server/src/shared/problemCatalog.js). The browser archive contains statements and public examples. The runner image carries the separate case bank. Repository readers can inspect the source cases, so the practice results are not an anti-cheat guarantee for contests.
 
 ### Errors

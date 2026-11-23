@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, CalendarDays, CalendarRange, RotateCcw, Settings2, Share2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarDays, CalendarRange, FolderOpen, RotateCcw, Settings2, Share2, Swords } from 'lucide-react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import MemberLock from '../../../components/MemberLock'
 import PageHeading from '../../../components/PageHeading'
@@ -88,7 +88,11 @@ export default function AlgorithmPage() {
     <div className="ex-container">
       <nav className="judge-catalog-back" aria-label="알고리즘 메뉴">
         <Link to="/study"><ArrowLeft size={16} aria-hidden="true" />스터디 자료</Link>
-        {user && <Link to="/study/algorithms/settings" state={{ from: location.pathname + location.search }}><Settings2 size={16} aria-hidden="true" />코딩 설정</Link>}
+        {user && <div className="judge-catalog-actions">
+          <Link to="/study/algorithms/battles"><Swords size={16} aria-hidden="true" />친선 배틀</Link>
+          <Link to="/study/algorithms/problem-sets"><FolderOpen size={16} aria-hidden="true" />문제집</Link>
+          <Link to="/study/algorithms/settings" state={{ from: location.pathname + location.search }}><Settings2 size={16} aria-hidden="true" />코딩 설정</Link>
+        </div>}
       </nav>
       <header className="judge-catalog-hero">
         <div>

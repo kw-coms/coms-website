@@ -147,3 +147,15 @@ test('signed out: the lesson shows the members-only guide and no runnable code',
   await expect(page.locator('.pg-stage')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /직접 해보기/ })).toHaveCount(0)
 })
+
+test('club API accepts the signed-in member and denies a guest', async ({ context }) => {
+  const data = { action: 'sets-list' }
+  const member = await context.request.post(`${FRONTEND}/study/api/club`, { data })
+  expect(member.status()).toBe(200)
+  expect((await member.json()).sets).toEqual(expect.any(Array))
+
+  await context.clearCookies()
+  const guest = await context.request.post(`${FRONTEND}/study/api/club`, { data })
+  expect(guest.status()).toBe(401)
+  expect((await guest.json()).error).toBe('unauthorized')
+})
