@@ -1,7 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { List } from 'lucide-react'
 import { onSceneFrame } from '../../../hooks/useSceneProgress'
-import { cssVars } from './cssVars'
 
 export type RailItem = { id: string; label: string }
 
@@ -15,7 +14,7 @@ export default function SceneRail({ items, calm }: { items: RailItem[]; calm: bo
   const listId = useId()
   const currentId = useId()
   const key = items.map((item) => item.id).join('|')
-  const activeLabel = items.find((item) => item.id === active)?.label
+  const activeIndex = items.findIndex((item) => item.id === active)
 
   useEffect(() => {
     // A scene is current while it holds the middle of the screen: the last scene whose top edge
@@ -65,8 +64,9 @@ export default function SceneRail({ items, calm }: { items: RailItem[]; calm: bo
     trigger.current?.focus({ preventScroll: true })
   }
 
-  const go = (id: string) => {
-    close()
+  const go = (id: string, fromMenu = false) => {
+    if (fromMenu) close()
+    else setOpen(false)
     document.getElementById(id)?.scrollIntoView({ behavior: calm ? 'instant' : 'smooth', block: 'start' })
   }
 
@@ -76,28 +76,39 @@ export default function SceneRail({ items, calm }: { items: RailItem[]; calm: bo
       event.stopPropagation()
       close()
     }}>
+      <ol className="scene-rail__markers" aria-label="홈 구간 바로가기">
+        {items.map((item, index) => (
+          <li key={item.id}>
+            <button
+              type="button"
+              className="scene-rail__marker"
+              aria-label={item.label}
+              aria-current={index === activeIndex ? 'true' : undefined}
+              data-passed={index < activeIndex ? '' : undefined}
+              onClick={() => go(item.id)}
+            >
+              <span aria-hidden="true" />
+            </button>
+          </li>
+        ))}
+      </ol>
+      <span id={currentId} className="sr-only">{items[activeIndex]?.label}</span>
+      <div className="sr-only" role="progressbar" aria-label="홈 스크롤 진행률" aria-valuenow={progress} />
       <button ref={trigger} type="button" className="scene-rail__trigger" aria-controls={listId}
         aria-label="홈 목차" aria-describedby={currentId} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        <span className="scene-rail__caption">홈 목차 <ChevronDown size={13} aria-hidden="true" /></span>
-        <span id={currentId} className="scene-rail__current">{activeLabel}</span>
+        <List size={16} aria-hidden="true" />
       </button>
-      <div className="scene-rail__progress" role="progressbar" aria-label="홈 스크롤 진행률" aria-valuenow={progress}
-        style={cssVars({ '--rail-page-progress': progress / 100 })}>
-        <span className="scene-rail__progress-track" aria-hidden="true" />
-        <span>{progress}%</span>
-      </div>
-      <ol id={listId} hidden={!open}>
+      <ol id={listId} className="scene-rail__menu" aria-label="홈 구간" hidden={!open}>
         {items.map((item) => (
           <li key={item.id}>
             <button
               type="button"
-              onClick={() => go(item.id)}
+              onClick={() => go(item.id, true)}
               aria-label={item.label}
               aria-current={active === item.id ? 'true' : undefined}
               className="scene-rail__item"
             >
-              <span className="scene-rail__name">{item.label}</span>
-              <span className="scene-rail__fill" aria-hidden="true" />
+              {item.label}
             </button>
           </li>
         ))}

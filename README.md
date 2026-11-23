@@ -27,7 +27,7 @@
 
 <br/><br/>
 
-<img src="docs/images/home.png" alt="가운데의 COM's 워드마크와 소개·지원 버튼, 오른쪽의 스크롤 진행 표시가 보이는 홈" width="100%" />
+<img src="docs/images/home.png" alt="가운데의 COM's 워드마크와 소개·지원 버튼, 오른쪽의 구간 막대가 보이는 홈" width="100%" />
 
 </div>
 
