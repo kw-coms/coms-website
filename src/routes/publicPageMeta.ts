@@ -44,6 +44,11 @@ export const PUBLIC_PAGE_META: PublicPageMeta[] = [
     description: "웹, 아두이노, C, Java, Python까지. COM's 스터디 자료를 골라 순서대로 따라 해 보세요.",
   },
   {
+    path: '/study/algorithms',
+    title: "알고리즘 문제 | KW COM's",
+    description: '오늘의 문제와 주간 문제에 도전하세요. COM’s 동아리원은 C, Java, Python으로 풀고 자동 채점할 수 있어요.',
+  },
+  {
     path: '/opportunities',
     title: "외부 일정 | KW COM's",
     description: '공식 출처의 해커톤, 코딩 대회, SSAFY·SW마에스트로·부트캠프 등 외부 일정을 확인하세요.',

@@ -65,7 +65,14 @@ function OutputBox({ title, value }: { title: string; value: string }) {
   return <div className="ex-output-box"><strong>{title}</strong><pre>{value || '(없음)'}</pre></div>
 }
 
-function ProblemBody({ studyId, problem }: { studyId: string; problem: Exercise | WebExercise }) {
+function ProblemBackLink({ studyId, fromAlgorithms }: { studyId: string; fromAlgorithms: boolean }) {
+  return <nav className="ex-back">{fromAlgorithms
+    ? <Link to="/study/algorithms">← 알고리즘 문제 목록</Link>
+    : <Link to={`/study/${studyId}/practice`}>← 실습 문제 목록</Link>}
+  </nav>
+}
+
+function ProblemBody({ studyId, problem, fromAlgorithms }: { studyId: string; problem: Exercise | WebExercise; fromAlgorithms: boolean }) {
   useDocumentTitle(problem.title)
   const navigate = useNavigate()
   const location = useLocation()
@@ -203,7 +210,7 @@ function ProblemBody({ studyId, problem }: { studyId: string; problem: Exercise 
   const login = () => navigate('/login', { state: { from: { pathname: location.pathname, search: location.search, hash: location.hash } } })
 
   return <main className="study-page ex-page">
-    <nav className="ex-back"><Link to={`/study/${studyId}/practice`}>← 실습 문제 목록</Link></nav>
+    <ProblemBackLink studyId={studyId} fromAlgorithms={fromAlgorithms} />
     <header className="ex-head"><div><p className="ex-eyebrow">실습 문제 · {LEVEL_NAME[problem.level - 1]}</p><PageHeading>{problem.title}</PageHeading><div className="ex-meta"><Dots level={problem.level} />{problem.topics.map((topic) => <span key={topic}>{topic}</span>)}</div></div></header>
     <div className="ex-columns">
       <section className="ex-panel ex-statement" aria-label="문제 설명">
@@ -226,7 +233,9 @@ function ProblemBody({ studyId, problem }: { studyId: string; problem: Exercise 
           {single && <div className="ex-results" role="status"><h2>{single.stage === 'compile' && !single.ok ? '컴파일 오류' : single.timedOut ? '시간 초과' : single.exitCode ? '실행 오류' : '실행 결과'}</h2><OutputBox title="출력" value={single.stdout} />{single.stderr && <OutputBox title="오류 출력" value={single.stderr} />}{mapDiagnostics(single.diagnostics, problem, lang, currentCode).map((diagnostic, index) => <button key={index} type="button" onClick={() => diagnostic.source === 'student' && editorRef.current?.goToLine(diagnostic.line, diagnostic.column)}>{diagnostic.source === 'harness' ? '채점 코드' : `${diagnostic.line}번째 줄`}: {diagnostic.message}</button>)}</div>}
           {grade && <div className="ex-results" aria-live="polite"><div ref={summaryRef} tabIndex={-1} data-ex-result-summary className={`ex-summary${grade.solved ? ' ex-success' : ''}`} role="status"><h2>{grade.compileError ? '컴파일 에러' : `${grade.passed}/${grade.total} 통과`}</h2>{grade.solved && <p>문제를 해결했어요!</p>}</div>{grade.compileError && <OutputBox title="컴파일 오류" value={grade.stderr} />}{grade.diagnostics.map((diagnostic, index) => <button key={index} type="button" onClick={() => diagnostic.source === 'student' && editorRef.current?.goToLine(diagnostic.line, diagnostic.column)}>{diagnostic.source === 'harness' ? '채점 코드' : `${diagnostic.line}번째 줄`}: {diagnostic.message}</button>)}{grade.cases.map((test) => <details className="ex-case" key={test.index} open={test.verdict !== 'correct'}><summary>테스트 {test.index + 1} · {test.label}</summary><div><OutputBox title="입력" value={test.input} /><OutputBox title="기대 출력" value={test.expected} /><OutputBox title="실제 출력" value={test.actual} />{test.stderr && <OutputBox title="오류 출력" value={test.stderr} />}{test.diff.length > 0 && <pre className="ex-diff">{test.diff.map((line) => `${line.kind === 'add' ? '+ ' : line.kind === 'del' ? '- ' : '  '}${line.text}`).join('\n')}</pre>}</div></details>)}</div>}
         </>}
-        {solved && next && <Link className="ex-next" to={`/study/${studyId}/practice/${next.id}`}>다음 문제 →</Link>}
+        {solved && (fromAlgorithms
+          ? <Link className="ex-next" to="/study/algorithms">과제 확인 →</Link>
+          : next && <Link className="ex-next" to={`/study/${studyId}/practice/${next.id}`}>다음 문제 →</Link>)}
       </section>
     </div>
   </main>
@@ -234,6 +243,8 @@ function ProblemBody({ studyId, problem }: { studyId: string; problem: Exercise 
 
 export default function ProblemPage() {
   const { id, problemId } = useParams()
+  const { search } = useLocation()
+  const fromAlgorithms = new URLSearchParams(search).get('from') === 'algorithms'
   const { user, loading, authError } = useAuth()
   const problem = findExercise(problemId ?? '')
   if (!id || !problem || !exercisesFor(id).some((item) => item.id === problem.id)) return <NotFoundPage />
@@ -242,9 +253,9 @@ export default function ProblemPage() {
   // Upgrade path: serve problems from an authenticated API.
   if (!user && authError) return <main className="study-page ex-page"><AuthCheckFailed /></main>
   if (!user) return <main className="study-page ex-page">
-    <nav className="ex-back"><Link to={`/study/${id}/practice`}>← 실습 문제 목록</Link></nav>
+    <ProblemBackLink studyId={id} fromAlgorithms={fromAlgorithms} />
     <header className="ex-head"><div><PageHeading>{problem.title}</PageHeading></div></header>
     <MembersGate heading="h2" title="문제 풀이는 동아리원만 할 수 있어요">문제 설명과 코드 편집기는 로그인한 동아리원에게만 열려요.</MembersGate>
   </main>
-  return <ProblemBody key={problem.id} studyId={id} problem={problem} />
+  return <ProblemBody key={problem.id} studyId={id} problem={problem} fromAlgorithms={fromAlgorithms} />
 }

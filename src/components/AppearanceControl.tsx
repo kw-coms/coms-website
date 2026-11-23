@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/useAuth'
 import MemberLock from './MemberLock'
 import { startSiteTour } from './tour/tourState'
 import { setPerfPreference, usePerfState, type PerfPreference } from '../utils/perfMode'
+import { setHomeLayout, useHomeLayout, type HomeLayout } from '../utils/homeLayout'
 
 const PERF_CHOICES: { value: PerfPreference; label: string }[] = [
   { value: 'auto', label: '자동' },
@@ -83,6 +84,7 @@ export default function AppearanceControl({
   const selectedTheme = APPEARANCE_THEMES.find((choice) => choice.value === appearanceTheme) ?? APPEARANCE_THEMES[0]
   const fontSelectValue = selectedFontId ? String(selectedFontId) : ''
   const perf = usePerfState()
+  const homeLayout = useHomeLayout()
   const { loading: authLoading } = useAuth()
   const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined)
   const dialogId = useId()
@@ -247,6 +249,22 @@ export default function AppearanceControl({
                   </div>
 
                   <div className="mt-3 divide-y divide-[var(--app-hairline)]">
+                    <div className="pb-3">
+                      <span id={`${dialogId}-home-layout`} className={groupLabel}>홈 구성</span>
+                      <div role="radiogroup" aria-labelledby={`${dialogId}-home-layout`} className={`${segment} mt-2`} onKeyDown={(event) => {
+                        const next: HomeLayout | null = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 'compact' : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? 'scenes' : null
+                        if (!next) return
+                        event.preventDefault()
+                        setHomeLayout(next)
+                        event.currentTarget.querySelector<HTMLElement>(`[data-home-layout="${next}"]`)?.focus()
+                      }}>
+                        {([{ value: 'scenes', label: '스크롤형' }, { value: 'compact', label: '한눈에 보기' }] as const).map((choice) => (
+                          <button key={choice.value} type="button" role="radio" aria-checked={homeLayout === choice.value} tabIndex={homeLayout === choice.value ? 0 : -1} data-home-layout={choice.value} onClick={() => setHomeLayout(choice.value)} className={`${chip} ${homeLayout === choice.value ? segmentOn : segmentOff}`}>
+                            {choice.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="pb-3">
                       <span id={`${dialogId}-site-theme`} className={groupLabel}>사이트 테마</span>
                       <div

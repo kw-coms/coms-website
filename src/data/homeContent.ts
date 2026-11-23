@@ -5,6 +5,7 @@ import {
   UserPlus,
   CalendarDays,
   CircuitBoard,
+  Code2,
   ClipboardCheck,
   Rocket,
   Sparkles,
@@ -506,6 +507,7 @@ export const navGroups: NavGroup[] = [
     sub: 'Learn',
     items: [
       { id: 'study', label: '스터디 자료', sub: 'Study', path: '/study', icon: BookOpen, keywords: '스터디 자료' },
+      { id: 'algorithms', label: '알고리즘 문제', sub: 'Algorithms', path: '/study/algorithms', icon: Code2, keywords: '오늘의 문제 주간 문제 코딩테스트 코테' },
       { id: 'lab', label: '회로 Lab', sub: 'Lab', path: '/lab/', icon: FlaskConical, keywords: '회로 시뮬레이터 circuit lab 아두이노' },
       { id: 'external-opportunities', label: '외부 일정', sub: 'Opportunities', path: '/opportunities', icon: CalendarDays, keywords: '해커톤 코딩 대회 공모전 싸피 SSAFY 소마 SW마에스트로 부트캠프 교육 모집' },
     ],

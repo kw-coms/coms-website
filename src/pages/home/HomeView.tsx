@@ -19,9 +19,18 @@ import Divider from './scenes/Divider'
 import SceneRail, { type RailItem } from './scenes/SceneRail'
 import type { SceneActions } from './scenes/parts'
 import { sectionStories } from '../../data/homeContent'
+import { useHomeLayout } from '../../utils/homeLayout'
+import CompactHome from './CompactHome'
 
 const LATEST_NOTICE_QUERY_KEY = ['app-shell', 'latest-notice']
 const SITE_SETTINGS_QUERY_KEY = ['site-settings', 'public']
+
+function SceneEffects({ member }: { member: boolean }) {
+  useSceneProgress()
+  usePointerFx()
+  useCineReveal(member)
+  return null
+}
 
 // The home page is a film in scenes, one subject at a time (see docs/design/specs/
 // 2026-11-10-cinematic-redesign.md). A visitor gets the story first; a member gets today's
@@ -31,6 +40,7 @@ export default function HomeView() {
   const navigate = useNavigate()
   const location = useLocation()
   const calm = useCalm()
+  const homeLayout = useHomeLayout()
   const member = Boolean(user)
   const latestNoticeQuery = useQuery({
     queryKey: LATEST_NOTICE_QUERY_KEY,
@@ -47,10 +57,6 @@ export default function HomeView() {
     queryFn: getPublicSiteSettings,
   })
   const siteSettings = siteSettingsQuery.data ?? defaultSiteSettings
-
-  useSceneProgress()
-  usePointerFx()
-  useCineReveal(member)
 
   const openPanel = (id: string) => {
     const el = document.getElementById(id)
@@ -140,8 +146,13 @@ export default function HomeView() {
     recruit: <Recruit key="recruit" index={number('recruit')} actions={actions.recruit} backdrop={backdrop('recruit')} />,
   }
 
+  if (homeLayout === 'compact') return (
+    <CompactHome member={member} latestNotice={latestNotice} settings={siteSettings} />
+  )
+
   return (
     <div className="theme-home cine-root scenes relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
+      <SceneEffects member={member} />
       <div className="cine-grain" aria-hidden="true" />
       <SceneRail items={railItems} calm={calm} />
       <main className="apple-home-main scenes-main relative overflow-x-clip">{order.map((key, i) => (
