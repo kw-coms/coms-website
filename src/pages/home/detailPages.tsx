@@ -83,7 +83,12 @@ export function AboutPage() {
             </ul>
           </div>
         </section>
-        <NextSteps steps={[{ label: '지원하기', to: '/recruit' }, { label: '해커톤 아카이브', to: '/hackathon' }, { label: '협업 제안', to: '/contact' }]} />
+        <NextSteps steps={[
+          { label: '지원하기', to: '/recruit' },
+          { label: '스터디 보기', to: '/study' },
+          { label: '해커톤 아카이브', to: '/hackathon' },
+          { label: '협업 제안', to: '/contact' },
+        ]} />
       </main>
     </div>
   )
