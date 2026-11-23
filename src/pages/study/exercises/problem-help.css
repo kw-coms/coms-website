@@ -1,0 +1,27 @@
+.judge-help { margin-top: 36px; padding-top: 22px; border-top: 1px solid var(--app-hairline); }
+.judge-help h2 { margin: 0 0 20px; }
+.judge-help h3 { margin: 0; font-size: 17px; }
+.judge-help p { margin: 6px 0 0; color: var(--app-muted); font-size: 15px; line-height: 1.55; }
+.judge-help-hints { margin-bottom: 20px; }
+.judge-help-hint { padding: 14px 0; border-bottom: 1px solid var(--app-hairline); }
+.judge-help-hint > strong { font-size: 13px; color: var(--app-accent-text); }
+.judge-help-hint .ex-markdown p { margin: 7px 0 0; color: var(--app-text); }
+.judge-help button { min-height: 44px; margin-top: 14px; padding: 8px 15px; }
+.judge-help-discussion { border-top: 1px solid var(--app-hairline); padding-top: 16px; }
+.judge-help-discussion-head { display: flex; justify-content: space-between; align-items: start; gap: 14px; }
+.judge-help-discussion-head button { flex: none; margin-top: 0; }
+.judge-problem .judge-help-discussion ul { list-style: none; padding: 0; margin: 18px 0; }
+.judge-problem .judge-help-discussion li { list-style: none; }
+.judge-help-discussion li + li { border-top: 1px solid var(--app-hairline); }
+.judge-help-discussion li a { display: flex; justify-content: space-between; gap: 12px; padding: 13px 0; color: var(--app-text); font-size: 15px; text-decoration: none; }
+.judge-help-discussion li a:hover { color: var(--app-accent-text); }
+.judge-help-discussion li span { flex: none; color: var(--app-muted); font-size: 13px; }
+.judge-help form { display: grid; gap: 14px; margin-top: 20px; }
+.judge-help form label { display: grid; gap: 7px; font-size: 14px; font-weight: 650; }
+.judge-help form :is(input, textarea) { width: 100%; padding: 10px 12px; border: 1px solid var(--app-hairline); border-radius: 9px; background: var(--app-surface); color: var(--app-text); font-size: 15px; font-weight: 400; }
+.judge-help form button { justify-self: start; margin-top: 0; background: var(--app-accent); color: white; }
+.judge-help [role='alert'] { color: var(--warn); }
+.judge-help :is(button, a, input, textarea):focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+@media (max-width: 500px) { .judge-help-discussion-head { flex-wrap: wrap; } }
+.judge-problem .judge-help h2 { margin: 0 0 16px; }
+.judge-problem .judge-help h3 { margin: 0; }

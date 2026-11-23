@@ -22,7 +22,3 @@ export function readEditorAppearance(): EditorAppearance {
     return { ...defaultEditorAppearance }
   }
 }
-
-export function saveEditorAppearance(appearance: EditorAppearance): void {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appearance)) } catch { /* Current tab still uses the selection. */ }
-}
