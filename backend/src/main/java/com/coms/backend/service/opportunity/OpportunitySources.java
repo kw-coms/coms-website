@@ -54,6 +54,8 @@ public class OpportunitySources {
     private static final String SSAFY_NAME = "삼성청년SW·AI아카데미";
     private static final String SOMA_NAME = "AI·SW마에스트로";
     private static final String SESAC_NAME = "청년취업사관학교 새싹";
+    private static final String BOOSTCAMP_KEY = "naver-boostcamp";
+    private static final String BOOSTCAMP_NAME = "네이버 부스트캠프";
 
     private static final String CODEFORCES_API = "https://codeforces.com/api/contest.list?gym=false";
     private static final String ATCODER_PAGE = "https://atcoder.jp/contests/?lang=en";
@@ -66,8 +68,18 @@ public class OpportunitySources {
     private static final String SOMA_PAGE = "https://www.swmaestro.ai/sw/main/notifyMentee.do?menuNo=200091";
     private static final String SESAC_LIST = "https://sesac.seoul.kr/sesac/course/offline/courseList.do?searchRcrtStts=RECRUITING&cPage=";
     private static final String SESAC_DETAIL = "https://sesac.seoul.kr/sesac/course/offline/courseDetail.do?crsSn=";
+    private static final String BOOSTCAMP_BLOG = "https://blog.naver.com/boostcamp_official/";
+    private static final String BOOSTCAMP_RSS = "https://rss.blog.naver.com/boostcamp_official.xml";
+    private static final String RSS_ACCEPT = "application/rss+xml, application/xml, text/xml";
 
     private static final Pattern ICPC_LINK = Pattern.compile("https://icpckorea\\.org/archives/([1-9]\\d{0,10})/?");
+    private static final Pattern BOOSTCAMP_POST = Pattern.compile(
+            "https://(?:m\\.)?blog\\.naver\\.com/boostcamp_official/([1-9]\\d{5,19})(?:\\?[^#]*)?");
+    private static final Pattern BOOSTCAMP_RECRUITMENT = Pattern.compile(
+            "모집|(?:지원서|서류)\\s*접수|지원\\s*(?:안내|일정|기간|마감)|설명회|알림\\s*신청");
+    private static final Pattern BOOSTCAMP_OTHER = Pattern.compile(
+            "다시\\s*보기|수료생|인터뷰|현장\\s*스케치|프리\\s*코스|스터디|가산점"
+                    + "|시상식|기업\\s*파트너|파트너\\s*기업|채용\\s*공고|(?:모집|운영)\\s*(?:취소|중단)");
     private static final Pattern ATCODER_PATH = Pattern.compile("/contests/([a-z0-9_-]{1,100})");
     private static final Pattern DUID = Pattern.compile("[?&]DUID=([1-9]\\d{0,10})(?:&|$)");
     private static final Pattern SSAFY_ID = Pattern.compile("javascript:goViewPage\\(([1-9]\\d{0,10})\\);?");
@@ -101,11 +113,12 @@ public class OpportunitySources {
         return List.of(
                 new Source("codeforces", CF_NAME, () -> parseCodeforces(download(CODEFORCES_API, "application/json"), Instant.now())),
                 new Source("atcoder", ATCODER_NAME, () -> parseAtCoder(html(ATCODER_PAGE), Instant.now())),
-                new Source("icpc-korea", ICPC_NAME, () -> parseIcpc(download(ICPC_RSS, "application/rss+xml, application/xml, text/xml"), dateToday())),
+                new Source("icpc-korea", ICPC_NAME, () -> parseIcpc(download(ICPC_RSS, RSS_ACCEPT), dateToday())),
                 new Source("kw-hackathon", KW_NAME, this::kwHackathons),
                 new Source("ssafy", SSAFY_NAME, this::ssafyRecruiting),
                 new Source("sw-maestro", SOMA_NAME, () -> parseSoma(html(SOMA_PAGE))),
-                new Source("sesac", SESAC_NAME, this::sesacCourses));
+                new Source("sesac", SESAC_NAME, this::sesacCourses),
+                new Source(BOOSTCAMP_KEY, BOOSTCAMP_NAME, () -> parseBoostcamp(download(BOOSTCAMP_RSS, RSS_ACCEPT), dateToday())));
     }
 
     static List<OpportunityNotice> parseCodeforces(String response, Instant now) {
@@ -194,14 +207,8 @@ public class OpportunitySources {
             if (!url.matches() || RESULTS.matcher(title).find() || !EVENT_NOTICE.matcher(title).find()) {
                 continue;
             }
-            LocalDate publication;
-            try {
-                publication = OffsetDateTime.parse(text(row.selectFirst("pubDate")), DateTimeFormatter.RFC_1123_DATE_TIME)
-                        .atZoneSameInstant(SEOUL).toLocalDate();
-            } catch (DateTimeException invalidDate) {
-                continue;
-            }
-            if (publication.isBefore(today.minusDays(120))) {
+            LocalDate publication = rssPublicationDate(row);
+            if (publication == null || publication.isBefore(today.minusDays(120))) {
                 continue;
             }
             Element body = row.selectFirst("content|encoded");
@@ -216,6 +223,46 @@ public class OpportunitySources {
             }
         }
         return items;
+    }
+
+    static List<OpportunityNotice> parseBoostcamp(String response, LocalDate today) {
+        Document feed = Jsoup.parse(response, BOOSTCAMP_RSS, Parser.xmlParser());
+        if (feed.selectFirst("rss > channel") == null) {
+            throw unavailable();
+        }
+        List<OpportunityNotice> items = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (Element row : feed.select("channel > item")) {
+            String title = cleanTitle(text(row.selectFirst("title")));
+            Matcher post = BOOSTCAMP_POST.matcher(text(row.selectFirst("link")));
+            LocalDate publication = rssPublicationDate(row);
+            if (title == null || !post.matches() || publication == null
+                    || publication.isBefore(today.minusDays(120)) || publication.isAfter(today)
+                    || !(title.contains("부스트캠프") || COHORT.matcher(title).find())
+                    || !BOOSTCAMP_RECRUITMENT.matcher(title).find() || BOOSTCAMP_OTHER.matcher(title).find()
+                    || RESULTS.matcher(title).find() || !seen.add(post.group(1))) {
+                continue;
+            }
+            Element description = row.selectFirst("description");
+            List<String> schedule = description == null ? List.of()
+                    : lines(Jsoup.parseBodyFragment(description.wholeText()).body());
+            // A newly posted notice can be reviewed even when the application schedule is not announced yet.
+            add(items, fromText(BOOSTCAMP_KEY, post.group(1), BOOSTCAMP_NAME, BOOSTCAMP_BLOG + post.group(1),
+                    TRAINING, title, schedule, publication.getYear()));
+            if (items.size() == MAX_ITEMS) {
+                break;
+            }
+        }
+        return items;
+    }
+
+    private static LocalDate rssPublicationDate(Element row) {
+        try {
+            return OffsetDateTime.parse(text(row.selectFirst("pubDate")), DateTimeFormatter.RFC_1123_DATE_TIME)
+                    .atZoneSameInstant(SEOUL).toLocalDate();
+        } catch (DateTimeException invalidDate) {
+            return null;
+        }
     }
 
     private List<OpportunityNotice> kwHackathons() {

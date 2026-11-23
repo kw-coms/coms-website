@@ -15,10 +15,13 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -94,6 +97,32 @@ class OpportunityWorkflowTest {
         mvc.perform(post("/api/admin/opportunities/collect").cookie(account("opportunity-chair", Member.Role.ADMIN))
                         .header("Origin", "https://coms.kw.ac.kr"))
                 .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void boostcampPreannouncementWithoutDatesAppearsOnlyInOperatorReview() throws Exception {
+        String feed = """
+                <rss><channel><item>
+                  <title>부스트캠프 AI Tech 9기 모집 예정 안내</title>
+                  <link>https://blog.naver.com/boostcamp_official/999996</link>
+                  <pubDate>Sun, 22 Nov 2026 20:00:00 +0900</pubDate>
+                </item></channel></rss>
+                """;
+        OpportunitySources sources = mock(OpportunitySources.class);
+        var officialSource = new OpportunitySources().sources().stream()
+                .filter(source -> source.key().equals("naver-boostcamp")).findFirst().orElseThrow();
+        when(sources.sources()).thenReturn(List.of(new OpportunitySources.Source(officialSource.key(), officialSource.name(),
+                () -> OpportunitySources.parseBoostcamp(feed, LocalDate.of(2026, 11, 23)))));
+        var collection = new OpportunityCollection(store, sources, mock(OpportunityDateExtraction.class), Runnable::run, true);
+
+        collection.scheduled();
+
+        mvc.perform(get("/api/admin/opportunities").cookie(account("opportunity-chair", Member.Role.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].sourceName").value("네이버 부스트캠프"))
+                .andExpect(jsonPath("$.items[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.items[0].applicationEnd").doesNotExist());
+        mvc.perform(get("/api/opportunities")).andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
     }
 
     @Test

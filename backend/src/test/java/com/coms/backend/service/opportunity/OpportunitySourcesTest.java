@@ -71,6 +71,54 @@ class OpportunitySourcesTest {
     }
 
     @Test
+    void boostcampFeedCollectsNewPreannouncementsAndFutureRecruitment() {
+        String feed = """
+                <rss><channel>
+                  <item><title>부스트캠프 웹·모바일 11기 모집 예정 안내</title>
+                    <link>https://blog.naver.com/boostcamp_official/999991?fromRss=true&amp;trackingCode=rss</link>
+                    <pubDate>Sun, 22 Nov 2026 20:00:00 +0900</pubDate>
+                    <description><![CDATA[<p>자세한 접수 일정은 추후 안내합니다.</p>]]></description>
+                  </item>
+                  <item><title>부스트캠프 AI Tech 9기 모집 안내</title>
+                    <link>https://m.blog.naver.com/boostcamp_official/999992</link>
+                    <pubDate>Mon, 23 Nov 2026 01:00:00 +0900</pubDate>
+                    <description><![CDATA[<p>지원서 접수 기간</p><p>2026년 12월 1일 ~ 12월 10일 오전 11시</p>]]></description>
+                  </item>
+                  <item><title>부스트캠프 웹·모바일 11기 모집 예정 안내</title>
+                    <link>https://blog.naver.com/boostcamp_official/999991</link>
+                    <pubDate>Sun, 22 Nov 2026 20:00:00 +0900</pubDate>
+                  </item>
+                  <item><title>부스트캠프 웹·모바일 10기 모집 공고</title>
+                    <link>https://blog.naver.com/boostcamp_official/999993</link>
+                    <pubDate>Wed, 14 May 2025 11:59:35 +0900</pubDate>
+                  </item>
+                  <item><title>부스트캠프 AI Tech 8기 모집 설명회 다시보기</title>
+                    <link>https://blog.naver.com/boostcamp_official/999994</link>
+                    <pubDate>Sun, 22 Nov 2026 20:00:00 +0900</pubDate>
+                  </item>
+                  <item><title>부스트캠프 AI Tech 9기 모집 공고</title>
+                    <link>https://blog.naver.com/other_account/999995</link>
+                    <pubDate>Sun, 22 Nov 2026 20:00:00 +0900</pubDate>
+                  </item>
+                </channel></rss>
+                """;
+
+        List<OpportunityNotice> notices = OpportunitySources.parseBoostcamp(feed, LocalDate.of(2026, 11, 23));
+        assertThat(notices).extracting(OpportunityNotice::externalId).containsExactly("999991", "999992");
+        assertThat(notices.getFirst()).satisfies(notice -> {
+            assertThat(notice.sourceKey()).isEqualTo("naver-boostcamp");
+            assertThat(notice.sourceUrl()).isEqualTo("https://blog.naver.com/boostcamp_official/999991");
+            assertThat(notice.applicationStart()).isNull();
+            assertThat(notice.applicationEnd()).isNull();
+            assertThat(notice.dateSnippet()).isNull();
+        });
+        assertThat(notices.getLast()).satisfies(notice -> {
+            assertThat(notice.applicationStart()).isEqualTo("2026-12-01");
+            assertThat(notice.applicationEnd()).isEqualTo("2026-12-10T11:00");
+        });
+    }
+
+    @Test
     void officialTrainingParsersKeepSeparateCentersAndCanonicalCourseLinks() {
         String soma = """
                 <h3 class="tit-page">2026년도 AI·SW마에스트로 제17기 연수생 모집 공고</h3>
