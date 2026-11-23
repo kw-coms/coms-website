@@ -28,8 +28,8 @@ function savedDone(progressKey: string) {
   }
 }
 
-/** Problem id prefix -> studies it belongs to (the shared "core-" problems are offered in three). Kept here so the hub can tell, without loading the problem lists, which cards will show a resume link. */
-const ID_PREFIX_STUDIES: Array<[string, string[]]> = [['web-', ['web']], ['c-', ['c']], ['java-', ['java']], ['py-', ['python']], ['core-', ['c', 'java', 'python']]]
+/** Problem id prefix -> studies it belongs to. Kept here so the hub can tell, without loading the problem lists, which cards will show a resume link. */
+const ID_PREFIX_STUDIES: Array<[string, string[]]> = [['web-', ['web']], ['c-', ['c']], ['java-', ['java']], ['py-', ['python']], ['core-', ['c', 'java', 'python']], ['dc-', ['c', 'java', 'python']]]
 
 /** Studies with a last-worked-on problem in saved progress; the Arduino card never has one. */
 function studiesWithResume() {

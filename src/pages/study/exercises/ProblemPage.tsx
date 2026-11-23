@@ -11,7 +11,8 @@ import { runRemote, type RunOutput } from '../playground/runner'
 import { decodeShareHash, encodeShareHash } from '../playground/storage'
 import { buildProgram, gradeExercise, mapDiagnostics, type GradeReport } from './grade'
 import { MiniMarkdown } from './markdown'
-import { exercisesFor, findExercise } from './problems'
+import { exercisesFor, findExercise, findNumberedExercise } from './problems'
+import { exercisePath } from './problemNumbers'
 import { flushSaves, markOpened, markViewed, readProgress, recordAttempt, saveCode, scheduleSaveCode, useProgress } from './progress'
 import { type ExLang, type Exercise, type WebExercise } from './types'
 import WebWorkspace from './WebWorkspace'
@@ -72,7 +73,7 @@ function ProblemBackLink({ studyId, fromAlgorithms }: { studyId: string; fromAlg
   </nav>
 }
 
-function ProblemBody({ studyId, problem, fromAlgorithms }: { studyId: string; problem: Exercise | WebExercise; fromAlgorithms: boolean }) {
+function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: string; problem: Exercise | WebExercise; fromAlgorithms: boolean; number?: number }) {
   useDocumentTitle(problem.title)
   const navigate = useNavigate()
   const location = useLocation()
@@ -110,7 +111,8 @@ function ProblemBody({ studyId, problem, fromAlgorithms }: { studyId: string; pr
   const abortRef = useRef<AbortController | null>(null)
   const codeRef = useRef(codeByLang)
   const currentCode = codeByLang[lang] ?? ''
-  const next = exercisesFor(studyId)[exercisesFor(studyId).findIndex((item) => item.id === problem.id) + 1]
+  const studyProblems = exercisesFor(studyId)
+  const next = studyProblems[studyProblems.findIndex((item) => item.id === problem.id) + 1]
 
   useEffect(() => { markOpened(problem.id); return () => { flushSaves(); abortRef.current?.abort() } }, [problem.id])
   useEffect(() => {
@@ -211,7 +213,7 @@ function ProblemBody({ studyId, problem, fromAlgorithms }: { studyId: string; pr
 
   return <main className="study-page ex-page">
     <ProblemBackLink studyId={studyId} fromAlgorithms={fromAlgorithms} />
-    <header className="ex-head"><div><p className="ex-eyebrow">실습 문제 · {LEVEL_NAME[problem.level - 1]}</p><PageHeading>{problem.title}</PageHeading><div className="ex-meta"><Dots level={problem.level} />{problem.topics.map((topic) => <span key={topic}>{topic}</span>)}</div></div></header>
+    <header className="ex-head"><div><p className="ex-eyebrow">{number === undefined ? '실습 문제' : `문제 ${number}번`} · {LEVEL_NAME[problem.level - 1]}</p><PageHeading>{problem.title}</PageHeading><div className="ex-meta"><Dots level={problem.level} />{problem.topics.map((topic) => <span key={topic}>{topic}</span>)}</div></div></header>
     <div className="ex-columns">
       <section className="ex-panel ex-statement" aria-label="문제 설명">
         <MiniMarkdown text={problem.statement} />
@@ -235,27 +237,33 @@ function ProblemBody({ studyId, problem, fromAlgorithms }: { studyId: string; pr
         </>}
         {solved && (fromAlgorithms
           ? <Link className="ex-next" to="/study/algorithms">과제 확인 →</Link>
-          : next && <Link className="ex-next" to={`/study/${studyId}/practice/${next.id}`}>다음 문제 →</Link>)}
+          : next && <Link className="ex-next" to={exercisePath(studyId, next.id)}>다음 문제 →</Link>)}
       </section>
     </div>
   </main>
 }
 
 export default function ProblemPage() {
-  const { id, problemId } = useParams()
+  const { id, problemId, problemNumber } = useParams()
   const { search } = useLocation()
-  const fromAlgorithms = new URLSearchParams(search).get('from') === 'algorithms'
+  const params = new URLSearchParams(search)
+  const numbered = problemNumber === undefined ? undefined : findNumberedExercise(problemNumber)
+  const fromAlgorithms = Boolean(numbered) || params.get('from') === 'algorithms'
   const { user, loading, authError } = useAuth()
-  const problem = findExercise(problemId ?? '')
-  if (!id || !problem || !exercisesFor(id).some((item) => item.id === problem.id)) return <NotFoundPage />
+  const problem = numbered?.problem ?? findExercise(problemId ?? '')
+  const studyId = numbered
+    ? numbered.problem.langs.find((lang) => lang === params.get('lang'))
+      ?? (numbered.problem.langs.includes('python') ? 'python' : numbered.problem.langs[0])
+    : id
+  if (!studyId || !problem || (!numbered && !exercisesFor(studyId).some((item) => item.id === problem.id))) return <NotFoundPage />
   if (loading) return <main className="study-page ex-page"><p className="study-loading" role="status">불러오는 중...</p></main>
   // ponytail: UI-only gate. Problem statements and starter code are still in the public JS bundle (problems/*).
   // Upgrade path: serve problems from an authenticated API.
   if (!user && authError) return <main className="study-page ex-page"><AuthCheckFailed /></main>
   if (!user) return <main className="study-page ex-page">
-    <ProblemBackLink studyId={id} fromAlgorithms={fromAlgorithms} />
-    <header className="ex-head"><div><PageHeading>{problem.title}</PageHeading></div></header>
+    <ProblemBackLink studyId={studyId} fromAlgorithms={fromAlgorithms} />
+    <header className="ex-head"><div>{numbered && <p className="ex-eyebrow">문제 {numbered.number}번</p>}<PageHeading>{problem.title}</PageHeading></div></header>
     <MembersGate heading="h2" title="문제 풀이는 동아리원만 할 수 있어요">문제 설명과 코드 편집기는 로그인한 동아리원에게만 열려요.</MembersGate>
   </main>
-  return <ProblemBody key={problem.id} studyId={id} problem={problem} fromAlgorithms={fromAlgorithms} />
+  return <ProblemBody key={`${problem.id}:${studyId}`} studyId={studyId} problem={problem} fromAlgorithms={fromAlgorithms} number={numbered?.number} />
 }

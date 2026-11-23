@@ -45,6 +45,11 @@ test('inline DOM caps chapter problems, links the full count and cleans up owned
       assert.equal(paths.at(-1), `/study/c/practice?chapter=${section.id}`)
     } else assert.equal(full, null)
   }
+  const first = root.querySelector('section#start .ex-inline-row')
+  assert.match(first.textContent, /1041번 ·/)
+  assert.equal(first.getAttribute('href'), '/study/algorithms/1041?lang=c')
+  first.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }))
+  assert.equal(paths.at(-1), '/study/algorithms/1041?lang=c')
   cleanup()
   assert.equal(root.querySelectorAll('.ex-inline').length, 0)
 })

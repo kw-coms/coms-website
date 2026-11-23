@@ -225,6 +225,7 @@ function App() {
         <Route path="/projects" element={<ProjectsDetailPage />} />
         <Route path="/study" element={<StudyHubPage />} />
         <Route path="/study/algorithms" element={<AlgorithmPage />} />
+        <Route path="/study/algorithms/:problemNumber" element={<ProblemPage />} />
         <Route path="/study/:id" element={<StudyPage />} />
         <Route path="/study/:id/practice" element={<PracticeListPage />} />
         <Route path="/study/:id/practice/:problemId" element={<ProblemPage />} />

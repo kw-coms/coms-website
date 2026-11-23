@@ -3,7 +3,6 @@ import { useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, BookOpen, Check, Code2, GitPullRequest, type LucideIcon } from 'lucide-react'
 import {
-  aboutDetailPrinciples,
   activitiesDetailCards,
   activitiesDetailFlow,
   activitiesDetailTopics,
@@ -21,15 +20,14 @@ import { usePermissions } from '../../contexts/usePermissions'
 import { canManageContent } from '../../utils/roleAccess'
 import { useScrollReveal } from '../../hooks/useScrollReveal'
 import '../../styles/site-pages.css'
-import ClubWorkFeature from './ClubWorkFeature'
 import { LearningStackVisual, ProjectLabVisual } from './HomeVisuals'
 
 const DETAIL_TITLE_MIN_FIT = 0.74
 
 const ABOUT_ACTIVITIES = [
-  { title: '세미나와 스터디', body: '프로그래밍 기초부터 웹 개발, 알고리즘, Arduino까지 함께 실습합니다.', to: '/activities', label: '활동 살펴보기', icon: BookOpen },
-  { title: '팀 프로젝트와 해커톤', body: '주제를 정하고 역할을 나눠 웹 서비스, 앱, 실습 도구를 만듭니다.', to: '/projects', label: '프로젝트 살펴보기', icon: Code2 },
-  { title: '코드 리뷰와 공유', body: '서로의 코드를 읽고 배운 점을 정리합니다. 완성한 결과물은 부원 작품에서 볼 수 있습니다.', to: '/apps', label: '부원 작품 보기', icon: GitPullRequest },
+  { title: '세미나와 스터디', body: '프로그래밍 기초, 웹 개발, 알고리즘, Arduino를 함께 배우고 실습합니다.', to: '/activities', label: '활동 보기', icon: BookOpen },
+  { title: '팀 프로젝트와 해커톤', body: '팀을 꾸려 웹 서비스와 앱을 만들고, 해커톤에서 아이디어를 구현합니다.', to: '/projects', label: '프로젝트 보기', icon: Code2 },
+  { title: '코드 리뷰와 공유', body: '서로의 코드를 읽고 개선한 뒤, 완성한 결과물을 부원 작품에 공개합니다.', to: '/apps', label: '부원 작품 보기', icon: GitPullRequest },
 ]
 
 export function AboutPage() {
@@ -40,7 +38,7 @@ export function AboutPage() {
           <div className="about-story__inner about-story__hero-grid">
             <div className="about-story__intro">
               <PageHeading className="about-story__title"><span>함께 배우고,</span>{' '}<span>바로 만듭니다.</span></PageHeading>
-              <p>COM’s는 광운대학교 중앙 컴퓨터 학술동아리입니다. 관심 있는 주제를 함께 공부하고, 배운 내용을 실제로 쓸 수 있는 프로젝트로 만듭니다.</p>
+              <p>COM’s는 광운대학교 중앙 컴퓨터 학술동아리입니다. 스터디에서 배운 것을 팀 프로젝트와 해커톤에서 직접 만들어 봅니다.</p>
               <Link to="/recruit" className="apple-action-primary about-story__button">지원하기 <ArrowRight size={17} aria-hidden="true" /></Link>
             </div>
             <section className="about-story__activities" aria-labelledby="about-activities">
@@ -61,28 +59,6 @@ export function AboutPage() {
           </div>
         </section>
 
-        <section className="about-story__inner about-story__work" aria-labelledby="about-work">
-          <div>
-            <h2 id="about-work">코드로 LED에<br />불을 켜 보는 곳</h2>
-            <p>COM’s의 Circuit Lab에서는 아두이노에 저항과 LED를 연결하고, 작성한 코드를 실행해 회로가 어떻게 동작하는지 브라우저에서 확인할 수 있습니다.</p>
-          </div>
-          <ClubWorkFeature />
-        </section>
-
-        <section className="about-story__start" aria-labelledby="about-first-visit">
-          <div className="about-story__inner about-story__start-grid">
-            <div>
-              <h2 id="about-first-visit">처음 오셨다면</h2>
-              <p>공개 스터디 자료에서 관심 있는 주제를 하나 골라 첫 실습을 시작해 보세요.</p>
-              <Link to="/study" className="apple-action-secondary about-story__button">스터디 자료 열기 <ArrowRight size={17} aria-hidden="true" /></Link>
-            </div>
-            <ul aria-label="COM’s가 지향하는 방식">
-              {aboutDetailPrinciples.map(item => (
-                <li key={item}><Check size={19} aria-hidden="true" /><span>{item}</span></li>
-              ))}
-            </ul>
-          </div>
-        </section>
         <NextSteps steps={[
           { label: '지원하기', to: '/recruit' },
           { label: '스터디 보기', to: '/study' },

@@ -4,6 +4,7 @@ import { STUDIES } from '../studies'
 import { problemIndex } from './problemIndex'
 import { labMissions } from './labMissions'
 import { useProgress } from './progress'
+import { exercisePath } from './problemNumbers'
 import './exercises.css'
 
 // Reads problemIndex.ts (ids and titles), never the problem bodies: see scripts/gen-problem-index.mjs.
@@ -22,7 +23,7 @@ export default function StudyPracticeSummary({ studyId, reserveResume }: { study
       </Link>
       {counted && solved > 0 && <span className="ex-hub-bar" role="img" aria-label={`${problems.length}문제 중 ${solved}문제 해결`}><i style={{ width: `${Math.round((solved / problems.length) * 100)}%` }} /></span>}
     </div>
-    {latest && <Link to={`/study/${studyId}/practice/${latest.id}`} className="ex-hub-resume"><Play size={12} aria-hidden="true" /><span>이어서 풀기: {latest.title}</span></Link>}
+    {latest && <Link to={exercisePath(studyId, latest.id)} className="ex-hub-resume"><Play size={12} aria-hidden="true" /><span>이어서 풀기: {latest.title}</span></Link>}
   </div>
 }
 
@@ -47,6 +48,6 @@ export function StudyHubOverview({ reserveResume }: { reserveResume: boolean }) 
       <div><dt>Lab 미션</dt><dd>{labMissions.length}</dd></div>
       <div><dt>내가 푼 문제</dt><dd>{solved}</dd></div>
     </dl>
-    {last && <Link to={`/study/${last.studyId}/practice/${last.id}`} className="study-overview-resume"><Play size={13} aria-hidden="true" /><span><b>이어서 풀기</b> {last.studyTitle} · {last.title}</span></Link>}
+    {last && <Link to={exercisePath(last.studyId, last.id)} className="study-overview-resume"><Play size={13} aria-hidden="true" /><span><b>이어서 풀기</b> {last.studyTitle} · {last.title}</span></Link>}
   </div>
 }
