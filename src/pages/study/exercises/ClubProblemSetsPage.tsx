@@ -30,10 +30,11 @@ function ProblemSetsBody() {
     const requestedSet = search.get('set')
     const suggestedNumber = Number(search.get('problem'))
     void Promise.all([
-      requestJudgeClub<{ sets: ClubSetView[] }>({ action: 'sets-list' }, controller.signal),
+      requestJudgeClub<{ sets: ClubSetView[] }>({ action: 'sets-list' }, controller.signal)
+        .then(({ sets: ownSets }) => { if (!controller.signal.aborted) setSets(ownSets) }),
       requestedSet ? requestJudgeClub<{ set: ClubSetView }>({ action: 'sets-open', id: requestedSet }, controller.signal) : Promise.resolve(null),
-    ]).then(([list, requested]) => {
-      setSets(list.sets)
+    ]).then(([, requested]) => {
+      if (controller.signal.aborted) return
       if (requested) { setOpened(requested.set); setDraft(fromSet(requested.set)) }
       else if (Number.isSafeInteger(suggestedNumber) && findNumberedExercise(String(suggestedNumber))) {
         setDraft({ ...empty(), problemNumbers: [suggestedNumber] })

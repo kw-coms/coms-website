@@ -48,13 +48,20 @@ test('a shared set opens as read-only and the owner can copy it', async ({ page 
   await mockOptionalApis(page)
   await asMember(page)
   const shared = { id: 'aabbccdd-0000-4000-8000-222222222222', title: '자료구조 연습', problemNumbers: [1001, 1100], shared: true, updatedAt: 1, owned: false }
+  let revoked = false
+  let copied = null
   await page.route('**/study/api/club', (route) => {
     const body = route.request().postDataJSON()
-    if (body.action === 'sets-list') return route.fulfill({ json: { sets: [] } })
-    if (body.action === 'sets-open') return route.fulfill({ json: { set: shared } })
+    if (body.action === 'sets-list') return route.fulfill({ json: { sets: copied ? [copied] : [] } })
+    if (body.action === 'sets-open') {
+      return revoked
+        ? route.fulfill({ status: 404, json: { error: 'rejected', messageKo: '문제집을 찾을 수 없어요.' } })
+        : route.fulfill({ json: { set: shared } })
+    }
     if (body.action === 'sets-save') {
       expect(body.shared).toBe(false)
-      return route.fulfill({ json: { set: { ...shared, id: 'aabbccdd-0000-4000-8000-333333333333', owned: true, shared: body.shared } } })
+      copied = { ...shared, id: 'aabbccdd-0000-4000-8000-333333333333', owned: true, shared: body.shared }
+      return route.fulfill({ json: { set: copied } })
     }
     throw new Error(`Unexpected action ${body.action}`)
   })
@@ -70,6 +77,10 @@ test('a shared set opens as read-only and the owner can copy it', async ({ page 
   const { violations } = await new AxeBuilder({ page }).include('.club-sets-page').withTags(['wcag2a', 'wcag2aa']).analyze()
   expect(violations.filter(({ impact }) => ['serious', 'critical'].includes(impact))).toEqual([])
   await page.screenshot({ path: info.outputPath('club-problem-sets-mobile.png') })
+  revoked = true
+  await page.reload()
+  await expect(page.getByRole('alert')).toHaveText('문제집을 찾을 수 없어요.')
+  await expect(page.getByRole('complementary', { name: '내 문제집 목록' }).getByRole('button', { name: /자료구조 연습/ })).toBeVisible()
 })
 
 test('only a verified solver can vote and changing a vote keeps one vote', async ({ page }) => {
