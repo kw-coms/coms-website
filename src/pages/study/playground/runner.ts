@@ -101,7 +101,9 @@ export async function runRemote(lang: RunLang, code: string, stdin: string, sign
 }
 
 /** Shared transport for single-run and multi-case requests. Keep auth, retry and errors identical. */
-export async function postRun(body: { lang: RunLang; code: string; stdin?: string; tests?: string[]; problemNumber?: number; battleCode?: string }, signal?: AbortSignal): Promise<PostRunResult> {
+export type TournamentSubmission = { tournamentId: string; matchId: string }
+
+export async function postRun(body: { lang: RunLang; code: string; stdin?: string; tests?: string[]; problemNumber?: number; battleCode?: string } & Partial<TournamentSubmission>, signal?: AbortSignal): Promise<PostRunResult> {
   const jsonBody = JSON.stringify(body)
   if (bytes(jsonBody) > MAX_BODY_BYTES) return { kind: 'rejected', messageKo: '요청 본문은 112 KB 이하여야 해요.' }
   let timeout: AbortSignal | null = null

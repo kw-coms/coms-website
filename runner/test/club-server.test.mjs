@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { createRunnerServer } from '../server.mjs';
 import { createClubBattles } from '../club-battles.mjs';
 import { createClubSocial } from '../club-social.mjs';
+import { createClubTournaments } from '../club-tournaments.mjs';
 import { createClubStore } from '../club-store.mjs';
 import { createJudgeProgress } from '../judge-progress.mjs';
 
@@ -60,4 +61,54 @@ test('authenticated club requests connect to numbered grading, a battle result a
   const shared = await post('beta', '/club', { action: 'sets-open', id: set.data.set.id });
   assert.deepEqual(shared.data.set.problemNumbers, [1001]);
   assert.equal(shared.data.set.owned, false);
+});
+
+test('president opens a tournament and only the assigned members can submit to its match', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'coms-tournament-server-'));
+  const numberedProblems = {
+    1001: { langs: ['cpp'], cases: [{ stdin: '', expected: '21' }] },
+    1002: { langs: ['cpp'], cases: [{ stdin: '', expected: '42' }] },
+  };
+  const startsAt = Date.now() - 500;
+  let time = startsAt - 1_000;
+  const tournaments = createClubTournaments({ numberedProblems, now: () => time, store: createClubStore({
+    directory, filename: 'tournaments.json', initial: () => ({ version: 1, events: [] }),
+  }) });
+  const server = createRunnerServer({ trustProxy: true, numberedProblems, clubTournaments: tournaments, logger() {},
+    executor: async ({ code }) => ({ stage: 'run', results: [{ stdout: code, exitCode: 0 }] }) });
+  t.after(async () => { await new Promise(resolve => server.close(resolve)); await rm(directory, { recursive: true, force: true }); });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${server.address().port}/study/api`;
+  const post = async (actor, body, path = '/club', role = 'USER') => {
+    const response = await fetch(url + path, { method: 'POST', body: JSON.stringify(body), headers: {
+      'Content-Type': 'application/json', 'X-Runner-Client': actor, 'X-Runner-Role': role,
+      'X-Runner-Name': Buffer.from(actor === 'alpha' ? '테스트 참가자' : actor).toString('base64url'),
+    } });
+    return { status: response.status, data: await response.json() };
+  };
+  const config = { action: 'tournament-save', title: '코딩 대회', rules: '시간 안에 제출합니다.', startsAt,
+    capacity: 4, durationMinutes: 5, breakMinutes: 0, problemNumbers: [1001, 1002] };
+  assert.equal((await post('alpha', { ...config, canManage: true })).status, 403);
+  const draft = await post('chair', config, '/club', 'ADMIN');
+  assert.equal(draft.status, 200);
+  const { id } = draft.data.event;
+  assert.equal((await post('alpha', { action: 'tournament-get', id })).status, 404);
+  assert.equal((await post('chair', { action: 'tournament-publish', id }, '/club', 'ADMIN')).status, 200);
+  await post('alpha', { action: 'tournament-join', id, displayName: '회장' });
+  await post('beta', { action: 'tournament-join', id });
+  time = Date.now() + 5_000;
+  const running = (await post('alpha', { action: 'tournament-get', id })).data.event;
+  assert.deepEqual(running.participants, ['테스트 참가자', 'beta']);
+  assert.equal(running.rounds[0].problemNumber, 1002);
+  const submission = { lang: 'cpp', code: '42', problemNumber: 1002, tournamentId: id, matchId: running.rounds[0].matches[0].id };
+  assert.equal((await post('alpha', { ...submission, problemNumber: 1001 }, '/run')).status, 400);
+  assert.equal((await post('alpha', { ...submission, battleCode: '123456ABCDEF' }, '/run')).status, 400);
+  assert.equal((await post('other', submission, '/run')).status, 403);
+  assert.equal((await post('alpha', submission, '/run')).data.judge.solved, true);
+  assert.equal((await post('beta', { ...submission, code: '0' }, '/run')).data.judge.solved, false);
+  time = running.rounds[0].endsAt + 60_000;
+  const result = (await post('beta', { action: 'tournament-get', id })).data.event;
+  assert.equal(result.status, 'finished');
+  assert.equal(result.champion, '테스트 참가자');
+  assert.equal(result.rounds[0].matches[0].winner, '테스트 참가자');
 });

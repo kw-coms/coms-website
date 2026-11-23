@@ -30,7 +30,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -181,12 +183,15 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<MemberResponse> me(Authentication authentication) {
-        // The member's own id on their own /me call. The frontend nginx reads it from its internal
-        // auth_request for Circuit Lab (/lab/api/compile) and hands it to the compiler as the key of the
-        // member's rate limit; it never comes from the client.
+        // nginx reads the authenticated identity from this subrequest for Circuit Lab and the judge.
+        MemberResponse member = authService.getMe(authentication.getName());
+        String encodedName = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(member.name().getBytes(StandardCharsets.UTF_8));
         return ResponseEntity.ok()
                 .header("X-Member-Id", authentication.getName())
-                .body(authService.getMe(authentication.getName()));
+                .header("X-Member-Role", member.role())
+                .header("X-Member-Name", encodedName)
+                .body(member);
     }
 
     @DeleteMapping("/me")

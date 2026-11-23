@@ -11,6 +11,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -34,16 +37,21 @@ class AuthMeMemberIdHeaderTest {
 
     @Test
     void meReturnsTheCallersOwnIdInAHeader() throws Exception {
-        mockMvc.perform(get("/api/auth/me").cookie(account("2026123499")))
+        mockMvc.perform(get("/api/auth/me").cookie(account("2026123499")).header("X-Member-Role", "ADMIN"))
                 .andExpect(status().isOk())
-                .andExpect(header().string("X-Member-Id", "2026123499"));
+                .andExpect(header().string("X-Member-Id", "2026123499"))
+                .andExpect(header().string("X-Member-Role", "USER"))
+                .andExpect(header().string("X-Member-Name", Base64.getUrlEncoder().withoutPadding()
+                        .encodeToString("테스트회원".getBytes(StandardCharsets.UTF_8))));
     }
 
     @Test
     void rejectedRequestsGetNoMemberId() throws Exception {
         mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(header().doesNotExist("X-Member-Id"));
+                .andExpect(header().doesNotExist("X-Member-Id"))
+                .andExpect(header().doesNotExist("X-Member-Role"))
+                .andExpect(header().doesNotExist("X-Member-Name"));
         mockMvc.perform(get("/api/auth/me").cookie(new Cookie("token", "not-a-jwt")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().doesNotExist("X-Member-Id"));

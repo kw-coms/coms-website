@@ -9,9 +9,13 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 public interface GatheringRepository extends JpaRepository<Gathering, Long> {
     List<Gathering> findTop100ByOrderByCreatedAtDescIdDesc();
+
+    @Query("select g from Gathering g where g.opportunityId is not null and g.closedAt is null and (g.closesAt is null or g.closesAt > :now) order by g.createdAt desc, g.id desc")
+    List<Gathering> findOpenOpportunityGatherings(@Param("now") LocalDateTime now);
 
     List<Gathering> findByCreatorStudentId(String creatorStudentId);
 

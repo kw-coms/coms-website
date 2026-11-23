@@ -5,6 +5,7 @@ import type { Gathering, GatheringDetail } from '../utils/gathering'
 // name off it are for the member who opened it and the president; the server decides.
 
 export type GatheringDraft = {
+  opportunityId?: number | null
   title: string
   description: string
   capacity: number | null
@@ -14,6 +15,11 @@ export type GatheringDraft = {
 
 export async function listGatherings(): Promise<Gathering[]> {
   const data = await request('/api/gatherings')
+  return Array.isArray(data) ? data : []
+}
+
+export async function listOpenOpportunityGatherings(): Promise<Gathering[]> {
+  const data = await request('/api/gatherings/opportunities')
   return Array.isArray(data) ? data : []
 }
 

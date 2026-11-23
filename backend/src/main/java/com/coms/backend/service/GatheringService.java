@@ -9,6 +9,7 @@ import com.coms.backend.dto.GatheringResponse;
 import com.coms.backend.repository.GatheringRepository;
 import com.coms.backend.repository.GatheringSignupRepository;
 import com.coms.backend.repository.MemberRepository;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,15 +38,18 @@ public class GatheringService {
     private final GatheringRepository gatheringRepository;
     private final GatheringSignupRepository signupRepository;
     private final MemberRepository memberRepository;
+    private final JdbcClient jdbc;
     private final Clock clock;
 
     public GatheringService(GatheringRepository gatheringRepository,
                             GatheringSignupRepository signupRepository,
                             MemberRepository memberRepository,
+                            JdbcClient jdbc,
                             Clock clock) {
         this.gatheringRepository = gatheringRepository;
         this.signupRepository = signupRepository;
         this.memberRepository = memberRepository;
+        this.jdbc = jdbc;
         this.clock = clock;
     }
 
@@ -53,6 +57,16 @@ public class GatheringService {
     public List<GatheringResponse> list(String studentId) {
         Member member = requireMember(studentId);
         List<Gathering> gatherings = gatheringRepository.findTop100ByOrderByCreatedAtDescIdDesc();
+        return responses(gatherings, member);
+    }
+
+    @Transactional(readOnly = true)
+    public List<GatheringResponse> listOpenOpportunityGatherings(String studentId) {
+        Member member = requireMember(studentId);
+        return responses(gatheringRepository.findOpenOpportunityGatherings(LocalDateTime.now(clock)), member);
+    }
+
+    private List<GatheringResponse> responses(List<Gathering> gatherings, Member member) {
         if (gatherings.isEmpty()) return List.of();
         Map<Long, List<GatheringSignup>> byGathering = signupRepository
                 .findByGatheringIdIn(gatherings.stream().map(Gathering::getId).toList())
@@ -85,10 +99,16 @@ public class GatheringService {
         if (closesAt != null && (!closesAt.isAfter(now) || closesAt.isAfter(now.plusDays(MAX_DAYS_AHEAD)))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "마감 시각은 지금부터 1년 안으로 정해 주세요.");
         }
+        if (request.opportunityId() != null && (request.opportunityId() <= 0 ||
+                jdbc.sql("SELECT id FROM external_opportunities WHERE id = :id AND published_at IS NOT NULL FOR UPDATE")
+                        .param("id", request.opportunityId()).query(Long.class).optional().isEmpty())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "게시 중인 외부 일정만 연결할 수 있어요.");
+        }
 
         Gathering gathering = new Gathering();
         gathering.setTitle(title);
         gathering.setDescription(blankToNull(request.description()));
+        gathering.setOpportunityId(request.opportunityId());
         gathering.setCapacity(request.capacity());
         gathering.setNoteLabel(blankToNull(request.noteLabel()));
         gathering.setClosesAt(closesAt);
@@ -224,6 +244,7 @@ public class GatheringService {
     private GatheringResponse toResponse(Gathering gathering, List<GatheringSignup> signups, Member member, LocalDateTime now) {
         return new GatheringResponse(
                 gathering.getId(),
+                gathering.getOpportunityId(),
                 gathering.getTitle(),
                 gathering.getDescription(),
                 gathering.getCreatorName(),

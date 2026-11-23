@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -62,6 +63,8 @@ class GatheringIntegrationTest {
     private GatheringSignupRepository signupRepository;
     @Autowired
     private GatheringService gatheringService;
+    @Autowired
+    private JdbcClient jdbc;
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
@@ -266,6 +269,50 @@ class GatheringIntegrationTest {
         join(memberCookie, id, "가".repeat(101)).andExpect(status().isBadRequest());
         join(memberCookie, 999_999L, null).andExpect(status().isNotFound());
         assertThat(signupRepository.count()).isZero();
+    }
+
+    @Test
+    void aPublishedExternalOpportunityCanRecruitMembersAndUnpublishedIdsAreRejected() throws Exception {
+        long opportunityId = 920_001L;
+        create(hostCookie, "{\"title\":\"공고 함께 보기\",\"opportunityId\":920001}")
+                .andExpect(status().isBadRequest());
+        jdbc.sql("""
+                INSERT INTO external_opportunities
+                  (id, source_key, external_id, source_fingerprint, draft_json, published_json,
+                   published_at, collected_at, status)
+                VALUES (:id, 'test', 'gathering-link', :fingerprint, '{}', '{}', CURRENT_TIMESTAMP,
+                        CURRENT_TIMESTAMP, 'PUBLISHED')
+                """).param("id", opportunityId).param("fingerprint", "0".repeat(64)).update();
+
+        long gatheringId = json(create(hostCookie,
+                "{\"title\":\"함께 참가할 사람 모집\",\"opportunityId\":920001,\"capacity\":2}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.gathering.opportunityId").value(opportunityId))
+                .andReturn()).get("gathering").get("id").asLong();
+        join(memberCookie, gatheringId, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.gathering.opportunityId").value(opportunityId))
+                .andExpect(jsonPath("$.gathering.participantCount").value(1));
+        mockMvc.perform(get("/api/gatherings/opportunities"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/gatherings/opportunities").cookie(otherCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].opportunityId").value(opportunityId));
+        mockMvc.perform(get("/api/gatherings").cookie(otherCookie))
+                .andExpect(jsonPath("$[0].opportunityId").value(opportunityId))
+                .andExpect(jsonPath("$[0].participantCount").value(1));
+        assertThat(gatheringRepository.findById(gatheringId).orElseThrow().getOpportunityId()).isEqualTo(opportunityId);
+
+        mockMvc.perform(post("/api/gatherings/{id}/close", gatheringId).cookie(hostCookie).header("Origin", ORIGIN))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/gatherings/opportunities").cookie(otherCookie))
+                .andExpect(jsonPath("$.length()").value(0));
+
+        jdbc.sql("UPDATE external_opportunities SET published_at = NULL WHERE id = :id")
+                .param("id", opportunityId).update();
+        create(hostCookie, "{\"title\":\"미공개 모집\",\"opportunityId\":920001}")
+                .andExpect(status().isBadRequest());
     }
 
     @Test

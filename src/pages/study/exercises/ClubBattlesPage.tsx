@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, Clock3, Copy, Swords } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Clock3, Copy, Swords, Trophy } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import PageHeading from '../../../components/PageHeading'
 import MembersGate, { AuthCheckFailed } from '../../../components/MembersGate'
@@ -157,7 +157,10 @@ function BattleContent() {
 
   return <main className="study-page club-battles">
     <div className="club-battles-inner">
-      <Link to="/study/algorithms" className="club-battles-back"><ArrowLeft size={16} aria-hidden="true" />문제 목록</Link>
+      <nav className="judge-catalog-back" aria-label="배틀 메뉴">
+        <Link to="/study/algorithms" className="club-battles-back"><ArrowLeft size={16} aria-hidden="true" />문제 목록</Link>
+        <Link to="/study/algorithms/tournaments" className="club-battles-back"><Trophy size={16} aria-hidden="true" />알고리즘 대회</Link>
+      </nav>
       <header className="club-battles-heading"><PageHeading>친구와 문제 대결</PageHeading><p>같은 문제를 시간 안에 풀고, 먼저 정답을 낸 사람이 이깁니다.</p></header>
       {error && <div className="club-battle-alert" role="alert"><p>{error}</p><button type="button" onClick={() => window.location.reload()}>다시 불러오기</button></div>}
       {notice && <p role="status" className="club-battle-notice">{notice}</p>}

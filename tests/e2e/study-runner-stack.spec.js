@@ -159,3 +159,20 @@ test('club API accepts the signed-in member and denies a guest', async ({ contex
   expect(guest.status()).toBe(401)
   expect((await guest.json()).error).toBe('unauthorized')
 })
+
+test('tournament management uses the authenticated role passed by nginx', async ({ context }) => {
+  const endpoint = `${FRONTEND}/study/api/club`
+  const data = {
+    action: 'tournament-save', title: 'CI 알고리즘 대회', rules: '시작하면 지정 문제를 풉니다.',
+    startsAt: Date.now() + 600_000, capacity: 4, durationMinutes: 5, breakMinutes: 0,
+    problemNumbers: [1100, 11001],
+  }
+  const president = await context.request.post(endpoint, { data, headers: { 'X-Runner-Role': 'USER' } })
+  expect(president.status()).toBe(200)
+  const { event } = await president.json()
+  expect(event).toMatchObject({ status: 'draft', problemNumbers: [1100, 11001] })
+
+  await context.clearCookies()
+  const guest = await context.request.post(endpoint, { data, headers: { 'X-Runner-Role': 'ADMIN' } })
+  expect(guest.status()).toBe(401)
+})

@@ -28,6 +28,9 @@ public class Gathering {
     @Column(name = "description", length = 1000)
     private String description;
 
+    @Column(name = "opportunity_id")
+    private Long opportunityId;
+
     /** How many may sign up; null for no limit. */
     @Column(name = "capacity")
     private Integer capacity;
@@ -61,6 +64,8 @@ public class Gathering {
     public void setTitle(String title) { this.title = title; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    public Long getOpportunityId() { return opportunityId; }
+    public void setOpportunityId(Long opportunityId) { this.opportunityId = opportunityId; }
     public Integer getCapacity() { return capacity; }
     public void setCapacity(Integer capacity) { this.capacity = capacity; }
     public String getNoteLabel() { return noteLabel; }

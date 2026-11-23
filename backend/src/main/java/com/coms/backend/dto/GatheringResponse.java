@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
  */
 public record GatheringResponse(
         Long id,
+        Long opportunityId,
         String title,
         String description,
         String creatorName,

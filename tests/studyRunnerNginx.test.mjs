@@ -37,6 +37,8 @@ const club = block('location = /study/api/club {')
 for (const part of [
   /limit_req zone=study_club_ip\b/, /limit_req zone=study_club\b/, /auth_request \/lab\/_auth;/,
   /auth_request_set \$club_client \$upstream_http_x_member_id;/, /proxy_set_header X-Runner-Client \$club_client;/,
+  /auth_request_set \$club_role \$upstream_http_x_member_role;/, /proxy_set_header X-Runner-Role \$club_role;/,
+  /auth_request_set \$club_name \$upstream_http_x_member_name;/, /proxy_set_header X-Runner-Name \$club_name;/,
   /proxy_pass http:\/\/unix:\/run\/coms-study\/run\.sock:\/study\/api\/club;/,
 ]) assert.match(club, part)
 assert.doesNotMatch(club, /limit_req zone=study_pre/)

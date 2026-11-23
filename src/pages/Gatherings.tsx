@@ -1,6 +1,6 @@
 import PageHeading from '../components/PageHeading'
 import { useMemo, useState, type ReactNode } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Download, Link2, Plus, Trash2, UserPlus, Users } from 'lucide-react'
 import {
@@ -27,6 +27,7 @@ import {
   type GatheringDetail,
 } from '../utils/gathering'
 import { showToast } from '../components/common/Toast'
+import { listOpportunities, opportunityQuery, type Opportunity } from '../services/opportunityApi'
 import { confirmDialog } from '../components/common/ConfirmDialog'
 import ToolFlow from '../components/ToolFlow'
 import ErrorState from '../components/common/ErrorState'
@@ -88,7 +89,12 @@ function Places({ gathering }: { gathering: Gathering }) {
 
 function GatheringList() {
   const navigate = useNavigate()
-  const [creating, setCreating] = useState(false)
+  const [search] = useSearchParams()
+  const opportunityId = Number(search.get('opportunity'))
+  const linkedOpportunityId = Number.isSafeInteger(opportunityId) && opportunityId > 0 ? opportunityId : null
+  const [creating, setCreating] = useState(search.get('create') === '1')
+  const linkedOpportunityQuery = useQuery({ queryKey: opportunityQuery, queryFn: listOpportunities, enabled: linkedOpportunityId !== null })
+  const opportunity = linkedOpportunityQuery.data?.find((item) => item.id === linkedOpportunityId)
   const listQuery = useQuery({ queryKey: LIST_KEY, queryFn: listGatherings })
   const gatherings = listQuery.data ?? []
   const { active, past } = useMemo(() => splitGatherings(listQuery.data ?? []), [listQuery.data])
@@ -113,9 +119,12 @@ function GatheringList() {
         </PageHead>
         <ToolFlow current="gatherings" />
 
-        {creating && (
+        {creating && linkedOpportunityId !== null && linkedOpportunityQuery.isLoading && <p role="status" className="p-4">일정을 불러오는 중...</p>}
+        {creating && linkedOpportunityId !== null && linkedOpportunityQuery.isError && <ErrorState message="일정을 불러오지 못했습니다." onRetry={() => linkedOpportunityQuery.refetch()} />}
+        {creating && linkedOpportunityId !== null && linkedOpportunityQuery.isSuccess && !opportunity && <p role="alert" className="p-4">게시 중인 일정을 찾을 수 없어요.</p>}
+        {creating && (linkedOpportunityId === null || opportunity) && (
           <div className="border-b border-[var(--app-hairline)] p-4 sm:p-6">
-            <CreateGatheringForm onCancel={() => setCreating(false)} onCreated={(detail) => navigate(`/gatherings/${detail.gathering.id}`)} />
+            <CreateGatheringForm opportunity={opportunity} onCancel={() => setCreating(false)} onCreated={(detail) => navigate(`/gatherings/${detail.gathering.id}`)} />
           </div>
         )}
 
@@ -213,10 +222,10 @@ function GatheringCards({ gatherings, label }: { gatherings: Gathering[]; label:
 const fieldClass = 'min-h-10 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none placeholder:text-[var(--app-subtle)]'
 const labelClass = 'mb-1 block text-xs font-bold text-[var(--app-text)]'
 
-function CreateGatheringForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: (detail: GatheringDetail) => void }) {
+function CreateGatheringForm({ opportunity, onCancel, onCreated }: { opportunity?: Opportunity; onCancel: () => void; onCreated: (detail: GatheringDetail) => void }) {
   const queryClient = useQueryClient()
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
+  const [title, setTitle] = useState(() => opportunity ? `${opportunity.title} 함께 가요`.slice(0, 100) : '')
+  const [description, setDescription] = useState(() => opportunity ? `${opportunity.title}에 함께 참가할 동아리원을 모읍니다.\n공식 공고: ${opportunity.sourceUrl}`.slice(0, 1000) : '')
   const [capacity, setCapacity] = useState('')
   const [closesAt, setClosesAt] = useState('')
   const [noteLabel, setNoteLabel] = useState('')
@@ -242,11 +251,13 @@ function CreateGatheringForm({ onCancel, onCreated }: { onCancel: () => void; on
     const closing = closesAt ? toApiDateTime(closesAt) : null
     if (closing && new Date(closing).getTime() <= Date.now()) return setError('마감 시각은 지금보다 뒤여야 합니다.')
     setError('')
-    mutation.mutate({ title: title.trim(), description: description.trim(), capacity: places, noteLabel: noteLabel.trim(), closesAt: closing })
+    mutation.mutate({ title: title.trim(), description: description.trim(), capacity: places, noteLabel: noteLabel.trim(), closesAt: closing,
+      ...(opportunity ? { opportunityId: opportunity.id } : {}) })
   }
 
   return (
     <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2" aria-label="새 모임 열기">
+      {opportunity && <p className="sm:col-span-2">외부 일정 연결 · {opportunity.title}</p>}
       <div className="sm:col-span-2">
         <label htmlFor="gatheringTitle" className={labelClass}>제목</label>
         <input id="gatheringTitle" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={100} placeholder="예: 알고리즘 스터디 모집" className={fieldClass} />
@@ -290,7 +301,7 @@ function GatheringView({ id }: { id: string }) {
 
   const settle = (next: GatheringDetail) => {
     queryClient.setQueryData(detailKey(id), next)
-    queryClient.invalidateQueries({ queryKey: LIST_KEY, exact: true })
+    queryClient.invalidateQueries({ queryKey: LIST_KEY })
   }
   const fail = (fallback: string) => (err: Error) => {
     showToast({ message: err.message || fallback, tone: 'error' })
@@ -326,7 +337,7 @@ function GatheringView({ id }: { id: string }) {
     mutationFn: () => deleteGathering(id),
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: detailKey(id) })
-      queryClient.invalidateQueries({ queryKey: LIST_KEY, exact: true })
+      queryClient.invalidateQueries({ queryKey: LIST_KEY })
       showToast({ message: '모임을 지웠습니다.' })
       navigate('/gatherings')
     },
@@ -422,6 +433,10 @@ function GatheringView({ id }: { id: string }) {
             링크 복사
           </button>
         </PageHead>
+        {gathering.opportunityId && <Link to={`/opportunities#opportunity-${gathering.opportunityId}`}
+          className="mx-4 mt-4 inline-flex min-h-10 items-center text-sm font-semibold text-[var(--app-accent-text)] underline-offset-2 hover:underline sm:mx-6">
+          연결된 외부 일정 보기
+        </Link>}
 
         <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <div className="coms-gather-panel">

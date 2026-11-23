@@ -17,6 +17,10 @@ public record GatheringRequest(
         @Size(max = 1000) String description,
         @Min(1) @Max(500) Integer capacity,
         @Size(max = 40) String noteLabel,
-        LocalDateTime closesAt
+        LocalDateTime closesAt,
+        Long opportunityId
 ) {
+    public GatheringRequest(String title, String description, Integer capacity, String noteLabel, LocalDateTime closesAt) {
+        this(title, description, capacity, noteLabel, closesAt, null);
+    }
 }
