@@ -19,7 +19,7 @@ export function stripPaths(text, { tempDir = '', redactSystemPaths = true } = {}
   if (!redactSystemPaths) return value;
   const redact = path => {
     const leaf = path.replace(/[\\/]+$/, '').split(/[\\/]/).pop();
-    return /^(?:main\.c|main\.py|[A-Za-z_$][\w$]*\.java)$/.test(leaf) ? leaf : '[경로]';
+    return /^(?:main\.(?:c|cpp|py|js)|[A-Za-z_$][\w$]*\.java)$/.test(leaf) ? leaf : '[경로]';
   };
   const system = new RegExp(`(?<![\\w.:/~-])${SYSTEM_PATH}`, 'g');
   value = value.replace(/(["'\x60])((?:(?<!\w)[A-Za-z]:[\\/]|\\\\)[^\n]*?)\1/g, (_, quote, path) => `${quote}${redact(path)}${quote}`);
@@ -52,8 +52,8 @@ export function parseDiagnostics(text, { lang, tempDir = '' } = {}) {
   for (let i = 0; i < lines.length && found.length < MAX_DIAGNOSTICS; i++) {
     const raw = lines[i];
     let match;
-    if (lang === 'c') {
-      match = raw.match(/^(?:.*[\\/])?main\.c:(\d+):(\d+):\s*(?:fatal )?(error|warning):\s*(.*)$/);
+    if (lang === 'c' || lang === 'cpp') {
+      match = raw.match(/^(?:.*[\\/])?main\.(?:c|cpp):(\d+):(\d+):\s*(?:fatal )?(error|warning):\s*(.*)$/);
       if (match) found.push(diagnostic(Number(match[1]), Number(match[2]), match[3], match[4], tempDir));
     } else if (lang === 'java') {
       match = raw.match(/^(?:.*[\\/])?[A-Za-z_$][\w$]*\.java:(\d+):\s*(error|warning):\s*(.*)$/);
@@ -61,6 +61,12 @@ export function parseDiagnostics(text, { lang, tempDir = '' } = {}) {
       else {
         match = raw.match(/^\s*at [\w.$/<>]+\((?:[A-Za-z_$][\w$]*\.java):(\d+)\)/);
         if (match && i > 0) found.push(diagnostic(Number(match[1]), undefined, 'error', lines[i - 1].trim(), tempDir));
+      }
+    } else if (lang === 'javascript') {
+      match = raw.match(/(?:^|\s)(?:.*[\\/])?main\.js:(\d+)(?::(\d+))?/);
+      if (match) {
+        const message = lines.slice(i + 1).find(line => /^(?:SyntaxError|TypeError|ReferenceError|RangeError):/.test(line.trim()));
+        if (message) found.push(diagnostic(Number(match[1]), Number(match[2] || 0), 'error', message.trim(), tempDir));
       }
     } else if (lang === 'python') {
       match = raw.match(/^\s*File ["'](?:.*[\\/])?main\.py["'], line (\d+)/);

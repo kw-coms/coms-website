@@ -6,7 +6,7 @@ FROM eclipse-temurin:21-jdk-jammy@sha256:4b1a74fbffbe6b4e7b6f0171a472478282fb463
 FROM node:22-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      gcc libc6-dev util-linux tini libstdc++6 libzstd1 libssl3 libsqlite3-0 \
+      gcc g++ libc6-dev util-linux tini libstdc++6 libzstd1 libssl3 libsqlite3-0 \
       zlib1g libbz2-1.0 liblzma5 libreadline8 libffi8 libexpat1 \
       libuuid1 libcrypt1 libncursesw6 libtinfo6 \
     && mkdir -p /opt/runner /run/coms-study /jobs /var/lib/coms-study \
@@ -24,13 +24,15 @@ COPY --from=java-runtime /opt/java/openjdk /opt/java/openjdk
 RUN ldconfig \
     && ln -s /opt/java/openjdk/bin/java /usr/local/bin/java \
     && ln -s /opt/java/openjdk/bin/javac /usr/local/bin/javac \
-    && gcc --version >/dev/null && python3 --version | grep '^Python 3\.12\.' \
+    && gcc --version >/dev/null && g++ --version >/dev/null && python3 --version | grep '^Python 3\.12\.' \
     && java -version 2>&1 | grep '21\.' && javac -version 2>&1 | grep '^javac 21\.' \
     && /usr/bin/prlimit --version >/dev/null && /usr/bin/setpriv --version >/dev/null && /usr/bin/env -C / true
 ENV NODE_ENV=production RUNNER_CONTAINER=1 PORT=8788 \
     PATH=/usr/local/bin:/usr/bin:/bin JAVA_HOME=/opt/java/openjdk
 WORKDIR /app
 COPY --chown=root:root *.mjs package.json ./
+COPY --chown=root:root numbered-problems.json /opt/runner/numbered-problems.json
+RUN chmod 0600 /opt/runner/numbered-problems.json
 # test/ stays in the image on purpose: the toolchain/attack suite runs inside this exact image.
 COPY --chown=root:root test ./test
 # No USER: the server starts as container-root and the compose/run flags leave it only

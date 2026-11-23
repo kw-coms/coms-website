@@ -8,7 +8,7 @@ HTML/CSS/JS run client-side in the existing `/study-sandbox.html` iframe; Arduin
 
 Request (JSON, ≤ 112 KiB body after escaping):
 ```json
-{ "lang": "c" | "java" | "python", "code": "<source ≤ 64 KB>", "stdin": "<optional ≤ 16 KB>" }
+{ "lang": "c" | "cpp" | "java" | "python" | "javascript", "code": "<source ≤ 64 KB>", "stdin": "<optional ≤ 16 KB>" }
 ```
 For grading, replace `stdin` with `"tests": ["<case 1 stdin>", "<case 2 stdin>"]`.
 `tests` must contain 1–10 strings, each at most 16 KiB UTF-8 and at most 32 KiB UTF-8 in total.
@@ -30,7 +30,7 @@ Response 200 (the program ran or failed to compile — both are normal outcomes)
 }
 ```
 
-With `tests`, the runner compiles C/Java once and runs cases in request order. The response is:
+With `tests`, the runner compiles C, C++, or Java once and runs cases in request order. The response is:
 ```json
 {
   "ok": true,
@@ -46,6 +46,15 @@ With `tests`, the runner compiles C/Java once and runs cases in request order. T
 }
 ```
 `stderr` at the top level contains compile diagnostics, capped at 8 KiB in multi-case mode; the serialized diagnostics array is also bounded to 8 KiB. On compile failure, `ok` is `false`, `stage` is `"compile"`, and `results` is absent. A runtime error or timeout belongs to its individual case; `ok` remains `true` when compilation succeeded. A `{ "skipped": true }` entry means the shared 10 s run wall budget was exhausted before that case could start; it has no output or exit fields. Each executed case's stdout and stderr are capped at 8 KiB UTF-8 and marked `truncated` when the cap is hit; output containing many JSON-escaped characters may truncate sooner to bound the serialized response. Top-level `timeMs` includes compilation and all started cases; each result's `timeMs` measures that case only. As in single-run responses, stdout strips only the private job directory and stderr strips system paths. Single-`stdin` requests retain the response shape shown above.
+
+### Numbered problems and progress
+
+Submit a numbered problem with `lang`, `code`, and an integer `problemNumber`. Omit `stdin` and `tests`. The runner selects the stored cases and assembles any function harness. A response contains `judge` with `passed`, `total`, `solved`, `verdicts`, `diagnostics`, `compileError`, `stderr`, and `timeMs`. Cases return verdicts without input or expected output. The runner records a first solve only when every case passes.
+
+Authenticated `GET /study/api/progress` returns `solved` (problem numbers), `solvedToday`, and `streak` for the authenticated member. Dates use Korean standard time. First solves are stored in the existing runner state volume. A numbered submission also returns the member's latest `progress`. The achievement-sharing control shares a summary and problem link.
+
+`scripts/gen-numbered-judge.mjs` regenerates the runner bank after edits to COM’s study problems. To refresh the archive, pass the trusted DailyCoding catalog module from [`2b4fe3c9`](https://github.com/choijunhuk/dailycoding-final/blob/2b4fe3c9e93f3b7a05a5a9da6c80c2603f37c323/dailycoding-server/src/shared/problemCatalog.js). The browser archive contains statements and public examples. The runner image carries the separate case bank. Repository readers can inspect the source cases, so the practice results are not an anti-cheat guarantee for contests.
+
 ### Errors
 All error bodies are JSON with a Korean `messageKo`; `Content-Type: application/json`.
 
@@ -54,7 +63,7 @@ All error bodies are JSON with a Korean `messageKo`; `Content-Type: application/
 | 400 | `{ "error": "rejected", "messageKo" }` | bad JSON, wrong content type, unknown `lang`, size limits, or invalid `tests` | – |
 | 401 | `{ "error": "unauthorized", "messageKo" }` | `X-Runner-Client` missing/malformed (nginx must set it from `auth_request`; also returned by nginx itself when not logged in) | – |
 | 403 | `{ "error": "rejected", "messageKo" }` | refused by nginx before the runner: the browser labels the request cross-site (`Sec-Fetch-Site: cross-site`). Applies to `POST /study/api/run` (`/study/api/health` is internal and never behind that nginx check); the frontend shows `messageKo` instead of asking to sign in | – |
-| 404 | `{ "error": "rejected", "messageKo" }` | any path other than `/study/api/run` and `/study/api/health` | – |
+| 404 | `{ "error": "rejected", "messageKo" }` | unknown path or numbered problem | – |
 | 405 | `{ "error": "rejected", "messageKo" }` | non-POST on `/study/api/run` (`Allow: POST`) | – |
 | 429 | `{ "error": "rate-limited", "messageKo" }` | more than the per-member limit (default **10 runs/min per member**) | 60 |
 | 429 | `{ "error": "rate-limited", "messageKo" }` | member deny-listed for 15 min after making the runner crash or fail cleanup | remaining seconds (≤ 900) |
@@ -69,8 +78,10 @@ Used by the container healthcheck over the unix socket; do **not** expose it thr
 
 ## Languages
 - `c`: gcc, `-std=c17 -O1 -Wall -Wextra -lm`, file `main.c`. Strict C17: POSIX functions such as `fork` need `#define _POSIX_C_SOURCE 200809L`.
+- `cpp` uses g++ with C++17 and `main.cpp`.
 - `java`: JDK 21. The runner picks the file/class name itself: the first `public [final|abstract] class X` whose body contains `static void main(` (comments and string literals ignored); if there is none, `Main`. Non-public classes may coexist.
 - `python`: CPython 3.12, file `main.py`, `-I -u`.
+- `javascript` uses Node.js 22 with CommonJS input in `main.cjs`. Programs can read standard input from file descriptor 0.
 
 ## Limits (per run)
 Wall 10 s (compile 15 s), CPU 3 s (Java 6 s; compile 10 s CPU), memory via container/cgroup (Java `-Xmx192m -Xss1m -XX:MaxMetaspaceSize=96m`, javac `-Xmx256m`), output 64 KB per stream, processes+threads ≤ 32 (C/Python) or ≤ 128 (Java) for the dedicated job uid 10100, open files ≤ 64 (Java 256), files ≤ 8 MB, no network, private 0700 job dir on a tmpfs wiped after every job, killed process group, every uid-10100 process killed after each job, one job at a time per container (queue ≤ 8, then 429 busy). If sandbox cleanup ever fails the runner answers `503 {"error":"unavailable"}` (Retry-After 30) and restarts itself.

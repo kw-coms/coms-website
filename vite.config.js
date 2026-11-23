@@ -115,6 +115,7 @@ export const pwaOptions = {
       '**/vendor-sentry-*.js',
       '**/study-content-*.js', // /study lesson markup (~525 KB for the five studies) and circuit drawings, fetched when a study is opened
       '**/study-editor-*.js', // CodeMirror of the /study playground (~350 KB), fetched when someone presses "직접 해보기"
+      '**/judge-archive-*.js', // The numbered archive is needed only for the algorithm problem pages.
     ],
     maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
     runtimeCaching: [
@@ -160,6 +161,7 @@ export default defineConfig({
         // parallelize and survive app-code redeploys. ponytail: coarse grouping
         // by package, finer splits only if a chunk actually gets too big.
         manualChunks(id) {
+          if (id.endsWith('/dailyCodingArchive.json')) return 'judge-archive'
           if (!id.includes('node_modules')) return
           if (id.includes('@sentry')) return 'vendor-sentry'
           if (id.includes('dompurify')) return 'vendor-dompurify'

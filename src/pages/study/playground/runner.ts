@@ -1,8 +1,9 @@
 // Calls POST /study/api/run (docs/study-runner-api.md) and turns every outcome into one result type.
 
 import { renewSessionAfter401, sessionGeneration } from '../../../services/apiClient'
+import type { ExLang } from '../exercises/types'
 
-export type RunLang = 'c' | 'java' | 'python'
+export type RunLang = ExLang
 
 export interface Diagnostic { line: number; column?: number; severity: 'error' | 'warning' | 'note' | string; message: string; hintKo?: string }
 export interface RunOutput {
@@ -100,7 +101,7 @@ export async function runRemote(lang: RunLang, code: string, stdin: string, sign
 }
 
 /** Shared transport for single-run and multi-case requests. Keep auth, retry and errors identical. */
-export async function postRun(body: { lang: RunLang; code: string; stdin?: string; tests?: string[] }, signal?: AbortSignal): Promise<PostRunResult> {
+export async function postRun(body: { lang: RunLang; code: string; stdin?: string; tests?: string[]; problemNumber?: number }, signal?: AbortSignal): Promise<PostRunResult> {
   const jsonBody = JSON.stringify(body)
   if (bytes(jsonBody) > MAX_BODY_BYTES) return { kind: 'rejected', messageKo: '요청 본문은 112 KB 이하여야 해요.' }
   let timeout: AbortSignal | null = null

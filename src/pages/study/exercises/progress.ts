@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import type { ExLang } from './types'
+import { JUDGE_LANGUAGES, type ExLang } from './types'
 
 export const PROGRESS_KEY = 'coms-study-exercises:v1'
 export type CodeLang = ExLang | 'html' | 'css' | 'js'
@@ -37,7 +37,7 @@ export function readProgress(): ProgressMap {
       const v = value as Partial<ProgressEntry>
       const code: ProgressEntry['code'] = {}
       if (v.code && typeof v.code === 'object' && !Array.isArray(v.code)) {
-        for (const lang of ['c', 'java', 'python', 'html', 'css', 'js'] as const) {
+        for (const lang of [...JUDGE_LANGUAGES, 'html', 'css', 'js'] as const) {
           if (typeof v.code[lang] === 'string') code[lang] = v.code[lang]
         }
       }
@@ -46,7 +46,7 @@ export function readProgress(): ProgressMap {
         tries: Number.isSafeInteger(v.tries) && (v.tries ?? -1) >= 0 ? v.tries! : 0,
         lastAt: Number.isFinite(v.lastAt) && (v.lastAt ?? -1) >= 0 ? v.lastAt! : 0,
         code,
-        solvedLangs: Array.isArray(v.solvedLangs) ? v.solvedLangs.filter((lang): lang is ExLang => lang === 'c' || lang === 'java' || lang === 'python') : [],
+        solvedLangs: Array.isArray(v.solvedLangs) ? v.solvedLangs.filter((lang) => JUDGE_LANGUAGES.includes(lang)) : [],
         ...(v.viewed === true ? { viewed: true } : {}),
       }
     }

@@ -114,7 +114,10 @@ const numbers: Readonly<Record<string, number>> = {
 }
 
 export function numberedProblemNumber(id: string): number | undefined {
-  return Object.hasOwn(numbers, id) ? numbers[id] : undefined
+  if (Object.hasOwn(numbers, id)) return numbers[id]
+  const sourceId = /^dailycoding-([1-9]\d*)$/.exec(id)?.[1]
+  const number = Number(sourceId) + 10_000
+  return Number.isSafeInteger(number) ? number : undefined
 }
 
 export function numberedProblemPath(number: number, lang?: string): string {
