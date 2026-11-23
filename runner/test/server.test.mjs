@@ -17,6 +17,8 @@ const result = { ok: true, stage: 'run', stdout: '1\n', stderr: '', exitCode: 0,
 
 test('validation counts UTF-8 bytes and rejects invalid shapes', () => {
   assert.equal(validateRequest(good), null);
+  assert.equal(validateRequest({ ...good, lang: 'cpp' }), null);
+  assert.equal(validateRequest({ ...good, lang: 'javascript' }), null);
   for (const body of [null, [], { ...good, lang: 'js' }, { ...good, code: '한'.repeat(22_000) }, { ...good, stdin: '한'.repeat(6_000) }, { ...good, stdin: 1 }]) assert.ok(validateRequest(body));
   assert.equal(MAX_BODY_BYTES, 112 * 1024);
   assert.throws(() => rateLimitPerMinute('0'));

@@ -7,6 +7,8 @@ import { pathToFileURL } from 'node:url';
 import { basename, resolve as resolvePath, sep } from 'node:path';
 import { runCode, runnerHealthy } from './run.mjs';
 import { createRunQueue, createRateLimiter, createDenyList, createInflight, normalizeIp, QUEUE_TIMEOUT } from './limits.mjs';
+import { buildNumberedCode, gradeNumberedOutput, loadNumberedProblems } from './numbered-judge.mjs';
+import { createJudgeProgress } from './judge-progress.mjs';
 
 export const MAX_BODY_BYTES = 112 * 1024;
 const MAX_CODE_BYTES = 64 * 1024;
@@ -42,8 +44,13 @@ const errorInfo = error => ({ name: error?.name, message: String(error?.message)
 
 export function validateRequest(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return '요청 본문은 JSON 객체여야 해요.';
-  if (!['c', 'java', 'python'].includes(body.lang)) return '지원하지 않는 언어예요.';
+  if (!['c', 'cpp', 'java', 'python', 'javascript'].includes(body.lang)) return '지원하지 않는 언어예요.';
   if (typeof body.code !== 'string' || Buffer.byteLength(body.code, 'utf8') > MAX_CODE_BYTES) return '코드는 64 KB 이하의 문자열이어야 해요.';
+  if (Object.hasOwn(body, 'problemNumber')) {
+    if (!Number.isSafeInteger(body.problemNumber) || body.problemNumber < 1 ||
+        Object.hasOwn(body, 'stdin') || Object.hasOwn(body, 'tests')) return '문제 번호 제출에는 표준 입력이나 테스트 입력을 함께 보낼 수 없어요.';
+    return null;
+  }
   if (Object.hasOwn(body, 'stdin') && Object.hasOwn(body, 'tests')) return '표준 입력과 테스트 입력은 함께 보낼 수 없어요.';
   if (body.stdin !== undefined && (typeof body.stdin !== 'string' || Buffer.byteLength(body.stdin, 'utf8') > MAX_STDIN_BYTES)) return '표준 입력은 16 KB 이하의 문자열이어야 해요.';
   if (Object.hasOwn(body, 'tests')) {
@@ -91,6 +98,7 @@ export function createRunnerServer({
   onFatal = () => {},
   denyList = { has: () => false },
   inflight = { begin() {}, end() {} },
+  numberedProblems = {}, judgeProgress = null,
 } = {}) {
   const heldKeys = new Set();
   const server = createServer({ maxHeaderSize: 16 * 1024 }, async (request, response) => {
@@ -111,13 +119,22 @@ export function createRunnerServer({
     try {
       const path = request.url?.split('?')[0];
       if (request.method === 'GET' && path === '/study/api/health') return healthCheck() ? send(200, { ok: true }) : send(503, { ok: false });
-      if (path !== '/study/api/run') return send(404, rejected('요청한 경로를 찾을 수 없어요.'));
-      if (request.method !== 'POST') { response.setHeader('Allow', 'POST'); return send(405, rejected('POST 요청만 사용할 수 있어요.')); }
+      if (path !== '/study/api/run' && path !== '/study/api/progress') return send(404, rejected('요청한 경로를 찾을 수 없어요.'));
+      if ((path === '/study/api/run' && request.method !== 'POST') ||
+          (path === '/study/api/progress' && request.method !== 'GET')) {
+        response.setHeader('Allow', path === '/study/api/run' ? 'POST' : 'GET');
+        return send(405, rejected('지원하지 않는 요청 방식이에요.'));
+      }
       key = clientKey(request, trustProxy);
       if (!key) return send(401, { error: 'unauthorized', messageKo: '로그인한 회원만 코드를 실행할 수 있어요.' });
       if (denyList.has(key)) {
         response.setHeader('Retry-After', String(denyList.remainingSeconds?.(key) ?? 900));
         return send(429, { error: 'rate-limited', messageKo: '이 계정에서 실행기를 불안정하게 만든 요청이 있어 잠시 실행이 제한돼요. 잠시 후 다시 시도해 주세요.' });
+      }
+      if (path === '/study/api/progress') {
+        return send(200, judgeProgress && key.startsWith('m:')
+          ? await judgeProgress.get(key)
+          : { solved: [], solvedToday: 0, streak: 0 });
       }
       // Cheap header checks first: a request that is refused here must not use up the member's run budget.
       const contentType = request.headers['content-type'] || '';
@@ -132,21 +149,40 @@ export function createRunnerServer({
       catch (error) { response.setHeader('Connection', 'close'); return send(400, rejected(error.message)); }
       const problem = validateRequest(body);
       if (problem) return send(400, rejected(problem));
+      const numbered = Object.hasOwn(body, 'problemNumber') ? numberedProblems[body.problemNumber] : null;
+      if (Object.hasOwn(body, 'problemNumber') && (!numbered || !numbered.langs.includes(body.lang))) {
+        return send(400, rejected('해당 번호의 문제나 언어를 찾을 수 없어요.'));
+      }
       // One in-flight request per member: a single member cannot fill the queue.
       if (heldKeys.has(key)) { response.setHeader('Retry-After', '20'); return send(429, { error: 'busy', messageKo: '이전 실행이 끝난 뒤에 다시 시도해 주세요.' }); }
       heldKeys.add(key); held = true;
       const pending = queue.submit(async () => {
         if (response.destroyed) return null;
         inflight.begin({ clientKey: key, jobId: id, startedAt: Date.now() });
-        try { return await executor(Object.hasOwn(body, 'tests')
-          ? { lang: body.lang, code: body.code, tests: body.tests }
-          : { lang: body.lang, code: body.code, stdin: body.stdin ?? '' }); }
+        try {
+          if (numbered) return await executor({
+            lang: body.lang,
+            code: buildNumberedCode(numbered, body.lang, body.code),
+            tests: numbered.cases.map(entry => entry.stdin),
+          });
+          return await executor(Object.hasOwn(body, 'tests')
+            ? { lang: body.lang, code: body.code, tests: body.tests }
+            : { lang: body.lang, code: body.code, stdin: body.stdin ?? '' });
+        }
         finally { inflight.end(); }
       });
       if (!pending) { response.setHeader('Retry-After', '20'); return send(429, { error: 'busy', messageKo: '실행 대기열이 가득 찼어요. 잠시 후 다시 시도해 주세요.' }); }
       const result = await pending;
       if (result === QUEUE_TIMEOUT) { response.setHeader('Retry-After', '20'); return send(429, { error: 'busy', messageKo: '실행 대기열이 길어 시간 안에 시작하지 못했어요. 잠시 후 다시 시도해 주세요.' }); }
-      if (result !== null) send(200, result);
+      if (result !== null && numbered) {
+        const judge = gradeNumberedOutput(numbered, result);
+        const progress = judgeProgress && key.startsWith('m:')
+          ? judge.solved
+            ? await judgeProgress.recordSolved(key, body.problemNumber)
+            : await judgeProgress.get(key)
+          : { solved: [], solvedToday: 0, streak: 0 };
+        send(200, { judge, progress });
+      } else if (result !== null) send(200, result);
     } catch (error) {
       logger({ event: 'error', id, ...errorInfo(error) });
       // Cleanup failure poisons the runner: answer 503 and let the process exit so the
@@ -221,6 +257,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const denyFile = process.env.DENYLIST_FILE ? resolveStateFile(process.env.DENYLIST_FILE) : null;
   const denyList = denyFile ? createDenyList({ file: denyFile, fs: fsSync, logger: log }) : undefined;
   const inflight = denyFile ? createInflight({ file: resolvePath(STATE_DIR, 'inflight.json'), fs: fsSync, logger: log }) : undefined;
+  const numberedProblems = loadNumberedProblems(resolvePath('/opt/runner', 'numbered-problems.json'));
+  const judgeProgress = createJudgeProgress({ directory: resolvePath(STATE_DIR, 'judge-progress') });
   // A record left behind means the previous process died mid-job (OOM, SIGKILL, crash): blame its client.
   const crashed = inflight?.recover();
   if (crashed) {
@@ -228,7 +266,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     log({ event: 'recovered-inflight', client: keyHash(crashed.clientKey), jobId: crashed.jobId, startedAt: crashed.startedAt });
   }
   server = createRunnerServer({
-    denyList, inflight,
+    denyList, inflight, numberedProblems, judgeProgress,
     onFatal({ key } = {}) {
       if (exiting) return;
       exiting = true;

@@ -4,7 +4,7 @@
 
 export type PageLang = 'web' | 'c' | 'java' | 'python' | 'arduino'
 /** What the block is: a runner language, or 'shell' (commands/transcripts), or 'text' (pseudo code, annotated). */
-export type BlockLang = 'c' | 'java' | 'python' | 'html' | 'js' | 'css' | 'arduino' | 'shell' | 'repl' | 'text'
+export type BlockLang = 'c' | 'cpp' | 'java' | 'python' | 'javascript' | 'html' | 'js' | 'css' | 'arduino' | 'shell' | 'repl' | 'text'
 export type TemplateName = 'c-main' | 'java-main'
 
 export interface BlockDecision {
@@ -26,7 +26,7 @@ export interface BlockAttrs {
 }
 
 const LANG_LABEL: Record<BlockLang, string> = {
-  c: 'C', java: 'Java', python: 'Python', html: 'HTML', js: 'JavaScript', css: 'CSS', arduino: 'Arduino', shell: '명령어', repl: '파이썬 대화창', text: '',
+  c: 'C', cpp: 'C++', java: 'Java', python: 'Python', javascript: 'JavaScript', html: 'HTML', js: 'JavaScript', css: 'CSS', arduino: 'Arduino', shell: '명령어', repl: '파이썬 대화창', text: '',
 }
 export const langLabel = (lang: BlockLang) => LANG_LABEL[lang]
 

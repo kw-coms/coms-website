@@ -2,6 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { detectJavaClass, hintFor, parseDiagnostics, stripPaths } from '../diagnostics.mjs';
 
+test('C++ compiler and JavaScript runtime messages point to source lines', () => {
+  const cpp = parseDiagnostics('main.cpp:2:11: error: missing_symbol was not declared in this scope', { lang: 'cpp' });
+  assert.equal(cpp[0]?.line, 2);
+  assert.match(cpp[0]?.hintKo || '', /이름/);
+  const js = parseDiagnostics('main.js:4\nReferenceError: missing is not defined', { lang: 'javascript' });
+  assert.equal(js[0]?.line, 4);
+  assert.match(js[0]?.message || '', /ReferenceError/);
+});
+
 test('gcc and javac locations and beginner hints', () => {
   const c = parseDiagnostics('/tmp/study-abc/main.c:3:5: error: expected ‘;’ before ‘}’ token\nmain.c:4:2: warning: control reaches end of non-void function', { lang: 'c' });
   assert.deepEqual(c.map(x => [x.line, x.column, x.severity]), [[3, 5, 'error'], [4, 2, 'warning']]);

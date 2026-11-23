@@ -69,9 +69,30 @@ test('CPU soft limit signal is a timeout; java virtual address space remains unc
   assert.equal(stageLimits('java', 'compile').some(x => x.startsWith('--as=')), false);
   assert.ok(stageLimits('java', 'run').includes('--cpu=6:7'));
   assert.ok(stageLimits('java', 'run').includes('--nproc=128:128')); assert.ok(stageLimits('c', 'run').includes('--nproc=32:32')); assert.ok(stageLimits('python', 'compile').includes('--nproc=32:32'));
+  assert.ok(stageLimits('cpp', 'run').includes('--nproc=32:32'));
+  assert.equal(stageLimits('javascript', 'run').some(x => x.startsWith('--as=')), false);
 });
 
 const success = { stdout: '', stderr: '', exitCode: 0, signal: null, timedOut: false, truncated: false };
+test('C++ compiles once and JavaScript uses a bounded interpreter', async () => {
+  for (const [lang, source, expectedFile, command] of [
+    ['cpp', '#include <iostream>\nint main(){}', 'main.cpp', '/usr/bin/g++'],
+    ['javascript', 'console.log(1)', 'main.js', '/usr/local/bin/node'],
+  ]) {
+    const calls = [];
+    const result = await runCode({ lang, code: source, tests: ['1', '2'] }, {
+      executor: async (cmd, args, options) => {
+        calls.push({ cmd, args, options });
+        assert.equal(await readFile(`${options.cwd}/${expectedFile}`, 'utf8'), source);
+        return { ...success, stdout: options.stage === 'run' ? `${options.stdin}\n` : '' };
+      }, cleanup: async () => {},
+    });
+    assert.deepEqual(result.results.map(item => item.stdout), ['1\n', '2\n']);
+    assert.equal(calls.filter(item => item.cmd === command).length, lang === 'cpp' ? 1 : 2);
+    if (lang === 'cpp') assert.deepEqual(calls[0].args.slice(0, 2), ['-std=c++17', '-O1']);
+    else assert.deepEqual(calls[0].args.slice(0, 3), ['--permission', '--jitless', '--max-old-space-size=128']);
+  }
+});
 test('runCode compiles Java matching filename, feeds stdin only to run, strips paths and wipes directory', async () => {
   const calls = [], cleaned = [];
   const r = await runCode({ lang: 'java', code: 'public class Hello { public static void main(String[] args) {} }', stdin: '입력\n' }, {

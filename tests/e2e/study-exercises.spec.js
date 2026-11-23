@@ -154,6 +154,7 @@ test('inline chapter cards cap at four and open a persistent removable chapter f
   await page.goto('/study/c/practice')
   const chapterSelect = page.getByRole('combobox', { name: '장', exact: true })
   await chapterSelect.selectOption('loop')
+  await expect(page.getByRole('button', { name: '장 필터 해제: loop' })).toBeVisible()
   const rows = page.locator('.ex-list .ex-row')
   const chapterHrefs = await rows.evaluateAll(links => links.map(link => link.getAttribute('href')))
   expect(chapterHrefs.length).toBeGreaterThan(4)

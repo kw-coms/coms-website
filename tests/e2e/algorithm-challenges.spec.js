@@ -39,19 +39,24 @@ test('guests can discover daily and weekly problems, and the member gate protect
 
 test('member submission uses the study editor and persists a solved daily problem', async ({ page }, info) => {
   const { problem } = algorithmChallenges(stamp.getTime()).daily
-  const cases = [...problem.examples, ...problem.tests]
+  const number = numberedProblemNumber(problem.id)
+  const code = 'print("submission")'
+  const progress = { solved: [], solvedToday: 0, streak: 0 }
   await page.setViewportSize({ width: 1280, height: 720 })
   await page.clock.setFixedTime(stamp)
   await mockOptionalApis(page)
   await asMember(page)
+  await page.route('**/study/api/progress', (route) => route.fulfill({ json: progress }))
   await page.route('**/study/api/run', async (route) => {
     const body = route.request().postDataJSON()
     expect(body.lang).toBe('python')
-    expect(body.tests).toEqual(cases.map(({ stdin }) => stdin))
-    expect(body.code).toContain(problem.solution.python.trim())
+    expect(body).toEqual({ lang: 'python', problemNumber: number, code })
+    progress.solved.push(number)
+    progress.solvedToday = 1
+    progress.streak = 1
     await route.fulfill({ status: 200, json: {
-      ok: true, stage: 'run', stderr: '', diagnostics: [], timeMs: 12,
-      results: cases.map(({ expected }) => ({ stdout: expected, stderr: '', exitCode: 0, signal: null, timedOut: false, truncated: false, timeMs: 2 })),
+      judge: { passed: 5, total: 5, solved: true, verdicts: Array(5).fill('correct'), diagnostics: [], compileError: false, stderr: '', timeMs: 12 },
+      progress,
     } })
   })
   await page.goto('/study/algorithms')
@@ -61,19 +66,20 @@ test('member submission uses the study editor and persists a solved daily proble
   await daily.getByRole('link', { name: /문제 풀기/ }).click()
   await expect(page.getByRole('tab', { name: 'Python' })).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByRole('tab', { name: 'C', exact: true })).toBeVisible()
-  await expect(page.getByRole('tab', { name: 'Java' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Java', exact: true })).toBeVisible()
   const editor = page.locator('.ex-editor .cm-content')
   await editor.click()
   await page.keyboard.press('ControlOrMeta+A')
-  await page.keyboard.insertText(problem.solution.python)
+  await page.keyboard.insertText(code)
   await page.getByRole('button', { name: '제출', exact: true }).click()
   await expect(page.getByText('문제를 해결했어요!')).toBeVisible()
   await page.getByRole('link', { name: /과제 확인/ }).click()
   await expect(daily).toContainText('해결 완료')
   await page.reload()
   await expect(daily.getByRole('link', { name: /다시 풀기/ })).toBeVisible()
-  await expect(page.getByRole('progressbar')).toHaveAttribute('value', '1')
-  const list = page.getByRole('region', { name: '전체 알고리즘 문제' })
+  const summary = page.getByRole('region', { name: '내 문제 풀이 기록' })
+  await expect(summary.getByText('채점 완료', { exact: true }).locator('..').locator('strong')).toHaveText('1')
+  const list = page.getByRole('region', { name: '전체 문제', exact: true })
   await list.getByRole('combobox', { name: '해결 상태' }).selectOption('solved')
   await expect(list.getByRole('link')).toHaveCount(1)
   await expect(list.getByRole('link')).toContainText(problem.title)
@@ -104,7 +110,7 @@ test('a lesson opens its numbered problem in the study language and the catalog 
   await expect(page.locator('.ex-eyebrow')).toContainText(`문제 ${number}번`)
   await expect(page.getByRole('textbox', { name: 'Java 코드 편집기' })).toBeVisible()
   await page.getByRole('link', { name: /알고리즘 문제 목록/ }).click()
-  const list = page.getByRole('region', { name: '전체 알고리즘 문제' })
+  const list = page.getByRole('region', { name: '전체 문제', exact: true })
   await list.getByRole('searchbox', { name: '문제 검색' }).fill(`#${number}`)
   await expect(list.getByRole('link')).toHaveCount(1)
   await expect(list.getByRole('link')).toHaveAttribute('href', `/study/algorithms/${number}`)
@@ -115,8 +121,8 @@ test('a lesson opens its numbered problem in the study language and the catalog 
 test('the catalog filters by supported language and opens results in that language', async ({ page }, info) => {
   await mockOptionalApis(page)
   await page.goto('/study/algorithms?q=1041&lang=java')
-  const list = page.getByRole('region', { name: '전체 알고리즘 문제' })
-  await expect(list.getByText('조건에 맞는 문제가 없습니다.')).toBeVisible()
+  const list = page.getByRole('region', { name: '전체 문제', exact: true })
+  await expect(list.getByText('일치하는 문제가 없습니다.')).toBeVisible()
   await list.getByRole('combobox', { name: '언어', exact: true }).selectOption('c')
   await expect(list.getByRole('link')).toHaveCount(1)
   await expect(list.getByRole('link')).toHaveAttribute('href', '/study/algorithms/1041?lang=c')

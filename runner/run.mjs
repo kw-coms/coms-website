@@ -56,7 +56,7 @@ export function asJob(command, args = [], { input = '', timeoutMs = 10_000 } = {
   });
 }
 
-export const NPROC = { c: 32, python: 32, java: 128 };
+export const NPROC = { c: 32, cpp: 32, python: 32, java: 128, javascript: 32 };
 export function stageLimits(lang, stage, cpuOverride) {
   const cpu = cpuOverride ?? (stage === 'compile' ? 10 : lang === 'java' ? 6 : 3);
   // NPROC counts threads of the job uid only (the server has another uid). The JVM needs
@@ -64,7 +64,7 @@ export function stageLimits(lang, stage, cpuOverride) {
   const args = [`--cpu=${cpu}:${cpu + 1}`, `--nproc=${NPROC[lang]}:${NPROC[lang]}`, '--fsize=8388608:8388608', '--msgqueue=262144:262144', '--sigpending=512:512', '--locks=16:16', `--nofile=${lang === 'java' ? 256 : 64}:${lang === 'java' ? 256 : 64}`, '--core=0:0'];
   // Both JVMs reserve far more address space than their heaps. Container memory
   // is the ceiling; javac uses -J-Xmx256m and java uses -Xmx192m instead of AS.
-  if (lang !== 'java') {
+  if (lang !== 'java' && lang !== 'javascript') {
     const bytes = stage === 'compile' ? 1024 ** 3 : 256 * 1024 ** 2;
     args.push(`--as=${bytes}:${bytes}`);
   }
@@ -295,7 +295,7 @@ export async function runCode({ lang, code, stdin = '', tests }, {
       await wipeJobFiles();
     }
     const className = lang === 'java' ? detectJavaClass(code) : null;
-    const file = lang === 'c' ? 'main.c' : lang === 'python' ? 'main.py' : `${className}.java`;
+    const file = lang === 'c' ? 'main.c' : lang === 'cpp' ? 'main.cpp' : lang === 'python' ? 'main.py' : lang === 'javascript' ? 'main.js' : `${className}.java`;
     if (real) {
       work = join(JOB_ROOT, `coms-${randomBytes(6).toString('hex')}`);
       // The job-owned 0700 dir is created and filled as the job uid; the server never needs access.
@@ -320,8 +320,9 @@ export async function runCode({ lang, code, stdin = '', tests }, {
     const jvm = ['-XX:+UseSerialGC', '-XX:TieredStopAtLevel=1', '-XX:CICompilerCount=1', '-XX:ActiveProcessorCount=1',
       '-XX:-UsePerfData', '-XX:+DisableAttachMechanism', '-Xshare:auto', '-Xlog:disable', `-Djava.io.tmpdir=${work}`];
     if (lang === 'c') compile = await invoke('/usr/bin/gcc', ['-std=c17', '-O1', '-Wall', '-Wextra', 'main.c', '-o', 'program', '-lm'], 'compile');
+    else if (lang === 'cpp') compile = await invoke('/usr/bin/g++', ['-std=c++17', '-O1', '-Wall', '-Wextra', 'main.cpp', '-o', 'program'], 'compile');
     else if (lang === 'java') compile = await invoke('/opt/java/openjdk/bin/javac', [...jvm.map(x => `-J${x}`), '-J-Xmx256m', '-J-Xss2m', '-J-XX:MaxMetaspaceSize=128m', '-encoding', 'UTF-8', file], 'compile');
-    else if (lang !== 'python') throw new Error('Unknown language');
+    else if (lang !== 'python' && lang !== 'javascript') throw new Error('Unknown language');
     if (compile) {
       if (compile.exitCode !== 0 || compile.truncated || compile.timedOut) {
         if (!multi) return response(compile, 'compile');
@@ -332,8 +333,9 @@ export async function runCode({ lang, code, stdin = '', tests }, {
       // No compiler-spawned daemon may overlap execution of the program.
       try { await cleanup(); } catch (error) { if (real) poisoned = true; throw error; }
     }
-    const run = overrides => lang === 'c' ? invoke(join(work, 'program'), [], 'run', overrides) : lang === 'python'
+    const run = overrides => (lang === 'c' || lang === 'cpp') ? invoke(join(work, 'program'), [], 'run', overrides) : lang === 'python'
       ? invoke('/usr/local/bin/python3', ['-I', '-u', 'main.py'], 'run', overrides)
+      : lang === 'javascript' ? invoke('/usr/local/bin/node', ['--permission', '--jitless', '--max-old-space-size=128', 'main.js'], 'run', overrides)
       : invoke('/opt/java/openjdk/bin/java', ['-Xmx192m', '-Xss1m', '-XX:MaxMetaspaceSize=96m', ...jvm, '-cp', '.', className], 'run', overrides);
     if (!multi) return response(await run(), 'run');
     // Compilation is outside the shared run budget; inter-case reaping is inside it.

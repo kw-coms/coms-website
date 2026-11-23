@@ -1,0 +1,89 @@
+.judge-problem { --ex-w: 1450px; }
+.judge-problem > .ex-back,
+.judge-problem > .ex-head,
+.judge-problem > .ex-columns { max-width: var(--ex-w); }
+.judge-problem > .ex-back { padding-bottom: 0; }
+.judge-problem > .ex-head { margin-top: 0; margin-bottom: 8px; padding-block: 12px 16px; }
+.judge-problem .page-crumb { display: none; }
+.judge-problem .ex-head h1 { font-size: clamp(34px, 4.5vw, 58px); line-height: 1.12; }
+.judge-problem .ex-eyebrow { font-size: 14px; color: var(--app-accent-text); }
+.judge-problem .ex-columns {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: clamp(14px, 2vw, 30px);
+  align-items: start;
+}
+.judge-problem .ex-panel { border-radius: 20px; padding: clamp(20px, 2.5vw, 36px); }
+.judge-problem .ex-statement {
+  position: static;
+  max-height: none;
+  overflow: visible;
+  background: color-mix(in srgb, var(--app-surface) 93%, var(--app-bg));
+  font-size: 18px;
+  line-height: 1.8;
+}
+.judge-problem .ex-statement > .ex-markdown { max-width: 68ch; }
+.judge-problem .ex-statement .ex-markdown p { margin: 0 0 1.1em; }
+.judge-problem .ex-statement .ex-markdown p:last-child { margin-bottom: 0; }
+.judge-problem .ex-statement h2 { margin-top: 30px; margin-bottom: 12px; font-size: 23px; line-height: 1.35; }
+.judge-problem .ex-statement h3 { font-size: 17px; }
+.judge-problem .ex-spec,
+.judge-problem .ex-example { padding: 20px; border-radius: 14px; }
+.judge-problem .ex-spec { border: 0; border-top: 1px solid var(--app-hairline); border-radius: 0; margin-top: 20px; padding: 6px 0 0; }
+.judge-problem .ex-statement pre { font-size: 15px; line-height: 1.6; }
+.judge-problem .ex-workspace { min-width: 0; }
+.judge-problem .ex-editor { min-height: 460px; margin-top: 12px; border-radius: 14px; }
+.judge-problem .ex-editor .cm-editor { min-height: 460px; max-height: 75vh; }
+.judge-problem .ex-editor .cm-content { min-height: 430px; }
+.judge-problem .ex-solution-editor,
+.judge-problem .ex-solution-editor .cm-editor { min-height: 260px; }
+.judge-problem .ex-solution-editor .cm-content { min-height: 240px; }
+.judge-problem .ex-actions { gap: 10px; }
+.judge-problem .ex-actions > button { min-height: 44px; }
+.judge-problem .ex-actions > button.ex-primary { min-width: 132px; font-size: 16px; }
+.judge-problem .ex-stdin { font-size: 14px; font-weight: 650; }
+.judge-problem .ex-stdin textarea { margin-top: 8px; font-weight: 400; }
+.judge-editor-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.judge-editor-tools > strong { margin-inline-end: auto; font-size: 15px; }
+.judge-problem .judge-editor-tools button { min-height: 36px; padding: 6px 10px; font-size: 13px; }
+.judge-editor-settings { position: relative; }
+.judge-editor-settings summary { cursor: pointer; list-style: none; border: 1px solid var(--app-hairline); border-radius: 9px; padding: 7px 10px; font-size: 13px; line-height: 20px; }
+.judge-editor-settings summary::-webkit-details-marker { display: none; }
+.judge-editor-settings > div { position: absolute; right: 0; top: calc(100% + 8px); z-index: 5; display: grid; gap: 12px; width: min(320px, 82vw); padding: 16px; border: 1px solid var(--app-hairline); border-radius: 14px; background: var(--app-surface); box-shadow: 0 18px 45px color-mix(in srgb, var(--app-text) 16%, transparent); }
+.judge-editor-settings label { display: grid; gap: 5px; font-size: 13px; font-weight: 600; }
+.judge-editor-settings select { min-height: 38px; }
+.judge-editor-settings .judge-wrap { display: flex; align-items: center; gap: 10px; }
+.judge-editor-settings .judge-wrap input { width: 18px; height: 18px; }
+.judge-mobile-nav { display: none; }
+.judge-result-anchor { scroll-margin-top: 112px; }
+.judge-result-empty { margin: 18px 0 0; padding: 16px; border: 1px dashed var(--app-hairline); border-radius: 10px; color: var(--app-muted); font-size: 14px; }
+.judge-problem .ex-meta { gap: 8px 12px; font-size: 13px; }
+.judge-problem .ex-meta > span:not(.judge-tier) { color: var(--app-muted); }
+.judge-verdict-list { list-style: none; margin: 18px 0 0; padding: 0; border-top: 1px solid var(--app-hairline); }
+.judge-verdict-list li { display: flex; justify-content: space-between; gap: 16px; padding: 12px 2px; border-bottom: 1px solid var(--app-hairline); font-size: 14px; }
+.judge-verdict-list strong { font-weight: 700; }
+.judge-verdict-list [data-result='correct'] strong { color: var(--ok); }
+.judge-verdict-list [data-result='wrong'] strong,
+.judge-verdict-list [data-result='runtime'] strong,
+.judge-verdict-list [data-result='timeout'] strong { color: var(--warn); }
+.judge-problem button.judge-share { min-height: 42px; margin-top: 12px; border-color: var(--app-accent-border); background: var(--app-accent-soft); color: var(--app-text); }
+.judge-problem :is(.judge-editor-tools button, .judge-editor-settings summary, .judge-editor-settings select, .judge-editor-settings input):focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+
+@media (max-width: 900px) {
+  .judge-problem .ex-columns { grid-template-columns: 1fr; }
+  .judge-mobile-nav { display: flex; position: sticky; top: var(--apple-nav-height, 44px); z-index: 3; gap: 4px; margin-inline: 12px; padding: 7px; border: 1px solid var(--app-hairline); border-radius: 12px; background: var(--app-surface); }
+  .judge-mobile-nav a { flex: 1; min-height: 40px; display: grid; place-items: center; color: var(--app-text); border-radius: 8px; text-align: center; font-size: 13px; font-weight: 700; text-decoration: none; }
+  .judge-mobile-nav a:hover { background: var(--app-accent-soft); }
+  .judge-mobile-nav a:focus-visible { outline: 2px solid var(--app-accent); outline-offset: -2px; }
+  .judge-problem :is(#judge-statement, #judge-workspace) { scroll-margin-top: 112px; }
+}
+
+@media (max-width: 500px) {
+  .judge-problem .ex-tabs { flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding-bottom: 4px; scrollbar-width: thin; }
+  .judge-problem .ex-tabs > button { flex: none; min-height: 44px; }
+  .judge-problem .ex-panel { padding: 20px; }
+  .judge-problem .ex-statement { font-size: 17px; line-height: 1.75; }
+  .judge-problem .ex-statement h2 { font-size: 21px; }
+  .judge-problem .ex-head h1 { font-size: 35px; }
+  .judge-problem .ex-editor, .judge-problem .ex-editor .cm-editor { min-height: 360px; }
+  .judge-problem .ex-editor .cm-content { min-height: 330px; }
+}

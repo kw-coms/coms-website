@@ -23,15 +23,17 @@ if (enabled) {
   if (process.env.NODE_TEST_CONTEXT) throw new Error('Use node test/toolchain.mjs directly, not node --test');
   await assertContainer();
 }
-const tools = { c: '/usr/bin/gcc', java: '/opt/java/openjdk/bin/javac', python: '/usr/local/bin/python3' };
+const tools = { c: '/usr/bin/gcc', cpp: '/usr/bin/g++', java: '/opt/java/openjdk/bin/javac', python: '/usr/local/bin/python3', javascript: '/usr/local/bin/node' };
 const options = (lang, attack = false) => ({ skip: reason || (!existsSync(tools[lang]) && `${lang} toolchain missing`) || (attack && process.env.RUNNER_CONTAINER_ATTACK_TESTS !== '1' && 'set RUNNER_CONTAINER_ATTACK_TESTS=1') });
 const run = (lang, code, stdin = '') => runCode({ lang, code, stdin });
 const runCases = (lang, code, tests) => runCode({ lang, code, tests });
 
 for (const [lang, code] of [
   ['c', '#include <stdio.h>\nint main(void) { char b[100]; fgets(b,sizeof b,stdin); printf("hello %s",b); }'],
+  ['cpp', '#include <iostream>\n#include <string>\nint main() { std::string name; std::getline(std::cin,name); std::cout << "hello " << name << "\\n"; }'],
   ['java', 'import java.util.Scanner; public class Greeting { public static void main(String[] args) { System.out.println("hello " + new Scanner(System.in).nextLine()); }}'],
   ['python', 'print("hello " + input())'],
+  ['javascript', 'const fs = require("node:fs"); console.log("hello " + fs.readFileSync(0,"utf8").trim())'],
 ]) {
   test(`${lang}: real hello world and stdin`, options(lang), async () => {
     const r = await run(lang, code, 'COMS\n');
@@ -42,8 +44,10 @@ for (const [lang, code] of [
 
 for (const [lang, code] of [
   ['c', '#include <stdio.h>\nint main(void){int n;if(scanf("%d",&n)!=1)return 1;printf("%d\\n",n*2);return 0;}'],
+  ['cpp', '#include <iostream>\nint main(){int n;std::cin>>n;std::cout<<n*2<<"\\n";}'],
   ['java', 'import java.util.Scanner; public class Main { public static void main(String[] a) { System.out.println(new Scanner(System.in).nextInt()*2); } }'],
   ['python', 'print(int(input())*2)'],
+  ['javascript', 'const n=Number(require("node:fs").readFileSync(0,"utf8"));console.log(n*2)'],
 ]) {
   test(`${lang}: three ordered cases return separate results`, options(lang), async () => {
     const r = await runCases(lang, code, ['1\n', '7\n', '21\n']);
@@ -101,6 +105,20 @@ test('Java: ten trivial cases finish within the shared run budget', options('jav
 test('C: real compiler error with source diagnostic', options('c'), async () => {
   const r = await run('c', 'int main(void) { return unknown; }');
   assert.equal(r.ok, false); assert.equal(r.stage, 'compile'); assert.ok(r.diagnostics.length > 0); assert.ok(r.diagnostics[0].hintKo);
+});
+test('C++: real compiler error with source diagnostic', options('cpp'), async () => {
+  const r = await run('cpp', '#include <iostream>\nint main(){std::cout << missing;}');
+  assert.equal(r.ok, false); assert.equal(r.stage, 'compile'); assert.equal(r.diagnostics[0]?.line, 2);
+});
+test('JavaScript: runtime error points to source', options('javascript'), async () => {
+  const r = await run('javascript', 'console.log(missing)');
+  assert.equal(r.ok, true); assert.notEqual(r.exitCode, 0); assert.equal(r.diagnostics[0]?.line, 1);
+});
+test('JavaScript: file reads outside stdin are denied by Node permission mode', options('javascript'), async () => {
+  const code = 'const fs=require("node:fs"); try { fs.readFileSync("/etc/passwd"); console.log("unexpected"); } catch (error) { console.log(error.code); }';
+  const r = await run('javascript', code);
+  assert.equal(r.exitCode, 0, r.stderr);
+  assert.equal(r.stdout.trim(), 'ERR_ACCESS_DENIED');
 });
 test('Java: real compiler error', options('java'), async () => {
   const r = await run('java', 'public class Main { public static void main(String[] args) { int x = "bad"; }}');

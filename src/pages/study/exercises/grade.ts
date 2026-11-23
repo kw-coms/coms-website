@@ -1,9 +1,10 @@
 import { matchesOutput } from './compare'
 export { matchesOutput } from './compare'
 import { compareOutput, type DiffLine } from '../playground/compare'
-import type { Diagnostic } from '../playground/runner'
+import { MAX_CODE_BYTES, postRun, type Diagnostic } from '../playground/runner'
 import { runTests, type MultiRunOutput, type TestRun, type TestsResult } from './api'
 import { USER_MARKER, type ExCase, type ExLang, type Exercise } from './types'
+import { readJudgeProgress, type JudgeProgress } from './judgeProgress'
 
 export type Verdict = 'correct' | 'wrong' | 'timeout' | 'runtime' | 'truncated' | 'skipped'
 export const VERDICT_LABEL: Record<Verdict, string> = {
@@ -30,6 +31,8 @@ export interface GradeReport {
   compileError: boolean
   stderr: string
   timeMs: number
+  privateCases?: true
+  progress?: JudgeProgress
 }
 export type GradeResult = { kind: 'graded'; grade: GradeReport } | Exclude<TestsResult, { kind: 'output' }>
 
@@ -83,7 +86,31 @@ export function gradeOutput(exercise: Exercise, lang: ExLang, studentCode: strin
   return { passed, total: cases.length, solved: !compileError && passed === cases.length, cases: verdicts, diagnostics, compileError, stderr: output.stderr, timeMs: output.timeMs }
 }
 
-export async function gradeExercise(exercise: Exercise, lang: ExLang, studentCode: string, signal?: AbortSignal): Promise<GradeResult> {
+export async function gradeExercise(exercise: Exercise, lang: ExLang, studentCode: string, signal?: AbortSignal, number?: number): Promise<GradeResult> {
+  if (number !== undefined) {
+    if (new TextEncoder().encode(studentCode).length > MAX_CODE_BYTES) return { kind: 'rejected', messageKo: '코드는 64KB 이하로 줄여 주세요.' }
+    const result = await postRun({ lang, code: studentCode, problemNumber: number }, signal)
+    if (result.kind !== 'output') return result
+    const judge = result.data.judge as (Partial<GradeReport> & { verdicts?: Verdict[] }) | undefined
+    if (!judge || typeof judge.total !== 'number' || typeof judge.passed !== 'number' ||
+        !Number.isSafeInteger(judge.total) || judge.total < 1 || !Number.isSafeInteger(judge.passed) ||
+        judge.passed < 0 || judge.passed > judge.total || !Array.isArray(judge.verdicts)) {
+      return { kind: 'network', messageKo: '채점 결과를 받지 못했어요. 잠시 뒤 다시 제출해 주세요.' }
+    }
+    const diagnostics = Array.isArray(judge.diagnostics)
+      ? mapDiagnostics(judge.diagnostics.filter((d) => d && Number.isFinite(d.line) && typeof d.message === 'string'), exercise, lang, studentCode)
+      : []
+    return { kind: 'graded', grade: {
+      passed: judge.passed, total: judge.total, solved: judge.solved === true && judge.passed === judge.total,
+      compileError: judge.compileError === true, diagnostics,
+      stderr: typeof judge.stderr === 'string' ? judge.stderr : '', timeMs: typeof judge.timeMs === 'number' ? judge.timeMs : 0,
+      cases: judge.verdicts.map((value, index) => {
+        const verdict = Object.hasOwn(VERDICT_LABEL, value) ? value : 'skipped'
+        return { index, verdict, label: VERDICT_LABEL[verdict], input: '', expected: '', actual: '', stderr: '', diff: [], timeMs: 0 }
+      }),
+      privateCases: true, progress: readJudgeProgress(result.data.progress) ?? undefined,
+    } }
+  }
   let code: string
   try { code = buildProgram(exercise, lang, studentCode) }
   catch (error) { return { kind: 'rejected', messageKo: error instanceof Error ? error.message : '채점 코드를 만들 수 없어요.' } }
