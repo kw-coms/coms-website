@@ -7,6 +7,7 @@ import { createRunnerServer } from '../server.mjs';
 import { createClubBattles } from '../club-battles.mjs';
 import { createClubSocial } from '../club-social.mjs';
 import { createClubTournaments } from '../club-tournaments.mjs';
+import { createClubProblems } from '../club-problems.mjs';
 import { createClubStore } from '../club-store.mjs';
 import { createJudgeProgress } from '../judge-progress.mjs';
 
@@ -111,4 +112,64 @@ test('president opens a tournament and only the assigned members can submit to i
   assert.equal(result.status, 'finished');
   assert.equal(result.champion, '테스트 참가자');
   assert.equal(result.rounds[0].matches[0].winner, '테스트 참가자');
+});
+
+test('reference verification uses stored cases and the sandbox queue before issuing a gradeable number', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'coms-authoring-server-'));
+  const numberedProblems = {};
+  const clubProblems = createClubProblems({ numberedProblems, store: createClubStore({
+    directory, filename: 'problems.json', initial: () => ({ version: 1, proposals: [], nextNumber: 90_000 }),
+  }) });
+  let executions = 0;
+  const server = createRunnerServer({
+    trustProxy: true, numberedProblems, clubProblems, logger() {},
+    executor: async ({ code, tests }) => {
+      executions += 1;
+      return { stage: 'run', results: tests.map(stdin => ({
+        stdout: code === 'double' ? String(Number(stdin) * 2) : '0', exitCode: 0,
+      })) };
+    },
+  });
+  t.after(async () => { await new Promise(resolve => server.close(resolve)); await rm(directory, { recursive: true, force: true }); });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${server.address().port}/study/api`;
+  const post = async (actor, body, path = '/club', role = 'USER') => {
+    const response = await fetch(url + path, { method: 'POST', body: JSON.stringify(body), headers: {
+      'Content-Type': 'application/json', 'X-Runner-Client': actor, 'X-Runner-Role': role,
+    } });
+    return { status: response.status, data: await response.json() };
+  };
+  const draft = {
+    title: '수를 두 배로', statement: '정수의 두 배를 출력합니다.', inputSpec: '정수 한 개', outputSpec: '정수의 두 배',
+    difficultyTier: 1, topics: ['구현'], compare: 'tokens',
+    examples: [{ stdin: '1', expected: '2' }],
+    tests: [2, -1, 0, 17, 99].map(value => ({ stdin: String(value), expected: String(value * 2) })),
+    reference: { lang: 'python', code: 'double' },
+  };
+  const saved = await post('author', { action: 'problem-save', draft });
+  assert.equal(saved.status, 200);
+  const { id } = saved.data.proposal;
+  assert.equal((await post('stranger', { action: 'problem-verify', authoringId: id }, '/run')).status, 404);
+  assert.equal((await post('author', { action: 'problem-verify', authoringId: id, code: 'other' }, '/run')).status, 400);
+  assert.equal(executions, 0);
+  const verification = await post('author', { action: 'problem-verify', authoringId: id }, '/run');
+  assert.equal(verification.status, 200);
+  assert.equal(verification.data.judge.solved, true);
+  assert.equal(verification.data.judge.total, 6);
+  assert.equal(verification.data.proposal.verified, true);
+  assert.equal(executions, 1);
+  const queued = await post('author', { action: 'problem-submit', id, revision: verification.data.proposal.revision });
+  assert.equal(queued.status, 200);
+  assert.equal((await post('author', { action: 'problem-publish', id, revision: queued.data.proposal.revision })).status, 403);
+  const published = await post('chair', { action: 'problem-publish', id, revision: queued.data.proposal.revision }, '/club', 'ADMIN');
+  assert.equal(published.status, 200);
+  const number = published.data.proposal.number;
+  const catalog = await post('stranger', { action: 'problem-catalog' });
+  assert.equal(catalog.data.problems[0].number, number);
+  assert.deepEqual(catalog.data.problems[0].problem.tests, []);
+  assert.deepEqual(catalog.data.problems[0].problem.solution, {});
+  const graded = await post('stranger', { lang: 'python', code: 'double', problemNumber: number }, '/run');
+  assert.equal(graded.data.judge.solved, true);
+  assert.equal(graded.data.judge.total, 6);
+  assert.equal(executions, 2);
 });

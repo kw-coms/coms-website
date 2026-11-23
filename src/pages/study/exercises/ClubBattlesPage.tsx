@@ -6,7 +6,7 @@ import MembersGate, { AuthCheckFailed } from '../../../components/MembersGate'
 import { useAuth } from '../../../contexts/useAuth'
 import { requestJudgeClub, type BattleView } from './clubApi'
 import { JudgeTierBadge } from './JudgeTierBadge'
-import { numberedExercises } from './problems'
+import { useNumberedCatalog } from './useNumberedCatalog'
 import '../study.css'
 import './club-battles.css'
 
@@ -25,7 +25,7 @@ function BattleRoom({ room, now, busy, onCancel, onCopy }: {
   onCancel(): void
   onCopy(): void
 }) {
-  const match = numberedExercises.find(({ number }) => number === room.problemNumber)
+  const match = useNumberedCatalog().find(({ number }) => number === room.problemNumber)
   const title = match?.problem.title ?? `문제 ${room.problemNumber}번`
   const result = room.result && { win: '승리', loss: '패배', draw: '무승부', unsolved: '미해결' }[room.result]
   const status = {
@@ -61,6 +61,7 @@ function BattleRoom({ room, now, busy, onCancel, onCopy }: {
 }
 
 function BattleContent() {
+  const numberedExercises = useNumberedCatalog()
   const [search, setSearch] = useSearchParams()
   const requestedCode = (search.get('room') ?? '').trim().toUpperCase()
   const [code, setCode] = useState(requestedCode)

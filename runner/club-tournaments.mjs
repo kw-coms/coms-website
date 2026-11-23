@@ -4,7 +4,7 @@ import { ClubError, clubMemberId } from './club-store.mjs';
 const GRACE_MS = 60_000;
 const MAX_EVENTS = 50;
 const ID = /^[a-f0-9]{24}$/;
-const CAPACITIES = new Set([4, 8, 16, 32]);
+const LEGACY_CAPACITIES = new Set([4, 8, 16, 32]);
 const fail = (status, message) => { throw new ClubError(status, message); };
 const validTime = value => Number.isSafeInteger(value) && value >= 0;
 const randomId = () => randomBytes(12).toString('hex');
@@ -38,6 +38,12 @@ function makeMatch(players) {
   return { id: randomId(), players, winner: null, result: null, records: {} };
 }
 
+function roundSettings(event, index) {
+  if (event.roundsConfig) return event.roundsConfig[index];
+  return { durationMinutes: event.durationMinutes,
+    problems: [{ number: event.problemNumbers[index], points: 1 }] };
+}
+
 function start(event, shuffle) {
   const players = shuffle(event.participants.map(item => item.member));
   const matchCount = 1 << (Math.ceil(Math.log2(players.length)) - 1);
@@ -53,16 +59,41 @@ function start(event, shuffle) {
     const first = players[cursor++];
     matches.push(makeMatch([first, byeSlots.has(index) ? null : players[cursor++]]));
   }
-  const problemOffset = event.problemNumbers.length - Math.ceil(Math.log2(players.length));
+  const problemOffset = Math.ceil(Math.log2(event.capacity)) - Math.ceil(Math.log2(players.length));
+  const settings = roundSettings(event, problemOffset);
   event.rounds = [{ number: 1, startsAt: event.startsAt,
-    endsAt: event.startsAt + event.durationMinutes * 60_000,
-    problemNumber: event.problemNumbers[problemOffset], matches }];
+    endsAt: event.startsAt + settings.durationMinutes * 60_000,
+    problemNumber: settings.problems[0].number,
+    ...(event.roundsConfig ? { problems: settings.problems.map(problem => ({ ...problem })) } : {}),
+    matches }];
   event.status = 'running';
 }
 
-function chooseWinner(match) {
+function participantScore(match, round, event, member) {
+  const results = match.problemRecords?.[member] ?? {};
+  let score = 0, attainedAt = 0;
+  for (const problem of round.problems) {
+    const record = results[problem.number];
+    if (!record) continue;
+    const earned = event.scoring === 'partial'
+      ? Math.floor(problem.points * record.passed / record.total)
+      : record.solved ? problem.points : 0;
+    score += earned;
+    if (earned > 0) attainedAt = Math.max(attainedAt, record.receivedAt);
+  }
+  return { score, attainedAt };
+}
+
+function chooseWinner(match, round, event) {
   const [first, second] = match.players;
   if (!first || !second) return first ?? second ?? null;
+  if (event.roundsConfig) {
+    const left = participantScore(match, round, event, first);
+    const right = participantScore(match, round, event, second);
+    if (left.score === 0 && right.score === 0) return null;
+    if (left.score !== right.score) return left.score > right.score ? first : second;
+    return left.attainedAt <= right.attainedAt ? first : second;
+  }
   const left = match.records[first], right = match.records[second];
   if (!left && !right) return null;
   if (!left) return right.passed ? second : null;
@@ -84,10 +115,10 @@ function settle(event, time, shuffle) {
     if (time < round.endsAt + GRACE_MS) break;
     for (const match of round.matches) {
       if (match.result) continue;
-      match.winner = chooseWinner(match);
+      match.winner = chooseWinner(match, round, event);
       if (match.players.some(player => player === null) && match.winner) match.result = 'bye';
       else if (!match.winner) match.result = 'no-score';
-      else match.result = match.records[match.winner]?.solved ? 'solved' : 'score';
+      else match.result = event.roundsConfig ? 'score' : match.records[match.winner]?.solved ? 'solved' : 'score';
     }
     const winners = round.matches.map(match => match.winner);
     if (round.matches.length === 1) {
@@ -100,9 +131,12 @@ function settle(event, time, shuffle) {
     for (let index = 0; index < winners.length; index += 2) {
       matches.push(makeMatch([winners[index], winners[index + 1] ?? null]));
     }
+    const settingsIndex = Math.ceil(Math.log2(event.capacity)) - Math.log2(matches.length) - 1;
+    const settings = roundSettings(event, settingsIndex);
     event.rounds.push({ number: round.number + 1, startsAt,
-      endsAt: startsAt + event.durationMinutes * 60_000,
-      problemNumber: event.problemNumbers[event.problemNumbers.length - Math.log2(matches.length) - 1],
+      endsAt: startsAt + settings.durationMinutes * 60_000,
+      problemNumber: settings.problems[0].number,
+      ...(event.roundsConfig ? { problems: settings.problems.map(problem => ({ ...problem })) } : {}),
       matches });
   }
 }
@@ -114,15 +148,23 @@ function displayName(event, member) {
 function view(event, member, canManage, time) {
   const summary = { id: event.id, title: event.title, startsAt: event.startsAt,
     capacity: event.capacity, durationMinutes: event.durationMinutes, breakMinutes: event.breakMinutes,
+    registrationClosesAt: event.registrationClosesAt ?? event.startsAt,
+    scoring: event.scoring ?? 'legacy',
     status: event.status, participantCount: event.participants.length,
     registered: event.participants.some(item => item.member === member),
     champion: event.champion ? displayName(event, event.champion) : null };
   return { ...summary, rules: event.rules,
     participants: event.participants.map(item => item.name),
     problemNumbers: canManage ? [...event.problemNumbers] : null,
+    roundsConfig: canManage && event.roundsConfig ? event.roundsConfig.map(settings => ({
+      durationMinutes: settings.durationMinutes,
+      problems: settings.problems.map(problem => ({ ...problem })),
+    })) : null,
     rounds: event.rounds.map(round => ({
       number: round.number, startsAt: round.startsAt, endsAt: round.endsAt,
       problemNumber: canManage || time >= round.startsAt ? round.problemNumber : null,
+      problems: canManage || time >= round.startsAt
+        ? (round.problems ?? [{ number: round.problemNumber, points: 1 }]).map(problem => ({ ...problem })) : null,
       matches: round.matches.map((match, index) => ({
         id: match.id, number: index + 1,
         status: match.result ? 'finished' : time < round.startsAt ? 'waiting'
@@ -131,6 +173,8 @@ function view(event, member, canManage, time) {
         winner: match.winner ? displayName(event, match.winner) : null,
         winnerSlot: match.winner ? match.players.indexOf(match.winner) : null,
         result: match.result,
+        scores: match.result && event.roundsConfig
+          ? match.players.map(player => player ? participantScore(match, round, event, player).score : 0) : null,
         isMine: match.players.includes(member),
         canSubmit: event.status === 'running' && match.players.includes(member) &&
           match.players.every(Boolean) && !match.result && time >= round.startsAt && time < round.endsAt,
@@ -141,6 +185,8 @@ function view(event, member, canManage, time) {
 function summary(event, member) {
   return { id: event.id, title: event.title, startsAt: event.startsAt,
     capacity: event.capacity, durationMinutes: event.durationMinutes, breakMinutes: event.breakMinutes,
+    registrationClosesAt: event.registrationClosesAt ?? event.startsAt,
+    scoring: event.scoring ?? 'legacy',
     status: event.status, participantCount: event.participants.length,
     registered: event.participants.some(item => item.member === member),
     champion: event.champion ? displayName(event, event.champion) : null };
@@ -162,7 +208,9 @@ export function createClubTournaments({ store, numberedProblems, now = Date.now,
     if (!event.participants.some(item => item.member === member) || !match.players.includes(member) || !match.players.every(Boolean)) {
       fail(403, '참가한 대진만 제출할 수 있어요.');
     }
-    if (round.problemNumber !== number) fail(400, '대진 문제 번호가 일치하지 않아요.');
+    if (!(round.problems ?? [{ number: round.problemNumber }]).some(problem => problem.number === number)) {
+      fail(400, '대진 문제 번호가 일치하지 않아요.');
+    }
     return { event, round, match };
   };
   return {
@@ -183,14 +231,33 @@ export function createClubTournaments({ store, numberedProblems, now = Date.now,
           if (!canManage) fail(403, '회장만 대회를 관리할 수 있어요.');
           const title = typeof body.title === 'string' ? body.title.trim() : '';
           const rules = typeof body.rules === 'string' ? body.rules.trim() : '';
-          const rounds = Math.log2(body.capacity);
+          const customized = Object.hasOwn(body, 'roundsConfig');
+          const rounds = customized ? Math.ceil(Math.log2(body.capacity)) : Math.log2(body.capacity);
+          const capacityValid = customized
+            ? Number.isSafeInteger(body.capacity) && body.capacity >= 2 && body.capacity <= 64
+            : LEGACY_CAPACITIES.has(body.capacity);
+          const registrationClosesAt = body.registrationClosesAt ?? body.startsAt;
+          const roundsValid = customized
+            ? Array.isArray(body.roundsConfig) && body.roundsConfig.length === rounds &&
+              body.roundsConfig.every(settings => settings && typeof settings === 'object' &&
+                Number.isSafeInteger(settings.durationMinutes) && settings.durationMinutes >= 1 &&
+                settings.durationMinutes <= 180 && Array.isArray(settings.problems) &&
+                settings.problems.length >= 1 && settings.problems.length <= 12 &&
+                new Set(settings.problems.map(problem => problem?.number)).size === settings.problems.length &&
+                settings.problems.every(problem => problem && Number.isSafeInteger(problem.number) &&
+                  Object.hasOwn(numberedProblems, problem.number) && Number.isSafeInteger(problem.points) &&
+                  problem.points >= 1 && problem.points <= 1000))
+            : Number.isInteger(body.durationMinutes) && body.durationMinutes >= 5 &&
+              body.durationMinutes <= 60 && Array.isArray(body.problemNumbers) &&
+              body.problemNumbers.length === rounds && new Set(body.problemNumbers).size === rounds &&
+              body.problemNumbers.every(number => Number.isSafeInteger(number) && Object.hasOwn(numberedProblems, number));
           if (!title || title.length > 80 || !rules || rules.length > 2000 ||
-              !validTime(body.startsAt) || body.startsAt <= time || !CAPACITIES.has(body.capacity) ||
-              !Number.isInteger(body.durationMinutes) || body.durationMinutes < 5 || body.durationMinutes > 60 ||
+              !validTime(body.startsAt) || body.startsAt <= time || !capacityValid ||
+              !validTime(registrationClosesAt) || registrationClosesAt <= time ||
+              registrationClosesAt > body.startsAt ||
+              (customized && body.scoring !== undefined && body.scoring !== 'full' && body.scoring !== 'partial') ||
               !Number.isInteger(body.breakMinutes) || body.breakMinutes < 0 || body.breakMinutes > 30 ||
-              !Array.isArray(body.problemNumbers) || body.problemNumbers.length !== rounds ||
-              new Set(body.problemNumbers).size !== rounds ||
-              body.problemNumbers.some(number => !Number.isSafeInteger(number) || !Object.hasOwn(numberedProblems, number))) {
+              !roundsValid) {
             fail(400, '대회 제목·규칙·시작 시각·라운드 문제를 확인해 주세요.');
           }
           let event;
@@ -210,8 +277,15 @@ export function createClubTournaments({ store, numberedProblems, now = Date.now,
             if (event.status !== 'draft') fail(409, '공개 전 대회만 수정할 수 있어요.');
           }
           Object.assign(event, { title, rules, startsAt: body.startsAt, capacity: body.capacity,
-            durationMinutes: body.durationMinutes, breakMinutes: body.breakMinutes,
-            problemNumbers: [...body.problemNumbers] });
+            durationMinutes: customized ? body.roundsConfig[0].durationMinutes : body.durationMinutes,
+            breakMinutes: body.breakMinutes, registrationClosesAt,
+            scoring: customized ? body.scoring ?? 'full' : 'legacy',
+            roundsConfig: customized ? body.roundsConfig.map(settings => ({
+              durationMinutes: settings.durationMinutes,
+              problems: settings.problems.map(problem => ({ number: problem.number, points: problem.points })),
+            })) : undefined,
+            problemNumbers: customized ? body.roundsConfig.map(settings => settings.problems[0].number)
+              : [...body.problemNumbers] });
           return { event: view(event, member, canManage, time) };
         }
         const event = eventFor(state, body.id, canManage);
@@ -226,13 +300,13 @@ export function createClubTournaments({ store, numberedProblems, now = Date.now,
           if (event.status === 'finished' || event.status === 'cancelled') fail(409, '이미 종료된 대회예요.');
           event.status = 'cancelled';
         } else if (body.action === 'tournament-join') {
-          if (event.status !== 'registration' || time >= event.startsAt) fail(409, '참가 신청이 끝난 대회예요.');
+          if (event.status !== 'registration' || time >= (event.registrationClosesAt ?? event.startsAt)) fail(409, '참가 신청이 끝난 대회예요.');
           if (event.participants.some(item => item.member === member)) fail(409, '이미 참가 신청했어요.');
           if (event.participants.length >= event.capacity) fail(409, '참가 인원이 가득 찼어요.');
           const label = cleanName(name) ?? `참가자 ${event.participants.length + 1}`;
           event.participants.push({ member, name: label });
         } else if (body.action === 'tournament-leave') {
-          if (event.status !== 'registration' || time >= event.startsAt) fail(409, '참가 취소 기간이 지났어요.');
+          if (event.status !== 'registration' || time >= (event.registrationClosesAt ?? event.startsAt)) fail(409, '참가 취소 기간이 지났어요.');
           const index = event.participants.findIndex(item => item.member === member);
           if (index < 0) fail(409, '참가 신청 내역이 없어요.');
           event.participants.splice(index, 1);
@@ -253,7 +327,7 @@ export function createClubTournaments({ store, numberedProblems, now = Date.now,
         return { event: view(event, member, false, time) };
       });
     },
-    async recordResult(key, eventId, matchId, problemNumber, receivedAt, { passed, solved }) {
+    async recordResult(key, eventId, matchId, problemNumber, receivedAt, { passed, total, solved }) {
       const member = clubMemberId(key);
       const time = currentTime();
       if (!Number.isSafeInteger(passed) || passed < 0 || typeof solved !== 'boolean') {
@@ -265,6 +339,23 @@ export function createClubTournaments({ store, numberedProblems, now = Date.now,
             receivedAt >= round.endsAt || time >= round.endsAt + GRACE_MS) {
           settle(event, time, shuffle);
           return { recorded: false };
+        }
+        if (event.roundsConfig) {
+          if (!Number.isSafeInteger(total) || total < 1 || passed > total || solved !== (passed === total)) {
+            fail(400, '채점 결과를 확인할 수 없어요.');
+          }
+          const records = match.problemRecords ??= {};
+          const memberRecords = records[member] ??= {};
+          const previous = memberRecords[problemNumber];
+          const points = round.problems.find(problem => problem.number === problemNumber).points;
+          const score = result => event.scoring === 'partial'
+            ? Math.floor(points * result.passed / result.total) : result.solved ? points : 0;
+          const current = { passed, total, solved, receivedAt };
+          if (!previous || score(current) > score(previous) ||
+              (score(current) === score(previous) && receivedAt < previous.receivedAt)) {
+            memberRecords[problemNumber] = current;
+          }
+          return { recorded: true };
         }
         const previous = match.records[member];
         if (!previous || (solved && !previous.solved) ||

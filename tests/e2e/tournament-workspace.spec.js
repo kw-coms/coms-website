@@ -10,7 +10,7 @@ async function useTournament(page, isMine) {
   await asMember(page)
   await page.route('**/study/api/progress', route => route.fulfill({ json: { solved: [], solvedToday: 0, streak: 0 } }))
   await page.route('**/study/api/club', route => route.fulfill({ json: { event: {
-    id, title: '가을 알고리즘 대회', status: 'running', rounds: [{ number: 1, problemNumber: 11001,
+    id, title: '가을 알고리즘 대회', status: 'running', rounds: [{ number: 1, problemNumber: 1100, problems: [{ number: 1100, points: 20 }, { number: 11001, points: 80 }],
       endsAt: Date.now() + 300_000, matches: [{ id: matchId, status: 'active', isMine, canSubmit: isMine }],
     }],
   } } }))
@@ -26,6 +26,7 @@ test('the match workspace supports timed tournament submission and keeps practic
   await page.goto(url)
   await expect(page.getByRole('timer', { name: '남은 경기 시간' })).toBeVisible()
   await expect(page.getByRole('link', { name: /대진표로 돌아가기/ })).toHaveAttribute('href', `/study/algorithms/tournaments/${id}`)
+  await expect(page.getByRole('navigation', { name: '경기 문제' }).getByRole('link', { name: '11001번 · 80점' })).toHaveAttribute('aria-current', 'page')
   await expect(page.locator('#judge-help')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '답 보기' })).toHaveCount(0)
   await page.locator('.ex-editor .cm-content').fill('print(42)')

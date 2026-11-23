@@ -6,7 +6,7 @@ import MembersGate, { AuthCheckFailed } from '../../../components/MembersGate'
 import { useAuth } from '../../../contexts/useAuth'
 import { requestJudgeClub, type ClubSetView } from './clubApi'
 import { numberedProblemPath } from './problemNumbers'
-import { findNumberedExercise } from './problems'
+import { useNumberedCatalog } from './useNumberedCatalog'
 import './club-social.css'
 
 type Draft = { id?: string; title: string; problemNumbers: number[]; shared: boolean }
@@ -14,7 +14,10 @@ const empty = (): Draft => ({ title: '', problemNumbers: [], shared: false })
 const fromSet = (set: ClubSetView): Draft => ({ id: set.id, title: set.title, problemNumbers: [...set.problemNumbers], shared: set.shared })
 
 function ProblemSetsBody() {
+  const catalog = useNumberedCatalog()
   const [search] = useSearchParams()
+  const suggestedNumber = Number(search.get('problem'))
+  const suggestedExists = catalog.some(({ number }) => number === suggestedNumber)
   const [sets, setSets] = useState<ClubSetView[]>([])
   const [opened, setOpened] = useState<ClubSetView | null>(null)
   const [draft, setDraft] = useState<Draft>(empty)
@@ -28,7 +31,6 @@ function ProblemSetsBody() {
   useEffect(() => {
     const controller = new AbortController()
     const requestedSet = search.get('set')
-    const suggestedNumber = Number(search.get('problem'))
     void Promise.all([
       requestJudgeClub<{ sets: ClubSetView[] }>({ action: 'sets-list' }, controller.signal)
         .then(({ sets: ownSets }) => { if (!controller.signal.aborted) setSets(ownSets) }),
@@ -36,14 +38,14 @@ function ProblemSetsBody() {
     ]).then(([, requested]) => {
       if (controller.signal.aborted) return
       if (requested) { setOpened(requested.set); setDraft(fromSet(requested.set)) }
-      else if (Number.isSafeInteger(suggestedNumber) && findNumberedExercise(String(suggestedNumber))) {
+      else if (suggestedExists) {
         setDraft({ ...empty(), problemNumbers: [suggestedNumber] })
       }
     }).catch((cause) => {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '문제집을 불러오지 못했어요.')
     }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [search, retry])
+  }, [search, retry, suggestedNumber, suggestedExists])
 
   const open = async (id: string) => {
     setLoading(true)
@@ -51,11 +53,10 @@ function ProblemSetsBody() {
     try {
       const { set } = await requestJudgeClub<{ set: ClubSetView }>({ action: 'sets-open', id })
       const next = fromSet(set)
-      const suggested = Number(search.get('problem'))
-      const canAddSuggested = Number.isSafeInteger(suggested) && findNumberedExercise(String(suggested)) && !next.problemNumbers.includes(suggested)
+      const canAddSuggested = suggestedExists && !next.problemNumbers.includes(suggestedNumber)
       if (set.owned && canAddSuggested && next.problemNumbers.length < 40) {
-        next.problemNumbers.push(suggested)
-        setMessage(`${suggested}번 문제를 담았습니다. 저장하면 반영됩니다.`)
+        next.problemNumbers.push(suggestedNumber)
+        setMessage(`${suggestedNumber}번 문제를 담았습니다. 저장하면 반영됩니다.`)
       } else {
         setMessage('')
       }
@@ -68,7 +69,7 @@ function ProblemSetsBody() {
 
   const add = () => {
     const number = Number(input)
-    if (!/^[1-9]\d*$/.test(input.trim()) || !findNumberedExercise(String(number))) {
+    if (!/^[1-9]\d*$/.test(input.trim()) || !catalog.some((entry) => entry.number === number)) {
       setError('등록된 문제 번호를 입력해 주세요.')
       return
     }
@@ -147,7 +148,7 @@ function ProblemSetsBody() {
           </>}
           <h3>담긴 문제 {draft.problemNumbers.length}/40</h3>
           <ol className="club-sets-problems">{draft.problemNumbers.map((number) => {
-            const problem = findNumberedExercise(String(number))?.problem
+            const problem = catalog.find((entry) => entry.number === number)?.problem
             return <li key={number}><Link to={numberedProblemPath(number)}><span>{number}번</span><strong>{problem?.title ?? '문제를 찾을 수 없어요'}</strong></Link>{opened?.owned !== false && <button type="button" aria-label={`${number}번 문제 빼기`} onClick={() => setDraft({ ...draft, problemNumbers: draft.problemNumbers.filter((item) => item !== number) })}>빼기</button>}</li>
           })}</ol>
           {error && <p role="alert">{error}</p>}{!loading && error && sets.length === 0 && <button type="button" onClick={() => { setLoading(true); setError(''); setRetry((value) => value + 1) }}>다시 시도</button>}{message && <p role="status">{message}</p>}

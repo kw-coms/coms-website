@@ -27,6 +27,7 @@ import ClubVote from './ClubVote'
 import ClubBattleBanner from './ClubBattleBanner'
 import { requestJudgeClub } from './clubApi'
 import type { TournamentDetail, TournamentMatch } from './tournamentApi'
+import { CLUB_PROBLEM_START, usePublishedProblems } from './useNumberedCatalog'
 import { shareJudgeResult, useJudgeProgress } from './judgeProgress'
 import '../study.css'
 import './exercises.css'
@@ -38,7 +39,8 @@ const TOURNAMENT_ID = /^[a-f0-9]{24}$/
 const tournamentPath = (id: string) => `/study/algorithms/tournaments/${id}`
 
 type TournamentRoundContext = TournamentSubmission & {
-  title: string; round: number; endsAt: number; match: TournamentMatch
+  title: string; round: number; endsAt: number; match: TournamentMatch; activeProblem: number;
+  problems: { number: number; points: number }[]
 }
 
 type ProblemProps = { studyId: string; problem: Exercise | WebExercise; fromAlgorithms: boolean; number?: number }
@@ -95,7 +97,7 @@ function ProblemBackLink({ studyId, fromAlgorithms, battleLink, tournamentLink }
   </nav>
 }
 
-function TournamentBanner({ title, round, endsAt, match }: TournamentRoundContext) {
+function TournamentBanner({ title, round, endsAt, match, activeProblem, problems, tournamentId, matchId }: TournamentRoundContext) {
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     if (!match.canSubmit) return undefined
@@ -107,6 +109,11 @@ function TournamentBanner({ title, round, endsAt, match }: TournamentRoundContex
     <strong>{title} · {round}라운드</strong>
     {match.canSubmit ? <span role="timer" aria-label="남은 경기 시간">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</span>
       : <span role="status">{match.status === 'settling' ? '제한 시간 내 제출의 채점 결과를 확인 중입니다.' : '이 경기의 제출이 마감됐습니다.'}</span>}
+    {problems.length > 1 && <nav className="judge-tournament-problems" aria-label="경기 문제">
+      {problems.map(({ number, points }) => <Link key={number} className="judge-tools-link"
+        to={`/study/algorithms/${number}?tournament=${tournamentId}&match=${matchId}`}
+        aria-current={number === activeProblem ? 'page' : undefined}>{number}번 · {points}점</Link>)}
+    </nav>}
   </aside>
 }
 
@@ -120,10 +127,13 @@ function TournamentProblem({ entry, ...props }: ProblemProps & { entry: Tourname
     retry: false,
   })
   const event = query.data?.event
-  const round = event?.rounds.find((candidate) => candidate.problemNumber === props.number && candidate.matches.some((match) => match.id === matchId && match.isMine))
+  const round = event?.rounds.find((candidate) => (candidate.problems
+    ? candidate.problems.some(({ number }) => number === props.number)
+    : candidate.problemNumber === props.number) && candidate.matches.some((match) => match.id === matchId && match.isMine))
   const match = round?.matches.find((candidate) => candidate.id === matchId)
-  if (event && round && match && match.status !== 'waiting') {
-    return <ProblemBody {...props} tournament={{ ...entry, title: event.title, round: round.number, endsAt: round.endsAt, match }} />
+  if (event && round && match && props.number !== undefined && match.status !== 'waiting') {
+    return <ProblemBody {...props} tournament={{ ...entry, title: event.title, round: round.number,
+      endsAt: round.endsAt, match, activeProblem: props.number, problems: round.problems ?? [] }} />
   }
   return <main className="study-page ex-page judge-problem">
     <ProblemBackLink {...props} tournamentLink={tournamentPath(tournamentId)} />
@@ -357,7 +367,11 @@ export default function ProblemPage() {
   const { id, problemId, problemNumber } = useParams()
   const { search } = useLocation()
   const params = new URLSearchParams(search)
-  const numbered = problemNumber === undefined ? undefined : findNumberedExercise(problemNumber)
+  const builtIn = problemNumber === undefined ? undefined : findNumberedExercise(problemNumber)
+  const numeric = Number(problemNumber)
+  const publishedNumber = !builtIn && /^[1-9]\d*$/.test(problemNumber ?? '') && Number.isSafeInteger(numeric) && numeric >= CLUB_PROBLEM_START
+  const published = usePublishedProblems(publishedNumber)
+  const numbered = builtIn ?? (publishedNumber ? published.data?.problems?.find(({ number }) => number === numeric) : undefined)
   const battleCode = params.get('battle') ?? undefined
   const tournamentId = params.get('tournament')
   const matchId = params.get('match')
@@ -365,6 +379,12 @@ export default function ProblemPage() {
     ? { tournamentId, matchId } : null
   const fromAlgorithms = Boolean(numbered) || params.get('from') === 'algorithms'
   const { user, loading, authError } = useAuth()
+  if (publishedNumber && !numbered) {
+    if (loading || published.isLoading) return <main className="study-page ex-page"><p className="study-loading" role="status">문제를 불러오는 중...</p></main>
+    if (authError) return <main className="study-page ex-page"><AuthCheckFailed /></main>
+    if (!user) return <main className="study-page ex-page"><MembersGate title="문제 풀이는 동아리원만 할 수 있어요" /></main>
+    if (published.isError) return <main className="study-page ex-page"><p role="alert">문제를 불러오지 못했어요. <button type="button" onClick={() => void published.refetch()}>다시 시도</button></p></main>
+  }
   const problem = numbered?.problem ?? findExercise(problemId ?? '')
   const studyId = numbered
     ? numberedLanguages(numbered.problem).find((lang) => lang === params.get('lang'))
