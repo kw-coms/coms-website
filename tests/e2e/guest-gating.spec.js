@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { numberedProblemNumber } from '../../src/pages/study/exercises/problemNumbers.ts'
 import { expectMembersGate, mockAdminApis, mockOptionalApis, trackRequests } from './visualSupport.js'
 
 // Guests: member-only menus carry a lock and open a guide screen; study shows chapter titles only.
@@ -172,7 +173,9 @@ test.describe('study for guests', () => {
     await expect(row.locator(LOCK)).toHaveCount(1)
     await expect(page.getByText('동아리 이름표에 적힌 번호를')).toHaveCount(0)
     await row.click()
-    await expect(page).toHaveURL(/\/study\/c\/practice\/c-start-badge$/)
+    const number = numberedProblemNumber('c-start-badge')
+    await expect(page).toHaveURL(`/study/algorithms/${number}?lang=c`)
+    await expect(page.getByRole('heading', { name: '문제 풀이는 동아리원만 할 수 있어요' })).toBeVisible()
   })
 
   test('a guest on a problem gets the title and the guide, no statement and no editor', async ({ page }) => {

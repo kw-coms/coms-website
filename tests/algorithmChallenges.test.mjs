@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { algorithmChallenges, algorithmProblems } from '../src/pages/study/exercises/algorithmChallenges.ts'
-import { exercisesFor } from '../src/pages/study/exercises/problems/index.ts'
+import { exercisesFor, findNumberedExercise, numberedExercises } from '../src/pages/study/exercises/problems/index.ts'
+import { exercisePath } from '../src/pages/study/exercises/problemNumbers.ts'
 
 const challenges = (stamp) => algorithmChallenges(Date.parse(stamp))
 
@@ -31,5 +32,32 @@ test('every algorithm challenge uses an existing problem offered in each of the 
   for (const lang of ['c', 'java', 'python']) {
     const registered = new Set(exercisesFor(lang).map(({ id }) => id))
     for (const { id } of algorithmProblems) assert.ok(registered.has(id), `${id} is playable in ${lang}`)
+  }
+})
+
+test('published C, Java and Python exercises each have one shared, distinct problem number', () => {
+  const ids = new Set(['c', 'java', 'python'].flatMap((lang) => exercisesFor(lang).map(({ id }) => id)))
+  assert.deepEqual(new Set(numberedExercises.map(({ problem }) => problem.id)), ids)
+  assert.equal(new Set(numberedExercises.map(({ number }) => number)).size, ids.size)
+  assert.equal(findNumberedExercise('1001')?.problem.id, 'core-sum-difference')
+  assert.equal(findNumberedExercise('1099')?.problem.id, 'py-zip-attendance')
+  assert.equal(findNumberedExercise('1100')?.problem.id, 'dc-range-sum')
+  assert.equal(findNumberedExercise('1111')?.problem.id, 'dc-shortest-path')
+  for (const { number, problem } of numberedExercises) {
+    assert.ok(Number.isSafeInteger(number) && number >= 1001)
+    for (const lang of problem.langs) assert.equal(exercisePath(lang, problem.id), `/study/algorithms/${number}?lang=${lang}`)
+  }
+  assert.equal(exercisePath('web', 'web-html-headings'), '/study/web/practice/web-html-headings')
+  assert.equal(findNumberedExercise('01001'), undefined)
+})
+
+test('new DailyCoding exercises use distinct test inputs and are available for shared challenges', () => {
+  const imported = numberedExercises.filter(({ problem }) => problem.id.startsWith('dc-'))
+  assert.ok(imported.length >= 12)
+  for (const { problem } of imported) {
+    assert.deepEqual(new Set(problem.langs), new Set(['c', 'java', 'python']))
+    const cases = [...problem.examples, ...problem.tests].map(({ stdin }) => stdin.trim())
+    assert.equal(new Set(cases).size, cases.length, `${problem.id} repeats a test input`)
+    assert.ok(algorithmProblems.some(({ id }) => id === problem.id))
   }
 })

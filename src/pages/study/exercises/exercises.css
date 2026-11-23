@@ -63,6 +63,11 @@
 .algorithm-card-foot a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .study-page .algorithm-schedule { margin: 12px 0 32px; }
 #algorithm-list { font-size: 21px; font-weight: 750; }
+.algorithm-number { margin-inline-end: .55em; color: var(--app-muted); font-size: .74em; font-variant-numeric: tabular-nums; }
+.algorithm-filters label:first-child { flex-grow: 3; }
+.algorithm-filters label:not(:first-child) { flex-basis: 96px; }
+.ex-page .algorithm-filters input { display: block; width: 100%; min-height: 40px; margin-top: 6px; border-radius: 99px; background: var(--app-surface-soft); font-size: 14px; }
+@media (max-width: 640px) { .algorithm-filters label:first-child { flex-basis: 100%; } }
 /* Study-body surfaces reuse the quiz box language: --surface fill, --line border, --radius. */
 .study-page .ex-inline { margin: 28px 0 8px; padding: 12px 16px 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 .study-page .ex-inline-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 8px; }

@@ -276,12 +276,6 @@ export const sectionStories = {
   },
 }
 
-export const aboutDetailPrinciples = [
-  '처음 시작하는 사람도 편하게 질문할 수 있는 분위기',
-  '작게 만들고 빠르게 공유하며 개선하는 제작 문화',
-  '동아리 밖에서도 이어지는 개발 경험과 포트폴리오',
-]
-
 export const activitiesDetailCards = [
   {
     title: '정기 세미나',

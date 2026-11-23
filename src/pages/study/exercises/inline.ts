@@ -2,6 +2,7 @@ import { exercisesFor } from './problems'
 import { selectInlineProblems } from './selection'
 import { readProgress } from './progress'
 import { chapterOf, problemStatus } from './navigation'
+import { exercisePath, numberedProblemNumber } from './problemNumbers'
 
 /** Append owned DOM only: the trusted lesson HTML and its demos stay untouched. */
 export function initExerciseLinks(root: HTMLElement, studyId: string, navigate: (path: string) => void) {
@@ -54,13 +55,15 @@ export function initExerciseLinks(root: HTMLElement, studyId: string, navigate: 
     const list = el('ul', 'ex-inline-list')
     for (const p of selectInlineProblems(matches, progress)) {
       const status = problemStatus(progress[p.id])
-      const row = link(`/study/${studyId}/practice/${p.id}`, 'ex-inline-row', `${p.title}, 난이도 ${p.level} / 5, ${status}`)
+      const number = numberedProblemNumber(p.id)
+      const title = number === undefined ? p.title : `${number}번 · ${p.title}`
+      const row = link(exercisePath(studyId, p.id), 'ex-inline-row', `${title}, 난이도 ${p.level} / 5, ${status}`)
       const dots = el('span', 'ex-dots', '●'.repeat(p.level) + '○'.repeat(5 - p.level))
       dots.setAttribute('aria-hidden', 'true')
       const badge = el('span', 'ex-badge', status)
       badge.setAttribute('aria-hidden', 'true')
       if (progress[p.id]?.solved) badge.dataset.state = 'solved'
-      row.append(el('strong', undefined, p.title), dots, badge)
+      row.append(el('strong', undefined, title), dots, badge)
       const li = el('li')
       li.append(row)
       list.append(li)

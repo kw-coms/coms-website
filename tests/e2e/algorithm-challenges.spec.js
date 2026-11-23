@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { algorithmChallenges } from '../../src/pages/study/exercises/algorithmChallenges.ts'
+import { numberedProblemNumber } from '../../src/pages/study/exercises/problemNumbers.ts'
 import { asMember, mockOptionalApis } from './visualSupport.js'
 
 test.use({ reducedMotion: 'reduce', timezoneId: 'America/Los_Angeles' })
@@ -27,6 +28,8 @@ test('guests can discover daily and weekly problems, and the member gate protect
   expect(results.violations.filter(({ impact }) => impact === 'serious' || impact === 'critical')).toEqual([])
   await page.screenshot({ path: info.outputPath('algorithms-mobile.png') })
   await weeklyAction.click()
+  const weeklyNumber = numberedProblemNumber(algorithmChallenges(stamp.getTime()).weekly.problem.id)
+  await expect(page).toHaveURL(new RegExp(`/study/algorithms/${weeklyNumber}$`))
   await expect(page.getByRole('heading', { name: '문제 풀이는 동아리원만 할 수 있어요' })).toBeVisible()
   await expect(page.getByRole('button', { name: '제출', exact: true })).toHaveCount(0)
   expect(runCalls).toBe(0)
@@ -70,6 +73,10 @@ test('member submission uses the study editor and persists a solved daily proble
   await page.reload()
   await expect(daily.getByRole('link', { name: /다시 풀기/ })).toBeVisible()
   await expect(page.getByRole('progressbar')).toHaveAttribute('value', '1')
+  const list = page.getByRole('region', { name: '전체 알고리즘 문제' })
+  await list.getByRole('combobox', { name: '해결 상태' }).selectOption('solved')
+  await expect(list.getByRole('link')).toHaveCount(1)
+  await expect(list.getByRole('link')).toContainText(problem.title)
 })
 
 test('an open challenge page rolls over at midnight without refreshing', async ({ page }) => {
@@ -82,4 +89,36 @@ test('an open challenge page rolls over at midnight without refreshing', async (
   await page.clock.fastForward(121_000)
   await expect(daily).toContainText('11월 23일')
   await expect(weekly).toContainText('11월 23일 – 11월 29일')
+})
+
+test('a lesson opens its numbered problem in the study language and the catalog finds it by number', async ({ page }) => {
+  await mockOptionalApis(page)
+  await asMember(page)
+  await page.goto('/study/java#array')
+  const link = page.locator('#array .ex-inline-row').filter({ hasText: /\d+번/ }).first()
+  await expect(link).toHaveAttribute('href', /^\/study\/algorithms\/\d+\?lang=java$/)
+  const href = await link.getAttribute('href')
+  const number = href.split('/').at(-1).split('?')[0]
+  await link.click()
+  await expect(page).toHaveURL(new RegExp(`/study/algorithms/${number}\\?lang=java$`))
+  await expect(page.locator('.ex-eyebrow')).toContainText(`문제 ${number}번`)
+  await expect(page.getByRole('textbox', { name: 'Java 코드 편집기' })).toBeVisible()
+  await page.getByRole('link', { name: /알고리즘 문제 목록/ }).click()
+  const list = page.getByRole('region', { name: '전체 알고리즘 문제' })
+  await list.getByRole('searchbox', { name: '문제 검색' }).fill(`#${number}`)
+  await expect(list.getByRole('link')).toHaveCount(1)
+  await expect(list.getByRole('link')).toHaveAttribute('href', `/study/algorithms/${number}`)
+  await page.reload()
+  await expect(list.getByRole('searchbox', { name: '문제 검색' })).toHaveValue(`#${number}`)
+})
+
+test('the catalog filters by supported language and opens results in that language', async ({ page }, info) => {
+  await mockOptionalApis(page)
+  await page.goto('/study/algorithms?q=1041&lang=java')
+  const list = page.getByRole('region', { name: '전체 알고리즘 문제' })
+  await expect(list.getByText('조건에 맞는 문제가 없습니다.')).toBeVisible()
+  await list.getByRole('combobox', { name: '언어', exact: true }).selectOption('c')
+  await expect(list.getByRole('link')).toHaveCount(1)
+  await expect(list.getByRole('link')).toHaveAttribute('href', '/study/algorithms/1041?lang=c')
+  await list.screenshot({ path: info.outputPath('numbered-filters.png') })
 })

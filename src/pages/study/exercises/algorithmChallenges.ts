@@ -1,10 +1,10 @@
-import core from './problems/core'
+import { sharedExercises } from './problems'
 
 const DAY_MS = 86_400_000
 const KST_OFFSET_MS = 9 * 3_600_000
 const FIRST_MONDAY = 4 // 1970-01-05, measured from the Unix epoch in calendar days.
 
-export const algorithmProblems = core.filter((problem) => problem.level >= 2)
+export const algorithmProblems = sharedExercises.filter((problem) => problem.level >= 2)
 const dailyProblems = algorithmProblems.filter((problem) => problem.level <= 3)
 const weeklyProblems = algorithmProblems.filter((problem) => problem.level >= 4)
 
