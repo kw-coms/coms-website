@@ -33,6 +33,8 @@ for (const part of [
   /security-headers-common\.conf/, /proxy_hide_header X-Content-Type-Options/,
 ]) assert.match(run, part)
 assert.match(block('location @study_unauthorized {'), /return 401 .*"error":"unauthorized".*messageKo/)
+assert.match(run, /auth_request_set \$runner_role \$upstream_http_x_member_role;/)
+assert.match(run, /proxy_set_header X-Runner-Role \$runner_role;/)
 const club = block('location = /study/api/club {')
 for (const part of [
   /limit_req zone=study_club_ip\b/, /limit_req zone=study_club\b/, /auth_request \/lab\/_auth;/,

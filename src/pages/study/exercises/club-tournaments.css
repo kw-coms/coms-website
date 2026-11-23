@@ -39,8 +39,22 @@
 .club-tournament-form-grid, .club-tournament-problem-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .club-tournament-form-grid label, .club-tournament-problem-grid label { display: grid; align-content: start; gap: 7px; font-size: 14px; font-weight: 700; }
 .club-tournament-form-grid .wide { grid-column: 1 / -1; }
+.club-tournament-form-grid small { color: var(--app-muted); font-weight: 450; }
 .club-tournament-problem-grid small { color: var(--app-muted); font-weight: 450; }
 .club-tournament-form > button { margin-top: 26px; }
+.club-tournament-round-editor { display: grid; gap: 18px; margin-top: 16px; }
+.club-tournament-round-config { min-width: 0; padding: clamp(18px, 2.5vw, 26px); border: 1px solid var(--app-hairline); border-radius: 14px; background: var(--app-surface-soft); }
+.club-tournament-round-config-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+.club-tournament-round-config-head h4 { margin: 0; font-size: 21px; }
+.club-tournament-round-config-head label { display: grid; gap: 7px; min-width: 145px; font-size: 14px; font-weight: 700; }
+.club-tournament-round-config-head input { max-width: 170px; }
+.club-tournament-round-config > button { margin-top: 16px; }
+.club-tournament-problem-grid { grid-template-columns: minmax(0, 1fr); }
+.club-tournament-problem-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, 125px) auto; gap: 10px; align-items: end; min-width: 0; }
+.club-tournament-problem-row > label { min-width: 0; }
+.club-tournament-problem-controls { display: flex; gap: 4px; }
+.club-tournament-problem-controls button { width: 42px; min-width: 42px; padding: 8px; }
+.club-tournament-section-head a { color: var(--app-accent-text); font-size: 14px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .club-tournament-summary { display: flex; gap: 13px; align-items: center; flex-wrap: wrap; color: var(--app-muted); }
 .club-tournament-summary span { display: flex; align-items: center; gap: 6px; }
 .club-tournament-summary strong { color: var(--app-accent-text); }
@@ -55,6 +69,7 @@
 .club-tournament-round > header span { font-weight: 800; font-size: 20px; }
 .club-tournament-round > header small { color: var(--app-muted); }
 .club-tournament-round-problem { font-size: 14px; color: var(--app-accent-text); }
+.club-tournament-scores { margin: 0 0 12px; color: var(--app-accent-text); font-weight: 750; }
 .club-tournament-matches { display: grid; gap: 12px; }
 .club-tournament-match { padding: 16px; border-radius: 13px; }
 .club-tournament-match[data-status='active'] { border-color: var(--app-accent-border); }
@@ -64,6 +79,7 @@
 .club-tournament-players span[data-winner='true'] { color: var(--app-accent-text); font-weight: 800; }
 .club-tournament-result { display: block; margin: 0 0 12px; color: var(--app-muted); }
 .club-tournament-match .club-tournament-primary { width: 100%; }
+.club-tournament-match .club-tournament-primary + .club-tournament-primary { margin-top: 7px; }
 .club-tournament-notice { color: var(--app-accent-text); }
 .club-tournament-error { color: var(--app-danger); }
 @media (max-width: 720px) {
@@ -74,4 +90,6 @@
   .club-tournament-cards, .club-tournament-form-grid, .club-tournament-problem-grid { grid-template-columns: minmax(0, 1fr); }
   .club-tournament-form-grid .wide { grid-column: auto; }
   .club-tournament-card { padding: 22px; }
+  .club-tournament-problem-row { grid-template-columns: minmax(0, 1fr) minmax(85px, 95px); }
+  .club-tournament-problem-controls { grid-column: 1 / -1; justify-content: flex-end; }
 }

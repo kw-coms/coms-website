@@ -18,6 +18,7 @@ test('member creates a room, copies a link and sees a timed race after a friend 
   const room = pending()
   await page.route('**/study/api/club', async (route) => {
     const { action, problemNumber, durationMinutes } = route.request().postDataJSON()
+    if (action === 'problem-catalog') return route.fulfill({ json: { problems: [] } })
     if (action === 'battle-list') return route.fulfill({ json: { battles: [] } })
     if (action === 'battle-create') {
       expect(problemNumber).toBe(1100)
@@ -65,6 +66,7 @@ test('invite link lets a friend join and shows the recorded result', async ({ pa
   const actions = []
   await page.route('**/study/api/club', async (route) => {
     const body = route.request().postDataJSON()
+    if (body.action === 'problem-catalog') return route.fulfill({ json: { problems: [] } })
     actions.push(body.action)
     if (body.action === 'battle-get' && room.status === 'waiting') {
       return route.fulfill({ status: 403, json: { message: '참가 후 볼 수 있어요.' } })

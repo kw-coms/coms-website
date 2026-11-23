@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, CalendarDays, CalendarRange, FolderOpen, RotateCcw, Settings2, Share2, Swords, Trophy } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarDays, CalendarRange, FilePlus2, FolderOpen, RotateCcw, Settings2, Share2, Swords, Trophy } from 'lucide-react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import MemberLock from '../../../components/MemberLock'
 import PageHeading from '../../../components/PageHeading'
@@ -10,7 +10,7 @@ import { JudgeTierBadge } from './JudgeTierBadge'
 import { JUDGE_TIER_FAMILIES, judgeTier } from './judgeTiers'
 import { problemStatus } from './navigation'
 import { numberedProblemNumber, numberedProblemPath } from './problemNumbers'
-import { numberedExercises } from './problems'
+import { useNumberedCatalog } from './useNumberedCatalog'
 import { useProgress } from './progress'
 import { LANG_NAMES } from './types'
 import '../study.css'
@@ -24,6 +24,7 @@ const STATUS_VALUES = new Set(['solved', 'unsolved'])
 
 export default function AlgorithmPage() {
   const { user } = useAuth()
+  const numberedExercises = useNumberedCatalog()
   const location = useLocation()
   const verified = useJudgeProgress(Boolean(user))
   const saved = useProgress()
@@ -92,6 +93,7 @@ export default function AlgorithmPage() {
           <Link to="/study/algorithms/battles"><Swords size={16} aria-hidden="true" />친선 배틀</Link>
           <Link to="/study/algorithms/tournaments"><Trophy size={16} aria-hidden="true" />알고리즘 대회</Link>
           <Link to="/study/algorithms/problem-sets"><FolderOpen size={16} aria-hidden="true" />문제집</Link>
+          <Link to="/study/algorithms/authoring"><FilePlus2 size={16} aria-hidden="true" />문제 출제</Link>
           <Link to="/study/algorithms/settings" state={{ from: location.pathname + location.search }}><Settings2 size={16} aria-hidden="true" />코딩 설정</Link>
         </div>}
       </nav>

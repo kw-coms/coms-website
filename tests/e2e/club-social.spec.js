@@ -12,6 +12,7 @@ test('a member saves, shares, and removes a numbered problem set', async ({ page
   const actions = []
   await page.route('**/study/api/club', async (route) => {
     const body = route.request().postDataJSON()
+    if (body.action === 'problem-catalog') return route.fulfill({ json: { problems: [] } })
     actions.push(body)
     if (body.action === 'sets-list') return route.fulfill({ json: { sets: saved ? [saved] : [] } })
     if (body.action === 'sets-save') {
@@ -52,6 +53,7 @@ test('a shared set opens as read-only and the owner can copy it', async ({ page 
   let copied = null
   await page.route('**/study/api/club', (route) => {
     const body = route.request().postDataJSON()
+    if (body.action === 'problem-catalog') return route.fulfill({ json: { problems: [] } })
     if (body.action === 'sets-list') return route.fulfill({ json: { sets: copied ? [copied] : [] } })
     if (body.action === 'sets-open') {
       return revoked

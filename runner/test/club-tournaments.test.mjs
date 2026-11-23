@@ -14,7 +14,7 @@ const form = (capacity = 4) => ({ action: 'tournament-save', title: '가을 알�
   startsAt: start + 30_000, capacity, durationMinutes: 5, breakMinutes: 0,
   problemNumbers: capacity === 4 ? [1001, 1002] : [1001, 1002, 1003] });
 
-function fixture(initial = { version: 1, events: [] }, shuffle = players => players) {
+function fixture(initial = { version: 1, events: [] }, shuffle = players => players, problemBank = bank) {
   let time = start;
   let data = structuredClone(initial);
   let pending = Promise.resolve();
@@ -31,7 +31,7 @@ function fixture(initial = { version: 1, events: [] }, shuffle = players => play
       return job;
     },
   };
-  return { tournaments: createClubTournaments({ store, numberedProblems: bank, now: () => time, shuffle }),
+  return { tournaments: createClubTournaments({ store, numberedProblems: problemBank, now: () => time, shuffle }),
     at: () => time, until: value => { time = value; }, advance: delta => { time += delta; }, state: () => structuredClone(data) };
 }
 const asPresident = { canManage: true, displayName: '회장' };
@@ -245,4 +245,164 @@ test('a cancelled draft remains private and a new event replaces the oldest clos
   assert.equal(f.state().events.length, 50);
   assert.notEqual(next, first);
   await assert.rejects(f.tournaments.handle(president, { action: 'tournament-get', id: first }, asPresident), /찾을 수 없어요/);
+});
+
+test('custom rounds admit five weighted problems and keep them hidden until their round', async () => {
+  const f = fixture();
+  const config = { ...form(4), capacity: 2, scoring: 'full', registrationClosesAt: start + 15_000,
+    roundsConfig: [{ durationMinutes: 7, problems: [1001, 1002, 1003, 1004, 1005]
+      .map((number, index) => ({ number, points: (index + 1) * 10 })) }] };
+  delete config.problemNumbers;
+  const event = (await f.tournaments.handle(president, config, asPresident)).event;
+  assert.equal(event.registrationClosesAt, start + 15_000);
+  assert.deepEqual(event.roundsConfig, config.roundsConfig);
+  assert.deepEqual(event.problemNumbers, [1001]);
+  assert.equal(event.scoring, 'full');
+  await f.tournaments.handle(president, { action: 'tournament-publish', id: event.id }, asPresident);
+  await enter(f, event.id, 2);
+  const memberView = (await f.tournaments.handle(members[0], { action: 'tournament-get', id: event.id })).event;
+  assert.equal(memberView.roundsConfig, null);
+  f.until(start + 15_000);
+  await assert.rejects(f.tournaments.handle(members[2], { action: 'tournament-join', id: event.id }), /참가 신청이 끝난/);
+  await assert.rejects(f.tournaments.handle(members[0], { action: 'tournament-leave', id: event.id }), /참가 취소 기간/);
+  f.until(start + 30_000);
+  const active = (await f.tournaments.handle(members[0], { action: 'tournament-get', id: event.id })).event;
+  assert.equal(active.rounds[0].endsAt, start + 30_000 + 7 * 60_000);
+  assert.deepEqual(active.rounds[0].problems, config.roundsConfig[0].problems);
+  const match = active.rounds[0].matches[0];
+  await f.tournaments.assertSubmission(members[0], event.id, match.id, 1005, f.at());
+  await assert.rejects(f.tournaments.assertSubmission(members[0], event.id, match.id, 9999, f.at()), /문제 번호/);
+  await f.tournaments.recordResult(members[0], event.id, match.id, 1001, f.at(), { passed: 5, total: 5, solved: true });
+  await f.tournaments.recordResult(members[0], event.id, match.id, 1002, f.at(), { passed: 4, total: 5, solved: false });
+  f.advance(1_000);
+  await f.tournaments.recordResult(members[1], event.id, match.id, 1003, f.at(), { passed: 2, total: 5, solved: false });
+  await f.tournaments.recordResult(members[1], event.id, match.id, 1004, f.at(), { passed: 5, total: 5, solved: true });
+  assert.equal((await f.tournaments.handle(members[0], { action: 'tournament-get', id: event.id })).event.rounds[0].matches[0].scores, null);
+  f.until(active.rounds[0].endsAt + 60_000);
+  const finished = (await f.tournaments.handle(members[0], { action: 'tournament-get', id: event.id })).event;
+  assert.equal(finished.champion, '나래');
+  assert.deepEqual(finished.rounds[0].matches[0].scores, [10, 40]);
+});
+
+test('partial scoring compares weighted best results and earliest receipt at the attained total', async () => {
+  const f = fixture();
+  const config = { ...form(4), capacity: 2, scoring: 'partial', roundsConfig: [{ durationMinutes: 2,
+    problems: [{ number: 1001, points: 100 }, { number: 1002, points: 15 }] }] };
+  const id = (await f.tournaments.handle(president, config, asPresident)).event.id;
+  await f.tournaments.handle(president, { action: 'tournament-publish', id }, asPresident);
+  await enter(f, id, 2);
+  f.advance(30_000);
+  const active = (await f.tournaments.handle(members[0], { action: 'tournament-get', id })).event.rounds[0];
+  const matchId = active.matches[0].id;
+  await f.tournaments.recordResult(members[0], id, matchId, 1001, f.at(), { passed: 2, total: 3, solved: false });
+  await f.tournaments.recordResult(members[0], id, matchId, 1002, f.at(), { passed: 1, total: 3, solved: false });
+  f.advance(1_000);
+  await f.tournaments.recordResult(members[1], id, matchId, 1001, f.at(), { passed: 2, total: 3, solved: false });
+  await f.tournaments.recordResult(members[1], id, matchId, 1002, f.at(), { passed: 1, total: 3, solved: false });
+  f.advance(1_000);
+  await f.tournaments.recordResult(members[0], id, matchId, 1001, f.at(), { passed: 1, total: 3, solved: false });
+  f.until(active.endsAt + 60_000);
+  const event = (await f.tournaments.handle(members[0], { action: 'tournament-get', id })).event;
+  assert.deepEqual(event.rounds[0].matches[0].scores, [71, 71]);
+  assert.equal(event.champion, '가람');
+});
+
+test('custom round validation and changing the number bank protect new event setup', async () => {
+  const dynamicBank = { ...bank };
+  const f = fixture(undefined, players => players, dynamicBank);
+  const config = { ...form(4), capacity: 3, roundsConfig: [
+    { durationMinutes: 3, problems: [{ number: 1006, points: 20 }] },
+    { durationMinutes: 5, problems: [{ number: 1002, points: 30 }] },
+  ] };
+  delete config.problemNumbers;
+  await assert.rejects(f.tournaments.handle(president, config, asPresident), /라운드 문제/);
+  dynamicBank[1006] = {};
+  assert.equal((await f.tournaments.handle(president, config, asPresident)).event.status, 'draft');
+  await assert.rejects(f.tournaments.handle(president, { ...config,
+    roundsConfig: [{ durationMinutes: 0, problems: config.roundsConfig[0].problems }, config.roundsConfig[1]] }, asPresident), /라운드 문제/);
+  await assert.rejects(f.tournaments.handle(president, { ...config,
+    roundsConfig: [{ durationMinutes: 3, problems: [{ number: 1001, points: 1 }, { number: 1001, points: 2 }] }, config.roundsConfig[1]] }, asPresident), /라운드 문제/);
+  await assert.rejects(f.tournaments.handle(president, { ...config,
+    roundsConfig: [{ durationMinutes: 3, problems: [{ number: 1001, points: 1001 }] }, config.roundsConfig[1]] }, asPresident), /라운드 문제/);
+});
+
+test('underfilled bracket uses the last configured rounds and reveals each at its own start', async () => {
+  const f = fixture();
+  const config = { ...form(8), capacity: 8, scoring: 'full', breakMinutes: 2,
+    roundsConfig: [
+      { durationMinutes: 1, problems: [{ number: 1001, points: 5 }] },
+      { durationMinutes: 2, problems: [{ number: 1002, points: 10 }, { number: 1003, points: 20 }] },
+      { durationMinutes: 3, problems: [{ number: 1004, points: 30 }] },
+    ] };
+  const id = (await f.tournaments.handle(president, config, asPresident)).event.id;
+  await f.tournaments.handle(president, { action: 'tournament-publish', id }, asPresident);
+  await enter(f, id, 3);
+  f.advance(30_000);
+  const current = (await f.tournaments.handle(members[0], { action: 'tournament-get', id })).event;
+  assert.deepEqual(current.rounds[0].problems, config.roundsConfig[1].problems);
+  assert.equal(current.rounds[0].endsAt, f.at() + 2 * 60_000);
+  const activeMatch = current.rounds[0].matches.find(match => match.players.every(Boolean));
+  const participating = members.find((key, index) => names[index] === activeMatch.players[0]);
+  await f.tournaments.assertSubmission(participating, id, activeMatch.id, 1003, f.at());
+  await assert.rejects(f.tournaments.assertSubmission(participating, id, activeMatch.id, 1001, f.at()), /문제 번호/);
+  await f.tournaments.recordResult(participating, id, activeMatch.id, 1003, f.at(),
+    { passed: 2, total: 2, solved: true });
+  f.until(current.rounds[0].endsAt + 60_000);
+  const waiting = (await f.tournaments.handle(members[0], { action: 'tournament-get', id })).event;
+  assert.equal(waiting.rounds[1].startsAt, current.rounds[0].endsAt + 3 * 60_000);
+  assert.equal(waiting.rounds[1].problemNumber, null);
+  assert.equal(waiting.rounds[1].problems, null);
+  assert.equal(waiting.rounds[1].matches[0].status, 'waiting');
+  f.until(waiting.rounds[1].startsAt);
+  const final = (await f.tournaments.handle(members[0], { action: 'tournament-get', id })).event;
+  assert.deepEqual(final.rounds[1].problems, config.roundsConfig[2].problems);
+  assert.equal(final.rounds[1].endsAt, final.rounds[1].startsAt + 3 * 60_000);
+});
+
+test('custom scores survive store restart and unchanged legacy snapshots remain valid', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'coms-tournaments-custom-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  let time = start;
+  const make = () => createClubTournaments({ store: createClubStore({ directory: join(root, 'club'),
+    filename: 'tournaments.json', initial: () => ({ version: 1, events: [] }) }),
+  numberedProblems: bank, now: () => time, shuffle: players => players });
+  const config = { ...form(4), capacity: 2, scoring: 'partial',
+    roundsConfig: [{ durationMinutes: 1, problems: [{ number: 1001, points: 15 }] }] };
+  let tournaments = make();
+  const id = (await tournaments.handle(president, config, asPresident)).event.id;
+  await tournaments.handle(president, { action: 'tournament-publish', id }, asPresident);
+  for (let index = 0; index < 2; index++) {
+    await tournaments.handle(members[index], { action: 'tournament-join', id },
+      { displayName: names[index] });
+  }
+  time += 30_000;
+  const matchId = (await tournaments.handle(members[0], { action: 'tournament-get', id })).event.rounds[0].matches[0].id;
+  await tournaments.recordResult(members[0], id, matchId, 1001, time,
+    { passed: 2, total: 3, solved: false });
+  tournaments = make();
+  time += 120_000;
+  const finished = (await tournaments.handle(members[0], { action: 'tournament-get', id })).event;
+  assert.equal(finished.champion, '가람');
+  assert.deepEqual(finished.rounds[0].matches[0].scores, [10, 0]);
+});
+
+test('a full-score round gives no points for partial cases and ends unresolved when both score zero', async () => {
+  const f = fixture();
+  const config = { ...form(4), capacity: 2, roundsConfig: [{ durationMinutes: 1,
+    problems: [{ number: 1001, points: 50 }, { number: 1002, points: 20 }] }] };
+  const id = (await f.tournaments.handle(president, config, asPresident)).event.id;
+  await f.tournaments.handle(president, { action: 'tournament-publish', id }, asPresident);
+  await enter(f, id, 2);
+  f.advance(30_000);
+  const active = (await f.tournaments.handle(members[0], { action: 'tournament-get', id })).event.rounds[0];
+  const matchId = active.matches[0].id;
+  await f.tournaments.recordResult(members[0], id, matchId, 1001, f.at(),
+    { passed: 2, total: 3, solved: false });
+  await assert.rejects(f.tournaments.recordResult(members[1], id, matchId, 1002, f.at(),
+    { passed: 3, total: 3, solved: false }), /채점 결과/);
+  f.until(active.endsAt + 60_000);
+  const ended = (await f.tournaments.handle(members[0], { action: 'tournament-get', id })).event;
+  assert.equal(ended.champion, null);
+  assert.equal(ended.rounds[0].matches[0].result, 'no-score');
+  assert.deepEqual(ended.rounds[0].matches[0].scores, [0, 0]);
 });

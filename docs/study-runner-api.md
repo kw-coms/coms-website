@@ -61,6 +61,10 @@ Attach a `battleCode` to a numbered submission to enter it in a live room. The r
 
 The same authenticated club endpoint serves `tournament-*` actions. nginx forwards the verified role and encoded display name from the backend session check. Only the president can save, publish, or cancel a tournament. Send both `tournamentId` and `matchId` with a numbered submission for an assigned live match. A round allows 60 seconds for work already queued at the deadline, then advances winners by accepted receipt time or by the best case count and its receipt time. Tournament drafts use a separate editor key per match.
 
+New tournament configurations can specify 1–12 weighted problems and a duration for each round, a separate registration cutoff, and full-answer or partial scoring. Final scores sum the best result for each problem. The earlier time to reach a tied positive score breaks the tie. Existing tournament records retain their original result calculation.
+
+The authenticated `problem-*` club actions manage drafts, review and the published catalog. `problem-catalog` returns the numbered problem statement and examples. To verify a saved draft, send `{ "action": "problem-verify", "authoringId": "…" }` to `/study/api/run`. The runner executes the stored reference against the stored examples and private cases, using its regular queue. Publication assigns a durable COM’s number once the current draft passes and the president publishes it. Case inputs and expected outputs stay in the private state volume.
+
 `scripts/gen-numbered-judge.mjs` regenerates the runner bank after edits to COM’s study problems. To refresh the archive, pass the trusted DailyCoding catalog module from [`2b4fe3c9`](https://github.com/choijunhuk/dailycoding-final/blob/2b4fe3c9e93f3b7a05a5a9da6c80c2603f37c323/dailycoding-server/src/shared/problemCatalog.js). The browser archive contains statements and public examples. The runner image carries the separate case bank. Repository readers can inspect the source cases, so the practice results are not an anti-cheat guarantee for contests.
 
 ### Errors

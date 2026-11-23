@@ -84,3 +84,5 @@
   .judge-problem .ex-editor, .judge-problem .ex-editor .cm-editor { min-height: 360px; }
   .judge-problem .ex-editor .cm-content { min-height: 330px; }
 }
+.judge-tournament-problems { display: flex; flex: 1 0 100%; flex-wrap: wrap; gap: 0.5rem; }
+.judge-tournament-problems [aria-current='page'] { color: var(--app-accent-text); font-weight: 700; }

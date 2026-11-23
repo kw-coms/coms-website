@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, CalendarClock, Check, Copy, Plus, Trophy, Users } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CalendarClock, Check, Copy, Plus, Trash2, Trophy, Users } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import PageHeading from '../../../components/PageHeading'
 import MembersGate, { AuthCheckFailed } from '../../../components/MembersGate'
 import { useAuth } from '../../../contexts/useAuth'
-import { numberedExercises } from './problems'
-import { requestTournament, type TournamentDetail, type TournamentSummary, type TournamentStatus } from './tournamentApi'
+import { useNumberedCatalog } from './useNumberedCatalog'
+import { requestTournament, type TournamentDetail, type TournamentRound, type TournamentSavePayload, type TournamentSummary, type TournamentStatus, type TournamentScoring } from './tournamentApi'
 import '../study.css'
 import './club-tournaments.css'
 
@@ -14,7 +14,9 @@ const statusLabel: Record<TournamentStatus, string> = {
   draft: '준비 중', registration: '참가 신청 중', running: '진행 중', finished: '종료', cancelled: '취소',
 }
 const matchLabel = { waiting: '대진 대기', active: '풀이 중', settling: '채점 정리 중', finished: '경기 종료' }
-const resultLabel = { solved: '정답 시각', score: '통과한 테스트', bye: '부전승', 'no-score': '미해결' }
+const resultLabel = { solved: '정답 시각', score: '획득 점수', bye: '부전승', 'no-score': '미해결' }
+const visibleProblems = (round: TournamentRound) => round.problems ??
+  (round.problemNumber !== null ? [{ number: round.problemNumber, points: null }] : null)
 
 const seoulParts = (time: number) => Object.fromEntries(
   new Intl.DateTimeFormat('en-GB', {
@@ -30,73 +32,145 @@ const seoulTime = (time: number) => new Intl.DateTimeFormat('ko-KR', {
   timeZone: 'Asia/Seoul', dateStyle: 'medium', timeStyle: 'short',
 }).format(time)
 
+type DraftProblem = { number: string; points: string }
+type DraftRound = { durationMinutes: string; problems: DraftProblem[] }
 type Draft = {
-  title: string
-  rules: string
-  startsAt: string
-  capacity: 4 | 8 | 16 | 32
-  durationMinutes: number
-  breakMinutes: number
-  problems: string[]
+  title: string; rules: string; startsAt: string; registrationClosesAt: string
+  capacity: number; breakMinutes: string; scoring: TournamentScoring; rounds: DraftRound[]
 }
+const roundsFor = (capacity: number) => Math.ceil(Math.log2(capacity))
+const newRound = (durationMinutes = '20'): DraftRound => ({
+  durationMinutes, problems: [{ number: '', points: '100' }],
+})
 const emptyDraft = (): Draft => ({
   title: '', rules: '', startsAt: seoulInput(Date.now() + 24 * 60 * 60 * 1000),
-  capacity: 8, durationMinutes: 20, breakMinutes: 5, problems: ['', '', ''],
+  registrationClosesAt: '', capacity: 8, breakMinutes: '5', scoring: 'full',
+  rounds: Array.from({ length: 3 }, () => newRound()),
 })
 const draftFromEvent = (event: TournamentDetail): Draft => ({
   title: event.title, rules: event.rules, startsAt: seoulInput(event.startsAt),
-  capacity: event.capacity, durationMinutes: event.durationMinutes, breakMinutes: event.breakMinutes,
-  problems: event.problemNumbers?.map(String) ?? [],
+  registrationClosesAt: event.registrationClosesAt && event.registrationClosesAt !== event.startsAt
+    ? seoulInput(event.registrationClosesAt) : '',
+  capacity: event.capacity, breakMinutes: String(event.breakMinutes), scoring: event.scoring ?? 'full',
+  rounds: event.roundsConfig?.map(round => ({
+    durationMinutes: String(round.durationMinutes),
+    problems: round.problems.map(problem => ({ number: String(problem.number), points: String(problem.points) })),
+  })) ?? (event.problemNumbers ?? []).map(number => ({
+    durationMinutes: String(event.durationMinutes), problems: [{ number: String(number), points: '100' }],
+  })),
 })
-const roundsFor = (capacity: Draft['capacity']) => Math.log2(capacity)
 
 function TournamentForm({ event, busy, onSave }: {
   event: TournamentDetail | null
   busy: boolean
-  onSave(draft: Draft): void
+  onSave(payload: TournamentSavePayload): void
 }) {
+  const catalog = useNumberedCatalog()
   const [draft, setDraft] = useState<Draft>(() => event ? draftFromEvent(event) : emptyDraft())
   const [queryError, setQueryError] = useState('')
   const roundCount = roundsFor(draft.capacity)
+  const problemTitle = (number: string) => catalog.find(entry => String(entry.number) === number)?.problem.title
+  const updateRound = (index: number, value: DraftRound) => setDraft(current => ({
+    ...current, rounds: current.rounds.map((round, at) => at === index ? value : round),
+  }))
 
-  const submit = () => {
-    const numbers = draft.problems.slice(0, roundCount).map(Number)
-    if (!draft.title.trim() || !draft.rules.trim() || !/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(draft.startsAt) ||
-      numbers.length !== roundCount || numbers.some(number => !Number.isSafeInteger(number) ||
-        !numberedExercises.some(entry => entry.number === number)) || new Set(numbers).size !== numbers.length) {
-      setQueryError('제목·규칙·시작 시각과 라운드별 서로 다른 문제 번호를 확인해 주세요.')
+  const submit = (now: number) => {
+    const startsAt = Date.parse(draft.startsAt + ':00+09:00')
+    const registrationClosesAt = draft.registrationClosesAt
+      ? Date.parse(draft.registrationClosesAt + ':00+09:00') : startsAt
+    const roundsConfig = draft.rounds.slice(0, roundCount).map(round => ({
+      durationMinutes: Number(round.durationMinutes),
+      problems: round.problems.map(problem => ({ number: Number(problem.number), points: Number(problem.points) })),
+    }))
+    const invalidRound = roundsConfig.some(round => !Number.isInteger(round.durationMinutes) ||
+      round.durationMinutes < 1 || round.durationMinutes > 180 ||
+      round.problems.length < 1 || round.problems.length > 12 ||
+      new Set(round.problems.map(problem => problem.number)).size !== round.problems.length ||
+      round.problems.some(problem => !Number.isSafeInteger(problem.number) ||
+        !catalog.some(entry => entry.number === problem.number) ||
+        !Number.isInteger(problem.points) || problem.points < 1 || problem.points > 1000))
+    if (!draft.title.trim() || !draft.rules.trim() || !Number.isFinite(startsAt) || startsAt <= now ||
+        !Number.isFinite(registrationClosesAt) || registrationClosesAt > startsAt ||
+        registrationClosesAt <= now || !Number.isInteger(Number(draft.breakMinutes)) ||
+        Number(draft.breakMinutes) < 0 || Number(draft.breakMinutes) > 30 ||
+        roundsConfig.length !== roundCount || invalidRound) {
+      setQueryError('대회 시간과 문제 구성을 확인해 주세요. 각 라운드에 1~12개의 등록된 문제와 배점이 필요합니다.')
       return
     }
     setQueryError('')
-    onSave(draft)
+    onSave({
+      title: draft.title.trim(), rules: draft.rules.trim(), startsAt, registrationClosesAt,
+      capacity: draft.capacity, breakMinutes: Number(draft.breakMinutes), scoring: draft.scoring,
+      roundsConfig, durationMinutes: roundsConfig[0].durationMinutes,
+      problemNumbers: roundsConfig.map(round => round.problems[0].number),
+    })
   }
 
   return <section className="club-tournament-panel club-tournament-form" aria-label={event ? '대회 설정 수정' : '대회 만들기'}>
     <h2>{event ? '대회 설정 수정' : '새 대회 만들기'}</h2>
-    <p>참가 신청을 열기 전까지 설정을 수정할 수 있어요.</p>
+    <p>참가 신청을 열기 전까지 경기 시간과 문제 구성을 수정할 수 있어요.</p>
     <div className="club-tournament-form-grid">
       <label className="wide">대회 이름<input value={draft.title} maxLength={80} onChange={e => setDraft({ ...draft, title: e.target.value })} placeholder="예: COM’s 알고리즘 컵" /></label>
       <label>시작 시각 (한국 시간)<input type="datetime-local" value={draft.startsAt} onChange={e => setDraft({ ...draft, startsAt: e.target.value })} /></label>
+      <label>참가 신청 마감 (한국 시간)<input type="datetime-local" value={draft.registrationClosesAt} onChange={e => setDraft({ ...draft, registrationClosesAt: e.target.value })} /><small>비워두면 대회 시작 시 마감됩니다.</small></label>
       <label>모집 정원<select value={draft.capacity} onChange={e => {
-        const capacity = Number(e.target.value) as Draft['capacity']
+        const capacity = Number(e.target.value)
         const count = roundsFor(capacity)
-        setDraft({ ...draft, capacity, problems: Array.from({ length: count }, (_, index) => draft.problems[index] ?? '') })
-      }}>{[4, 8, 16, 32].map(n => <option key={n} value={n}>{n}명</option>)}</select></label>
-      <label>라운드 제한 시간 (분)<input type="number" min={5} max={60} value={draft.durationMinutes} onChange={e => setDraft({ ...draft, durationMinutes: Number(e.target.value) })} /></label>
-      <label>라운드 사이 휴식 (분)<input type="number" min={0} max={30} value={draft.breakMinutes} onChange={e => setDraft({ ...draft, breakMinutes: Number(e.target.value) })} /></label>
+        setDraft({ ...draft, capacity, rounds: Array.from({ length: count }, (_, index) => draft.rounds[index] ?? newRound()) })
+      }}>{[2, 4, 8, 16, 32, 64].map(n => <option key={n} value={n}>{n}명</option>)}</select></label>
+      <label>라운드 사이 휴식 (분)<input type="number" min={0} max={30} value={draft.breakMinutes} onChange={e => setDraft({ ...draft, breakMinutes: e.target.value })} /></label>
+      <label>점수 방식<select value={draft.scoring} onChange={e => setDraft({ ...draft, scoring: e.target.value as TournamentScoring })}>
+        <option value="full">정답 문제의 배점 합산</option><option value="partial">통과한 테스트 비율도 점수에 반영</option>
+      </select></label>
       <label className="wide">대회 규칙<textarea rows={5} maxLength={2000} value={draft.rules} onChange={e => setDraft({ ...draft, rules: e.target.value })} placeholder="참가 조건과 대회 진행 방식을 알려주세요." /></label>
     </div>
-    <h3>라운드별 문제</h3>
-    <p>라운드마다 한 문제를 지정합니다. 참가자가 정원보다 적으면 마지막 라운드의 문제가 결승에 배정됩니다.</p>
-    <div className="club-tournament-problem-grid">
-      {Array.from({ length: roundCount }, (_, index) => <label key={index}>{index === roundCount - 1 ? '결승' : `${index + 1}라운드`} 문제 번호
-        <input type="search" inputMode="numeric" list="club-tournament-problems" value={draft.problems[index] ?? ''} onChange={e => setDraft({ ...draft, problems: draft.problems.map((value, at) => at === index ? e.target.value : value) })} placeholder="문제 번호 검색" />
-        {numberedExercises.find(entry => String(entry.number) === draft.problems[index]) && <small>{numberedExercises.find(entry => String(entry.number) === draft.problems[index])?.problem.title}</small>}
-      </label>)}
-      <datalist id="club-tournament-problems">{numberedExercises.map(({ number, problem }) => <option key={number} value={number}>{problem.title}</option>)}</datalist>
+    <div className="club-tournament-section-head">
+      <h3>라운드별 문제</h3>
+      <p>라운드마다 경기 시간과 문제·배점을 정하세요. 참가자가 적으면 마지막 라운드 구성을 사용합니다.</p>
+      <Link to="/study/algorithms/authoring">새 문제 만들기 또는 문제 등록 요청</Link>
+    </div>
+    <div className="club-tournament-round-editor">
+      {draft.rounds.slice(0, roundCount).map((round, roundIndex) => <section key={roundIndex} className="club-tournament-round-config" aria-label={roundIndex === roundCount - 1 ? '결승 설정' : String(roundIndex + 1) + '라운드 설정'}>
+        <div className="club-tournament-round-config-head">
+          <h4>{roundIndex === roundCount - 1 ? '결승' : String(roundIndex + 1) + '라운드'}</h4>
+          <label>경기 시간 (분)<input type="number" min={1} max={180} value={round.durationMinutes} onChange={e => updateRound(roundIndex, { ...round, durationMinutes: e.target.value })} /></label>
+        </div>
+        <div className="club-tournament-problem-grid">
+          {round.problems.map((problem, problemIndex) => <div key={problemIndex} className="club-tournament-problem-row">
+            <label>{roundIndex === roundCount - 1 ? '결승' : String(roundIndex + 1) + '라운드'} 문제 {problemIndex + 1} 번호
+              <input type="search" inputMode="numeric" list="club-tournament-problems" value={problem.number} onChange={e => {
+                const next = [...round.problems]
+                next[problemIndex] = { ...problem, number: e.target.value }
+                updateRound(roundIndex, { ...round, problems: next })
+              }} placeholder="번호로 검색" />
+              {problemTitle(problem.number) && <small>{problemTitle(problem.number)}</small>}
+            </label>
+            <label>배점<input type="number" min={1} max={1000} value={problem.points} onChange={e => {
+              const next = [...round.problems]
+              next[problemIndex] = { ...problem, points: e.target.value }
+              updateRound(roundIndex, { ...round, problems: next })
+            }} /></label>
+            <div className="club-tournament-problem-controls">
+              <button type="button" aria-label={String(roundIndex + 1) + '라운드 문제 ' + String(problemIndex + 1) + ' 위로'} disabled={problemIndex === 0} onClick={() => {
+                const next = [...round.problems]
+                ;[next[problemIndex - 1], next[problemIndex]] = [next[problemIndex], next[problemIndex - 1]]
+                updateRound(roundIndex, { ...round, problems: next })
+              }}><ArrowUp size={16} aria-hidden="true" /></button>
+              <button type="button" aria-label={String(roundIndex + 1) + '라운드 문제 ' + String(problemIndex + 1) + ' 아래로'} disabled={problemIndex === round.problems.length - 1} onClick={() => {
+                const next = [...round.problems]
+                ;[next[problemIndex], next[problemIndex + 1]] = [next[problemIndex + 1], next[problemIndex]]
+                updateRound(roundIndex, { ...round, problems: next })
+              }}><ArrowDown size={16} aria-hidden="true" /></button>
+              <button type="button" aria-label={String(roundIndex + 1) + '라운드 문제 ' + String(problemIndex + 1) + ' 삭제'} disabled={round.problems.length === 1} onClick={() => updateRound(roundIndex, { ...round, problems: round.problems.filter((_, at) => at !== problemIndex) })}><Trash2 size={16} aria-hidden="true" /></button>
+            </div>
+          </div>)}
+        </div>
+        <button type="button" disabled={round.problems.length >= 12} onClick={() => updateRound(roundIndex, { ...round, problems: [...round.problems, { number: '', points: '100' }] })}><Plus size={16} aria-hidden="true" />문제 추가</button>
+      </section>)}
+      <datalist id="club-tournament-problems">{catalog.map(({ number, problem }) => <option key={number} value={number}>{problem.title}</option>)}</datalist>
     </div>
     {queryError && <p role="alert">{queryError}</p>}
-    <button type="button" className="club-tournament-primary" disabled={busy} onClick={submit}><Check size={17} aria-hidden="true" />{event ? '설정 저장' : '초안 저장'}</button>
+    <button type="button" className="club-tournament-primary" disabled={busy} onClick={() => submit(Date.now())}><Check size={17} aria-hidden="true" />{event ? '설정 저장' : '초안 저장'}</button>
   </section>
 }
 
@@ -118,15 +192,12 @@ function TournamentList({ canManage }: { canManage: boolean }) {
     return () => controller.abort()
   }, [])
 
-  const save = async (draft: Draft) => {
+  const save = async (payload: TournamentSavePayload) => {
     setBusy(true)
     setError('')
     try {
       const { event } = await requestTournament<{ event: TournamentDetail }>({
-        action: 'tournament-save', title: draft.title.trim(), rules: draft.rules.trim(),
-        startsAt: Date.parse(`${draft.startsAt}:00+09:00`), capacity: draft.capacity,
-        durationMinutes: draft.durationMinutes, breakMinutes: draft.breakMinutes,
-        problemNumbers: draft.problems.slice(0, roundsFor(draft.capacity)).map(Number),
+        action: 'tournament-save', ...payload,
       })
       setCreatedId(event.id)
       setNewEvent(false)
@@ -168,6 +239,8 @@ function TournamentList({ canManage }: { canManage: boolean }) {
 }
 
 function TournamentDetailPage({ id, canManage }: { id: string; canManage: boolean }) {
+  const catalog = useNumberedCatalog()
+  const [now, setNow] = useState(Date.now)
   const [event, setEvent] = useState<TournamentDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -187,12 +260,15 @@ function TournamentDetailPage({ id, canManage }: { id: string; canManage: boolea
     if (eventStatus !== 'registration' && eventStatus !== 'running') return
     const timer = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return
+      setNow(Date.now())
       void requestTournament<{ event: TournamentDetail }>({ action: 'tournament-get', id })
         .then(result => { setEvent(result.event); setError('') })
         .catch(() => setError('대회 상태를 확인하지 못했어요. 다시 시도해 주세요.'))
     }, 10_000)
     return () => window.clearInterval(timer)
   }, [id, eventStatus])
+  const registrationOpen = event?.status === 'registration' &&
+    now < (event.registrationClosesAt ?? event.startsAt)
 
   const act = async (action: string, fields: Record<string, unknown> = {}) => {
     setBusy(true)
@@ -206,11 +282,7 @@ function TournamentDetailPage({ id, canManage }: { id: string; canManage: boolea
     } catch (cause) { setError(cause instanceof Error ? cause.message : '요청을 처리하지 못했어요.') }
     finally { setBusy(false) }
   }
-  const save = (draft: Draft) => void act('tournament-save', {
-    title: draft.title.trim(), rules: draft.rules.trim(), startsAt: Date.parse(`${draft.startsAt}:00+09:00`),
-    capacity: draft.capacity, durationMinutes: draft.durationMinutes, breakMinutes: draft.breakMinutes,
-    problemNumbers: draft.problems.slice(0, roundsFor(draft.capacity)).map(Number),
-  })
+  const save = (payload: TournamentSavePayload) => void act('tournament-save', payload)
   const copyLink = async () => {
     try { await navigator.clipboard.writeText(new URL(`${basePath}/${id}`, window.location.origin).href); setNotice('대회 링크를 복사했습니다.') }
     catch { setError('대회 링크를 복사하지 못했어요.') }
@@ -223,21 +295,23 @@ function TournamentDetailPage({ id, canManage }: { id: string; canManage: boolea
       {error && <p role="alert" className="club-tournament-error">{error}</p>}
       {notice && <p role="status" className="club-tournament-notice">{notice}</p>}
       {event && <>
-        <header className="club-tournaments-heading"><div><span className="club-tournament-status" data-status={event.status}>{statusLabel[event.status]}</span><PageHeading>{event.title}</PageHeading><p><CalendarClock size={17} aria-hidden="true" />{seoulTime(event.startsAt)} · {event.durationMinutes}분 경기 · {event.breakMinutes}분 휴식</p></div><Trophy size={38} aria-hidden="true" /></header>
+        <header className="club-tournaments-heading"><div><span className="club-tournament-status" data-status={event.status}>{statusLabel[event.status]}</span><PageHeading>{event.title}</PageHeading><p><CalendarClock size={17} aria-hidden="true" />{seoulTime(event.startsAt)} · 라운드별 경기 시간 · {event.breakMinutes}분 휴식</p></div><Trophy size={38} aria-hidden="true" /></header>
         <div className="club-tournament-summary">
           <span><Users size={17} aria-hidden="true" />{event.participantCount}/{event.capacity}명 참가</span>
           {event.registered && <strong>참가 신청 완료</strong>}
           {event.champion && <strong>우승 {event.champion}</strong>}
+          {event.registrationClosesAt && event.status === 'registration' && <span>신청 마감 {seoulTime(event.registrationClosesAt)}</span>}
         </div>
         <div className="club-tournament-actions">
-          {event.status === 'registration' && !event.registered && <button type="button" className="club-tournament-primary" disabled={busy || event.participantCount >= event.capacity} onClick={() => void act('tournament-join')}>참가 신청</button>}
-          {event.status === 'registration' && event.registered && <button type="button" disabled={busy} onClick={() => void act('tournament-leave')}>신청 취소</button>}
+          {registrationOpen && !event.registered && <button type="button" className="club-tournament-primary" disabled={busy || event.participantCount >= event.capacity} onClick={() => void act('tournament-join')}>참가 신청</button>}
+          {registrationOpen && event.registered && <button type="button" disabled={busy} onClick={() => void act('tournament-leave')}>신청 취소</button>}
+          {event.status === 'registration' && !registrationOpen && <span>참가 신청이 마감됐습니다.</span>}
           {canManage && event.status === 'draft' && <><button type="button" onClick={() => setEditing(value => !value)} disabled={busy}>설정 수정</button><button type="button" className="club-tournament-primary" disabled={busy} onClick={() => void act('tournament-publish')}>참가 모집 시작</button></>}
           {canManage && (event.status === 'draft' || event.status === 'registration' || event.status === 'running') && <button type="button" disabled={busy} onClick={() => { if (window.confirm(`“${event.title}” 대회를 취소할까요?`)) void act('tournament-cancel') }}>대회 취소</button>}
           {event.status !== 'draft' && <button type="button" onClick={() => void copyLink()}><Copy size={16} aria-hidden="true" />링크 복사</button>}
         </div>
         {editing && canManage && event.status === 'draft' && <TournamentForm event={event} busy={busy} onSave={save} />}
-        <section className="club-tournament-panel club-tournament-rules"><h2>대회 규칙</h2><p>{event.rules}</p><ul><li>대진 순서는 시작 시 무작위로 정해집니다.</li><li>정답을 서버에 먼저 제출한 회원이 승리합니다.</li><li>정답이 없으면 통과한 테스트 수와 서버 접수 순서로 승부를 정합니다.</li><li>제한 시간 안에 접수된 제출은 최대 60초 동안 채점 결과를 기다립니다.</li></ul></section>
+        <section className="club-tournament-panel club-tournament-rules"><h2>대회 규칙</h2><p>{event.rules}</p><ul><li>대진 순서는 시작 시 무작위로 정해집니다.</li><li>{event.scoring === 'partial' ? '통과한 테스트 비율까지 배점에 반영합니다.' : '정답을 낸 문제의 배점을 합산합니다.'} 동점이면 점수를 획득한 서버 접수 시각으로 판정합니다.</li><li>제한 시간 안에 접수된 제출은 최대 60초 동안 채점 결과를 기다립니다.</li></ul></section>
         {event.status === 'registration' && <section className="club-tournament-panel"><h2>참가자 {event.participantCount}명</h2><div className="club-tournament-participants">{event.participants.map((name, index) => <span key={`${index}-${name}`}>{name}</span>)}</div><p>대회 시작 전까지 참가 신청을 받을 수 있어요.</p></section>}
         {event.rounds.length > 0 && <section className="club-tournament-bracket" aria-label="대진표">
           <div className="club-tournament-section-head">
@@ -249,14 +323,17 @@ function TournamentDetailPage({ id, canManage }: { id: string; canManage: boolea
               <span>{round.matches.length === 1 ? '결승' : `${round.number}라운드`}</span>
               <small>{seoulTime(round.startsAt)} ~ {seoulTime(round.endsAt)}</small>
             </header>
-            {round.problemNumber !== null && <p className="club-tournament-round-problem">
-              {round.problemNumber}번 · {numberedExercises.find(entry => entry.number === round.problemNumber)?.problem.title ?? '알고리즘 문제'}
-            </p>}
+            {visibleProblems(round)?.map(problem =>
+              <p key={problem.number} className="club-tournament-round-problem">
+                {problem.number}번 · {catalog.find(entry => entry.number === problem.number)?.problem.title ?? '알고리즘 문제'}{problem.points !== null && ' · ' + problem.points + '점'}
+              </p>)}
             <div className="club-tournament-matches">{round.matches.map(match => <article key={match.id} className="club-tournament-match" data-status={match.status}>
               <div className="club-tournament-match-top"><span>경기 {match.number}</span><small>{matchLabel[match.status]}</small></div>
               <div className="club-tournament-players">{match.players.map((player, index) => <span key={index} data-winner={match.winnerSlot === index}>{player ?? '대기'}</span>)}</div>
-              {match.result && <small className="club-tournament-result">{resultLabel[match.result]}</small>}
-              {match.canSubmit && round.problemNumber !== null && <Link to={`/study/algorithms/${round.problemNumber}?tournament=${event.id}&match=${match.id}`} className="club-tournament-primary">문제 풀기 <ArrowRight size={15} aria-hidden="true" /></Link>}
+              {match.result && <small className="club-tournament-result">{match.result === 'score' && !event.roundsConfig ? '통과한 테스트' : resultLabel[match.result]}</small>}
+              {match.scores && <p className="club-tournament-scores">획득 점수 {match.scores[0]} : {match.scores[1]}</p>}
+              {match.canSubmit && visibleProblems(round)?.map(problem =>
+                <Link key={problem.number} to={'/study/algorithms/' + problem.number + '?tournament=' + event.id + '&match=' + match.id} className="club-tournament-primary">{problem.number}번 문제 풀기{problem.points !== null && ' · ' + problem.points + '점'} <ArrowRight size={15} aria-hidden="true" /></Link>)}
             </article>)}</div>
           </section>)}</div>
         </section>}

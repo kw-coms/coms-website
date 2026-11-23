@@ -13,6 +13,7 @@ import { ClubError, createClubStore } from './club-store.mjs';
 import { createClubBattles } from './club-battles.mjs';
 import { createClubSocial } from './club-social.mjs';
 import { createClubTournaments } from './club-tournaments.mjs';
+import { createClubProblems } from './club-problems.mjs';
 
 export const MAX_BODY_BYTES = 112 * 1024;
 const MAX_CODE_BYTES = 64 * 1024;
@@ -112,7 +113,7 @@ export function createRunnerServer({
   denyList = { has: () => false },
   inflight = { begin() {}, end() {} },
   numberedProblems = {}, judgeProgress = null,
-  clubBattles = null, clubSocial = null, clubTournaments = null,
+  clubBattles = null, clubSocial = null, clubTournaments = null, clubProblems = null,
 } = {}) {
   const heldKeys = new Set();
   const server = createServer({ maxHeaderSize: 16 * 1024 }, async (request, response) => {
@@ -161,26 +162,40 @@ export function createRunnerServer({
       let body;
       try { body = await readJson(request); }
       catch (error) { response.setHeader('Connection', 'close'); return send(400, rejected(error.message)); }
+      const canManage = key.startsWith('m:') && request.headers['x-runner-role'] === 'ADMIN';
       if (path === '/study/api/club') {
         if (!key.startsWith('m:')) return send(401, { error: 'unauthorized', messageKo: '로그인한 동아리원만 이용할 수 있어요.' });
         const action = body?.action;
-        if (typeof action !== 'string' || !/^(battle|sets|vote|tournament)-[a-z]+$/.test(action)) return send(400, rejected('지원하지 않는 요청이에요.'));
+        if (typeof action !== 'string' || !/^(battle|sets|vote|tournament|problem)-[a-z]+$/.test(action)) return send(400, rejected('지원하지 않는 요청이에요.'));
+        if (action.startsWith('problem-')) {
+          if (!clubProblems) return send(503, rejected('문제 관리 기능을 잠시 이용할 수 없어요.'));
+          return send(200, await clubProblems.handle(key, body, { canManage }));
+        }
         if (action.startsWith('tournament-')) {
           if (!clubTournaments) return send(503, rejected('대회 기능을 잠시 이용할 수 없어요.'));
           const encoded = request.headers['x-runner-name'];
           const displayName = typeof encoded === 'string' && /^[A-Za-z0-9_-]{1,256}$/.test(encoded)
             ? Buffer.from(encoded, 'base64url').toString('utf8') : null;
-          return send(200, await clubTournaments.handle(key, body, {
-            canManage: request.headers['x-runner-role'] === 'ADMIN', displayName,
-          }));
+          return send(200, await clubTournaments.handle(key, body, { canManage, displayName }));
         }
         const service = action.startsWith('battle-') ? clubBattles : clubSocial;
         if (!service) return send(503, rejected('모임 기능을 잠시 이용할 수 없어요.'));
         return send(200, await service.handle(key, body));
       }
+      let verification = null;
+      if (body && (body.action === 'problem-verify' || Object.hasOwn(body, 'authoringId'))) {
+        if (body.action !== 'problem-verify' || typeof body.authoringId !== 'string' ||
+            !/^[a-f0-9]{24}$/.test(body.authoringId) || Object.keys(body).length !== 2) {
+          return send(400, rejected('검증할 문제 요청을 확인해 주세요.'));
+        }
+        if (!key.startsWith('m:')) return send(401, { error: 'unauthorized', messageKo: '로그인한 회원만 검증할 수 있어요.' });
+        if (!clubProblems) return send(503, rejected('문제 검증 기능을 잠시 이용할 수 없어요.'));
+        verification = await clubProblems.verification(key, body.authoringId, { canManage });
+        body = { lang: verification.lang, code: verification.code };
+      }
       const problem = validateRequest(body);
       if (problem) return send(400, rejected(problem));
-      const numbered = Object.hasOwn(body, 'problemNumber') ? numberedProblems[body.problemNumber] : null;
+      const numbered = verification?.problem ?? (Object.hasOwn(body, 'problemNumber') ? numberedProblems[body.problemNumber] : null);
       if (Object.hasOwn(body, 'problemNumber') && (!numbered || !numbered.langs.includes(body.lang))) {
         return send(400, rejected('해당 번호의 문제나 언어를 찾을 수 없어요.'));
       }
@@ -216,10 +231,14 @@ export function createRunnerServer({
       if (result === QUEUE_TIMEOUT) { response.setHeader('Retry-After', '20'); return send(429, { error: 'busy', messageKo: '실행 대기열이 길어 시간 안에 시작하지 못했어요. 잠시 후 다시 시도해 주세요.' }); }
       if (result !== null && numbered) {
         const judge = gradeNumberedOutput(numbered, result);
+        if (verification) {
+          const proposal = await clubProblems.finishVerification(key, verification.id, verification.revision, judge, { canManage });
+          return send(200, { proposal, judge });
+        }
         if (judge.solved && body.battleCode) await clubBattles.recordAccepted(key, body.battleCode, body.problemNumber, receivedAt);
         if (body.tournamentId && !judge.compileError) {
           await clubTournaments.recordResult(key, body.tournamentId, body.matchId, body.problemNumber, receivedAt,
-            { passed: judge.passed, solved: judge.solved });
+            { passed: judge.passed, total: judge.total, solved: judge.solved });
         }
         const progress = judgeProgress && key.startsWith('m:')
           ? judge.solved
@@ -315,6 +334,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const clubTournaments = createClubTournaments({ numberedProblems, store: createClubStore({
     directory: clubDirectory, filename: 'tournaments.json', initial: () => ({ version: 1, events: [] }),
   }) });
+  const clubProblems = createClubProblems({ numberedProblems, store: createClubStore({
+    directory: clubDirectory, filename: 'problems.json', initial: () => ({ version: 1, proposals: [], nextNumber: 90_000 }),
+  }) });
+  await clubProblems.hydrate();
   // A record left behind means the previous process died mid-job (OOM, SIGKILL, crash): blame its client.
   const crashed = inflight?.recover();
   if (crashed) {
@@ -322,7 +345,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     log({ event: 'recovered-inflight', client: keyHash(crashed.clientKey), jobId: crashed.jobId, startedAt: crashed.startedAt });
   }
   server = createRunnerServer({
-    denyList, inflight, numberedProblems, judgeProgress, clubBattles, clubSocial, clubTournaments,
+    denyList, inflight, numberedProblems, judgeProgress, clubBattles, clubSocial, clubTournaments, clubProblems,
     onFatal({ key } = {}) {
       if (exiting) return;
       exiting = true;
