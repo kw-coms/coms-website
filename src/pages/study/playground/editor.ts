@@ -30,7 +30,7 @@ async function languageSupport(lang: BlockLang): Promise<Extension> {
 const palette = HighlightStyle.define([
   { tag: [t.keyword, t.controlKeyword, t.definitionKeyword, t.modifier, t.operatorKeyword, t.moduleKeyword], color: '#ff9e64' },
   { tag: [t.string, t.special(t.string), t.regexp], color: '#9ece6a' },
-  { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], color: '#7f8aa3', fontStyle: 'italic' },
+  { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], color: '#9ca8c0', fontStyle: 'italic' },
   { tag: [t.number, t.bool, t.null, t.atom], color: '#e0af68' },
   { tag: [t.propertyName, t.attributeName, t.labelName], color: '#7dcfff' },
   { tag: [t.typeName, t.className, t.namespace], color: '#7aa2f7' },

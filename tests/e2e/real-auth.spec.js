@@ -31,6 +31,36 @@ const MAILBOX_PATH = fileURLToPath(new URL('../../test-results/coms-e2e-mailbox.
 const ADMIN = { identifier: 'admin', password: process.env.COMS_E2E_ADMIN_PASSWORD }
 
 test.describe('real backend auth', () => {
+  test('a numbered problem question is saved with its link and receives a community reply', async ({ page }) => {
+    const login = await page.request.post('/api/auth/login', {
+      headers: { Origin: ORIGIN },
+      data: { identifier: ADMIN.identifier, password: ADMIN.password, rememberMe: false },
+    })
+    expect(login.status()).toBe(200)
+    const title = `구간 합 질문 ${Date.now()}`
+    await page.goto('/study/algorithms/1100')
+    await page.getByRole('button', { name: '질문 보기' }).click()
+    await page.getByLabel('질문 제목').fill(title)
+    await page.getByLabel('질문 내용').fill('앞 구간의 누적 합을 어디에서 빼야 할까요?')
+    const creating = page.waitForResponse(response => new URL(response.url()).pathname === '/api/community/posts' && response.request().method() === 'POST')
+    await page.getByRole('button', { name: '질문 등록', exact: true }).click()
+    const created = await creating
+    expect(created.ok()).toBe(true)
+    const post = await created.json()
+    expect(post.title).toBe(`[문제 1100번] ${title}`)
+    expect(post.category).toBe('QUESTION')
+    await expect(page).toHaveURL(`/community/${post.id}`)
+    await expect(page.getByRole('link', { name: '문제 1100번으로 돌아가기' })).toHaveAttribute('href', `${ORIGIN}/study/algorithms/1100`)
+
+    const reply = await page.request.post(`/api/community/posts/${post.id}/comments`, {
+      headers: { Origin: ORIGIN },
+      data: { content: 'L부터 R까지라면 L 바로 앞까지의 누적 값을 빼면 됩니다.' },
+    })
+    expect(reply.ok()).toBe(true)
+    await page.reload()
+    await expect(page.getByText('L부터 R까지라면 L 바로 앞까지의 누적 값을 빼면 됩니다.')).toBeVisible()
+  })
+
   test('archive uploads one post with two attachments and downloads the original bytes', async ({ page }) => {
     const login = await page.request.post('/api/auth/login', {
       headers: { Origin: ORIGIN },

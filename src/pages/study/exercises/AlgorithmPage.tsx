@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, CalendarDays, CalendarRange, RotateCcw, Share2 } from 'lucide-react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, ArrowRight, CalendarDays, CalendarRange, RotateCcw, Settings2, Share2 } from 'lucide-react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import MemberLock from '../../../components/MemberLock'
 import PageHeading from '../../../components/PageHeading'
 import { useAuth } from '../../../contexts/useAuth'
@@ -24,6 +24,7 @@ const STATUS_VALUES = new Set(['solved', 'unsolved'])
 
 export default function AlgorithmPage() {
   const { user } = useAuth()
+  const location = useLocation()
   const verified = useJudgeProgress(Boolean(user))
   const saved = useProgress()
   const [now, setNow] = useState(Date.now)
@@ -85,7 +86,10 @@ export default function AlgorithmPage() {
 
   return <main className="study-page ex-page judge-catalog">
     <div className="ex-container">
-      <nav className="judge-catalog-back"><Link to="/study"><ArrowLeft size={16} aria-hidden="true" />스터디 자료</Link></nav>
+      <nav className="judge-catalog-back" aria-label="알고리즘 메뉴">
+        <Link to="/study"><ArrowLeft size={16} aria-hidden="true" />스터디 자료</Link>
+        {user && <Link to="/study/algorithms/settings" state={{ from: location.pathname + location.search }}><Settings2 size={16} aria-hidden="true" />코딩 설정</Link>}
+      </nav>
       <header className="judge-catalog-hero">
         <div>
           <PageHeading>알고리즘 문제</PageHeading>

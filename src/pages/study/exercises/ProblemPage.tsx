@@ -1,12 +1,14 @@
 import PageHeading from '../../../components/PageHeading'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Settings2 } from 'lucide-react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../../contexts/useAuth'
 import MembersGate, { AuthCheckFailed } from '../../../components/MembersGate'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import NotFoundPage from '../../../components/NotFoundPage'
 import { createEditor, type PgEditor } from '../playground/editor'
-import { readEditorAppearance, saveEditorAppearance, type EditorAppearance } from './editorAppearance'
+import type { EditorAppearance } from './editorAppearance'
+import { chooseCodingLanguage, problemStarter, readCodingSettings } from './codingSettings'
 import type { BlockLang } from '../playground/classify'
 import { runRemote, type RunOutput } from '../playground/runner'
 import { decodeShareHash, encodeShareHash } from '../playground/storage'
@@ -19,6 +21,7 @@ import { LANG_NAMES, type ExLang, type Exercise, type WebExercise } from './type
 import { numberedLanguages } from './judgeLanguages'
 import WebWorkspace from './WebWorkspace'
 import { JudgeTierBadge } from './JudgeTierBadge'
+import ProblemHelp from './ProblemHelp'
 import { shareJudgeResult, useJudgeProgress } from './judgeProgress'
 import '../study.css'
 import './exercises.css'
@@ -26,14 +29,6 @@ import './problem-workspace.css'
 
 const LEVEL_NAME = ['입문', '기초', '응용', '심화', '도전']
 const isWeb = (problem: Exercise | WebExercise): problem is WebExercise => 'checks' in problem
-
-const STDIO_SCAFFOLDS: Record<ExLang, string> = {
-  c: '#include <stdio.h>\n\nint main(void) {\n    // 입력을 읽고 답을 출력하세요.\n    return 0;\n}\n',
-  cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // 입력을 읽고 답을 출력하세요.\n    return 0;\n}\n',
-  java: 'import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws Exception {\n        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));\n        // 입력을 읽고 답을 출력하세요.\n    }\n}\n',
-  python: 'import sys\n\ndef solve():\n    # 입력을 읽고 답을 출력하세요.\n    data = sys.stdin.buffer.read().split()\n\nif __name__ == "__main__":\n    solve()\n',
-  javascript: "const fs = require('node:fs');\nconst input = fs.readFileSync(0, 'utf8').trim();\n// 입력을 읽고 답을 출력하세요.\n",
-}
 
 function CodePane({ lang, initial, appearance, editorRef, onChange, onRun, onSubmit }: {
   lang: ExLang; initial: string; editorRef: React.RefObject<PgEditor | null>
@@ -91,6 +86,8 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
   useDocumentTitle(problem.title)
   const navigate = useNavigate()
   const location = useLocation()
+  const { user } = useAuth()
+  const [settings] = useState(() => readCodingSettings(user?.studentId))
   const progress = useProgress()
   const judgeProgress = useJudgeProgress(number !== undefined)
   const record = progress[problem.id]
@@ -102,13 +99,15 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
     const share = decodeShareHash(location.hash)
     return { saved: readProgress()[problem.id]?.code ?? {}, share, sharedLang: share ? langs[share.index] : undefined }
   })
-  const [lang, setLang] = useState<ExLang>(initialContext.sharedLang ?? (langs.includes(studyId as ExLang) ? studyId as ExLang : langs[0] ?? 'c'))
+  const [lang, setLang] = useState<ExLang>(() => initialContext.sharedLang ?? chooseCodingLanguage(
+    langs, number === undefined ? studyId : new URLSearchParams(location.search).get('lang'), settings.preferredLanguage, studyId,
+  ))
   const sharedLang = initialContext.sharedLang
   const [shared, setShared] = useState(Boolean(sharedLang))
   const [codeByLang, setCodeByLang] = useState<Partial<Record<ExLang, string>>>(() => {
     if (web) return {}
     const next: Partial<Record<ExLang, string>> = {}
-    for (const language of langs) next[language] = initialContext.saved[language] ?? problem.starter[language] ?? (problem.mode === 'stdio' ? STDIO_SCAFFOLDS[language] : '')
+    for (const language of langs) next[language] = initialContext.saved[language] ?? problemStarter(problem, language, settings)
     if (sharedLang && initialContext.share) next[sharedLang] = initialContext.share.code
     return next
   })
@@ -123,7 +122,6 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
   const [single, setSingle] = useState<RunOutput | null>(null)
   const [grade, setGrade] = useState<GradeReport | null>(null)
   const [solved, setSolved] = useState(Boolean(record?.solved))
-  const [appearance, setAppearance] = useState(readEditorAppearance)
   const editorRef = useRef<PgEditor | null>(null)
   const summaryRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -147,7 +145,7 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
   }
   const dropSharedHash = () => { if (location.hash.startsWith('#pg=')) history.replaceState(history.state, '', location.pathname + location.search) }
   const leaveShared = (keep: boolean) => {
-    const value = keep ? codeRef.current[lang] ?? '' : initialContext.saved[lang] ?? (!web ? problem.starter[lang] ?? '' : '')
+    const value = keep ? codeRef.current[lang] ?? '' : initialContext.saved[lang] ?? (!web ? problemStarter(problem, lang, settings) : '')
     if (keep) saveCode(problem.id, lang, value)
     codeRef.current = { ...codeRef.current, [lang]: value }
     setCodeByLang(codeRef.current)
@@ -203,7 +201,7 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
   }
   const reset = () => {
     if (web || busy || !window.confirm('코드를 처음 상태로 되돌릴까요?')) return
-    const starter = problem.starter[lang] ?? ''
+    const starter = problemStarter(problem, lang, settings)
     if (shared && lang === sharedLang) {
       codeRef.current = { ...codeRef.current, [lang]: starter }
       setCodeByLang(codeRef.current)
@@ -218,20 +216,6 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
     editorRef.current?.clearDiagnostics()
     saveCode(problem.id, lang, starter)
     setGrade(null); setSingle(null)
-  }
-  const applyScaffold = () => {
-    if (web || problem.mode !== 'stdio' || busy || shared) return
-    if (currentCode.trim() && !window.confirm('현재 코드를 입출력 기본 코드로 바꿀까요?')) return
-    const scaffold = STDIO_SCAFFOLDS[lang]
-    editorRef.current?.setValue(scaffold)
-    editorRef.current?.focus()
-    saveCode(problem.id, lang, scaffold)
-    setGrade(null); setSingle(null)
-  }
-  const updateAppearance = (change: Partial<EditorAppearance>) => {
-    const next = { ...appearance, ...change }
-    setAppearance(next)
-    saveEditorAppearance(next)
   }
   const share = () => {
     const index = langs.indexOf(lang)
@@ -259,13 +243,15 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
     <header className="ex-head"><div><p className="ex-eyebrow">{number === undefined ? '실습 문제' : `문제 ${number}번`}</p><PageHeading>{problem.title}</PageHeading><div className="ex-meta"><JudgeTierBadge problem={problem} />{number === undefined && <span>{LEVEL_NAME[problem.level - 1]}</span>}{problem.topics.map((topic) => <span key={topic}>{topic}</span>)}</div></div></header>
     <nav className="judge-mobile-nav" aria-label="문제 화면 이동">
       <a href="#judge-statement">문제 설명</a><a href="#judge-workspace">코드 작성</a><a href="#judge-results">실행 결과</a>
+      {number !== undefined && <a href="#judge-help">힌트·질문</a>}
     </nav>
     <div className="ex-columns">
       <section id="judge-statement" className="ex-panel ex-statement" aria-label="문제 설명">
         <MiniMarkdown text={problem.statement} />
         {!web && <>{problem.inputSpec && <section className="ex-spec"><h2>입력</h2><MiniMarkdown text={problem.inputSpec} /></section>}{problem.outputSpec && <section className="ex-spec"><h2>출력</h2><MiniMarkdown text={problem.outputSpec} /></section>}
           <section className="ex-examples"><h2>예제</h2>{problem.examples.map((example, index) => <div className="ex-example" key={index}><h3>예제 {index + 1}</h3><OutputBox title="입력" value={example.stdin} /><button type="button" onClick={() => void navigator.clipboard.writeText(example.stdin)}>입력 복사</button><OutputBox title="출력" value={example.expected} /><button type="button" onClick={() => void navigator.clipboard.writeText(example.expected)}>출력 복사</button>{example.explain && <p>{example.explain}</p>}</div>)}</section></>}
-        {problem.hints.length > 0 && <section className="ex-hints"><h2>힌트</h2>{problem.hints.slice(0, shownHints).map((hint, index) => <div key={index}><MiniMarkdown text={hint} /></div>)}{shownHints < problem.hints.length && <button type="button" onClick={() => setShownHints((count) => count + 1)}>힌트 하나 보기</button>}</section>}
+        {number !== undefined ? <ProblemHelp number={number} title={problem.title} hints={problem.hints} />
+          : problem.hints.length > 0 && <section className="ex-hints"><h2>힌트</h2>{problem.hints.slice(0, shownHints).map((hint, index) => <div key={index}><MiniMarkdown text={hint} /></div>)}{shownHints < problem.hints.length && <button type="button" onClick={() => setShownHints((count) => count + 1)}>힌트 하나 보기</button>}</section>}
         {(web || problem.solution[lang]) && <section className="ex-solution"><button type="button" onClick={revealSolution}>답 보기</button>{showSolution && <div><h2>참고 답안</h2>{web ? <><h3>HTML</h3><SolutionEditor lang="html" code={problem.solution.html} /><h3>CSS</h3><SolutionEditor lang="css" code={problem.solution.css} /><h3>JavaScript</h3><SolutionEditor lang="js" code={problem.solution.js} /></> : <SolutionEditor lang={lang} code={problem.solution[lang] ?? ''} />}{problem.explain && <MiniMarkdown text={problem.explain} />}</div>}</section>}
       </section>
       <section id="judge-workspace" className="ex-panel ex-workspace" aria-label="코드 작성 및 채점">
@@ -274,21 +260,11 @@ function ProblemBody({ studyId, problem, fromAlgorithms, number }: { studyId: st
           {shared && lang === sharedLang && <div className="ex-shared" role="region" aria-label="공유된 코드"><p>공유된 코드를 보고 있어요. 내 코드는 그대로 보관됩니다.</p><button type="button" onClick={() => leaveShared(false)}>내 코드로 돌아가기</button><button type="button" onClick={() => leaveShared(true)}>이 코드로 저장</button></div>}
           <div className="judge-editor-tools">
             <strong>{LANG_NAMES[lang]} 코드</strong>
-            {problem.mode === 'stdio' && <button type="button" onClick={applyScaffold} disabled={busy || shared}>입출력 기본 코드</button>}
-            <details className="judge-editor-settings"><summary>편집기 설정</summary>
-              <div>
-                <label>코드 색상<select value={appearance.palette} onChange={(event) => updateAppearance({ palette: event.target.value as EditorAppearance['palette'] })}>
-                  <option value="midnight">어두운 화면</option><option value="paper">밝은 화면</option><option value="contrast">선명한 화면</option>
-                </select></label>
-                <label>글자 크기<select value={appearance.fontSize} onChange={(event) => updateAppearance({ fontSize: Number(event.target.value) as EditorAppearance['fontSize'] })}>
-                  {[14, 16, 18, 20].map((size) => <option key={size} value={size}>{size}px</option>)}
-                </select></label>
-                <label className="judge-wrap"><input type="checkbox" checked={appearance.wrap} onChange={(event) => updateAppearance({ wrap: event.target.checked })} />긴 줄 자동 줄바꿈</label>
-              </div>
-            </details>
+            {number !== undefined && <a className="judge-tools-link" href="#judge-help">힌트·질문</a>}
+            <Link className="judge-tools-link" to="/study/algorithms/settings" state={{ from: location.pathname + location.search + location.hash }}><Settings2 size={16} aria-hidden="true" />코딩 설정</Link>
           </div>
           <div className="ex-actions"><button type="button" onClick={() => void run()} disabled={busy || countdown > 0}>실행</button><button type="button" className="ex-primary" onClick={() => void submit()} disabled={busy || countdown > 0}>제출</button><span className="ex-actions-gap" aria-hidden="true" /><button type="button" className="ex-quiet" onClick={reset} disabled={busy}>초기화</button><button type="button" className="ex-quiet" onClick={share}>내 풀이 공유</button></div>
-          <CodePane key={lang} lang={lang} initial={currentCode} appearance={appearance} editorRef={editorRef} onChange={updateCode} onRun={() => void run()} onSubmit={() => void submit()} />
+          <CodePane key={lang} lang={lang} initial={currentCode} appearance={settings.appearance} editorRef={editorRef} onChange={updateCode} onRun={() => void run()} onSubmit={() => void submit()} />
           <label className="ex-stdin">직접 실행 입력 (stdin)<textarea value={stdin} onChange={(event) => setStdin(event.target.value)} rows={3} /></label>
           <p className="ex-shortcuts">⌘/Ctrl+Enter 실행 · ⌘/Ctrl+Shift+Enter 제출</p>
           <span id="judge-results" className="judge-result-anchor" aria-hidden="true" />
@@ -333,5 +309,5 @@ export default function ProblemPage() {
     <header className="ex-head"><div>{numbered && <p className="ex-eyebrow">문제 {numbered.number}번</p>}<PageHeading>{problem.title}</PageHeading></div></header>
     <MembersGate heading="h2" title="문제 풀이는 동아리원만 할 수 있어요">문제 설명과 코드 편집기는 로그인한 동아리원에게만 열려요.</MembersGate>
   </main>
-  return <ProblemBody key={`${problem.id}:${studyId}`} studyId={studyId} problem={problem} fromAlgorithms={fromAlgorithms} number={numbered?.number} />
+  return <ProblemBody key={`${user.studentId}:${problem.id}:${studyId}`} studyId={studyId} problem={problem} fromAlgorithms={fromAlgorithms} number={numbered?.number} />
 }
