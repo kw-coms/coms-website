@@ -41,7 +41,7 @@ export default function HomeView() {
       return notices.find((n) => (n.category || 'GENERAL') === 'GENERAL') ?? null
     },
   })
-  const latestNotice = latestNoticeQuery.data ?? null
+  const latestNotice = member ? latestNoticeQuery.data ?? null : null
   const siteSettingsQuery = useQuery({
     queryKey: SITE_SETTINGS_QUERY_KEY,
     queryFn: getPublicSiteSettings,
@@ -69,6 +69,13 @@ export default function HomeView() {
     navigate(to, options)
   }
   const locationPath = () => `${location.pathname}${location.search}${location.hash}`
+  const openNotice = () => {
+    if (!member) {
+      goPageTop('/recruit-notice', { state: { from: locationPath() } })
+      return
+    }
+    goPageTop(latestNotice?.id != null ? `/notices/${encodeURIComponent(latestNotice.id)}` : '/notices')
+  }
 
   const actions: Record<'about' | 'activities' | 'projects' | 'recruit', SceneActions> = {
     about: {
@@ -120,10 +127,10 @@ export default function HomeView() {
         title={siteSettings.homeHeroTitle}
         copy={siteSettings.homeHeroCopy === defaultSiteSettings.homeHeroCopy ? null : siteSettings.homeHeroCopy}
         semester={siteSettings.semesterLabel === defaultSiteSettings.semesterLabel ? null : siteSettings.semesterLabel}
-        noticeTitle={member ? latestNotice?.title ?? null : null}
+        noticeTitle={member ? latestNotice?.title || '동아리 공지사항 보기' : '모집 일정 및 지원 안내'}
         onMore={() => openPanel('about')}
         onApply={() => goPageTop('/recruit')}
-        onNotice={() => goPageTop('/notices')}
+        onNotice={openNotice}
       />
     ),
     members: <Members key="members" index={number('members')} member={member} noticeTitle={latestNotice?.title ?? null} onGo={(path) => goPageTop(path)} backdrop={backdrop('members')} />,

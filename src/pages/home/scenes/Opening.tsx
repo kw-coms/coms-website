@@ -11,7 +11,7 @@ type Props = {
   title: string
   copy: string | null
   semester: string | null
-  noticeTitle: string | null
+  noticeTitle: string
   onMore: () => void
   onApply: () => void
   onNotice: () => void
@@ -83,6 +83,12 @@ export default function Opening({ title, copy, semester, noticeTitle, onMore, on
           <p className="scene-opening__lede">
             {copy ?? <>광운대학교 중앙 컴퓨터 학술동아리<br />같이 배우고, 직접 만듭니다.</>}
           </p>
+          <button type="button" onClick={onNotice} className="scene-notice">
+            <Megaphone size={15} aria-hidden="true" />
+            <span className="scene-notice__tag">공지</span>
+            <span className="scene-notice__title">{noticeTitle}</span>
+            <ArrowRight size={14} aria-hidden="true" />
+          </button>
           <div className="scene-actions">
             <button type="button" onClick={onMore} className="apple-action-primary scene-btn">
               <span className="home-mode-prompt" aria-hidden="true">$</span>
@@ -95,13 +101,6 @@ export default function Opening({ title, copy, semester, noticeTitle, onMore, on
               지원하기
             </button>
           </div>
-          {noticeTitle && (
-            <button type="button" onClick={onNotice} className="scene-notice">
-              <Megaphone size={15} aria-hidden="true" />
-              <span className="scene-notice__title">{noticeTitle}</span>
-              <span className="scene-notice__tag">공지</span>
-            </button>
-          )}
           <ul className="scene-opening__activities" aria-label="주요 활동">
             <li>정기 세미나</li>
             <li>팀 프로젝트</li>

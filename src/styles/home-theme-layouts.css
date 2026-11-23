@@ -314,10 +314,6 @@
 		margin: 0.8rem 1.4rem;
 	}
 
-	& .scene-opening__layout:not(:has(.scene-notice)) .scene-opening__activities {
-		grid-column: 1 / -1;
-	}
-
 	& .scene-members__header {
 		padding: 0.85rem clamp(1rem, 2.5vw, 1.65rem);
 		box-shadow: var(--retro-bevel);
