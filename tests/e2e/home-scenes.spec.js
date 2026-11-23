@@ -130,6 +130,7 @@ test.describe('a visitor on the home page', () => {
 
   test('native wheel scroll reveals a chapter divider and a brief backdrop cue', async ({ page }) => {
     const divider = page.locator('.scene-divider').first()
+    const signal = divider.locator('.scene-divider__signal')
     const about = page.locator('#about')
     await expect(page.locator('.cine-root.cine-ready #opening h1')).toBeVisible()
     await page.mouse.move(400, 400)
@@ -138,6 +139,8 @@ test.describe('a visitor on the home page', () => {
     await expect(divider).toHaveClass(/is-revealed/)
     await expect.poll(() => divider.evaluate((el) => getComputedStyle(el, '::after').animationName))
       .toBe('chapter-divider-entry')
+    await expect(signal).toBeVisible()
+    await expect(signal).not.toHaveCSS('transform', 'none')
     await expect(about).toHaveClass(/is-onscreen/)
     const backdrop = about.locator('.scene-bg')
     await expect.poll(() => backdrop.evaluate((el) => getComputedStyle(el, '::after').animationName)).toBe('chapter-backdrop-entry')
@@ -158,6 +161,7 @@ test.describe('a visitor on the home page', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await expect.poll(() => divider.evaluate((el) => getComputedStyle(el, '::after').animationName)).toBe('none')
     await expect.poll(() => backdrop.evaluate((el) => getComputedStyle(el, '::after').animationName)).toBe('none')
+    await expect(signal).toBeHidden()
   })
 
   test('has no horizontal overflow at 1440 and 390', async ({ page }) => {
@@ -331,6 +335,7 @@ test.describe('a visitor on the home page', () => {
     await page.goto('/')
     const track = page.locator('.scene-about__track')
     const title = page.locator('.scene-about__pin h2')
+    const logo = page.locator('#about .scene-bg__logo')
     const first = page.locator('.scene-about__pin .cine-w').first()
     const last = page.locator('.scene-about__pin .cine-w').last()
     const top = await track.evaluate((el) => el.getBoundingClientRect().top + window.scrollY)
@@ -346,9 +351,11 @@ test.describe('a visitor on the home page', () => {
     await title.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished.catch(() => {}))))
     const y1 = (await title.boundingBox()).y
     const earlyLast = await last.evaluate((el) => getComputedStyle(el).color)
+    const earlyLogo = await logo.evaluate((el) => getComputedStyle(el).transform)
     await at(0.6)
     const y2 = (await title.boundingBox()).y
     expect(Math.abs(y1 - y2)).toBeLessThanOrEqual(1)
+    await expect(logo).not.toHaveCSS('transform', earlyLogo)
     await at(1)
     const lateLast = await last.evaluate((el) => getComputedStyle(el).color)
     const firstColor = await first.evaluate((el) => getComputedStyle(el).color)
