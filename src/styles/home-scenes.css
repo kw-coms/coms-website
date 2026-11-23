@@ -568,7 +568,7 @@
 	font-weight: 700;
 }
 
-.scene-members__header .scene-title {
+:root:is([data-appearance-theme='terminal'], [data-appearance-theme='retro'], [data-appearance-theme='blueprint']) .scene-members__header .scene-title {
 	font-size: clamp(1.9rem, 4.4vw, 3.6rem);
 }
 
@@ -713,26 +713,35 @@
 
 .scene-members--today .scene-hubcard {
 	height: 100%;
-	gap: 0.5rem;
-	padding: clamp(1rem, 2.1vw, 1.45rem);
-	border: 1px solid var(--app-hairline);
-	border-radius: 0.875rem;
-	background: var(--app-surface-soft);
-	transition: border-color 160ms ease;
 }
 
-.scene-members--today .scene-hubcard:hover {
-	border-color: var(--app-accent);
-}
+:root:is([data-appearance-theme='terminal'], [data-appearance-theme='retro'], [data-appearance-theme='blueprint']) .scene-members--today {
+	& .scene-hubcard {
+		gap: 0.5rem;
+		padding: clamp(1rem, 2.1vw, 1.45rem);
+		border: 1px solid var(--app-hairline);
+		border-radius: 0.875rem;
+		background: var(--app-surface-soft);
+		transition: border-color 160ms ease;
+	}
 
-.scene-members--today .scene-hubcard__title {
-	margin-top: 0.25rem;
-	font-size: clamp(1.12rem, 2vw, 1.45rem);
-}
+	& .scene-hubcard::before {
+		display: none;
+	}
 
-.scene-members--today .scene-hubcard__body {
-	font-size: 0.9375rem;
-	line-height: 1.55;
+	& .scene-hubcard:hover {
+		border-color: var(--app-accent);
+	}
+
+	& .scene-hubcard__title {
+		margin-top: 0.25rem;
+		font-size: clamp(1.12rem, 2vw, 1.45rem);
+	}
+
+	& .scene-hubcard__body {
+		font-size: 0.9375rem;
+		line-height: 1.55;
+	}
 }
 
 .scene-members--today .scene-hubcard svg,
@@ -804,6 +813,72 @@
 	overflow: hidden;
 	border: 1px solid var(--app-hairline);
 	border-radius: 0.5rem;
+}
+
+:root:not([data-appearance-theme='terminal'], [data-appearance-theme='retro'], [data-appearance-theme='blueprint']) .scene-members--today {
+	padding-block: var(--cine-gap);
+
+	& .scene-bg {
+		opacity: 1;
+	}
+
+	& .scene-members__eyebrow {
+		display: none;
+	}
+
+	& .scene-notice--lead {
+		margin-bottom: 0;
+		padding-inline: 0;
+		border-width: 1px 0;
+		border-color: var(--app-hairline-strong);
+		border-radius: 0;
+		background: none;
+	}
+
+	& .scene-notice--lead:hover {
+		border-color: var(--app-accent);
+	}
+
+	& .scene-hub {
+		gap: clamp(1.4rem, 3vw, 3rem);
+		margin-top: clamp(1.5rem, 3.5vw, 3rem);
+	}
+
+	& .scene-members__icon {
+		width: auto;
+		height: auto;
+		background: none;
+	}
+
+	& .scene-members__tools-title {
+		margin-top: clamp(2rem, 4.5vw, 3.75rem);
+	}
+
+	& .scene-chip {
+		background: none;
+	}
+
+	& .scene-members__calendar {
+		margin-top: clamp(2rem, 5vw, 4.25rem);
+		padding-top: clamp(1.5rem, 3vw, 2.5rem);
+		overflow: visible;
+		border: 0;
+		border-top: 1px solid var(--app-hairline-strong);
+		border-radius: 0;
+	}
+
+	& .club-calendar-section-compact {
+		padding: 0;
+		background: none;
+	}
+
+	& .club-calendar-section-compact > div {
+		max-width: none;
+	}
+
+	& .club-calendar-section-compact .apple-eyebrow {
+		display: none;
+	}
 }
 
 @media (max-width: 799px) {
@@ -885,39 +960,110 @@
 }
 
 @media (min-width: 1024px) {
+	.scenes {
+		--scene-rail-width: 7.15rem;
+		--scene-rail-offset: 1.1rem;
+		--scene-rail-clearance: calc(var(--scene-rail-width) + var(--scene-rail-offset) + 0.75rem);
+	}
+
+	.scene:not(.scene-opening) {
+		padding-inline-end: max(var(--cine-pad), var(--scene-rail-clearance));
+	}
+
+	.scene-recruit .scene-recruit__marquee {
+		margin-inline-end: calc(-1 * max(var(--cine-pad), var(--scene-rail-clearance)));
+	}
+
+	:root:is([data-appearance-theme='terminal'], [data-appearance-theme='retro'], [data-appearance-theme='blueprint']) .scene-opening__layout {
+		width: calc(100% - 2 * max(0px, var(--scene-rail-clearance) - var(--cine-pad)));
+	}
+
 	.scene-rail {
 		position: fixed;
-		top: calc(var(--apple-nav-height, 44px) + 0.9rem);
-		right: 1.1rem;
+		top: 50dvh;
+		right: var(--scene-rail-offset);
 		z-index: 30;
-		display: block;
+		display: grid;
+		justify-items: end;
+		width: var(--scene-rail-width);
+		padding: 0.2rem 0.85rem 0.55rem 0.15rem;
+		transform: translateY(-50%);
+		border: 1px solid var(--app-hairline-strong);
+		border-radius: 0.625rem;
+		background: var(--app-surface-elevated);
+		color: var(--app-text);
 	}
 	.scene-rail__trigger {
-		display: flex;
-		align-items: center;
-		gap: 0.45rem;
+		display: grid;
+		justify-items: end;
+		gap: 0.28rem;
+		width: 100%;
 		min-height: 2.75rem;
-		padding: 0.45rem 0.75rem;
-		border: 1px solid var(--app-hairline-strong);
-		border-radius: 0.5rem;
-		background: var(--app-surface-elevated);
+		padding: 0.4rem 0.45rem;
+		border: 1px solid transparent;
+		border-radius: 0.35rem;
+		background: transparent;
 		color: var(--app-text);
 		font: 650 0.8125rem/1.25 var(--apple-font-family);
 		cursor: pointer;
 	}
+	.scene-rail__caption {
+		display: flex;
+		align-items: center;
+		gap: 0.22rem;
+		font-size: 0.75rem;
+		font-weight: 550;
+	}
+	.scene-rail__current {
+		white-space: nowrap;
+	}
 	.scene-rail__trigger[aria-expanded='true'] svg {
 		transform: rotate(180deg);
 	}
+	.scene-rail__progress {
+		margin: 0 0.45rem;
+		color: var(--app-accent-text);
+		font: 650 0.75rem/1.2 var(--apple-font-family);
+		font-variant-numeric: tabular-nums;
+	}
+	.scene-rail__progress-track {
+		position: absolute;
+		inset: 0.6rem 0.48rem 0.6rem auto;
+		width: 2px;
+		border-radius: 2px;
+		background: var(--app-hairline-strong);
+	}
+	.scene-rail__progress-track::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		background: currentColor;
+		transform: scaleY(var(--rail-page-progress));
+		transform-origin: top;
+	}
+	.scene-rail__progress-track::after {
+		content: '';
+		position: absolute;
+		top: calc(var(--rail-page-progress) * 100%);
+		left: 50%;
+		width: 5px;
+		height: 5px;
+		transform: translate(-50%, -50%);
+		border-radius: 50%;
+		background: currentColor;
+	}
 	.scene-rail ol:not([hidden]) {
 		position: absolute;
-		inset: calc(100% + 0.45rem) 0 auto auto;
+		inset: 50% calc(100% + 0.55rem) auto auto;
 		display: grid;
 		gap: 0.15rem;
 		width: 11.5rem;
-		max-height: calc(100dvh - var(--apple-nav-height, 44px) - 6rem);
+		max-height: calc(100dvh - 2 * (var(--apple-nav-height, 44px) + 0.9rem));
 		margin: 0;
 		padding: 0.35rem;
 		overflow-y: auto;
+		transform: translateY(-50%);
 		border: 1px solid var(--app-hairline-strong);
 		border-radius: 0.625rem;
 		background: var(--app-surface-elevated);

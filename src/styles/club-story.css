@@ -105,7 +105,7 @@
 	& .scene-opening__copy {
 		width: 100%;
 		max-width: none;
-		text-align: left;
+		text-align: center;
 	}
 
 	& .scene-opening .scene-wordmark {
@@ -114,10 +114,6 @@
 		font-size: calc(clamp(5rem, 20.5vw, 22rem) * var(--fit, 1));
 		line-height: 0.92;
 		letter-spacing: 0;
-	}
-
-	& .scene-opening__copy :is(.scene-opening__semester, .scene-actions, .scene-opening__activities) {
-		justify-content: flex-start;
 	}
 
 	& .scene-opening__semester {
@@ -130,7 +126,7 @@
 
 	& .scene-opening__lede {
 		max-width: 35rem;
-		margin: 0;
+		margin: 0 auto;
 		color: var(--app-text);
 	}
 
@@ -150,18 +146,6 @@
 	:root:not([data-appearance-theme='terminal'], [data-appearance-theme='retro'], [data-appearance-theme='blueprint']) {
 		& .scene-opening .scene-wordmark {
 			font-size: calc(clamp(4.6rem, 26vw, 9rem) * var(--fit, 1));
-		}
-
-		& .scene-opening__copy {
-			text-align: center;
-		}
-
-		& .scene-opening__copy :is(.scene-opening__semester, .scene-actions, .scene-opening__activities) {
-			justify-content: center;
-		}
-
-		& .scene-opening__lede {
-			margin-inline: auto;
 		}
 	}
 }

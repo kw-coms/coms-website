@@ -98,6 +98,10 @@ export function useSceneProgress() {
       io.observe(el)
       live.observe(el)
     })
+    // Content such as the member calendar can change the scroll range while the page is still.
+    const size = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
+    size?.observe(root)
+    size?.observe(document.body)
 
     // Tickers speed up with the scroll velocity and settle back. Only while the opening is on
     // screen, one read per frame, and the animation list is looked up once.
@@ -147,6 +151,7 @@ export function useSceneProgress() {
     return () => {
       io.disconnect()
       live.disconnect()
+      size?.disconnect()
       if (rateRaf) cancelAnimationFrame(rateRaf)
       if (velRaf) cancelAnimationFrame(velRaf)
       kick = () => {}

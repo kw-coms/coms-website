@@ -67,8 +67,21 @@ test.describe('a visitor on the home page', () => {
     const rail = page.getByRole('navigation', { name: '장면 이동' })
     const toggle = rail.getByRole('button', { name: '홈 목차' })
     const list = rail.getByRole('list')
+    const progress = rail.getByRole('progressbar', { name: '홈 스크롤 진행률' })
     await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(toggle).toHaveAccessibleDescription('홈')
+    await expect(progress).toHaveAttribute('aria-valuenow', '0')
+    await expect(progress).toHaveText('0%')
     await expect(list).toBeHidden()
+    await expect.poll(async () => {
+      const { y, height } = await rail.boundingBox()
+      return y + height / 2
+    }).toBeCloseTo(page.viewportSize().height / 2, 0)
+    const [scene, position] = await Promise.all([
+      page.locator('#activities .scene-inner').boundingBox(),
+      rail.boundingBox(),
+    ])
+    expect(scene.x + scene.width).toBeLessThan(position.x)
     await toggle.click()
     await expect(list.getByRole('button')).toHaveCount(6)
     await expect(list.getByRole('button', { name: '모집' })).toBeVisible()
@@ -76,6 +89,8 @@ test.describe('a visitor on the home page', () => {
     await expect(page.locator('#projects')).toBeInViewport()
     await expect(list).toBeHidden()
     await expect(toggle).toBeFocused()
+    await expect(toggle).toHaveAccessibleDescription('프로젝트')
+    await expect.poll(async () => Number(await progress.getAttribute('aria-valuenow'))).toBeGreaterThan(0)
     await toggle.click()
     await expect(list.getByRole('button', { name: '프로젝트' })).toHaveAttribute('aria-current', 'true')
     await page.keyboard.press('Escape')
@@ -84,6 +99,11 @@ test.describe('a visitor on the home page', () => {
     await toggle.click()
     await page.mouse.click(48, 180)
     await expect(list).toBeHidden()
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    await expect(progress).toHaveText('100%')
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await expect(progress).toHaveText('0%')
+    await expect(toggle).toHaveAccessibleDescription('홈')
   })
 
   test('native wheel scroll reveals a chapter divider and a brief backdrop cue', async ({ page }) => {
@@ -149,6 +169,13 @@ test.describe('a visitor on the home page', () => {
     await expect(opening.locator('.scene-opening__cube')).toBeVisible()
     await expect(opening.getByRole('img')).toHaveCount(0)
     await expect(page.locator('.scene-opening__art')).toBeHidden()
+    const lede = await opening.locator('.scene-opening__lede').boundingBox()
+    const [intro, join] = await Promise.all([
+      opening.getByRole('button', { name: '동아리 소개' }).boundingBox(),
+      opening.getByRole('button', { name: '지원하기' }).boundingBox(),
+    ])
+    expect(lede.x + lede.width / 2).toBeCloseTo(720, 0)
+    expect((intro.x + join.x + join.width) / 2).toBeCloseTo(720, 0)
   })
 
   test('loops run only while their scene is on screen', async ({ page }) => {
