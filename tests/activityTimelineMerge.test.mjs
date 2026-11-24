@@ -15,12 +15,12 @@ test('merges completed DB rows after static fall events, ordered by date with un
     item(1, { eventDate: '2026-10-10', memberFacts: '회원 전용 한 줄' }),
   ], Date.parse('2026-11-24T00:00:00+09:00'))
   const fall = merged.sections.find((section) => section.term === '2026 2학기')
-  assert.deepEqual(fall.events.map((event) => event.id), ['fall-opening', 'fall-founding', 'fall-hackathon', 'db-1', 'db-2', 'db-3'])
-  assert.equal(fall.events[3].summary, '요약 1')
-  assert.deepEqual(fall.events[3].facts, ['공개 사실 1'])
-  assert.deepEqual(fall.events[3].memberFacts, ['회원 전용 한 줄'])
-  assert.equal(fall.events[4].dateLabel, '11월 말')
-  assert.equal(fall.events[5].dateLabel, '날짜 미정')
+  assert.deepEqual(fall.events.map((event) => event.id), ['fall-opening', 'fall-mt', 'fall-founding', 'fall-hackathon', 'db-1', 'db-2', 'db-3'])
+  assert.equal(fall.events[4].summary, '요약 1')
+  assert.deepEqual(fall.events[4].facts, ['공개 사실 1'])
+  assert.deepEqual(fall.events[4].memberFacts, ['회원 전용 한 줄'])
+  assert.equal(fall.events[5].dateLabel, '11월 말')
+  assert.equal(fall.events[6].dateLabel, '날짜 미정')
 })
 
 test('routes planned and confirmed items to upcoming, dated first, without guessing undated dates', () => {
