@@ -314,6 +314,18 @@
 	text-underline-offset: 3px;
 }
 
+@media (max-width: 639px) {
+	.activities-page .apple-detail-main {
+		padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
+	}
+	.act-guest-note a {
+		display: inline-flex;
+		min-height: 44px;
+		min-width: 44px;
+		align-items: center;
+	}
+}
+
 .act-guest-note a:hover {
 	color: var(--app-accent);
 }

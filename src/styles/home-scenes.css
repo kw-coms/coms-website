@@ -803,6 +803,14 @@
 	border-color: var(--app-accent);
 }
 
+@media (max-width: 639px) {
+	.scene-frame__link,
+	.scene-hubcard__link,
+	.scene-chip {
+		min-height: 44px;
+	}
+}
+
 .scene-chip svg {
 	color: var(--app-muted);
 }
@@ -1054,8 +1062,8 @@
 	}
 	.scene-rail__trigger {
 		display: grid;
-		width: 2.2rem;
-		min-height: 2.2rem;
+		width: 44px;
+		min-height: 44px;
 		place-items: center;
 		border: 1px solid var(--app-hairline-strong);
 		border-radius: 0.45rem;

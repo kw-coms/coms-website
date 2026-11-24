@@ -438,7 +438,7 @@ export default function GlobalNavigation() {
         )}
 
         <div className="flex items-center lg:hidden">
-          <button type="button" onClick={openQuickSearch} data-tour="quick-search" className="coms-quick-open size-11" aria-label="빠른 이동 열기">
+          <button type="button" onClick={openQuickSearch} data-tour="quick-search" className="coms-quick-open" aria-label="빠른 이동 열기">
             <Search size={19} aria-hidden="true" />
           </button>
           <button

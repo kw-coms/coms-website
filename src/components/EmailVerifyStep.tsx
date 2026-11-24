@@ -113,7 +113,7 @@ export function EmailVerifyStep({ studentId, email, onDone }: {
           type="button"
           onClick={handleResend}
           disabled={cooldown > 0 || resending}
-          className="font-semibold text-[var(--app-accent-text)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="min-h-11 font-semibold text-[var(--app-accent-text)] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0"
         >
           {resending ? '전송 중...' : cooldown > 0 ? `재전송 (${cooldown}s)` : '코드 재전송'}
         </button>
