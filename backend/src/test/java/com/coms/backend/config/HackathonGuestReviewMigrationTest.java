@@ -13,7 +13,7 @@ class HackathonGuestReviewMigrationTest {
     @Test
     void existingVotesSurviveAndNewGuestAndMemberIdentitiesAreUniquePerProject() throws Exception {
         try (var stream = getClass().getClassLoader().getResourceAsStream(
-                "db/migration/V124__hackathon_guest_review_guard.sql")) {
+                "db/migration/V127__hackathon_guest_review_guard.sql")) {
             assertThat(stream).isNotNull();
             String sql = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
             try (var db = DriverManager.getConnection("jdbc:h2:mem:hackathon-v124;MODE=PostgreSQL");

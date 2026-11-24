@@ -11,7 +11,7 @@ class ClubProjectReviewMigrationTest {
     @Test
     void existingAndLegacyInsertedProjectsStayApproved() throws Exception {
         try (var stream = getClass().getClassLoader().getResourceAsStream(
-                "db/migration/V125__club_project_review.sql")) {
+                "db/migration/V128__club_project_review.sql")) {
             assertThat(stream).isNotNull();
             String sql = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
             try (var db = DriverManager.getConnection("jdbc:h2:mem:club-project-v125;MODE=PostgreSQL");
