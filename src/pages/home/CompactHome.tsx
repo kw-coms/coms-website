@@ -82,7 +82,7 @@ export default function CompactHome({ member, latestNotice, settings, activity }
     }
   }, [hash])
 
-  const recruiting = /모집\s*중|상시/.test(settings.recruitmentStatus)
+  const recruiting = /(모집|접수)\s*중(?!단|지)|상시/.test(settings.recruitmentStatus)
 
   return (
     <main className={`compact-home theme-home ${member ? 'compact-home--member' : ''}`}>

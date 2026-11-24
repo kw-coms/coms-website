@@ -51,6 +51,7 @@
 .compact-home__recruit {
   display: grid;
   gap: 4px;
+  scroll-margin-top: calc(var(--apple-nav-height, 44px) + 16px);
 }
 
 .compact-home__status {
@@ -74,7 +75,7 @@
 .compact-home__recruit[data-open] .compact-home__status i {
   background: var(--app-accent);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--app-accent) 55%, transparent);
-  animation: compact-home-live 2.4s ease-out infinite;
+  animation: compact-home-live 2.4s ease-out 3;
 }
 
 @keyframes compact-home-live {
@@ -179,7 +180,7 @@
 
 .compact-home__quick a {
   display: inline-flex;
-  min-height: 40px;
+  min-height: 44px;
   align-items: center;
   gap: 6px;
   border: 1px solid var(--app-hairline);
@@ -275,7 +276,8 @@
     align-items: start;
     gap: 40px;
   }
-  .compact-home__lead {
+  /* Only the short guest board stays in view; a member's board is too tall to pin on shorter screens. */
+  .compact-home:not(.compact-home--member) .compact-home__lead {
     position: sticky;
     top: calc(var(--apple-nav-height, 44px) + 24px);
   }
@@ -288,7 +290,6 @@
   .compact-home__actions > a { flex: 1; justify-content: center; }
   .compact-home__group { padding: 14px 8px 8px; }
   .compact-home__group ul { grid-template-columns: 1fr; }
-  .compact-home__quick a { min-height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
