@@ -121,6 +121,21 @@ async function noticesAsMember(page, { role = 'USER', studentId = '2023000002', 
 }
 
 test.describe('notices', () => {
+  test('an officer keeps the notice write button when the permissions API is unavailable', async ({ page }) => {
+    await noticesAsMember(page, { role: 'OFFICER' })
+    let unavailable = true
+    await page.route('**/api/permissions/me', (route) => unavailable
+      ? route.fulfill({ status: 503, json: { message: 'Unavailable' } })
+      : route.fulfill({ json: { role: 'OFFICER', permissions: ['operations.panel'] } }))
+    await page.goto('/notices')
+    await expect(page.getByRole('button', { name: '공지 작성' })).toBeVisible()
+
+    unavailable = false
+    await page.reload()
+    await expect(page.getByRole('button', { name: '임원', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '공지 작성' })).toHaveCount(0)
+  })
+
   test('"최신" card shows the newest notice, not the first pinned one, and says 고정', async ({ page }) => {
     await noticesAsMember(page)
     await page.goto('/notices')

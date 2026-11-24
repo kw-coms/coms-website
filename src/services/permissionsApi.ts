@@ -35,8 +35,8 @@ export type MemberPermissionDetail = MemberPermissionOverrides & {
 }
 
 // 로그인한 본인의 유효 권한 — 회장이 매트릭스를 바꾸면 다음 로드부터 반영된다.
-export function getMyPermissions(): Promise<MyPermissions> {
-  return request('/api/permissions/me')
+export function getMyPermissions(signal?: AbortSignal): Promise<MyPermissions> {
+  return request('/api/permissions/me', { signal })
 }
 
 // 회장 전용 — 직급 × 권한 매트릭스 전체.
