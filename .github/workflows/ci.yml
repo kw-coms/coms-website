@@ -120,6 +120,10 @@ jobs:
             timeout -k 10 300 npx playwright install --with-deps chromium && break
             [ "$attempt" = 3 ] && exit 1
             echo "::warning::playwright install attempt $attempt timed out or failed; retrying"
+            # A killed attempt can leave apt/dpkg holding the lock or half-configured, which made every retry exit 100.
+            sudo pkill -9 -x apt-get || true
+            sudo pkill -9 -x dpkg || true
+            sudo dpkg --configure -a || true
             sleep 10
           done
           fc-match :lang=ko
@@ -514,6 +518,10 @@ jobs:
             timeout -k 10 300 npx playwright install --with-deps chromium && break
             [ "$attempt" = 3 ] && exit 1
             echo "::warning::playwright install attempt $attempt timed out or failed; retrying"
+            # A killed attempt can leave apt/dpkg holding the lock or half-configured, which made every retry exit 100.
+            sudo pkill -9 -x apt-get || true
+            sudo pkill -9 -x dpkg || true
+            sudo dpkg --configure -a || true
             sleep 10
           done
 
@@ -626,6 +634,10 @@ jobs:
             timeout -k 10 300 npx playwright install --with-deps chromium && break
             [ "$attempt" = 3 ] && exit 1
             echo "::warning::playwright install attempt $attempt timed out or failed; retrying"
+            # A killed attempt can leave apt/dpkg holding the lock or half-configured, which made every retry exit 100.
+            sudo pkill -9 -x apt-get || true
+            sudo pkill -9 -x dpkg || true
+            sudo dpkg --configure -a || true
             sleep 10
           done
 
