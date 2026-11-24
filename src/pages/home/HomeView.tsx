@@ -1,6 +1,6 @@
-import { Fragment, type ReactNode } from 'react'
+import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useLocation, type NavigateOptions, type To } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, CalendarDays } from 'lucide-react'
 import { listNotices } from '../../services/noticeApi'
 import { listClubActivityTimeline } from '../../services/clubActivityApi'
@@ -27,6 +27,9 @@ import CompactHome from './CompactHome'
 
 const LATEST_NOTICE_QUERY_KEY = ['app-shell', 'latest-notice']
 const SITE_SETTINGS_QUERY_KEY = ['site-settings', 'public']
+const ACTIVITY_TIMELINE_QUERY_KEY = ['home', 'activity-timeline']
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000
+const DAY_MS = 24 * 60 * 60 * 1000
 
 function SceneEffects({ member }: { member: boolean }) {
   useSceneProgress()
@@ -45,6 +48,22 @@ export default function HomeView() {
   const calm = useCalm()
   const homeLayout = useHomeLayout()
   const member = Boolean(user)
+  const queryClient = useQueryClient()
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    let timeoutId: number
+    const scheduleMidnight = () => {
+      const current = Date.now()
+      const nextMidnight = Math.floor((current + KST_OFFSET_MS) / DAY_MS + 1) * DAY_MS - KST_OFFSET_MS
+      timeoutId = window.setTimeout(() => {
+        setNow(Date.now())
+        void queryClient.invalidateQueries({ queryKey: ACTIVITY_TIMELINE_QUERY_KEY })
+        scheduleMidnight()
+      }, nextMidnight - current)
+    }
+    scheduleMidnight()
+    return () => window.clearTimeout(timeoutId)
+  }, [queryClient])
   const latestNoticeQuery = useQuery({
     queryKey: LATEST_NOTICE_QUERY_KEY,
     queryFn: listNotices,
@@ -61,16 +80,16 @@ export default function HomeView() {
   })
   const siteSettings = siteSettingsQuery.data ?? defaultSiteSettings
   const activityQuery = useQuery({
-    queryKey: ['home', 'activity-timeline'],
+    queryKey: ACTIVITY_TIMELINE_QUERY_KEY,
     queryFn: async () => {
       const items = await listClubActivityTimeline()
-      return Array.isArray(items) ? nextActivity(items, Date.now()) ?? null : null
+      return Array.isArray(items) ? items : []
     },
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   })
-  const activity = activityQuery.isSuccess ? activityQuery.data : null
+  const activity = activityQuery.isSuccess ? nextActivity(activityQuery.data, now) ?? null : null
   const nextActivityStrip = activity && (
     <div className="home-next-activity">
       <Link to="/activities#act-upcoming" className="scene-notice">
