@@ -409,7 +409,7 @@ public class NotificationService {
         });
     }
 
-    public record ExternalInviteBatchResult(int accepted, List<String> unknown, int rejected) {}
+    public record ExternalInviteBatchResult(int accepted, int undelivered) {}
 
     public ExternalInviteBatchResult notifyExternalInviteFromMember(String senderStudentId, MemberExternalInviteRequest request) {
         if (senderStudentId == null || senderStudentId.isBlank()) {
@@ -427,9 +427,7 @@ public class NotificationService {
                     "한 번에 최대 " + MAX_INVITE_RECIPIENTS_PER_BATCH + "명까지 초대할 수 있습니다.");
         }
 
-        String rawLabel = (request.getActorLabel() == null || request.getActorLabel().isBlank())
-                ? sender.getName()
-                : request.getActorLabel();
+        String rawLabel = sender.getName();
         String label = rawLabel == null ? null
                 : rawLabel.length() > ACTOR_LABEL_MAX ? rawLabel.substring(0, ACTOR_LABEL_MAX) : rawLabel;
 
@@ -450,11 +448,10 @@ public class NotificationService {
                 .map(Member::getStudentId).collect(Collectors.toSet());
         eligibleMemberRepository.findByStudentIdIn(normalizedRecipients).forEach(member -> knownRecipients.add(member.getStudentId()));
         Map<String, NotificationPreference> preferences = preferencesByStudentId(normalizedRecipients);
-        List<String> unknown = new ArrayList<>();
         int accepted = 0;
         for (String recipient : normalizedRecipients) {
             if (!knownRecipients.contains(recipient)) {
-                unknown.add(recipient);
+                rejected += 1;
                 continue;
             }
             if (!isCategoryEnabled(preferences, recipient, Notification.Type.EXTERNAL_INVITE)) {
@@ -469,7 +466,7 @@ public class NotificationService {
                 rejected += 1;
             }
         }
-        return new ExternalInviteBatchResult(accepted, unknown, rejected);
+        return new ExternalInviteBatchResult(accepted, rejected);
     }
 
     public void notifyRecruitApplication(com.coms.backend.domain.RecruitApplication application) {
