@@ -1,6 +1,7 @@
-import { useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Check } from 'lucide-react'
 import PageHeading from '../../../components/PageHeading'
 import { useAuth } from '../../../contexts/useAuth'
 import { usePermissions } from '../../../contexts/usePermissions'
@@ -26,6 +27,15 @@ const bandLabels = ['오전', '오후', '저녁', '밤']
 const levelLabels = { BEGINNER: '입문', INTERMEDIATE: '중급', ADVANCED: '심화' }
 const slotLabel = (slot: string) => { const [day, band] = slot.split('_'); return `${weekdayLabels[weekdays.indexOf(day as typeof weekdays[number])] ?? day}요일 ${bandLabels[bands.indexOf(band as typeof bands[number])] ?? band}` }
 const cardClass = 'study-group-panel'
+
+function revealTab(button: HTMLButtonElement | null) {
+  const list = button?.parentElement
+  if (!button || !list) return
+  const left = button.offsetLeft
+  const right = left + button.offsetWidth
+  if (left < list.scrollLeft) list.scrollLeft = left
+  else if (right > list.scrollLeft + list.clientWidth) list.scrollLeft = right - list.clientWidth
+}
 
 function useAction(invalidate: () => void) {
   const [busy, setBusy] = useState(false)
@@ -55,7 +65,21 @@ function InterestPanel({ group, refresh }: { group: GroupView; refresh: () => vo
     {canRespond && <>
       <div className="study-group-actions"><Button disabled={action.busy} onClick={() => void action.run(() => saveStudyInterest(group.id, { slots, level }))}>{group.myInterest ? '관심 정보 저장' : '관심 있어요'}</Button>
         {group.myInterest && <Button secondary disabled={action.busy} onClick={() => void action.run(() => removeStudyInterest(group.id))}>관심 취소</Button>}</div>
-      <fieldset className="study-group-interest-slots"><legend>선호 시간 (여러 개 선택)</legend>{weekdays.map((day, index) => <div key={day}><b>{weekdayLabels[index]}</b>{bands.map((band, bandIndex) => { const slot = `${day}_${band}`; return <label key={slot}><input type="checkbox" checked={slots.includes(slot)} onChange={event => setSlots(event.target.checked ? [...slots, slot] : slots.filter(value => value !== slot))} />{bandLabels[bandIndex]}</label> })}</div>)}</fieldset>
+      <fieldset className="study-group-interest-slots">
+        <legend>선호 시간 (여러 개 선택)</legend>
+        <div aria-hidden="true"><span />{bandLabels.map(label => <span key={label}>{label}</span>)}</div>
+        {weekdays.map((day, index) => <div key={day}>
+          <b aria-hidden="true">{weekdayLabels[index]}</b>
+          {bands.map(band => {
+            const slot = `${day}_${band}`
+            const selected = slots.includes(slot)
+            return <button key={slot} type="button" aria-label={slotLabel(slot)} aria-pressed={selected}
+              onClick={() => setSlots(current => selected ? current.filter(value => value !== slot) : [...current, slot])}>
+              {selected && <Check size={18} aria-hidden="true" />}
+            </button>
+          })}
+        </div>)}
+      </fieldset>
       <label className="study-group-field">수준 <select value={level ?? ''} onChange={event => setLevel(event.target.value ? event.target.value as Interest['level'] : undefined)}><option value="">선택 안 함</option>{Object.entries(levelLabels).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></label>
     </>}
     {action.error && <p role="alert" className="study-group-error">{action.error}</p>}
@@ -182,18 +206,45 @@ function ManageTab({ group, refresh }: { group: GroupView; refresh: () => void }
 
 export default function StudyGroupPage() {
   const id = Number(useParams().groupId)
+  const tabsId = useId()
   const [tab, setTab] = useState<Tab>('소개')
   const client = useQueryClient()
   const { user } = useAuth()
   const { can } = usePermissions()
   const query = useQuery({ queryKey: ['study', id, user?.studentId], queryFn: () => getStudyGroup(id), enabled: Number.isSafeInteger(id) && id > 0 })
+  const visibleTabs = query.data?.manager ? tabs : tabs.slice(0, -1)
+  const activeTab = visibleTabs.includes(tab) ? tab : visibleTabs[0]
+  const activeIndex = visibleTabs.indexOf(activeTab)
+  function handleTabKey(event: KeyboardEvent<HTMLDivElement>) {
+    let next: number
+    switch (event.key) {
+      case 'ArrowRight': next = (activeIndex + 1) % visibleTabs.length; break
+      case 'ArrowLeft': next = (activeIndex + visibleTabs.length - 1) % visibleTabs.length; break
+      case 'Home': next = 0; break
+      case 'End': next = visibleTabs.length - 1; break
+      default: return
+    }
+    event.preventDefault()
+    event.currentTarget.querySelectorAll('button')[next]?.focus({ preventScroll: true })
+    setTab(visibleTabs[next])
+  }
   const refresh = () => { void client.invalidateQueries({ queryKey: ['study', id] }); void client.invalidateQueries({ queryKey: ['study-groups'] }) }
   if (!Number.isSafeInteger(id) || id <= 0) return <main className="study-groups-page"><p>스터디 주소가 올바르지 않습니다.</p></main>
   return <main className="study-groups-page"><div className="study-groups-inner"><Link to="/study/groups" className="study-group-back">← 스터디 모임</Link>
     {query.isPending && <p role="status">스터디를 불러오는 중…</p>}{query.isError && <p role="alert">스터디를 불러오지 못했습니다. <button onClick={() => void query.refetch()}>다시 시도</button></p>}
     {query.data && <><header className="study-groups-head"><div><span className="study-group-state">{statusLabel(query.data.status)}</span><PageHeading>{query.data.name}</PageHeading><p>{query.data.topicTags.join(' · ')} · {query.data.schedule || '일정 협의 중'}</p></div></header>
-      <nav className="study-group-tabs" aria-label="스터디 메뉴">{tabs.filter(item => item !== '관리' || query.data.manager).map(item => <button key={item} className={item === tab ? 'active' : ''} type="button" aria-current={item === tab ? 'page' : undefined} onClick={() => setTab(item)}>{item}</button>)}</nav>
-      {tab === '소개' && <><IntroTab group={query.data} refresh={refresh} />{can('activity.write') && <div className="study-group-related"><Link to="/admin?tab=club-forms&category=STUDY">스터디 설문 양식 관리</Link></div>}</>}{tab === '회차/출석' && <RoundsTab group={query.data} refresh={refresh} />}{tab === '자료' && <MaterialsTab group={query.data} />}{tab === '멤버' && <MembersTab group={query.data} refresh={refresh} />}{tab === '관리' && <ManageTab group={query.data} refresh={refresh} />}
+      <div className="study-group-tabs" role="tablist" aria-label="스터디 메뉴" onKeyDown={handleTabKey}>
+        {visibleTabs.map((item, index) => <button key={item} id={`${tabsId}-${index}`} type="button" role="tab"
+          aria-controls={`${tabsId}-panel`} aria-selected={item === activeTab} tabIndex={item === activeTab ? 0 : -1}
+          ref={item === activeTab ? revealTab : undefined} onClick={() => setTab(item)}>{item}</button>)}
+      </div>
+      <div id={`${tabsId}-panel`} role="tabpanel" aria-labelledby={`${tabsId}-${activeIndex}`} tabIndex={0}>
+        {activeTab === '소개' && <><IntroTab group={query.data} refresh={refresh} />{can('activity.write') && <div className="study-group-related"><Link to="/admin?tab=club-forms&category=STUDY">스터디 설문 양식 관리</Link></div>}</>}
+        {activeTab === '회차/출석' && <RoundsTab group={query.data} refresh={refresh} />}
+        {activeTab === '자료' && <MaterialsTab group={query.data} />}
+        {activeTab === '멤버' && <MembersTab group={query.data} refresh={refresh} />}
+        {activeTab === '관리' && <ManageTab group={query.data} refresh={refresh} />}
+      </div>
     </>}
   </div></main>
 }
