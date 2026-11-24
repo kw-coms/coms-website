@@ -32,8 +32,9 @@ const root = createRoot(container)
 const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
 const render = async (component, expected) => {
   await act(async () => { root.render(createElement(QueryClientProvider, { client }, createElement(component))) })
-  for (let turn = 0; turn < 20 && container.textContent !== expected; turn += 1) {
-    await act(async () => { await new Promise((resolve) => setImmediate(resolve)) })
+  // Time-based wait: twenty bare ticks were not enough for the mocked fetch to settle on a loaded CI runner.
+  for (let turn = 0; turn < 100 && container.textContent !== expected; turn += 1) {
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
   }
   assert.equal(container.textContent, expected)
 }
