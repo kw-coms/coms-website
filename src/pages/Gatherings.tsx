@@ -1,3 +1,4 @@
+import { seoulDateStamp } from '../utils/seoulDate'
 import PageHeading from '../components/PageHeading'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -394,7 +395,7 @@ function GatheringView({ id }: { id: string }) {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `coms-gathering-${gathering.id}-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `coms-gathering-${gathering.id}-${seoulDateStamp()}.csv`
     document.body.appendChild(anchor)
     anchor.click()
     anchor.remove()

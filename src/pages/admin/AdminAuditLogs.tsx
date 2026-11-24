@@ -1,3 +1,4 @@
+import { seoulDateStamp } from '../../utils/seoulDate'
 import { useEffect, useState } from 'react'
 import { Download, RefreshCw, RotateCcw } from 'lucide-react'
 import { clearAdminCache, listAuditLogs } from '../../services/adminApi'
@@ -109,7 +110,7 @@ export default function AdminAuditLogs({ formatDateTime }: { formatDateTime: (va
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `coms-audit-logs-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `coms-audit-logs-${seoulDateStamp()}.csv`
     document.body.appendChild(anchor)
     anchor.click()
     anchor.remove()

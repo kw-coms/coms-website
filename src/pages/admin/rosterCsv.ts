@@ -1,3 +1,4 @@
+import { seoulDateStamp } from '../../utils/seoulDate'
 import { csvCell } from './auditLogCsv'
 import { formatPhoneForSheet } from './memberCsv'
 import { FIRST_GENERATION_YEAR, displayStudentId } from '../../utils/roleAccess'
@@ -81,7 +82,7 @@ export function downloadRosterCsv(roster: RosterRow[], now = new Date()) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `coms-roster-${now.toISOString().slice(0, 10)}.csv`
+  anchor.download = `coms-roster-${seoulDateStamp(now)}.csv`
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()

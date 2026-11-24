@@ -1,3 +1,4 @@
+import { seoulDateStamp } from '../../utils/seoulDate'
 import { csvCell } from './auditLogCsv'
 import { recruitStatusLabel } from './recruitStatus'
 
@@ -49,7 +50,7 @@ export function downloadRecruitApplicationsCsv(applications: ApplicationRow[], n
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `coms-recruit-${now.toISOString().slice(0, 10)}.csv`
+  anchor.download = `coms-recruit-${seoulDateStamp(now)}.csv`
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()

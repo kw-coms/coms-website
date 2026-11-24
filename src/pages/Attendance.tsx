@@ -1,3 +1,4 @@
+import { seoulDateStamp } from '../utils/seoulDate'
 import PageHeading from '../components/PageHeading'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -425,7 +426,7 @@ function SummaryPanel() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `coms-attendance-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `coms-attendance-${seoulDateStamp()}.csv`
     document.body.appendChild(anchor)
     anchor.click()
     anchor.remove()
