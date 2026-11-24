@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
+import { mockAdminApis, mockOptionalApis, signInHint } from './visualSupport.js'
 
 test('guests can draw without persisting names or offering private imports', async ({ page }) => {
   await mockOptionalApis(page)
@@ -19,6 +19,7 @@ test('guests can draw without persisting names or offering private imports', asy
 for (const path of ['/draw', '/attendance']) {
   test(`revoked attendance permission never offers manager actions while permissions load on ${path}`, async ({ page }) => {
     await mockAdminApis(page)
+    await signInHint(page)
     await page.route('**/api/auth/me', (route) => route.fulfill({ json: {
       id: 2, name: '임원', studentId: '2026000002', role: 'OFFICER', emailVerified: true,
     } }))
@@ -44,6 +45,7 @@ for (const path of ['/draw', '/attendance']) {
 test('draw names and results belong to one member and logout forgets them', async ({ page, context }) => {
   await mockAdminApis(context)
   let memberId = 1
+  await signInHint(context)
   await context.route('**/api/auth/me', (route) => route.fulfill({ json: {
     id: memberId, name: '테스트 회원', studentId: `202600000${memberId}`, role: 'ADMIN', emailVerified: true,
   } }))

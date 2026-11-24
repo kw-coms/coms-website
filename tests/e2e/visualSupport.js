@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 /** The members-only guide a guest gets on a RequireAuth route: shown in place (no redirect), with the login link and the recruit link. */
 export async function expectMembersGate(page, path) {
@@ -43,7 +43,14 @@ export async function mockOptionalApis(page) {
   }))
 }
 
+/** The non-secret `comsSession=1` hint the real login sets (path /); the app skips /api/auth/me and refresh without it. */
+export async function signInHint(pageOrContext) {
+  const url = test.info().project.use.baseURL
+  await (pageOrContext.context ? pageOrContext.context() : pageOrContext).addCookies([{ name: 'comsSession', value: '1', url }])
+}
+
 export async function mockAdminApis(page) {
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({
     status: 200,
     json: {
@@ -286,6 +293,7 @@ export async function autoDriveModals(page, { promptValue = '' } = {}) {
 
 /** A signed-in member on top of mockOptionalApis (routes are LIFO, so call it after): study content and exercises are members-only. */
 export async function asMember(page) {
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
 }
 

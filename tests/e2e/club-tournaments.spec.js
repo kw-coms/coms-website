@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { asMember, mockOptionalApis } from './visualSupport.js'
+import { asMember, mockOptionalApis, signInHint } from './visualSupport.js'
 
 test.use({ reducedMotion: 'reduce' })
 
@@ -18,6 +18,7 @@ const detail = (overrides = {}) => ({
 
 test('chair creates a draft with round problems and publishes recruitment', async ({ page }, info) => {
   await mockOptionalApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: {
     id: 1, studentId: '2026000001', name: '회장', role: 'ADMIN', emailVerified: true,
   } }))
@@ -144,6 +145,7 @@ test('guest sees the member guide before tournament data is requested', async ({
 
 test('older draft settings load and a closed application window blocks the action', async ({ page }) => {
   await mockOptionalApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: {
     id: 1, studentId: '2026000001', name: '회장', role: 'ADMIN', emailVerified: true,
   } }))

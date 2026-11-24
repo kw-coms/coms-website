@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { asMember, mockOptionalApis } from './visualSupport.js'
+import { asMember, mockOptionalApis, signInHint } from './visualSupport.js'
 
 test.use({ reducedMotion: 'reduce' })
 
@@ -45,6 +45,7 @@ test('settings stay private to each member and a failed write reports failure', 
   await page.goto('/study/algorithms/settings')
   await page.getByRole('button', { name: '예시 코드 불러오기' }).click()
   await page.getByRole('button', { name: '설정 저장' }).click()
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 6, studentId: '2023000003', name: '다른 회원', role: 'USER' } }))
   await page.reload()
   const editor = page.getByRole('textbox', { name: 'C++ 기본 템플릿 편집기' })

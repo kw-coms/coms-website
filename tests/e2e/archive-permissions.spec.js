@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
+import { mockAdminApis, mockOptionalApis, signInHint } from './visualSupport.js'
 
 const archiveFiles = [
   { id: 801, title: '운영 회의록', originalName: 'minutes.pdf', uploadedBy: 'other', uploaderName: '운영진', category: 'GENERAL', visibility: 'MEMBERS', fileSize: 2048, uploadedAt: '2026-11-20T12:00:00', viewCount: 12 },
@@ -8,6 +8,7 @@ const archiveFiles = [
 
 test('archive controls honor the individual grant and save selected visibility', async ({ page }) => {
   await mockAdminApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 2, studentId: 'viewer', role: 'USER', name: '회원', emailVerified: true } }))
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: ['archive.visibility'] } }))
   await page.route('**/api/files', route => route.fulfill({ json: archiveFiles }))

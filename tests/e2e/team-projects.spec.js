@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockAdminApis } from './visualSupport.js'
+import { mockAdminApis, signInHint } from './visualSupport.js'
 
 test.use({ serviceWorkers: 'block' })
 
@@ -47,6 +47,7 @@ async function installFakeApi(page) {
   const field = (body, name) => new RegExp(`name="${name}"\\r\\n\\r\\n([\\s\\S]*?)\\r\\n--`).exec(body)?.[1] ?? ''
   const all = (body, name) => [...body.matchAll(new RegExp(`name="${name}"\\r\\n\\r\\n([\\s\\S]*?)\\r\\n--`, 'g'))].map(match => match[1])
 
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: USERS[db.me] }))
   await page.route((url) => url.pathname === '/api/admin/members', route => route.fulfill({ json: PEOPLE }))
   await page.route(/\/api\/(admin\/)?team-projects(\/.*)?(\?.*)?$/, async (route) => {

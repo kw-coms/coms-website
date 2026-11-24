@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
+import { mockAdminApis, mockOptionalApis, signInHint } from './visualSupport.js'
 import { futureEvent } from '../hackathonFixture.mjs'
 
 test.use({ serviceWorkers: 'block' })
@@ -7,6 +7,7 @@ test.use({ serviceWorkers: 'block' })
 test('a team member writes and previews a private hackathon draft on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await mockOptionalApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 7, name: '테스트 회원', studentId: '2099000007', role: 'USER', emailVerified: true } }))
   await page.route('**/api/hackathon/events/2', route => route.fulfill({ json: { ...futureEvent, projects: [] } }))
   const teamPath = '**/api/hackathon/team-work/2'
@@ -60,6 +61,7 @@ test('the chair builds a reusable form and a member can submit its required answ
   await admin.getByLabel('응답 받기').check()
   await admin.getByRole('button', { name: '양식 저장' }).click()
   await expect(admin.getByRole('status').filter({ hasText: '양식을 저장했습니다.' })).toBeVisible()
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 8, name: '응답 테스트', studentId: '2099000008', role: 'USER', emailVerified: true } }))
   await page.goto('/forms/11')
   await page.getByRole('radio', { name: '참여 희망', exact: true }).check()

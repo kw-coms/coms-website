@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { asMember, mockAdminApis } from './visualSupport.js'
+import { asMember, mockAdminApis, signInHint } from './visualSupport.js'
 
 // Operator panel and participation tools. Every person, title and number below is made up.
 
@@ -10,6 +10,7 @@ const recruitApplication = (over = {}) => ({
 })
 
 async function mockOfficer(page, permissions) {
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 2, name: '임원', studentId: '2022000001', role: 'OFFICER', emailVerified: true } }))
   await page.route('**/api/permissions/me', (route) => route.fulfill({ json: { role: 'OFFICER', permissions } }))
 }

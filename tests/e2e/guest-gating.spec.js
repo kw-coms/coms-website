@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { numberedProblemNumber } from '../../src/pages/study/exercises/problemNumbers.ts'
-import { expectMembersGate, mockAdminApis, mockOptionalApis, trackRequests } from './visualSupport.js'
+import { expectMembersGate, mockAdminApis, mockOptionalApis, trackRequests, signInHint } from './visualSupport.js'
 
 // Guests: member-only menus carry a lock and open a guide screen; study shows chapter titles only.
 
@@ -134,6 +134,7 @@ test.describe('guide screen', () => {
   test('an auth error still redirects', async ({ page }) => {
     await skipIntro(page)
     await mockOptionalApis(page)
+    await signInHint(page)
     await page.route('**/api/auth/me', (route) => route.fulfill({ status: 500, json: { message: 'boom' } }))
     await page.goto('/settings')
     await expect(page).toHaveURL(/\/login$/)
@@ -223,6 +224,7 @@ test.describe('study for guests', () => {
     await mockOptionalApis(page)
     let release
     const held = new Promise((resolve) => { release = resolve })
+    await signInHint(page)
     await page.route('**/api/auth/me', async (route) => {
       await held
       await route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } })
@@ -249,6 +251,7 @@ test.describe('study for guests', () => {
     await mockOptionalApis(page)
     let release
     const held = new Promise((resolve) => { release = resolve })
+    await signInHint(page)
     await page.route('**/api/auth/me', async (route) => {
       await held
       await route.fulfill({ status: 401, json: { message: 'Unauthorized' } })
@@ -268,6 +271,7 @@ test.describe('study for guests', () => {
     await skipIntro(page)
     await mockOptionalApis(page)
     let fail = true
+    await signInHint(page)
     await page.route('**/api/auth/me', (route) => (fail
       ? route.fulfill({ status: 500, json: { message: 'boom' } })
       : route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } })))
@@ -286,6 +290,7 @@ test.describe('study for guests', () => {
     await skipIntro(page)
     await mockOptionalApis(page)
     let fail = true
+    await signInHint(page)
     await page.route('**/api/auth/me', (route) => (fail
       ? route.fulfill({ status: 500, json: { message: 'boom' } })
       : route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } })))

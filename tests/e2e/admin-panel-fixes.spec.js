@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockAdminApis } from './visualSupport.js'
+import { mockAdminApis, signInHint } from './visualSupport.js'
 
 test('overview announces loading without an empty claim before its sources settle', async ({ page }) => {
   await mockAdminApis(page)
@@ -54,6 +54,7 @@ for (const width of [1440, 390]) {
 
 test('an operator with just one tab permission sees only that group and recovers from a forbidden URL', async ({ page }) => {
   await mockAdminApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({ json: {
     id: 2, name: '임원', studentId: '2022000001', role: 'OFFICER', emailVerified: true,
   } }))

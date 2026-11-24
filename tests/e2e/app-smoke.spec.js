@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { Buffer } from 'node:buffer'
-import { asMember, mockAdminApis, mockOptionalApis, autoDriveModals, expectMembersGate, trackRequests } from './visualSupport.js'
+import { asMember, mockAdminApis, mockOptionalApis, autoDriveModals, expectMembersGate, trackRequests, signInHint } from './visualSupport.js'
 
 const routeExpectations = [
   ['/', /KW COM's/],
@@ -110,6 +110,7 @@ test('archive refuses saving while its rich editor is still loading', async ({ p
 
 test('archive non-owner vice president cannot see the content edit action', async ({ page }) => {
   await mockAdminApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { studentId: 'vp', name: '부회장', role: 'VICE_PRESIDENT', emailVerified: true } }))
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'VICE_PRESIDENT', permissions: ['archive.author_change'] } }))
   await page.route('**/api/files', route => route.fulfill({ json: [{ id: 912, title: '타인 자료', uploadedBy: 'owner', originalName: 'old.txt', uploadedAt: '2026-09-01T00:00:00' }] }))
@@ -122,6 +123,7 @@ test('notice author can edit after reassignment but cannot pin or delete', async
   await mockAdminApis(page)
   const notice = { id: 913, title: '이관된 공지', content: '기존 본문', category: 'GENERAL', author: '회원', authorStudentId: 'owner', pinned: true, createdAt: '2026-09-01T00:00:00' }
   let edited = null
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { studentId: 'owner', name: '회원', role: 'USER', emailVerified: true } }))
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
   await page.route('**/api/notices', route => route.fulfill({ json: [notice] }))
@@ -148,6 +150,7 @@ test('notice author can edit after reassignment but cannot pin or delete', async
 test('notice write permission does not expose another authors edit action', async ({ page }) => {
   await mockAdminApis(page)
   const notice = { id: 914, title: '다른 회원의 공지', content: '본문', category: 'GENERAL', author: '다른 회원', authorStudentId: 'owner', pinned: false, createdAt: '2026-09-01T00:00:00' }
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { studentId: 'vp', name: '부회장', role: 'VICE_PRESIDENT', emailVerified: true } }))
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'VICE_PRESIDENT', permissions: ['notice.write'] } }))
   await page.route('**/api/notices', route => route.fulfill({ json: [notice] }))
@@ -682,6 +685,7 @@ test('members can recommend, comment, reply and remove a thread without losing a
 // that did not answer, so a visitor does not find out from an error page.
 test('apps page marks an app whose link did not answer', async ({ page }) => {
   // The link check is for members; guests are not asked.
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   const project = (id, title, linkUrl) => ({ id, category: 'WEBSITE', categoryName: '웹사이트', title, eyebrow: '', description: `${title} 설명`, madeBy: '', linkUrl, displayUrl: '', position: id, files: [] })
   await page.route('**/api/club-projects/categories', route => route.fulfill({ json: [{ key: 'WEBSITE', name: '웹사이트', position: 0 }] }))
@@ -710,6 +714,7 @@ test('apps page marks an app whose link did not answer', async ({ page }) => {
 })
 
 test('apps page does without the link check when it cannot be read', async ({ page }) => {
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   await page.route('**/api/club-projects/categories', route => route.fulfill({ json: [{ key: 'WEBSITE', name: '웹사이트', position: 0 }] }))
   await page.route('**/api/club-projects', route => route.fulfill({
@@ -742,6 +747,7 @@ test('apps page does not ask guests for link status, members get it', async ({ p
   await expect(page.getByText('응답 없음')).toHaveCount(0)
 
   // Member: the call is made and the dot shows.
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   await page.goto('/apps')
   await expect(page.locator('.app-card').filter({ hasText: '죽은 앱' })).toContainText('지금 응답 없음')
@@ -794,6 +800,7 @@ test('appearance panel directs signed-in users to account-saved font settings', 
 test('signed-in account built-in font applies across the site', async ({ page }) => {
   await mockAdminApis(page)
   await page.unroute('**/api/auth/me')
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({
     status: 200,
     json: {
@@ -2037,6 +2044,7 @@ test('admin deleted community posts tab preserves deletion evidence', async ({ p
 
 test('community exposes my deleted posts and restore appeal for members', async ({ page }) => {
   let appealPayload = null
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({
     status: 200,
     json: {
@@ -2588,6 +2596,7 @@ for (const siteFont of ['arriving', 'blocked']) {
   test(`header with a 20-character Korean name stays inside the bar at 1280 and 1366, site font ${siteFont}`, async ({ page }) => {
     await page.addInitScript(() => { try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ } })
     await mockAdminApis(page)
+    await signInHint(page)
     await page.route('**/api/auth/me', (route) => route.fulfill({ status: 200, json: { id: 1, name: '가나다라마바사아자차카타파하거너더러머버', studentId: '2020123456', role: 'ADMIN', emailVerified: true } }))
     if (siteFont === 'blocked') await page.route(/pretendard/i, (route) => route.abort())
     else await holdSiteFont(page)
@@ -4600,6 +4609,7 @@ test('sponsors page renders tiers, anonymises, and hides the amount note from gu
 test.describe('gatherings', () => {
   const asMember = async (page) => {
     await mockAdminApis(page)
+    await signInHint(page)
     await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
     await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
   }
@@ -4802,6 +4812,7 @@ test.describe('gatherings', () => {
 // check opens it, shows the code, sees who came and closes it. The people are made up.
 test('a member checks in to attendance with the code', async ({ page }) => {
   await mockAdminApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
   let sessions = [{ id: 3, title: '웹 세미나 3주차', openedByName: '운영진', openedAt: '2026-10-12T19:00:00', closesAt: '2026-10-12T19:30:00', open: true, remainingSeconds: 1500, attendeeCount: 4, attended: false, code: null }]
@@ -4848,6 +4859,7 @@ test('a member checks in to attendance with the code', async ({ page }) => {
 
 test('a member is told when no attendance is being taken', async ({ page }) => {
   await mockAdminApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
   await page.route('**/api/attendance/sessions', route => route.fulfill({ json: [] }))
@@ -5159,6 +5171,7 @@ test('a best time of a meeting poll can be put on the club calendar by whoever m
 
 test('a member without calendar rights is not offered the calendar button', async ({ page }) => {
   await mockAdminApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
   const poll = { id: 7, title: '웹 스터디 첫 모임', description: '', creatorName: '김철수', mine: false, canDelete: false, dates: ['2026-10-14'], startMinute: 600, endMinute: 720, slotMinutes: 30, participantCount: 1, answered: false }
