@@ -3,6 +3,7 @@ package com.coms.backend.domain;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "study_sessions", uniqueConstraints = @UniqueConstraint(name = "uk_study_session_round", columnNames = {"group_id", "round_no"}))
@@ -20,7 +21,7 @@ public class StudySession {
     @Column(columnDefinition = "TEXT")
     private String notes;
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
     @Version @Column(nullable = false)
     private long version;
 

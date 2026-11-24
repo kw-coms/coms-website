@@ -84,11 +84,9 @@ public class StudyAttendanceService {
         StudySession round = require(groupId, sessionId);
         requireAttendanceDate(round);
         attendance.openStudy(round.getId(), attendanceTitle(group, round), request.minutes(), actor);
-        for (StudyGroupMember member : access.approvedMembers(groupId)) {
-            if (!member.getStudentId().equals(actor)) {
-                notifications.notifyStudy(member.getStudentId(), actor, groupId, group.getName() + " " + round.getRoundNo() + "회 출석이 열렸습니다.");
-            }
-        }
+        Set<String> studentIds = access.approvedMembers(groupId).stream()
+                .map(StudyGroupMember::getStudentId).collect(Collectors.toSet());
+        notifications.notifyStudyMembers(studentIds, actor, groupId, group.getName() + " " + round.getRoundNo() + "회 출석이 열렸습니다.");
         return view(round, group, true);
     }
 

@@ -2,10 +2,13 @@ package com.coms.backend.domain;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "study_groups")
 public class StudyGroup {
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+
     public enum Status { PROPOSED, RECRUITING, ACTIVE, ENDED }
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
     @Column(nullable = false, length = 120) private String name;
@@ -18,10 +21,10 @@ public class StudyGroup {
     private Integer capacity;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20) private Status status;
     @Column(name = "created_by", nullable = false, length = 50) private String createdBy;
-    @Column(name = "created_at", nullable = false) private LocalDateTime createdAt = LocalDateTime.now();
-    @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt = LocalDateTime.now();
+    @Column(name = "created_at", nullable = false) private LocalDateTime createdAt = LocalDateTime.now(SEOUL);
+    @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt = createdAt;
     @Version @Column(nullable = false) private long version;
-    @PreUpdate void touch() { updatedAt = LocalDateTime.now(); }
+    @PreUpdate void touch() { updatedAt = LocalDateTime.now(SEOUL); }
     public Long getId() { return id; }
     public String getName() { return name; }
     public void setName(String value) { name = value; }

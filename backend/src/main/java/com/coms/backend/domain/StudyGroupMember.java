@@ -2,6 +2,7 @@ package com.coms.backend.domain;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "study_group_members", uniqueConstraints = @UniqueConstraint(name = "uk_study_group_member", columnNames = {"group_id", "student_id"}))
@@ -13,7 +14,7 @@ public class StudyGroupMember {
     @Column(name = "student_id", nullable = false, length = 50) private String studentId;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20) private Role role = Role.MEMBER;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20) private Status status = Status.PENDING;
-    @Column(name = "joined_at", nullable = false) private LocalDateTime joinedAt = LocalDateTime.now();
+    @Column(name = "joined_at", nullable = false) private LocalDateTime joinedAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
     public Long getId() { return id; }
     public Long getGroupId() { return groupId; }
     public void setGroupId(Long value) { groupId = value; }
