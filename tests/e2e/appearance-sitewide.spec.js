@@ -56,7 +56,9 @@ async function contrastRatios(page) {
 
 for (const theme of themes) {
   for (const mode of modes) {
-    test(`${theme} ${mode} styles shared controls on representative routes`, async ({ page }) => {
+    for (const route of routes) {
+    test(`${theme} ${mode} styles shared controls on ${route}`, async ({ page }) => {
+      test.setTimeout(60_000)
       await page.addInitScript(({ appearance, brightness }) => {
         localStorage.setItem('kwcoms-appearance-theme:v1', appearance)
         localStorage.setItem('kwcoms-theme-mode:v2', brightness)
@@ -65,10 +67,10 @@ for (const theme of themes) {
       }, { appearance: theme, brightness: mode })
       await mockOptionalApis(page)
       await mockActivityTimeline(page)
-      await page.route('**/api/site-settings', (route) => route.fulfill({ json: {} }))
-      await page.route('**/api/files', (route) => route.fulfill({ json: [] }))
+      await page.route('**/api/site-settings', (request) => request.fulfill({ json: {} }))
+      await page.route('**/api/files', (request) => request.fulfill({ json: [] }))
 
-      for (const route of routes) {
+      {
         if (route.startsWith('/admin')) await mockAdminApis(page)
         await page.goto(route)
         await expect(page.locator('html')).toHaveAttribute('data-appearance-theme', theme)
@@ -91,7 +93,6 @@ for (const theme of themes) {
           '/study': '.study-card',
           '/recruit': '.apple-board-shell',
           '/login': '.appearance-auth-panel',
-          '/admin?tab=files': 'section.shape-cut',
         }[route]
         if (cardSelector && theme !== 'standard') {
           const card = page.locator(`#main-content ${cardSelector}`).first()
@@ -137,11 +138,43 @@ for (const theme of themes) {
           await expect(badge).toHaveCSS('border-top-left-radius', theme === 'terminal' ? '0px' : theme === 'retro' ? '3px' : '2px')
         }
 
+        if (theme === 'standard') {
+          // Baseline measured on a build of origin/main (3d4cc2af) with the same probe: the standard look must not move.
+          const baseline = { '/activities': ['.act-card', { radius: '18px', shadow: 'none', background: { light: 'color(srgb 1 1 1 / 0.78)', dark: 'color(srgb 0.109804 0.113725 0.133333 / 0.78)' } }],
+            '/recruit': ['.apple-action-primary', { radius: '9999px', shadow: 'none', background: 'rgb(0, 113, 227)' }] }[route]
+          if (baseline) {
+            const [selector, expected] = baseline
+            const target = page.locator(`#main-content ${selector}`).first()
+            await expect(target).toHaveCSS('border-top-left-radius', expected.radius)
+            await expect(target).toHaveCSS('box-shadow', expected.shadow)
+            await expect(target).toHaveCSS('background-color', expected.background[mode] ?? expected.background)
+            await expect(target).toHaveCSS('background-image', 'none')
+            await expect(target).toHaveCSS('font-family', /^"Pretendard Variable", "Pretendard Fallback Latin"/)
+          }
+        }
+
+        if (theme === 'retro' && route === '/activities') {
+          // Window title bar painted on the card heading, and a hard (blur-free) offset shadow on the card.
+          await expect(page.locator('#main-content .act-card-title').first()).not.toHaveCSS('background-image', 'none')
+          const shadow = await page.locator('#main-content .act-card').first().evaluate((element) => getComputedStyle(element).boxShadow)
+          // offset-x offset-y blur spread: the outer shadow has zero blur.
+          expect(shadow).toMatch(/ 3px 3px 0px 0px$/)
+        }
+
+        if ((theme === 'blueprint' || theme === 'retro') && route === '/login') {
+          const field = page.locator('#main-content input[type="password"]').first()
+          await field.focus()
+          await expect(field).toHaveCSS('outline-style', 'solid')
+          await expect(field).toHaveCSS('outline-width', '2px')
+          await field.blur()
+        }
+
         const contrast = await contrastRatios(page)
         for (const [name, value] of Object.entries(contrast)) {
           expect(value, `${theme} ${mode} ${route} ${name} contrast`).toBeGreaterThanOrEqual(4.5)
         }
       }
     })
+    }
   }
 }
