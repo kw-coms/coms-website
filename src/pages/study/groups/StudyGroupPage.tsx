@@ -82,7 +82,7 @@ function IntroTab({ group, refresh }: { group: GroupView; refresh: () => void })
   </div>
 }
 
-function RoundCard({ group, session, refresh }: { group: GroupView; session: StudySession; refresh: () => void }) {
+function RoundCard({ group, session, canEditRounds, refresh }: { group: GroupView; session: StudySession; canEditRounds: boolean; refresh: () => void }) {
   const { user } = useAuth()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<SessionWrite>({ date: session.date, topic: session.topic, notes: session.notes ?? '' })
@@ -92,19 +92,18 @@ function RoundCard({ group, session, refresh }: { group: GroupView; session: Stu
   const roster = rosterQuery.data ?? []
   const refreshRoster = () => { void rosterQuery.refetch(); refresh() }
   const mark = useAction(refreshRoster)
-  const canOpen = (group.status === 'RECRUITING' || group.status === 'ACTIVE')
-    && session.date <= new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
+  const canOpen = canEditRounds && session.date <= new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
   async function save(event: FormEvent<HTMLFormElement>) { event.preventDefault(); await action.run(() => updateStudySession(group.id, session.id, draft)) }
   return <article className={cardClass}>
     <header className="study-group-round-head"><div><h3>{session.roundNo}회 · {session.topic}</h3><p>{session.date}</p></div>{session.attendanceOpen && <span className="study-group-state">출석 진행 중</span>}</header>
     {session.notes && <p className="study-group-description">{session.notes}</p>}
     {group.manager && <div className="study-group-actions">
-      <Button secondary onClick={() => setEditing(!editing)}>{editing ? '수정 취소' : '회차 수정'}</Button>
+      {canEditRounds && <Button secondary onClick={() => setEditing(!editing)}>{editing ? '수정 취소' : '회차 수정'}</Button>}
       {!session.attendanceOpen && canOpen && <Button disabled={action.busy} onClick={() => void action.run(() => openStudyAttendance(group.id, session.id, 30))}>출석 열기 (30분)</Button>}
       {session.attendanceOpen && <Button secondary disabled={action.busy} onClick={() => void action.run(() => closeStudyAttendance(group.id, session.id))}>출석 마감</Button>}
     </div>}
     {group.manager && session.attendanceOpen && session.attendanceCode && <p className="study-group-code">출석 코드 <strong>{session.attendanceCode}</strong></p>}
-    {editing && <form className="study-group-form" onSubmit={save}><label>날짜 <input type="date" required value={draft.date} onChange={event => setDraft({ ...draft, date: event.target.value })} /></label><label>주제 <input required value={draft.topic} onChange={event => setDraft({ ...draft, topic: event.target.value })} /></label><label>메모 <textarea value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} /></label><button className="apple-action-primary">저장</button></form>}
+    {canEditRounds && editing && <form className="study-group-form" onSubmit={save}><label>날짜 <input type="date" required value={draft.date} onChange={event => setDraft({ ...draft, date: event.target.value })} /></label><label>주제 <input required value={draft.topic} onChange={event => setDraft({ ...draft, topic: event.target.value })} /></label><label>메모 <textarea value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} /></label><button className="apple-action-primary">저장</button></form>}
     {session.attendanceOpen && group.myMembership?.status === 'APPROVED' && <form className="study-group-checkin" onSubmit={event => { event.preventDefault(); void action.run(() => checkInToAttendance(code).then(refreshRoster)) }}><label>코드 입력 <input inputMode="numeric" pattern="[0-9]{4}" maxLength={4} value={code} onChange={event => setCode(event.target.value.replace(/\D/g, ''))} required aria-label="출석 코드" /></label><button className="apple-action-primary" disabled={action.busy}>출석하기</button></form>}
     {action.error && <p role="alert" className="study-group-error">{action.error}</p>}
     {rosterQuery.isPending && <p role="status">출석 명단을 불러오는 중…</p>}
@@ -122,12 +121,13 @@ function RoundsTab({ group, refresh }: { group: GroupView; refresh: () => void }
   const action = useAction(() => { void query.refetch(); void ratesQuery.refetch(); refresh() })
   async function create(event: FormEvent<HTMLFormElement>) { event.preventDefault(); await action.run(async () => { await createStudySession(group.id, draft); setDraft({ ...draft, topic: '', notes: '' }) }) }
   async function csv() { await action.run(async () => { const blob = await downloadStudyRates(group.id); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `study-${group.id}-attendance.csv`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) }) }
+  const canEditRounds = group.manager && (group.status === 'RECRUITING' || group.status === 'ACTIVE')
   if (!group.manager && group.myMembership?.status !== 'APPROVED') return <section className={cardClass}>참여가 승인되면 회차와 출석 명단을 볼 수 있습니다.</section>
   return <div className="study-group-stack">
-    {group.manager && <form className="study-group-form" onSubmit={create}><h2>회차 만들기</h2><label>날짜 <input type="date" required value={draft.date} onChange={event => setDraft({ ...draft, date: event.target.value })} /></label><label>주제 <input required maxLength={120} value={draft.topic} onChange={event => setDraft({ ...draft, topic: event.target.value })} /></label><label>메모 <textarea value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} /></label><button className="apple-action-primary" disabled={action.busy}>회차 추가</button>{action.error && <p role="alert" className="study-group-error">{action.error}</p>}</form>}
+    {canEditRounds && <form className="study-group-form" onSubmit={create}><h2>회차 만들기</h2><label>날짜 <input type="date" required value={draft.date} onChange={event => setDraft({ ...draft, date: event.target.value })} /></label><label>주제 <input required maxLength={120} value={draft.topic} onChange={event => setDraft({ ...draft, topic: event.target.value })} /></label><label>메모 <textarea value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} /></label><button className="apple-action-primary" disabled={action.busy}>회차 추가</button>{action.error && <p role="alert" className="study-group-error">{action.error}</p>}</form>}
     {query.isPending && <p role="status">회차를 불러오는 중…</p>}{query.isError && <p role="alert">회차를 불러오지 못했습니다. <button onClick={() => void query.refetch()}>다시 시도</button></p>}
     {query.isSuccess && query.data.length === 0 && <section className={cardClass}>아직 등록된 회차가 없습니다.</section>}
-    {query.data?.map(session => <RoundCard key={session.id} group={group} session={session} refresh={() => { void query.refetch(); void ratesQuery.refetch() }} />)}
+    {query.data?.map(session => <RoundCard key={session.id} group={group} session={session} canEditRounds={canEditRounds} refresh={() => { void query.refetch(); void ratesQuery.refetch() }} />)}
     {group.manager && <section className={cardClass}><div className="study-group-split"><h2>멤버별 출석률</h2><Button secondary disabled={action.busy} onClick={() => void csv()}>CSV 다운로드</Button></div>{ratesQuery.isPending && <p role="status">출석률을 불러오는 중…</p>}{ratesQuery.isError && <p role="alert">출석률을 불러오지 못했습니다.</p>}{ratesQuery.data?.map((row: RateRow) => <div className="study-group-rate" key={row.studentId}><span>{row.name}</span><span>{row.attended}/{row.eligible}회 · {attendancePercent(row)}%</span></div>)}</section>}
   </div>
 }

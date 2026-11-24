@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -218,6 +220,32 @@ class StudyAttendanceIntegrationTest {
                 .andExpect(status().isForbidden());
         mvc.perform(post(detail + "/attendance/close").cookie(cookie(OFFICER)).header("Origin", ORIGIN))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.attendanceOpen").value(false));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = StudyGroup.Status.class, names = {"PROPOSED", "ENDED"})
+    void closedRoundWritesStillAllowManualCorrections(StudyGroup.Status groupStatus) throws Exception {
+        long round = createRound(LEADER);
+        StudyGroup group = groups.findById(groupId).orElseThrow();
+        group.setStatus(groupStatus);
+        groups.saveAndFlush(group);
+        String detail = path() + "/" + round;
+
+        mvc.perform(post(path()).cookie(cookie(LEADER)).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(roundBody())).andExpect(status().isConflict());
+        mvc.perform(put(detail).cookie(cookie(LEADER)).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(roundBody().replace("스택", "큐"))).andExpect(status().isConflict());
+        mvc.perform(post(detail + "/attendance/open").cookie(cookie(LEADER)).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"minutes\":30}")).andExpect(status().isConflict());
+        assertThat(rounds.findByGroupIdOrderByRoundNoAsc(groupId)).extracting(StudySession::getTopic).containsExactly("스택");
+        assertThat(attendanceSessions.findByStudySessionId(round)).isEmpty();
+
+        mvc.perform(put(detail + "/attendance/members/" + APPROVED).cookie(cookie(LEADER)).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"LATE\"}"))
+                .andExpect(status().isOk());
+        long attendanceId = attendanceSessions.findByStudySessionId(round).orElseThrow().getId();
+        assertThat(attendanceRecords.findBySessionIdAndStudentId(attendanceId, APPROVED).orElseThrow().getStatus())
+                .isEqualTo(AttendanceRecord.Status.LATE);
     }
 
     private String path() { return "/api/study-groups/" + groupId + "/sessions"; }

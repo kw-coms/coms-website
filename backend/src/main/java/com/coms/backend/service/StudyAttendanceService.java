@@ -55,8 +55,7 @@ public class StudyAttendanceService {
     }
 
     public StudyAttendanceDto.Session create(Long groupId, StudyAttendanceDto.Write write, String actor) {
-        access.lockGroup(groupId);
-        access.requireManager(groupId, actor);
+        lockGroupForRoundChanges(groupId, actor);
         int next = sessions.findTopByGroupIdOrderByRoundNoDesc(groupId).map(s -> s.getRoundNo() + 1).orElse(1);
         StudySession session = new StudySession();
         session.setGroupId(groupId);
@@ -66,19 +65,14 @@ public class StudyAttendanceService {
     }
 
     public StudyAttendanceDto.Session edit(Long groupId, Long sessionId, StudyAttendanceDto.Write write, String actor) {
-        access.lockGroup(groupId);
-        access.requireManager(groupId, actor);
+        lockGroupForRoundChanges(groupId, actor);
         StudySession session = require(groupId, sessionId);
         apply(session, write);
         return view(session, actor);
     }
 
     public StudyAttendanceDto.Session open(Long groupId, Long sessionId, StudyAttendanceDto.Open request, String actor) {
-        StudyGroup group = access.lockGroup(groupId);
-        access.requireManager(groupId, actor);
-        if (group.getStatus() == StudyGroup.Status.ENDED || group.getStatus() == StudyGroup.Status.PROPOSED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "진행 중인 스터디에서만 출석을 열 수 있습니다.");
-        }
+        StudyGroup group = lockGroupForRoundChanges(groupId, actor);
         StudySession round = require(groupId, sessionId);
         requireAttendanceDate(round);
         attendance.openStudy(round.getId(), attendanceTitle(group, round), request.minutes(), actor);
@@ -199,6 +193,15 @@ public class StudyAttendanceService {
         session.setDate(write.date());
         session.setTopic(write.topic().trim());
         session.setNotes(write.notes() == null ? null : write.notes().trim());
+    }
+
+    private StudyGroup lockGroupForRoundChanges(Long groupId, String actor) {
+        StudyGroup group = access.lockGroup(groupId);
+        access.requireManager(groupId, actor);
+        if (group.getStatus() != StudyGroup.Status.RECRUITING && group.getStatus() != StudyGroup.Status.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "모집 중이거나 진행 중인 스터디에서만 회차를 수정하거나 출석을 열 수 있습니다.");
+        }
+        return group;
     }
 
     private StudySession require(Long groupId, Long id) {

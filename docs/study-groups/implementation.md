@@ -27,10 +27,10 @@ Round and attendance operations use `/api/study-groups/{groupId}`.
 | Method and path suffix | Access |
 | --- | --- |
 | `GET /sessions`, `GET /sessions/{sessionId}` | Participants. Open codes appear for group managers. |
-| `POST /sessions`, `PUT /sessions/{sessionId}` | Group managers. Round numbers are assigned per group. |
+| `POST /sessions`, `PUT /sessions/{sessionId}` | Group managers of recruiting or active groups. Round numbers are assigned per group. |
 | `POST /sessions/{sessionId}/attendance/open`, `POST /sessions/{sessionId}/attendance/close` | Group managers. Opening requires a recruiting or active group and a round dated today or earlier in Seoul. |
 | `GET /sessions/{sessionId}/attendance/roster` | Participants. Historical marks remain visible after a member leaves. |
-| `PUT /sessions/{sessionId}/attendance/members/{studentId}` | Group managers can manually mark approved members, including rounds without a code. |
+| `PUT /sessions/{sessionId}/attendance/members/{studentId}` | Group managers can manually mark approved members on existing rounds at any group status, including rounds without a code. |
 | `GET /attendance/rates`, `GET /attendance/rates.csv` | Group managers. |
 | `POST /api/attendance/check-in` | Existing attendance code entry. Study check-in requires approved group membership. |
 
