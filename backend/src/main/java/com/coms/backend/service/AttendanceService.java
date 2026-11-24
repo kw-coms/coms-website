@@ -14,6 +14,7 @@ import com.coms.backend.repository.AttendanceSessionRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.StudySessionRepository;
 import com.coms.backend.security.SlidingWindowRateLimiter;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +50,7 @@ public class AttendanceService {
     private final MemberRepository memberRepository;
     private final StudyAccessService studyAccess;
     private final StudySessionRepository studySessions;
+    private final JdbcTemplate jdbcTemplate;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
     /** A code is four digits, so guessing is bounded per member: wrong codes count, right ones do not. */
@@ -57,13 +59,15 @@ public class AttendanceService {
     public AttendanceService(AttendanceSessionRepository sessionRepository,
                              AttendanceRecordRepository recordRepository,
                              MemberRepository memberRepository,
-                             Clock clock, StudyAccessService studyAccess, StudySessionRepository studySessions) {
+                             Clock clock, StudyAccessService studyAccess, StudySessionRepository studySessions,
+                             JdbcTemplate jdbcTemplate) {
         this.sessionRepository = sessionRepository;
         this.recordRepository = recordRepository;
         this.memberRepository = memberRepository;
         this.clock = clock;
         this.studyAccess = studyAccess;
         this.studySessions = studySessions;
+        this.jdbcTemplate = jdbcTemplate;
         this.wrongCodesByMember = new SlidingWindowRateLimiter(MAX_CHECK_IN_ATTEMPTS, CHECK_IN_ATTEMPT_WINDOW, clock);
     }
 
@@ -260,6 +264,8 @@ public class AttendanceService {
     }
 
     private String newCode(LocalDateTime now) {
+        // This row lock covers code selection and the session insert until their transaction commits.
+        jdbcTemplate.queryForObject("SELECT id FROM attendance_code_lock WHERE id = 1 FOR UPDATE", Integer.class);
         Set<String> inUse = sessionRepository.findByClosedAtIsNullAndClosesAtAfter(now).stream()
                 .map(AttendanceSession::getCode)
                 .collect(Collectors.toSet());

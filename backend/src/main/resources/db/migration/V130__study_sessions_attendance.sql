@@ -15,3 +15,5 @@ ALTER TABLE attendance_sessions ADD CONSTRAINT uk_attendance_study_session UNIQU
 ALTER TABLE attendance_records ALTER COLUMN checked_at DROP NOT NULL;
 ALTER TABLE attendance_records ADD COLUMN status VARCHAR(12) NOT NULL DEFAULT 'PRESENT';
 ALTER TABLE attendance_records ADD COLUMN source VARCHAR(12) NOT NULL DEFAULT 'CODE';
+CREATE TABLE attendance_code_lock (id SMALLINT PRIMARY KEY);
+INSERT INTO attendance_code_lock (id) VALUES (1);
