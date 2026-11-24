@@ -3,7 +3,8 @@ import { ListSelect } from '../common/ListTools'
 import { downloadUrl } from '../../services/archiveApi'
 import { richBodyToPlainText } from '../richEditor/renderRichBody'
 import { CategorySegment } from './CategorySegment'
-import { ARCHIVE_CATEGORIES, archiveAttachments, archiveFileSize, categoryLabel, clickableCell, formatDate, formatSize, openRowWithKeyboard } from './archiveUtils'
+import { ARCHIVE_CATEGORIES, ARCHIVE_VISIBILITY_LABELS, archiveAttachments, archiveFileSize, categoryLabel, clickableCell, formatDate, formatSize, openRowWithKeyboard } from './archiveUtils'
+import type { ArchiveVisibility } from '../../services/archiveApi'
 
 const ARCHIVE_SORT_OPTIONS = [
   { value: 'default', label: '기본 순서' },
@@ -176,6 +177,7 @@ export function ArchiveListView({
                       <span className="rounded-full bg-[var(--app-accent-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--app-accent-text)]">
                         {categoryLabel(file.category || 'GENERAL')}
                       </span>
+                      <span className="rounded-full border border-[var(--app-hairline)] px-2.5 py-1 text-[11px] font-bold text-[var(--app-subtle)]">{ARCHIVE_VISIBILITY_LABELS[(file.visibility || 'MEMBERS') as ArchiveVisibility]}</span>
                       <span className="ml-auto shrink-0 text-[11px] font-bold text-[var(--app-subtle)]">{formatSize(archiveFileSize(file))}</span>
                     </span>
                     <span className="mt-3 block line-clamp-2 text-[15px] font-bold leading-6 text-[var(--app-text)]" title={file.title || file.originalName}>
@@ -241,6 +243,7 @@ export function ArchiveListView({
                         <span className="inline-flex rounded-full bg-[var(--app-accent-soft)] px-2.5 py-1 text-xs font-bold text-[var(--app-accent-text)]">
                           {categoryLabel(file.category || 'GENERAL')}
                         </span>
+                        <span className="mt-1 inline-flex rounded-full border border-[var(--app-hairline)] px-2.5 py-1 text-xs font-bold text-[var(--app-subtle)]">{ARCHIVE_VISIBILITY_LABELS[(file.visibility || 'MEMBERS') as ArchiveVisibility]}</span>
                       </td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
                         <span className="block max-w-[340px] truncate font-bold text-[var(--app-text)]" title={file.title || file.originalName}>

@@ -1,5 +1,13 @@
 import { ArchiveCategory } from '../../contract/enums'
 import { enumLabels } from '../../contract/labels'
+import type { ArchiveVisibility } from '../../services/archiveApi'
+
+export const ARCHIVE_VISIBILITY_LABELS: Record<ArchiveVisibility, string> = {
+  PUBLIC: '전체 공개',
+  MEMBERS: '동아리원',
+  OFFICERS: '임원',
+  SELECTED: '지정 회원',
+}
 
 export function archiveAttachments(file) {
   return file.attachments?.length ? file.attachments : [{

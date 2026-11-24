@@ -253,8 +253,8 @@ function App() {
         <Route path="/sponsors" element={<SponsorsPage />} />
         <Route path="/notices" element={<RequireAuth><NoticesPage /></RequireAuth>} />
         <Route path="/notices/:id" element={<RequireAuth><NoticesPage /></RequireAuth>} />
-        <Route path="/resources" element={<RequireAuth><ArchivePage /></RequireAuth>} />
-        <Route path="/resources/:id" element={<RequireAuth><ArchivePage /></RequireAuth>} />
+        <Route path="/resources" element={<ArchivePage />} />
+        <Route path="/resources/:id" element={<ArchivePage />} />
         <Route path="/community" element={<RequireAuth><CommunityPage /></RequireAuth>} />
         <Route path="/community/bookmarks" element={<RequireAuth><CommunityBookmarksPage /></RequireAuth>} />
         <Route path="/community/members/:studentId" element={<RequireAuth><CommunityMemberProfilePage /></RequireAuth>} />

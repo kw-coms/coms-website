@@ -513,7 +513,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { id: 'notices', label: '공지', sub: 'Notices', path: '/notices', icon: Megaphone, auth: true },
       { id: 'community', label: '커뮤니티', sub: 'Community', path: '/community', icon: MessagesSquare, auth: true },
-      { id: 'resources', label: '자료실', sub: 'Resources', path: '/resources', icon: FolderOpen, auth: true },
+      { id: 'resources', label: '자료실', sub: 'Resources', path: '/resources', icon: FolderOpen },
       fromActivityItem('activity-log'),
       fromActivityItem('monthly-calendar'),
       fromActivityItem('activity-events'),

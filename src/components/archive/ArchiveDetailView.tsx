@@ -1,11 +1,13 @@
 import { Download, ThumbsUp, Trash2 } from 'lucide-react'
 import { attachmentDownloadUrl, downloadUrl } from '../../services/archiveApi'
 import { renderRichBody } from '../richEditor/renderRichBody'
-import { archiveAttachments, categoryLabel, formatDate, formatSize } from './archiveUtils'
+import { ARCHIVE_VISIBILITY_LABELS, archiveAttachments, categoryLabel, formatDate, formatSize } from './archiveUtils'
+import type { ArchiveVisibility } from '../../services/archiveApi'
 
 export function ArchiveDetailView({
   detailFile,
-  isAdmin,
+  canDelete,
+  canVote,
   onAuthorEdit,
   voting,
   onVote,
@@ -13,7 +15,8 @@ export function ArchiveDetailView({
   onEdit,
 }: {
   detailFile: any
-  isAdmin: boolean
+  canDelete: boolean
+  canVote: boolean
   onAuthorEdit?: (file: { id: number; uploaderName?: string }) => void
   voting: boolean
   onVote: () => void
@@ -28,6 +31,7 @@ export function ArchiveDetailView({
         <h2 className="mt-3 break-words text-2xl font-bold text-[var(--app-text)]">{detailFile.title || detailFile.originalName}</h2>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--app-subtle)]">
           <span className="rounded-full bg-[var(--app-accent-soft)] px-2.5 py-1 font-bold text-[var(--app-accent-text)]">{categoryLabel(detailFile.category || 'GENERAL')}</span>
+          <span className="rounded-full bg-[var(--app-surface-soft)] px-2.5 py-1 font-bold">{ARCHIVE_VISIBILITY_LABELS[(detailFile.visibility || 'MEMBERS') as ArchiveVisibility]}</span>
           <span>{detailFile.uploaderName || detailFile.uploadedBy || '-'} · {formatDate(detailFile.uploadedAt)}</span>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--app-subtle)]">
@@ -79,7 +83,7 @@ export function ArchiveDetailView({
           <Download size={15} />
           다운로드
         </a>}
-        <button
+        {canVote && <button
           type="button"
           onClick={onVote}
           disabled={voting}
@@ -87,9 +91,9 @@ export function ArchiveDetailView({
         >
           <ThumbsUp size={15} />
           추천 {detailFile.upvotes ?? 0}
-        </button>
+        </button>}
         {onEdit && <button type="button" onClick={onEdit} className="apple-action-secondary min-h-12 px-4 text-sm">수정</button>}
-        {isAdmin && onAuthorEdit && (
+        {onAuthorEdit && (
           <button
             type="button"
             onClick={() => onAuthorEdit(detailFile)}
@@ -98,7 +102,7 @@ export function ArchiveDetailView({
             작성자 변경
           </button>
         )}
-        {isAdmin && (
+        {canDelete && (
           <button
             type="button"
             onClick={() => onDelete(detailFile.id)}

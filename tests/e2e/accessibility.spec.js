@@ -287,10 +287,16 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 
   })
 }
 
-test('guest members-only guide (/resources) and guest study page (/study/c) have no serious accessibility violations', async ({ page }) => {
+test('guest members-only guide, public resources, and study page have no serious accessibility violations', async ({ page }) => {
   await mockOptionalApis(page)
-  await page.goto('/resources')
+  await page.goto('/notices')
   await expect(page.locator('[data-members-gate]')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
+  await assertNoSeriousViolations(page)
+  await page.route('**/api/files', (route) => route.fulfill({ json: [] }))
+  await page.goto('/resources')
+  await expect(page.getByRole('heading', { name: '자료실', exact: true })).toBeVisible()
+  await expect(page.locator('[data-members-gate]')).toHaveCount(0)
   await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
   await assertNoSeriousViolations(page)
   await page.goto('/study/c')

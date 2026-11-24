@@ -1,6 +1,10 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileUp, X } from 'lucide-react'
-import { createPost, updateArchiveFile } from '../../services/archiveApi'
+import { createPost, searchArchiveVisibilityMembers, updateArchiveFile, type ArchiveVisibility } from '../../services/archiveApi'
+import { usePermissions } from '../../contexts/usePermissions'
+import { useAuth } from '../../contexts/useAuth'
+import { PERMISSIONS } from '../../utils/roleAccess'
+import { ownsArchive } from '../../utils/contentEditing'
 import { parseRichBodyBlocks } from '../richEditor/parseRichBodyBlocks'
 import { fetchLinkPreview, searchYoutubeVideos } from '../../services/communityApi'
 import RichBodyEditor from '../richEditor/RichBodyEditor'
@@ -12,21 +16,41 @@ const ARCHIVE_DESCRIPTION_FEATURES = { ...UPLOAD_RICH_FEATURES, fileUpload: fals
 import { resetRejectedRichBlocks, uploadPendingRichBlocks } from '../richEditor/uploadPendingRichBlocks'
 import { serializeRichBody } from '../richEditor/serializeRichBody'
 import { CategorySegment } from './CategorySegment'
-import { WRITABLE_ARCHIVE_CATEGORIES, archiveAttachments, formatSize } from './archiveUtils'
+import { ARCHIVE_VISIBILITY_LABELS, WRITABLE_ARCHIVE_CATEGORIES, archiveAttachments, formatSize } from './archiveUtils'
 
 export function WriteForm({ onCancel, onSave, initialFile }: {
-  initialFile?: { id: number; title?: string; originalName?: string; description?: string; category?: string; attachments?: { id?: number; originalName: string; fileSize: number; contentVersion?: string }[] }
+  initialFile?: { id: number; title?: string; originalName?: string; uploadedBy?: string; description?: string; category?: string; visibility?: ArchiveVisibility; selectedStudentIds?: string[]; attachments?: { id?: number; originalName: string; fileSize: number; contentVersion?: string }[] }
   onCancel: () => void
   onSave: (savedList: unknown[]) => void
 }) {
   const [form, setForm] = useState({ title: initialFile?.title || initialFile?.originalName || '', category: initialFile?.category || 'GENERAL' })
   const [files, setFiles] = useState<File[]>([])
+  const [visibility, setVisibility] = useState<ArchiveVisibility>(initialFile?.visibility || 'MEMBERS')
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>(initialFile?.selectedStudentIds || [])
+  const [memberQuery, setMemberQuery] = useState('')
+  const [memberResults, setMemberResults] = useState<{ studentId: string; name: string; role: string }[]>([])
+  const [memberSearchError, setMemberSearchError] = useState(false)
+  const [memberSearchNonce, setMemberSearchNonce] = useState(0)
+  const { user } = useAuth()
+  const { can } = usePermissions()
+  const canSetRestricted = can(PERMISSIONS.archiveVisibility)
+  const canChangeVisibility = !initialFile || ownsArchive(user, initialFile) || canSetRestricted
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)
   const editorApiRef = useRef(null)
   const initialBlocks = useMemo(() => initialFile ? parseRichBodyBlocks(initialFile.description || '') : [], [initialFile])
   const existingAttachments = initialFile ? archiveAttachments(initialFile) : []
+
+  useEffect(() => {
+    if (visibility !== 'SELECTED' || !canSetRestricted) return
+    let active = true
+    // A new search starts with a clean error state in its async continuation.
+    searchArchiveVisibilityMembers(memberQuery)
+      .then((members) => { if (active) { setMemberResults(members); setMemberSearchError(false) } })
+      .catch(() => { if (active) { setMemberResults([]); setMemberSearchError(true) } })
+    return () => { active = false }
+  }, [visibility, canSetRestricted, memberQuery, memberSearchNonce])
 
   const addFiles = (event) => {
     const picked = Array.from(event.target.files || []) as File[]
@@ -44,6 +68,7 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
     const blocks = editorApiRef.current?.getBlocks() || []
     if (!form.title.trim()) { setError('제목을 입력해주세요.'); return }
     if (!initialFile && files.length === 0) { setError('파일을 선택해주세요.'); return }
+    if (visibility === 'SELECTED' && canSetRestricted && selectedStudentIds.length === 0) { setError('공개할 회원을 선택해주세요.'); return }
     if (!editorApiRef.current) { setError('편집기를 불러오는 중입니다. 잠시 후 저장해주세요.'); return }
     setSaving(true)
     setError('')
@@ -55,9 +80,12 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
         description,
         category: form.category,
       }
+      const visibilityInput = initialFile && visibility === (initialFile.visibility || 'MEMBERS') &&
+        (visibility !== 'SELECTED' || selectedStudentIds.join(',') === (initialFile.selectedStudentIds || []).join(','))
+        ? {} : { visibility, selectedStudentIds: visibility === 'SELECTED' ? selectedStudentIds : [] }
       const saved = initialFile
-        ? await updateArchiveFile(initialFile.id, { ...metadata, files: files.length ? files : undefined })
-        : await createPost({ ...metadata, files })
+        ? await updateArchiveFile(initialFile.id, { ...metadata, ...visibilityInput, files: files.length ? files : undefined })
+        : await createPost({ ...metadata, ...visibilityInput, files })
       onSave([saved])
     } catch (err) {
       resetRejectedRichBlocks(blocks, err, (id, patch) => editorApiRef.current?.updateFigureMeta(id, patch))
@@ -89,6 +117,36 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
           />
         </div>
       </div>
+
+      <fieldset className="space-y-3">
+        <legend className="mb-2 text-xs font-bold text-[var(--app-subtle)]">공개 범위</legend>
+        <div className="flex flex-wrap gap-2">
+          {(Object.keys(ARCHIVE_VISIBILITY_LABELS) as ArchiveVisibility[]).map((value) => (
+            <label key={value} className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold ${visibility === value ? 'border-[var(--app-accent)] bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-muted)]'} ${!canChangeVisibility || !canSetRestricted && (value === 'OFFICERS' || value === 'SELECTED') ? 'opacity-50' : 'cursor-pointer'}`}>
+              <input type="radio" name={`archive-visibility-${initialFile?.id ?? 'new'}`} value={value} checked={visibility === value} disabled={saving || !canChangeVisibility || !canSetRestricted && (value === 'OFFICERS' || value === 'SELECTED')} onChange={() => setVisibility(value)} />
+              {ARCHIVE_VISIBILITY_LABELS[value]}
+            </label>
+          ))}
+        </div>
+        {visibility === 'SELECTED' && canSetRestricted && (
+          <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-3">
+            <label className="block text-xs font-bold text-[var(--app-subtle)]">
+              공개할 회원 검색 (이름 또는 학번)
+              <input value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} className="mt-2 h-11 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-sm text-[var(--app-text)]" />
+            </label>
+            <div className="mt-2 max-h-48 overflow-y-auto">
+              {memberResults.map((member) => (
+                <label key={member.studentId} className="flex min-h-11 cursor-pointer items-center gap-3 px-2 text-sm text-[var(--app-text)]">
+                  <input type="checkbox" checked={selectedStudentIds.includes(member.studentId)} onChange={(event) => setSelectedStudentIds((ids) => event.target.checked ? [...ids, member.studentId] : ids.filter((id) => id !== member.studentId))} />
+                  {member.name} · {member.studentId}
+                </label>
+              ))}
+            </div>
+            {memberSearchError && <p role="alert" className="mt-2 text-xs text-red-600">회원 검색에 실패했습니다. <button type="button" onClick={() => setMemberSearchNonce((value) => value + 1)} className="min-h-11 underline">다시 시도</button></p>}
+            {selectedStudentIds.length > 0 && <p className="mt-2 break-all text-xs text-[var(--app-muted)]">선택: {selectedStudentIds.join(', ')}</p>}
+          </div>
+        )}
+      </fieldset>
 
       <div className="block">
         <span className="mb-2 block text-xs font-bold text-[var(--app-subtle)]">설명 (선택)</span>

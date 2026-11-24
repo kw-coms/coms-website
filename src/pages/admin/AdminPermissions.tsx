@@ -2,12 +2,22 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   getPermissionMatrix,
   updatePermissionMatrix,
+  searchPermissionMembers,
+  listMemberPermissionOverrides,
+  getMemberPermissionOverrides,
+  updateMemberPermissionOverrides,
+  type PermissionDescriptor,
   type PermissionMatrix,
+  type PermissionMember,
+  type PermissionEffect,
+  type MemberPermissionOverrides,
+  type MemberPermissionDetail,
 } from '../../services/permissionsApi'
 import { showToast } from '../../components/common/Toast'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 import { useAuth } from '../../contexts/useAuth'
 import { ROLE_LABELS, defaultPermissionsForRole } from '../../utils/roleAccess'
+import { ListSearch } from '../../components/common/ListTools'
 
 type Allowed = Record<string, string[]>
 
@@ -116,7 +126,8 @@ export default function AdminPermissions() {
   const updatedAt = formatUpdatedAt(matrix.updatedAt)
 
   return (
-    <section className="space-y-4" data-testid="admin-permissions">
+    <section className="space-y-8" data-testid="admin-permissions">
+      <div className="space-y-4">
       <div>
         <h2 className="text-base font-bold text-[var(--theme-body-dark)]">직급별 권한</h2>
         <p className="mt-1 text-sm text-[var(--theme-body-muted)]">
@@ -198,6 +209,173 @@ export default function AdminPermissions() {
         </button>
         {dirty && <span className="text-xs text-[var(--theme-body-muted)]">저장하지 않은 변경이 있습니다.</span>}
       </div>
+      </div>
+      <MemberPermissions permissions={matrix.permissions} refreshPermissions={refreshPermissions} />
+    </section>
+  )
+}
+
+function MemberPermissions({ permissions, refreshPermissions }: {
+  permissions: PermissionDescriptor[]
+  refreshPermissions: () => void
+}) {
+  const [query, setQuery] = useState('')
+  const [matches, setMatches] = useState<PermissionMember[]>([])
+  const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState('')
+  const [overrideMembers, setOverrideMembers] = useState<MemberPermissionOverrides[]>([])
+  const [listLoading, setListLoading] = useState(true)
+  const [listError, setListError] = useState('')
+  const [listNonce, setListNonce] = useState(0)
+  const [selectedId, setSelectedId] = useState('')
+  const [detail, setDetail] = useState<MemberPermissionDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState('')
+  const [detailNonce, setDetailNonce] = useState(0)
+  const [draft, setDraft] = useState<Record<string, PermissionEffect>>({})
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    listMemberPermissionOverrides()
+      .then((rows) => { if (active) { setOverrideMembers(rows); setListError('') } })
+      .catch((err) => { if (active) setListError(err.message || '개인별 권한 목록을 불러오지 못했습니다.') })
+      .finally(() => { if (active) setListLoading(false) })
+    return () => { active = false }
+  }, [listNonce])
+
+  useEffect(() => {
+    const value = query.trim()
+    if (!value) return
+    let active = true
+    const timer = window.setTimeout(() => {
+      searchPermissionMembers(value)
+        .then((rows) => { if (active) { setMatches(rows); setSearchError('') } })
+        .catch((err) => { if (active) setSearchError(err.message || '회원을 검색하지 못했습니다.') })
+        .finally(() => { if (active) setSearching(false) })
+    }, 250)
+    return () => { active = false; window.clearTimeout(timer) }
+  }, [query])
+
+  useEffect(() => {
+    if (!selectedId) return
+    let active = true
+    getMemberPermissionOverrides(selectedId)
+      .then((value) => {
+        if (active) { setDetail(value); setDraft(value.overrides); setDetailError('') }
+      })
+      .catch((err) => { if (active) setDetailError(err.message || '회원 권한을 불러오지 못했습니다.') })
+      .finally(() => { if (active) setDetailLoading(false) })
+    return () => { active = false }
+  }, [selectedId, detailNonce])
+
+  const selectMember = (studentId: string) => {
+    if (saving || studentId === selectedId) return
+    setSelectedId(studentId)
+    setDetail(null)
+    setDraft({})
+    setDetailLoading(true)
+    setDetailError('')
+  }
+
+  const changeEffect = (key: string, effect: '' | PermissionEffect) => {
+    setDraft((current) => {
+      const next = { ...current }
+      if (effect) next[key] = effect
+      else delete next[key]
+      return next
+    })
+  }
+
+  const changed = detail && JSON.stringify(Object.entries(draft).sort()) !== JSON.stringify(Object.entries(detail.overrides).sort())
+  const save = async () => {
+    if (!detail || !changed || saving) return
+    setSaving(true)
+    try {
+      const saved = await updateMemberPermissionOverrides(detail.studentId, draft)
+      setDetail(saved)
+      setDraft(saved.overrides)
+      setListNonce((value) => value + 1)
+      refreshPermissions()
+      showToast({ message: '개인별 권한이 저장되었습니다.' })
+    } catch (err) {
+      showToast({ message: err.message || '개인별 권한을 저장하지 못했습니다.', tone: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className="space-y-4 border-t border-[var(--app-hairline)] pt-6" aria-labelledby="member-permissions-title">
+      <div>
+        <h2 id="member-permissions-title" className="text-base font-bold text-[var(--theme-body-dark)]">개인별 권한</h2>
+        <p className="mt-1 text-sm text-[var(--theme-body-muted)]">기본은 직급 권한을 따릅니다. 허용과 차단은 해당 회원에게만 적용됩니다.</p>
+      </div>
+      <div className="max-w-xl">
+        <ListSearch value={query} onChange={(value) => {
+          setQuery(value)
+          setMatches([])
+          setSearchError('')
+          setSearching(Boolean(value.trim()))
+        }} placeholder="이름 또는 학번" label="개인별 권한 회원 검색" />
+      </div>
+      {searching && <p role="status" className="text-sm text-[var(--theme-body-muted)]">회원 검색 중…</p>}
+      {searchError && <p role="alert" className="text-sm text-red-600">{searchError}</p>}
+      {query.trim() && !searching && !searchError && matches.length === 0 && <p className="text-sm text-[var(--theme-body-muted)]">검색 결과가 없습니다.</p>}
+      {matches.length > 0 && <ul className="max-h-56 space-y-1 overflow-y-auto" aria-label="회원 검색 결과">
+        {matches.map((member) => <li key={member.studentId}>
+          <button type="button" disabled={saving} onClick={() => selectMember(member.studentId)} className="min-h-11 w-full rounded-lg px-3 text-left text-sm text-[var(--theme-body-dark)] hover:bg-black/5 disabled:opacity-50">
+            {member.name} · {member.studentId} · {ROLE_LABELS[member.role] || member.role}
+          </button>
+        </li>)}
+      </ul>}
+      <div>
+        <h3 className="text-sm font-bold text-[var(--theme-body-dark)]">개인 설정이 있는 회원</h3>
+        {listLoading && <p role="status" className="mt-2 text-sm text-[var(--theme-body-muted)]">목록을 불러오는 중…</p>}
+        {listError && <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-red-600" role="alert">{listError}
+          <button type="button" onClick={() => { setListLoading(true); setListNonce((value) => value + 1) }} className="min-h-11 rounded-lg border border-[var(--app-hairline)] px-3 text-[var(--theme-body-dark)]">다시 시도</button>
+        </div>}
+        {!listLoading && !listError && overrideMembers.length === 0 && <p className="mt-2 text-sm text-[var(--theme-body-muted)]">개인 설정이 없습니다.</p>}
+        {!listLoading && !listError && overrideMembers.length > 0 && <ul className="mt-2 flex flex-wrap gap-2" aria-label="개인 설정 회원 목록">
+          {overrideMembers.map((member) => <li key={member.studentId}>
+            <button type="button" disabled={saving} onClick={() => selectMember(member.studentId)} className="min-h-11 rounded-lg border border-[var(--app-hairline)] px-3 text-sm text-[var(--theme-body-dark)] hover:bg-black/5 disabled:opacity-50">
+              {member.name} · {member.studentId} · {Object.keys(member.overrides).length}개
+            </button>
+          </li>)}
+        </ul>}
+      </div>
+      {selectedId && <div className="space-y-3 rounded-xl border border-[var(--app-hairline)] bg-white/60 p-4">
+        {detailLoading && <p role="status" className="text-sm text-[var(--theme-body-muted)]">회원 권한을 불러오는 중…</p>}
+        {detailError && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm text-red-600">{detailError}
+          <button type="button" onClick={() => { setDetailLoading(true); setDetailNonce((value) => value + 1) }} className="min-h-11 rounded-lg border border-[var(--app-hairline)] px-3 text-[var(--theme-body-dark)]">다시 시도</button>
+        </div>}
+        {detail && !detailLoading && !detailError && <>
+          <div>
+            <h3 className="font-bold text-[var(--theme-body-dark)]">{detail.name} · {detail.studentId}</h3>
+            <p className="text-sm text-[var(--theme-body-muted)]">{ROLE_LABELS[detail.role] || detail.role} · 직급 기본 권한은 회색으로 표시됩니다.</p>
+          </div>
+          <div className="space-y-2">
+            {permissions.map((permission) => {
+              const base = detail.rolePermissions.includes(permission.key)
+              const effect = draft[permission.key] || ''
+              return <div key={permission.key} className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--app-hairline)] py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[var(--theme-body-dark)]">{permission.label}</p>
+                  <p className="text-xs text-[var(--theme-body-muted)]">{permission.description}</p>
+                  <span className="text-xs text-[var(--theme-body-muted)]">직급 기본: {base ? '허용' : '차단'}</span>
+                </div>
+                <select aria-label={`${detail.name} ${permission.label} 개인 설정`} value={effect} disabled={detail.role === 'ADMIN' || saving} onChange={(event) => changeEffect(permission.key, event.target.value as '' | PermissionEffect)} className="min-h-11 rounded-lg border border-[var(--app-hairline)] bg-white px-3 text-sm text-[var(--theme-body-dark)] disabled:opacity-50">
+                  <option value="">기본</option>
+                  <option value="GRANT">허용</option>
+                  <option value="REVOKE">차단</option>
+                </select>
+              </div>
+            })}
+          </div>
+          <button type="button" onClick={save} disabled={!changed || saving || detail.role === 'ADMIN'} className="min-h-11 rounded-full bg-[var(--app-accent)] px-5 text-sm font-bold text-white disabled:opacity-50">{saving ? '저장 중…' : '개인별 권한 저장'}</button>
+          {detail.role === 'ADMIN' && <p className="text-xs text-[var(--theme-body-muted)]">회장은 항상 모든 권한을 가집니다.</p>}
+        </>}
+      </div>}
     </section>
   )
 }

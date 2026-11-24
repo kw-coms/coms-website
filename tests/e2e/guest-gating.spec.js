@@ -19,11 +19,12 @@ test.describe('lock icons', () => {
     await nav(page).getByRole('button', { name: '멤버', exact: true }).click()
     const panel = page.locator('#nav-panel')
     const column = (name) => panel.getByRole('region', { name })
-    for (const label of ['공지', '커뮤니티', '자료실', '활동 기록', '월별 일정', '회지·인기투표', '신청·수요조사', '팀 프로젝트']) {
+    for (const label of ['공지', '커뮤니티', '활동 기록', '월별 일정', '회지·인기투표', '신청·수요조사', '팀 프로젝트']) {
       await expect(column('멤버').getByRole('button', { name: new RegExp(`^${label}`) }).locator(LOCK), label).toHaveCount(1)
     }
     await expect(column('멤버').getByRole('button')).toHaveCount(9)
-    await expect(column('멤버').locator(LOCK)).toHaveCount(8)
+    await expect(column('멤버').locator(LOCK)).toHaveCount(7)
+    await expect(column('멤버').getByRole('button', { name: '자료실' }).locator(LOCK)).toHaveCount(0)
     await expect(column('멤버').getByRole('button', { name: '해커톤' }).locator(LOCK)).toHaveCount(0)
     await expect(panel.getByRole('button', { name: '공지 (회원 전용)' })).toBeVisible()
     // Public entries have none.
@@ -46,11 +47,12 @@ test.describe('lock icons', () => {
     await page.getByRole('button', { name: '메뉴 열기' }).click()
     const menu = page.locator('#mobile-menu')
     const section = (name) => menu.getByRole('region', { name })
-    for (const label of ['공지', '커뮤니티', '자료실']) {
+    for (const label of ['공지', '커뮤니티']) {
       await expect(menu.getByRole('button', { name: new RegExp(`^${label}`) }).locator(LOCK), label).toHaveCount(1)
     }
     await expect(menu.getByRole('button', { name: /^후원/ }).locator(LOCK)).toHaveCount(0)
-    await expect(section('멤버').locator(LOCK)).toHaveCount(8)
+    await expect(section('멤버').locator(LOCK)).toHaveCount(7)
+    await expect(section('멤버').getByRole('button', { name: '자료실' }).locator(LOCK)).toHaveCount(0)
     await expect(section('멤버').getByRole('button', { name: '해커톤' }).locator(LOCK)).toHaveCount(0)
     const tools = section('도구')
     await expect(tools.locator(LOCK)).toHaveCount(3)
@@ -68,6 +70,8 @@ test.describe('lock icons', () => {
     const dialog = page.getByRole('dialog', { name: '빠른 이동' })
     await dialog.getByRole('combobox', { name: '어디로 갈까요?' }).fill('공지')
     await expect(dialog.getByRole('option', { name: /공지사항/ }).locator(LOCK)).toHaveCount(1)
+    await dialog.getByRole('combobox', { name: '어디로 갈까요?' }).fill('자료실')
+    await expect(dialog.getByRole('option', { name: /자료실/ }).locator(LOCK)).toHaveCount(0)
     await dialog.getByRole('combobox', { name: '어디로 갈까요?' }).fill('프로젝트')
     await expect(dialog.getByRole('option').first().locator(LOCK)).toHaveCount(0)
   })
@@ -99,12 +103,32 @@ test.describe('guide screen', () => {
   test('the login link carries the page as `from`, and the recruit link is offered', async ({ page }) => {
     await skipIntro(page)
     await mockOptionalApis(page)
-    await page.goto('/resources')
-    const gate = await expectMembersGate(page, '/resources')
-    await expect(gate.getByText('세미나, 프로젝트, 학술회지 자료를 모아 두었어요.')).toBeVisible()
+    await page.goto('/notices')
+    const gate = await expectMembersGate(page, '/notices')
+    await expect(gate.getByText('공지, 홍보, 소모임, 취업공고를 한곳에서 볼 수 있어요.')).toBeVisible()
     await gate.getByRole('link', { name: '로그인', exact: true }).click()
     await expect(page).toHaveURL(/\/login$/)
-    expect(await page.evaluate(() => history.state?.usr?.from?.pathname)).toBe('/resources')
+    expect(await page.evaluate(() => history.state?.usr?.from?.pathname)).toBe('/notices')
+  })
+
+  test('a guest opens the unlocked resources entry and requests the public list', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await skipIntro(page)
+    await mockOptionalApis(page)
+    let listRequests = 0
+    await page.route('**/api/files', (route) => {
+      listRequests += 1
+      return route.fulfill({ json: [{ id: 44, title: '공개 세미나 자료', originalName: 'seminar.pdf', visibility: 'PUBLIC', category: 'GENERAL', fileSize: 100 }] })
+    })
+    await page.goto('/about')
+    await nav(page).getByRole('button', { name: '멤버', exact: true }).click()
+    const entry = page.locator('#nav-panel').getByRole('button', { name: '자료실' })
+    await expect(entry.locator(LOCK)).toHaveCount(0)
+    await entry.click()
+    await expect(page).toHaveURL(/\/resources$/)
+    await expect(page.locator('tr[role="button"]').getByText('공개 세미나 자료')).toBeVisible()
+    await expect(page.locator('[data-members-gate]')).toHaveCount(0)
+    expect(listRequests).toBeGreaterThan(0)
   })
 
   test('an auth error still redirects', async ({ page }) => {

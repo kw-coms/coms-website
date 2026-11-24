@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
 import { ArrowRight, FolderOpen, Megaphone, MessagesSquare } from 'lucide-react'
-import { activityHubItems, activitySectionNavItems } from '../../../data/homeContent'
+import { activityHubItems, activitySectionNavItems, navGroups } from '../../../data/homeContent'
 import MemberLock from '../../../components/MemberLock'
 import ClubCalendarSection from '../../../features/clubCalendar/ClubCalendarSection'
 import { CineTitle, Slate } from './parts'
 import { cssVars } from './cssVars'
 
 const HUB_ICONS = [Megaphone, MessagesSquare, FolderOpen]
+const MEMBER_PATHS = new Set(navGroups.flatMap(group => group.items).filter(item => item.auth).map(item => item.path))
 
 type Props = {
   index: number
@@ -34,7 +35,7 @@ export default function Members({ index, member, noticeTitle, onGo, backdrop }: 
             <Slate index={index} name="Members" />
             <CineTitle text="멤버가 되면" />
             <p className="scene-lede" data-cine style={cssVars({ '--i': 2 })}>
-              공지, 커뮤니티, 자료실과 활동 도구가 열립니다.
+              공지, 커뮤니티와 회원 자료, 활동 도구가 열립니다.
             </p>
           </>
         )}
@@ -58,7 +59,7 @@ export default function Members({ index, member, noticeTitle, onGo, backdrop }: 
                   {member ? <span className="scene-members__icon"><Icon size={19} aria-hidden="true" /></span> : <Icon size={20} aria-hidden="true" />}
                   <h3 className="scene-hubcard__title">
                     <button type="button" className="scene-hubcard__link" onClick={() => onGo(item.route)}>
-                      {item.title} <MemberLock />
+                      {item.title} {MEMBER_PATHS.has(item.route) && <MemberLock />}
                     </button>
                   </h3>
                   <p className="scene-hubcard__body">{item.body}</p>

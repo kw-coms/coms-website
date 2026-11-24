@@ -111,7 +111,7 @@ test('archive refuses saving while its rich editor is still loading', async ({ p
 test('archive non-owner vice president cannot see the content edit action', async ({ page }) => {
   await mockAdminApis(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { studentId: 'vp', name: '부회장', role: 'VICE_PRESIDENT', emailVerified: true } }))
-  await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'VICE_PRESIDENT', permissions: ['archive.manage'] } }))
+  await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'VICE_PRESIDENT', permissions: ['archive.author_change'] } }))
   await page.route('**/api/files', route => route.fulfill({ json: [{ id: 912, title: '타인 자료', uploadedBy: 'owner', originalName: 'old.txt', uploadedAt: '2026-09-01T00:00:00' }] }))
   await page.goto('/resources/912')
   await expect(page.getByRole('heading', { name: '타인 자료' })).toBeVisible()
@@ -309,13 +309,14 @@ test('home section cards lead where they say', async ({ page }) => {
   })
   await page.goto('/')
 
-  // A visitor's "멤버가 되면" scene: the three hub entries (still buttons that go to the login
-  // guide), the tool shortcuts as chips, and no calendar or member grid.
+  // A visitor's "멤버가 되면" scene: member-only entries keep their locks, while
+  // 자료실 opens the public list.
   const members = page.locator('#members')
   await expect(members.getByRole('heading', { name: '멤버가 되면' })).toBeAttached()
   for (const name of [/공지사항/, /커뮤니티/, /자료실/]) {
     await expect(members.getByRole('button', { name })).toBeVisible()
   }
+  await expect(members.getByRole('button', { name: /자료실/ }).locator('[data-member-lock]')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '동아리 일정 캘린더' })).toHaveCount(0)
   for (const heading of ['배운 건 만들어 보고, 만든 건 함께 나눕니다.', '기초부터 실전까지, 매주 이어지는 학습 루틴.', '아이디어를 실제 서비스와 제작물로.', '함께 배울 다음 멤버를 기다립니다.']) {
     await expect(page.getByRole('heading', { name: heading })).toBeAttached()
@@ -1329,25 +1330,29 @@ test('admin files tab can upload and delete archive files', async ({ page }) => 
   await page.goto('/admin')
   await page.getByRole('tab', { name: '파일 관리' }).click()
 
-  await expect(page.getByText('기존자료.pdf')).toBeVisible()
-  await expect(page.getByText('관리자 · 2.0 KB')).toBeVisible()
-  await page.locator('input[type="file"]').setInputFiles({
+  await expect(page.locator('article').filter({ hasText: '기존자료.pdf' })).toContainText('관리자 · 2.0 KB')
+  await page.getByRole('button', { name: '파일 업로드' }).click()
+  const uploadForm = page.locator('form.apple-soft-panel')
+  await uploadForm.getByPlaceholder('자료 제목').fill('회의록.pdf')
+  await uploadForm.getByLabel('파일 선택', { exact: true }).setInputFiles({
     name: '회의록.pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from('pdfbody'),
   })
+  await expect(uploadForm.locator('[contenteditable="true"]').first()).toBeVisible()
+  await uploadForm.getByRole('button', { name: '등록', exact: true }).click()
 
   await expect.poll(() => uploadPayload).toEqual({
     title: '회의록.pdf',
     category: 'GENERAL',
     filenames: ['회의록.pdf'],
   })
-  await expect(page.getByText('회의록.pdf')).toBeVisible()
+  await expect(page.locator('article').filter({ hasText: '회의록.pdf' })).toBeVisible()
 
-  await page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '회의록.pdf' }).getByRole('button', { name: '삭제' }).click()
+  await page.locator('article').filter({ hasText: '회의록.pdf' }).getByRole('button', { name: '삭제' }).click()
 
   await expect.poll(() => deletedFileId).toBe(2)
-  await expect(page.getByText('회의록.pdf')).toHaveCount(0)
+  await expect(page.locator('article').filter({ hasText: '회의록.pdf' })).toHaveCount(0)
 })
 
 test('admin files tab creates one post with all selected attachments', async ({ page }) => {
@@ -1368,20 +1373,24 @@ test('admin files tab creates one post with all selected attachments', async ({ 
 
   await page.goto('/admin')
   await page.getByRole('tab', { name: '파일 관리' }).click()
-  const input = page.locator('input[type="file"]')
+  await page.getByRole('button', { name: '파일 업로드' }).click()
+  const form = page.locator('form.apple-soft-panel')
+  await form.getByPlaceholder('자료 제목').fill('회의록.pdf')
+  const input = form.getByLabel('파일 선택', { exact: true })
   await expect(input).toHaveAttribute('multiple', '')
   await expect(input).toBeEnabled()
   await input.setInputFiles([
     { name: '회의록.pdf', mimeType: 'application/pdf', buffer: Buffer.from('first') },
     { name: '자료.zip', mimeType: 'application/zip', buffer: Buffer.from('second') },
   ])
+  await expect(form.locator('[contenteditable="true"]').first()).toBeVisible()
+  await form.getByRole('button', { name: '등록', exact: true }).click()
 
   await expect.poll(() => uploads).toEqual([{ title: '회의록.pdf', category: 'GENERAL', filenames: ['회의록.pdf', '자료.zip'] }])
-  await expect(page.getByText('2개 파일이 한 자료에 업로드되었습니다.')).toBeVisible()
-  const row = page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '회의록.pdf' })
+  await expect(page.getByText('자료가 등록되었습니다.')).toBeVisible()
+  const row = page.locator('article').filter({ hasText: '회의록.pdf' })
   await expect(row).toHaveCount(1)
-  await expect(row.getByText('회의록.pdf', { exact: true })).toBeVisible()
-  await expect(row).toContainText('첨부파일 2개: 회의록.pdf, 자료.zip')
+  await expect(row).toContainText('회의록.pdf, 자료.zip')
 })
 
 test('admin files tab retries the same attachment group after one rejected post', async ({ page }) => {
@@ -1401,23 +1410,29 @@ test('admin files tab retries the same attachment group after one rejected post'
 
   await page.goto('/admin')
   await page.getByRole('tab', { name: '파일 관리' }).click()
-  const input = page.locator('input[type="file"]')
+  await page.getByRole('button', { name: '파일 업로드' }).click()
+  const form = page.locator('form.apple-soft-panel')
+  await form.getByPlaceholder('자료 제목').fill('재시도.pdf')
+  const input = form.getByLabel('파일 선택', { exact: true })
   const selection = [
     { name: '재시도.pdf', mimeType: 'application/pdf', buffer: Buffer.from('pdf') },
     { name: '부록.pdf', mimeType: 'application/pdf', buffer: Buffer.from('appendix') },
   ]
   await expect(input).toBeEnabled()
   await input.setInputFiles(selection)
+  await expect(form.locator('[contenteditable="true"]').first()).toBeVisible()
+  await form.getByRole('button', { name: '등록', exact: true }).click()
   await expect(page.getByText('첨부파일을 확인해주세요.')).toBeVisible()
   await expect(page.getByText('등록된 파일이 없습니다.')).toBeVisible()
-  await expect(input).toHaveJSProperty('value', '')
-  await input.setInputFiles(selection)
+  await expect(form.getByText('2개 파일 선택됨')).toBeVisible()
+  await expect(form.locator('[contenteditable="true"]').first()).toBeVisible()
+  await form.getByRole('button', { name: '등록', exact: true }).click()
   await expect.poll(() => uploads).toEqual([
     { title: '재시도.pdf', filenames: ['재시도.pdf', '부록.pdf'] },
     { title: '재시도.pdf', filenames: ['재시도.pdf', '부록.pdf'] },
   ])
-  await expect(page.getByText('2개 파일이 한 자료에 업로드되었습니다.')).toBeVisible()
-  await expect(page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '재시도.pdf' })).toHaveCount(1)
+  await expect(page.getByText('자료가 등록되었습니다.')).toBeVisible()
+  await expect(page.locator('article').filter({ hasText: '재시도.pdf' })).toHaveCount(1)
 })
 
 test('admin files tab waits for the initial list before accepting an upload', async ({ page }) => {
@@ -1442,14 +1457,20 @@ test('admin files tab waits for the initial list before accepting an upload', as
   await page.getByRole('tab', { name: '파일 관리' }).click()
   await listStarted
   await expect(page.getByRole('button', { name: '파일 업로드' })).toBeDisabled()
-  await expect(page.locator('input[type="file"]')).toBeDisabled()
+  await expect(page.locator('form.apple-soft-panel')).toHaveCount(0)
+  expect(uploads).toEqual([])
 
   releaseList()
-  await expect(page.getByText('기존.pdf')).toBeVisible()
-  await page.locator('input[type="file"]').setInputFiles({ name: '신규.pdf', mimeType: 'application/pdf', buffer: Buffer.from('new') })
+  await expect(page.locator('article').filter({ hasText: '기존.pdf' })).toBeVisible()
+  await page.getByRole('button', { name: '파일 업로드' }).click()
+  const form = page.locator('form.apple-soft-panel')
+  await form.getByPlaceholder('자료 제목').fill('신규.pdf')
+  await form.getByLabel('파일 선택', { exact: true }).setInputFiles({ name: '신규.pdf', mimeType: 'application/pdf', buffer: Buffer.from('new') })
+  await expect(form.locator('[contenteditable="true"]').first()).toBeVisible()
+  await form.getByRole('button', { name: '등록', exact: true }).click()
   await expect.poll(() => uploads).toEqual(['신규.pdf'])
-  await expect(page.getByText('기존.pdf')).toBeVisible()
-  await expect(page.getByText('신규.pdf')).toBeVisible()
+  await expect(page.locator('article').filter({ hasText: '기존.pdf' })).toBeVisible()
+  await expect(page.locator('article').filter({ hasText: '신규.pdf' })).toBeVisible()
 })
 
 test('admin files tab keeps an edited row while an attachment group uploads', async ({ page }) => {
@@ -1479,29 +1500,37 @@ test('admin files tab keeps an edited row while an attachment group uploads', as
 
   await page.goto('/admin')
   await page.getByRole('tab', { name: '파일 관리' }).click()
-  await expect(page.getByText('기존.pdf')).toBeVisible()
-  await page.locator('input[type="file"]').setInputFiles([
+  await expect(page.locator('article').filter({ hasText: '기존.pdf' })).toBeVisible()
+  await page.getByRole('button', { name: '파일 업로드' }).click()
+  const uploadForm = page.locator('form.apple-soft-panel').last()
+  await uploadForm.getByPlaceholder('자료 제목').fill('첫째.pdf')
+  await uploadForm.getByLabel('파일 선택', { exact: true }).setInputFiles([
     { name: '첫째.pdf', mimeType: 'application/pdf', buffer: Buffer.from('first') },
     { name: '둘째.pdf', mimeType: 'application/pdf', buffer: Buffer.from('second') },
   ])
+  await expect(uploadForm.locator('[contenteditable="true"]').first()).toBeVisible()
+  await uploadForm.getByRole('button', { name: '등록', exact: true }).click()
   await uploadStarted
-  await page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '기존.pdf' }).getByRole('button', { name: '수정' }).click()
-  await page.getByPlaceholder('자료 제목').fill('수정된 자료')
-  await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
-  await page.getByRole('button', { name: '수정 저장' }).click()
+  await page.locator('article').filter({ hasText: '기존.pdf' }).getByRole('button', { name: '수정' }).click()
+  const editForm = page.locator('form.apple-soft-panel').first()
+  expect(await editForm.getByRole('radio', { name: '동아리원' }).getAttribute('name'))
+    .not.toBe(await uploadForm.getByRole('radio', { name: '동아리원' }).getAttribute('name'))
+  await editForm.getByPlaceholder('자료 제목').fill('수정된 자료')
+  await expect(editForm.locator('[contenteditable="true"]').first()).toBeVisible()
+  await editForm.getByRole('button', { name: '수정 저장' }).click()
   await expect(page.getByRole('button', { name: '수정 저장' })).toHaveCount(0)
 
   releaseUpload()
-  await expect(page.getByText('2개 파일이 한 자료에 업로드되었습니다.')).toBeVisible()
-  await expect(page.locator('.space-y-2 > .shape-cut-sm')).toHaveCount(2)
-  const editedRow = page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '수정된 자료' })
+  await expect(page.getByText('자료가 등록되었습니다.')).toBeVisible()
+  await expect(page.locator('article')).toHaveCount(2)
+  const editedRow = page.locator('article').filter({ hasText: '수정된 자료' })
   await expect(editedRow).toHaveCount(1)
   await expect(editedRow).toContainText('기존.pdf')
-  const newRow = page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '첫째.pdf' })
+  const newRow = page.locator('article').filter({ hasText: '첫째.pdf' })
   await expect(newRow).toHaveCount(1)
   await expect(newRow).toContainText('둘째.pdf')
   await editedRow.getByRole('button', { name: '수정' }).click()
-  await expect(page.getByPlaceholder('자료 제목')).toHaveValue('수정된 자료')
+  await expect(page.locator('form.apple-soft-panel').getByPlaceholder('자료 제목')).toHaveValue('수정된 자료')
 })
 
 test('archive write form saves remaining selected files as one post without changing its title', async ({ page }) => {
