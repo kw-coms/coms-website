@@ -178,7 +178,7 @@
 		opacity: 1;
 	}
 
-	& :is(button, a, input, textarea, select, summary, [role='tab'], [role='button'], [tabindex]):focus-visible {
+	& :is(button, a, input, textarea, select, summary, [role='tab'], [role='button'], [tabindex]:not([tabindex='-1'])):focus-visible {
 		outline: 2px solid var(--appearance-focus);
 		outline-offset: 2px;
 	}
