@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -43,6 +44,7 @@ class ArchiveVisibilityIntegrationTest {
     @Autowired ArchiveFileRepository files;
     @Autowired MemberRepository members;
     @Autowired JwtTokenProvider tokens;
+    @Autowired JdbcTemplate jdbc;
     private final ObjectMapper json = new ObjectMapper();
 
     private final Map<Member.Role, String> ids = new EnumMap<>(Member.Role.class);
@@ -80,6 +82,30 @@ class ArchiveVisibilityIntegrationTest {
         }
         assertThat(body(get("/api/files/" + publicId), uploaderId).path("uploadedBy").asText())
                 .isEqualTo(ids.get(Member.Role.ADMIN));
+    }
+
+    @Test
+    void guestDetailAndDownloadsDoNotCountViews() throws Exception {
+        assertThat(body(get("/api/files/" + publicId), null).path("viewCount").asLong()).isZero();
+        assertThat(status(get("/api/files/" + publicId + "/download"), null)).isEqualTo(200);
+        Long publicAttachment = archiveService.list(ids.get(Member.Role.ADMIN)).stream()
+                .filter(file -> file.id().equals(publicId)).findFirst().orElseThrow().attachments().get(0).id();
+        assertThat(status(get("/api/files/" + publicId + "/attachments/" + publicAttachment + "/download"), null))
+                .isEqualTo(200);
+        assertThat(jdbc.queryForObject("select view_count from archive_files where id = ?", Long.class, publicId)).isZero();
+    }
+
+    @Test
+    void memberDetailAndEachDownloadIncrementViewsOnce() throws Exception {
+        assertThat(body(get("/api/files/" + publicId), uploaderId).path("viewCount").asLong()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select view_count from archive_files where id = ?", Long.class, publicId)).isEqualTo(1);
+        assertThat(status(get("/api/files/" + publicId + "/download"), uploaderId)).isEqualTo(200);
+        assertThat(jdbc.queryForObject("select view_count from archive_files where id = ?", Long.class, publicId)).isEqualTo(2);
+        Long publicAttachment = archiveService.list(ids.get(Member.Role.ADMIN)).stream()
+                .filter(file -> file.id().equals(publicId)).findFirst().orElseThrow().attachments().get(0).id();
+        assertThat(status(get("/api/files/" + publicId + "/attachments/" + publicAttachment + "/download"), uploaderId))
+                .isEqualTo(200);
+        assertThat(jdbc.queryForObject("select view_count from archive_files where id = ?", Long.class, publicId)).isEqualTo(3);
     }
 
     @Test

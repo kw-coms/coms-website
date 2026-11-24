@@ -34,7 +34,7 @@ public interface ArchiveFileRepository extends JpaRepository<ArchiveFile, Long> 
     @Query("select a from ArchiveFile a where a.id = :id")
     Optional<ArchiveFile> findByIdForUpdate(@Param("id") Long id);
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE ArchiveFile a SET a.viewCount = a.viewCount + 1 WHERE a.id = :id")
     int incrementViewCount(@Param("id") Long id);
 }

@@ -74,7 +74,7 @@ class ArchiveControllerTest {
         assertThat(response.getHeaders().getCacheControl()).contains("no-store", "private");
         assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).contains("attachment", "second.pdf");
         assertThat(response.getBody()).isNotNull();
-        org.mockito.Mockito.verify(archiveService).incrementView(1L);
+        org.mockito.Mockito.verify(archiveService).incrementView(1L, "2026123456");
     }
 
     @Test

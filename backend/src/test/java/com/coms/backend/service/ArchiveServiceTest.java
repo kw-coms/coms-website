@@ -310,7 +310,7 @@ class ArchiveServiceTest {
     }
 
     @Test
-    void detailChecksVisibilityUnderWriteLockBeforeUpdatingViewCount() {
+    void detailChecksVisibilityWithoutLockingOrUpdatingHiddenFiles() {
         ArchiveFileRepository files = mock(ArchiveFileRepository.class);
         MemberRepository members = mock(MemberRepository.class);
         Member viewer = new Member();
@@ -320,7 +320,7 @@ class ArchiveServiceTest {
         privateFile.setUploadedBy("another-member");
         privateFile.setVisibility(ArchiveFile.Visibility.SELECTED);
         when(members.findByStudentId(viewer.getStudentId())).thenReturn(Optional.of(viewer));
-        when(files.findByIdForUpdate(88L)).thenReturn(Optional.of(privateFile));
+        when(files.findById(88L)).thenReturn(Optional.of(privateFile));
         ArchiveService service = new ArchiveService(files, mock(ArchiveAttachmentRepository.class),
                 mock(StorageService.class), members, mock(ArchiveFileVoteRepository.class),
                 mock(RichContentSanitizer.class), mock(AuditLogService.class),
@@ -329,7 +329,9 @@ class ArchiveServiceTest {
         assertThatThrownBy(() -> service.getAndIncrementView(88L, viewer.getStudentId()))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         ex -> assertThat(ex.getStatusCode().value()).isEqualTo(404));
-        verify(files).findByIdForUpdate(88L);
+        verify(files).findById(88L);
+        verify(files, org.mockito.Mockito.never()).findByIdForUpdate(any());
+        verify(files, org.mockito.Mockito.never()).incrementViewCount(any());
         verify(files, org.mockito.Mockito.never()).save(any());
     }
 

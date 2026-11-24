@@ -317,17 +317,19 @@ public class ArchiveService {
 
     public ArchiveFileResponse getAndIncrementView(Long id, String studentId) {
         Member viewer = member(studentId);
-        ArchiveFile file = repo.findByIdForUpdate(id)
+        ArchiveFile file = repo.findById(id)
                 .filter(row -> row.isVisibleTo(viewer))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        file.incrementViewCount();
-        ArchiveFile saved = repo.save(file);
-        return toResponse(saved, voteStats(List.of(saved)), studentId);
+        if (viewer != null) {
+            repo.incrementViewCount(id);
+            file = get(id, studentId);
+        }
+        return toResponse(file, voteStats(List.of(file)), studentId);
     }
 
-    public void incrementView(Long id) {
+    public void incrementView(Long id, String studentId) {
         // Atomic increment avoids the lost-update race of read-then-save under concurrent views.
-        repo.incrementViewCount(id);
+        if (studentId != null) repo.incrementViewCount(id);
     }
 
     @Transactional(readOnly = true)

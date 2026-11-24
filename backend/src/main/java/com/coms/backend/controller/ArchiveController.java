@@ -135,7 +135,7 @@ public class ArchiveController {
     @GetMapping("/{id}/download")
     public ResponseEntity<Resource> download(@PathVariable Long id, Authentication authentication) {
         ArchiveFile file = archiveService.get(id, studentId(authentication));
-        archiveService.incrementView(id);
+        archiveService.incrementView(id, studentId(authentication));
         Resource resource = storageService.load(file.getStoredName());
         ContentDisposition disposition = ContentDisposition.attachment()
                 .filename(file.getOriginalName(), StandardCharsets.UTF_8)
@@ -152,7 +152,7 @@ public class ArchiveController {
     public ResponseEntity<Resource> downloadAttachment(@PathVariable Long id, @PathVariable Long attachmentId,
                                                        Authentication authentication) {
         ArchiveAttachment attachment = archiveService.getAttachment(id, attachmentId, studentId(authentication));
-        archiveService.incrementView(id);
+        archiveService.incrementView(id, studentId(authentication));
         Resource resource = storageService.load(attachment.getStoredName());
         ContentDisposition disposition = ContentDisposition.attachment()
                 .filename(attachment.getOriginalName(), StandardCharsets.UTF_8)
