@@ -41,7 +41,7 @@ public class StudyAccessService {
         if (studentId == null) return false;
         StudyGroup group = requireGroup(groupId);
         Member actor = requireMember(studentId);
-        boolean leader = group.getLeaderStudentId().equals(studentId) && actor.getRole().isAtLeast(Member.Role.USER);
+        boolean leader = studentId.equals(group.getLeaderStudentId()) && actor.getRole().isAtLeast(Member.Role.USER);
         return leader || permissions.has(actor, Permission.ACTIVITY_WRITE);
     }
 

@@ -18,6 +18,30 @@ class StudyMigrationsTest {
     @TempDir Path migrations;
 
     @Test
+    void nullableLeaderMigrationClearsDeletedLeaderMarkersButPreservesRealLeaders() throws Exception {
+        try (var connection = DriverManager.getConnection("jdbc:h2:mem:study-leader;MODE=PostgreSQL", "sa", "");
+             var sql = connection.createStatement()) {
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration/V129__study_groups.sql"));
+            sql.execute("""
+                    INSERT INTO study_groups (id,name,leader_student_id,term,status,created_by) VALUES
+                      (1,'Vacant','removed','2026 2학기','ENDED','removed'),
+                      (2,'Occupied','removed','2026 2학기','ENDED','removed'),
+                      (3,'Active','other','2026 2학기','ACTIVE','other')
+                    """);
+            sql.execute("INSERT INTO study_group_members (group_id,student_id,role,status) VALUES (2,'removed','LEADER','APPROVED')");
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration/V132__study_group_leader_nullable.sql"));
+            try (var rows = sql.executeQuery("SELECT leader_student_id FROM study_groups ORDER BY id")) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getString(1)).isNull();
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getString(1)).isEqualTo("removed");
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getString(1)).isEqualTo("other");
+            }
+        }
+    }
+
+    @Test
     void studyMigrationsUpgradeLegacyAttendanceAndArchiveWithoutChangingTheirRows() throws Exception {
         String url = "jdbc:h2:mem:study-migrations;MODE=PostgreSQL;DB_CLOSE_DELAY=-1";
         try (var connection = DriverManager.getConnection(url, "sa", ""); var sql = connection.createStatement()) {

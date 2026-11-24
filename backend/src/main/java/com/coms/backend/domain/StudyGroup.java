@@ -11,7 +11,7 @@ public class StudyGroup {
     @Column(nullable = false, length = 120) private String name;
     @Column(columnDefinition = "TEXT") private String description;
     @Column(name = "topic_tags", length = 500) private String topicTags;
-    @Column(name = "leader_student_id", nullable = false, length = 50) private String leaderStudentId;
+    @Column(name = "leader_student_id", length = 50) private String leaderStudentId;
     @Column(nullable = false, length = 40) private String term;
     @Column(name = "schedule_text", length = 200) private String schedule;
     @Column(length = 200) private String place;

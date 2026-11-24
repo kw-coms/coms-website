@@ -50,8 +50,8 @@ public class StudyGroupService {
         List<StudyGroup> visible = groups.findAllByOrderByCreatedAtDescIdDesc().stream()
                 .filter(g -> signedIn || g.getStatus() == StudyGroup.Status.RECRUITING || g.getStatus() == StudyGroup.Status.ACTIVE)
                 .toList();
-        Map<String, String> names = names(visible.stream().map(StudyGroup::getLeaderStudentId).toList());
-        List<Card> result = visible.stream().map(g -> card(g, names.get(g.getLeaderStudentId()), signedIn)).toList();
+        Map<String, String> names = names(visible.stream().map(StudyGroup::getLeaderStudentId).filter(Objects::nonNull).toList());
+        List<Card> result = visible.stream().map(g -> card(g, names, signedIn)).toList();
         if (!signedIn || !"interest".equals(sort)) return result;
         return result.stream().sorted(Comparator.comparingLong((Card c) -> c.interestCount() == null ? 0 : c.interestCount()).reversed().thenComparing(Card::id)).toList();
     }
@@ -64,7 +64,8 @@ public class StudyGroupService {
         StudyInterest own = interests.findByGroupIdAndStudentId(id, actorId).orElse(null);
         InterestSummary summary = interestSummary(id, manager);
         return new View(group.getId(), group.getName(), group.getDescription(), tags(group.getTopicTags()),
-                group.getLeaderStudentId(), name(group.getLeaderStudentId()), group.getTerm(), group.getSchedule(), group.getPlace(),
+                group.getLeaderStudentId(), group.getLeaderStudentId() == null ? "리더 없음" : name(group.getLeaderStudentId()),
+                group.getTerm(), group.getSchedule(), group.getPlace(),
                 group.getCapacity(), group.getStatus(), group.getCreatedBy(), group.getCreatedAt(), group.getUpdatedAt(),
                 summary.total(), summary, membership == null ? null : memberView(membership, name(actorId)),
                 own == null ? null : new InterestOwn(slots(own.getPreferredSlots()), own.getLevel()), manager);
@@ -137,9 +138,11 @@ public class StudyGroupService {
         Member next = members.findByStudentId(newLeaderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "리더로 지정할 회원을 찾을 수 없습니다."));
         requireFullMember(next);
-        if (group.getStatus() == StudyGroup.Status.ENDED) throw conflict("종료된 스터디입니다.");
-        if (group.getLeaderStudentId().equals(newLeaderId)) return view(id, actorId);
-        StudyGroupMember old = memberships.findByGroupIdAndStudentId(id, group.getLeaderStudentId()).orElseThrow(() -> conflict("기존 리더 정보가 없습니다."));
+        String previousLeaderId = group.getLeaderStudentId();
+        if (group.getStatus() == StudyGroup.Status.ENDED && previousLeaderId != null) throw conflict("종료된 스터디입니다.");
+        if (newLeaderId.equals(previousLeaderId)) return view(id, actorId);
+        StudyGroupMember old = previousLeaderId == null ? null : memberships.findByGroupIdAndStudentId(id, previousLeaderId)
+                .orElseThrow(() -> conflict("기존 리더 정보가 없습니다."));
         StudyGroupMember candidate = memberships.findByGroupIdAndStudentId(id, newLeaderId).orElse(null);
         if (candidate == null) {
             checkCapacity(group);
@@ -152,8 +155,7 @@ public class StudyGroupService {
         if (candidate.getStatus() != StudyGroupMember.Status.APPROVED) candidate.setJoinedAt(LocalDateTime.now(clock));
         candidate.setStatus(StudyGroupMember.Status.APPROVED);
         candidate.setRole(StudyGroupMember.Role.LEADER);
-        old.setRole(StudyGroupMember.Role.MEMBER);
-        memberships.save(old);
+        if (old != null) old.setRole(StudyGroupMember.Role.MEMBER);
         memberships.save(candidate);
         group.setLeaderStudentId(newLeaderId);
         groups.saveAndFlush(group);
@@ -178,7 +180,7 @@ public class StudyGroupService {
 
     public void leave(Long id, String actorId) {
         StudyGroup group = groups.findByIdForUpdate(id).orElseThrow(() -> notFound());
-        if (group.getLeaderStudentId().equals(actorId)) throw conflict("리더를 교체한 뒤 탈퇴할 수 있습니다.");
+        if (actorId.equals(group.getLeaderStudentId())) throw conflict("리더를 교체한 뒤 탈퇴할 수 있습니다.");
         StudyGroupMember row = memberships.findByGroupIdAndStudentId(id, actorId).orElseThrow(() -> notFound());
         memberships.delete(row);
     }
@@ -215,7 +217,7 @@ public class StudyGroupService {
     public void removeMember(Long id, String studentId, String actorId) {
         StudyGroup group = groups.findByIdForUpdate(id).orElseThrow(() -> notFound());
         access.requireManager(id, actorId);
-        if (group.getLeaderStudentId().equals(studentId)) throw conflict("리더를 교체한 뒤 제거할 수 있습니다.");
+        if (studentId.equals(group.getLeaderStudentId())) throw conflict("리더를 교체한 뒤 제거할 수 있습니다.");
         memberships.findByGroupIdAndStudentId(id, studentId).ifPresent(memberships::delete);
     }
 
@@ -267,7 +269,7 @@ public class StudyGroupService {
         interests.deleteByStudentId(studentId);
         memberships.deleteByStudentId(studentId);
         for (StudyGroup group : groups.findByLeaderStudentId(studentId)) {
-            group.setLeaderStudentId("removed");
+            group.setLeaderStudentId(null);
             group.setStatus(StudyGroup.Status.ENDED);
         }
         for (StudyGroup group : groups.findByCreatedBy(studentId)) group.setCreatedBy("removed");
@@ -287,7 +289,9 @@ public class StudyGroupService {
         return new InterestSummary(rows.size(), slotCounts, levelCounts, names);
     }
 
-    private Card card(StudyGroup group, String leaderName, boolean signedIn) {
+    private Card card(StudyGroup group, Map<String, String> leaderNames, boolean signedIn) {
+        String leaderId = group.getLeaderStudentId();
+        String leaderName = leaderId == null ? "리더 없음" : leaderNames.getOrDefault(leaderId, "탈퇴한 회원");
         return new Card(group.getId(), group.getName(), tags(group.getTopicTags()), group.getSchedule(),
                 leaderName, group.getStatus(), signedIn ? interests.countByGroupId(group.getId()) : null);
     }

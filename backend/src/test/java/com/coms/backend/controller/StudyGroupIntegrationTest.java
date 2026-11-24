@@ -226,12 +226,28 @@ class StudyGroupIntegrationTest {
 
     @Test void deletedLeaderLosesMembershipAndGroupIsEnded() throws Exception {
         long id = propose();
+        save("removed", Member.Role.USER);
         studies.deleteDataForMember(LEADER);
         StudyGroup group = groups.findById(id).orElseThrow();
-        assertThat(group.getLeaderStudentId()).isEqualTo("removed");
+        assertThat(group.getLeaderStudentId()).isNull();
         assertThat(group.getStatus()).isEqualTo(StudyGroup.Status.ENDED);
+        assertThat(memberships.findByGroupIdAndStudentId(id, LEADER)).isEmpty();
         mvc.perform(get("/api/study-groups/{id}/members", id).cookie(cookie(LEADER)))
                 .andExpect(status().isForbidden());
+        mvc.perform(get("/api/study-groups/{id}", id).cookie(cookie("removed")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.leaderStudentId").value(nullValue()))
+                .andExpect(jsonPath("$.leaderName").value("리더 없음")).andExpect(jsonPath("$.manager").value(false));
+        mvc.perform(get("/api/study-groups").cookie(cookie(MANAGER)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].leaderName").value("리더 없음"));
+        mvc.perform(put("/api/study-groups/{id}/leader", id).cookie(cookie(LEADER)).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"studentId\":\"" + MEMBER + "\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(put("/api/study-groups/{id}/leader", id).cookie(cookie(MANAGER)).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"studentId\":\"" + MEMBER + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.leaderStudentId").value(MEMBER))
+                .andExpect(jsonPath("$.status").value("ENDED"));
+        assertThat(memberships.findByGroupIdAndStudentId(id, MEMBER).orElseThrow().getRole())
+                .isEqualTo(StudyGroupMember.Role.LEADER);
     }
 
     @Test void appointingPendingLeaderStartsAttendanceEligibilityAtApproval() throws Exception {

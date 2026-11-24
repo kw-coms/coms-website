@@ -52,7 +52,10 @@ A rate includes past and current rounds tracked since a member was approved. Pre
 | `V129__study_groups.sql` | Groups, membership and demand responses. |
 | `V130__study_sessions_attendance.sql` | Study rounds and attendance linkage, status and source. Existing records default to `PRESENT` and `CODE`. |
 | `V131__study_archive_materials.sql` | Group and optional round links on archive files. Group files use `GROUP` visibility. |
+| `V132__study_group_leader_nullable.sql` | Allows vacant leadership and clears legacy deleted-leader markers. |
 
 Study notifications use the existing notification service and link to the group. Join requests notify the leader, approvals notify the applicant, and opened attendance notifies approved members.
+
+Deleting a leader's account ends their group and clears its leader. An activity manager can fill a vacant position without changing the group's status.
 
 The generated API contract is in `backend/openapi.json`.

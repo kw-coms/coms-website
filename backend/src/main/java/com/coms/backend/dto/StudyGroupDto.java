@@ -34,7 +34,8 @@ public final class StudyGroupDto {
                                   Map<String, Long> levels, List<InterestName> names) {}
     @Schema(name = "StudyGroupView")
     public record View(Long id, String name, String description, List<String> topicTags,
-                       String leaderStudentId, String leaderName, String term, String schedule, String place,
+                       @Schema(types = {"string", "null"}) String leaderStudentId, String leaderName,
+                       String term, String schedule, String place,
                        Integer capacity, StudyGroup.Status status, String createdBy,
                        LocalDateTime createdAt, LocalDateTime updatedAt, long interestCount,
                        InterestSummary interestSummary, MemberView myMembership,
