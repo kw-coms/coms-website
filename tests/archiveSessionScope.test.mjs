@@ -28,7 +28,11 @@ await complete(pending.shift(), [file('첫 계정 비공개 자료')])
 assert.match(host.textContent, /첫 계정 비공개 자료/)
 await render(null)
 assert.doesNotMatch(host.textContent, /첫 계정 비공개 자료/, 'logout removes private metadata before the public request completes')
-await complete(pending.shift(), [])
+await complete(pending.shift(), [{ ...file('공개 자료'), uploadedBy: null, uploaderName: '공개 작성자', visibility: 'PUBLIC' }])
+assert.match(host.textContent, /공개 자료/)
+assert.match(host.textContent, /공개 작성자/)
+assert.equal([...host.querySelectorAll('button')].some(button => /수정|삭제/.test(button.textContent)), false,
+  'guest rendering with a redacted uploader keeps edit and delete controls hidden')
 
 await render(member('first'))
 const stale = pending.shift()

@@ -497,7 +497,7 @@ public class ArchiveService {
                 file.getOriginalName(),
                 file.getMimeType(),
                 file.getFileSize(),
-                file.getUploadedBy(),
+                studentId == null ? null : file.getUploadedBy(),
                 file.getUploaderName(),
                 file.getCategory().name(),
                 file.getVisibility().name(),

@@ -70,6 +70,19 @@ class ArchiveVisibilityIntegrationTest {
     }
 
     @Test
+    void guestListAndDetailHideUploaderStudentIdButKeepDisplayName() throws Exception {
+        JsonNode guestList = body(get("/api/files"), null);
+        assertThat(guestList.size()).isEqualTo(1);
+        JsonNode guestDetail = body(get("/api/files/" + publicId), null);
+        for (JsonNode file : List.of(guestList.get(0), guestDetail)) {
+            assertThat(file.path("uploadedBy").isNull()).isTrue();
+            assertThat(file.path("uploaderName").asText()).isEqualTo("Member " + ids.get(Member.Role.ADMIN));
+        }
+        assertThat(body(get("/api/files/" + publicId), uploaderId).path("uploadedBy").asText())
+                .isEqualTo(ids.get(Member.Role.ADMIN));
+    }
+
+    @Test
     void everyArchiveReadUsesTheSameVisibilityMatrix() throws Exception {
         record Viewer(String id, Set<ArchiveFile.Visibility> visible) {}
         List<Viewer> viewers = List.of(
