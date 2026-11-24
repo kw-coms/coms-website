@@ -7,12 +7,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 public interface EligibleMemberRepository extends JpaRepository<EligibleMember, Long> {
     List<EligibleMember> findAllByOrderByStudentIdAscNameAsc();
     Optional<EligibleMember> findByStudentId(String studentId);
+    List<EligibleMember> findByStudentIdIn(Collection<String> studentIds);
     Optional<EligibleMember> findByNameAndPhone(String name, String phone);
 
     /** 존재만 본다. 같은 (이름, 전화번호) 행이 둘 이상이어도 터지지 않는다 —

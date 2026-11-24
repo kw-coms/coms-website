@@ -285,18 +285,7 @@ public class NotificationService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown studentId");
         }
 
-        Notification notification = build(
-                recipientStudentId,
-                null,
-                Notification.Type.EXTERNAL_INVITE,
-                null,
-                null,
-                null,
-                message
-        );
-        notification.setActorLabel(actorLabel);
-        notification.setAcceptUrl(safeAcceptUrl);
-        Notification saved = notificationRepository.save(notification);
+        Notification saved = saveExternalInvite(recipientStudentId, actorLabel, message, safeAcceptUrl);
 
         if (sendEmail) {
             Optional<String> email = memberRepository.findByStudentId(recipientStudentId)
@@ -317,6 +306,14 @@ public class NotificationService {
             }
         }
         return saved;
+    }
+
+    private Notification saveExternalInvite(String recipientStudentId, String actorLabel, String message, String safeAcceptUrl) {
+        Notification notification = build(recipientStudentId, null, Notification.Type.EXTERNAL_INVITE,
+                null, null, null, message);
+        notification.setActorLabel(actorLabel);
+        notification.setAcceptUrl(safeAcceptUrl);
+        return notificationRepository.save(notification);
     }
 
     // Trust model: the non-allowlist path is reachable only via the HMAC-authenticated
@@ -449,21 +446,23 @@ public class NotificationService {
             normalizedRecipients.add(trimmed);
         }
 
+        Set<String> knownRecipients = memberRepository.findByStudentIdIn(normalizedRecipients).stream()
+                .map(Member::getStudentId).collect(Collectors.toSet());
+        eligibleMemberRepository.findByStudentIdIn(normalizedRecipients).forEach(member -> knownRecipients.add(member.getStudentId()));
+        Map<String, NotificationPreference> preferences = preferencesByStudentId(normalizedRecipients);
         List<String> unknown = new ArrayList<>();
         int accepted = 0;
         for (String recipient : normalizedRecipients) {
-            boolean known = memberRepository.existsByStudentId(recipient)
-                    || eligibleMemberRepository.findByStudentId(recipient).isPresent();
-            if (!known) {
+            if (!knownRecipients.contains(recipient)) {
                 unknown.add(recipient);
                 continue;
             }
-            if (!isCategoryEnabled(recipient, Notification.Type.EXTERNAL_INVITE)) {
+            if (!isCategoryEnabled(preferences, recipient, Notification.Type.EXTERNAL_INVITE)) {
                 rejected += 1;
                 continue;
             }
             try {
-                Notification saved = notifyExternalInvite(recipient, label, request.getMessage(), safeAcceptUrl, false);
+                Notification saved = saveExternalInvite(recipient, label, request.getMessage(), safeAcceptUrl);
                 saved.setActorStudentId(senderStudentId);
                 accepted += 1;
             } catch (ResponseStatusException ex) {
