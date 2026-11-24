@@ -6,7 +6,6 @@ import com.coms.backend.dto.NotificationPreferencesResponse;
 import com.coms.backend.dto.NotificationResponse;
 import com.coms.backend.dto.NotificationSummaryResponse;
 import com.coms.backend.service.NotificationService;
-import com.coms.backend.service.NotificationService.ExternalInviteBatchResult;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,10 +14,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/notifications")
 public class NotificationController {
+    private static final Map<String, Boolean> INVITE_ACCEPTED = Map.of("accepted", true);
     private final NotificationService notificationService;
 
     public NotificationController(NotificationService notificationService) {
@@ -58,13 +59,13 @@ public class NotificationController {
     }
 
     @PostMapping("/external-invite")
-    public ResponseEntity<ExternalInviteBatchResult> sendExternalInvite(Authentication authentication,
+    public ResponseEntity<Map<String, Boolean>> sendExternalInvite(Authentication authentication,
                                                                   @RequestHeader(value = "X-Requested-With", required = false) String requestedWith,
                                                                   @Valid @RequestBody MemberExternalInviteRequest request) {
         if (requestedWith == null || !"XMLHttpRequest".equalsIgnoreCase(requestedWith)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        ExternalInviteBatchResult result = notificationService.notifyExternalInviteFromMember(authentication.getName(), request);
-        return ResponseEntity.ok(result);
+        notificationService.notifyExternalInviteFromMember(authentication.getName(), request);
+        return ResponseEntity.ok(INVITE_ACCEPTED);
     }
 }

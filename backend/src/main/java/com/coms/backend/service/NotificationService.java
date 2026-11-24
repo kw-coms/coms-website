@@ -71,6 +71,7 @@ public class NotificationService {
     private final Clock clock;
     private final Set<String> acceptUrlAllowedHosts;
     private final Map<String, Deque<LocalDateTime>> inviteAttemptsBySender = new ConcurrentHashMap<>();
+    private final Map<String, Deque<LocalDateTime>> externalInviteAttemptsBySender = new ConcurrentHashMap<>();
 
     public NotificationService(NotificationRepository notificationRepository,
                                NotificationPreferenceRepository notificationPreferenceRepository,
@@ -356,20 +357,35 @@ public class NotificationService {
         }
     }
 
-    private void enforceExternalInviteRateLimit(String senderStudentId) {
+    private boolean canDeliverExternalInvites(String senderStudentId) {
         LocalDateTime now = LocalDateTime.now(clock);
         long perMinute = notificationRepository.countByActorStudentIdAndTypeAndCreatedAtAfter(
                 senderStudentId, Notification.Type.EXTERNAL_INVITE, now.minusMinutes(1));
-        if (perMinute >= MAX_EXTERNAL_INVITES_PER_MINUTE) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
-                    "초대 알림은 1분에 최대 " + MAX_EXTERNAL_INVITES_PER_MINUTE + "건까지 보낼 수 있습니다.");
-        }
         long perDay = notificationRepository.countByActorStudentIdAndTypeAndCreatedAtAfter(
                 senderStudentId, Notification.Type.EXTERNAL_INVITE, now.minusDays(1));
-        if (perDay >= MAX_EXTERNAL_INVITES_PER_DAY) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
-                    "초대 알림은 하루 최대 " + MAX_EXTERNAL_INVITES_PER_DAY + "건까지 보낼 수 있습니다.");
-        }
+        return perMinute < MAX_EXTERNAL_INVITES_PER_MINUTE && perDay < MAX_EXTERNAL_INVITES_PER_DAY;
+    }
+
+    // Rate-limit attempts so a 429 cannot reveal whether earlier recipients existed.
+    private void enforceExternalInviteAttemptRateLimit(String senderStudentId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime dayCutoff = now.minusDays(1);
+        LocalDateTime minuteCutoff = now.minusMinutes(1);
+        externalInviteAttemptsBySender.compute(senderStudentId, (ignored, recorded) -> {
+            Deque<LocalDateTime> attempts = recorded == null ? new ArrayDeque<>() : recorded;
+            while (!attempts.isEmpty() && attempts.peekFirst().isBefore(dayCutoff)) {
+                attempts.removeFirst();
+            }
+            if (attempts.stream().filter(attempt -> !attempt.isBefore(minuteCutoff)).count()
+                    >= MAX_EXTERNAL_INVITES_PER_MINUTE || attempts.size() >= MAX_EXTERNAL_INVITES_PER_DAY) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "초대 요청이 많습니다. 잠시 후 다시 시도해주세요.");
+            }
+            attempts.addLast(now);
+            return attempts;
+        });
+        externalInviteAttemptsBySender.forEach((key, ignored) -> externalInviteAttemptsBySender.computeIfPresent(
+                key, (id, attempts) -> attempts.peekLast().isBefore(dayCutoff) ? null : attempts));
     }
 
     // Per-sender sliding window, mirroring RecruitApplicationService.enforceRateLimit: caps how
@@ -399,6 +415,7 @@ public class NotificationService {
     // inherit each other's batch counts against the shared singleton service.
     void resetInviteRateLimiter() {
         inviteAttemptsBySender.clear();
+        externalInviteAttemptsBySender.clear();
     }
 
     private void evictExpiredInviteSenders(LocalDateTime cutoff) {
@@ -422,7 +439,8 @@ public class NotificationService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
 
         enforceInviteBatchRateLimit(senderStudentId);
-        enforceExternalInviteRateLimit(senderStudentId);
+        enforceExternalInviteAttemptRateLimit(senderStudentId);
+        boolean deliveryAllowed = canDeliverExternalInvites(senderStudentId);
 
         if (request.getRecipientStudentIds() != null
                 && request.getRecipientStudentIds().size() > MAX_INVITE_RECIPIENTS_PER_BATCH) {
@@ -453,6 +471,10 @@ public class NotificationService {
         Map<String, NotificationPreference> preferences = preferencesByStudentId(normalizedRecipients);
         int accepted = 0;
         for (String recipient : normalizedRecipients) {
+            if (!deliveryAllowed) {
+                rejected += 1;
+                continue;
+            }
             if (!knownRecipients.contains(recipient)) {
                 rejected += 1;
                 continue;
@@ -469,6 +491,7 @@ public class NotificationService {
                 rejected += 1;
             }
         }
+        log.info("External invite batch processed: accepted={}, undelivered={}", accepted, rejected);
         return new ExternalInviteBatchResult(accepted, rejected);
     }
 

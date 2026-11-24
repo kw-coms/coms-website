@@ -200,6 +200,19 @@ class NotificationServiceMemberInviteTest {
     }
 
     @Test
+    void unknownRecipientRequestsReachTheSamePerMinuteRateLimit() {
+        for (int i = 0; i < 10; i++) {
+            notificationService.notifyExternalInviteFromMember(sender.getStudentId(),
+                    request(List.of("9999999999"), "팀메이트", "팀플 " + i, null));
+        }
+
+        assertThatThrownBy(() -> notificationService.notifyExternalInviteFromMember(sender.getStudentId(),
+                request(List.of("9999999999"), "팀메이트", "한 건 더", null)))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+    }
+
+    @Test
     void defaultsActorLabelToSenderName() {
         MemberExternalInviteRequest req = request(
                 List.of(recipient.getStudentId()),
