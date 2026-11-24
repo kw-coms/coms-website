@@ -117,13 +117,14 @@ jobs:
           fc-match :lang=ko
           # A stalled apt mirror once hung this step until the 30-minute job timeout. Bound each attempt and retry.
           for attempt in 1 2 3; do
-            timeout -k 10 300 npx playwright install --with-deps chromium && break
+            timeout -k 10 240 npx playwright install --with-deps chromium && break
             [ "$attempt" = 3 ] && exit 1
             echo "::warning::playwright install attempt $attempt timed out or failed; retrying"
             # A killed attempt can leave apt/dpkg holding the lock or half-configured, which made every retry exit 100.
             sudo pkill -9 -x apt-get || true
             sudo pkill -9 -x dpkg || true
-            sudo dpkg --configure -a || true
+            sudo pkill -9 -f /usr/lib/apt/methods/ || true
+            sudo env DEBIAN_FRONTEND=noninteractive timeout 60 dpkg --force-confold --configure -a || true
             sleep 10
           done
           fc-match :lang=ko
@@ -515,13 +516,14 @@ jobs:
           fi
           # A stalled apt mirror once hung this step until the 30-minute job timeout. Bound each attempt and retry.
           for attempt in 1 2 3; do
-            timeout -k 10 300 npx playwright install --with-deps chromium && break
+            timeout -k 10 240 npx playwright install --with-deps chromium && break
             [ "$attempt" = 3 ] && exit 1
             echo "::warning::playwright install attempt $attempt timed out or failed; retrying"
             # A killed attempt can leave apt/dpkg holding the lock or half-configured, which made every retry exit 100.
             sudo pkill -9 -x apt-get || true
             sudo pkill -9 -x dpkg || true
-            sudo dpkg --configure -a || true
+            sudo pkill -9 -f /usr/lib/apt/methods/ || true
+            sudo env DEBIAN_FRONTEND=noninteractive timeout 60 dpkg --force-confold --configure -a || true
             sleep 10
           done
 
@@ -631,13 +633,14 @@ jobs:
           fi
           # A stalled apt mirror once hung this step until the 30-minute job timeout. Bound each attempt and retry.
           for attempt in 1 2 3; do
-            timeout -k 10 300 npx playwright install --with-deps chromium && break
+            timeout -k 10 240 npx playwright install --with-deps chromium && break
             [ "$attempt" = 3 ] && exit 1
             echo "::warning::playwright install attempt $attempt timed out or failed; retrying"
             # A killed attempt can leave apt/dpkg holding the lock or half-configured, which made every retry exit 100.
             sudo pkill -9 -x apt-get || true
             sudo pkill -9 -x dpkg || true
-            sudo dpkg --configure -a || true
+            sudo pkill -9 -f /usr/lib/apt/methods/ || true
+            sudo env DEBIAN_FRONTEND=noninteractive timeout 60 dpkg --force-confold --configure -a || true
             sleep 10
           done
 
