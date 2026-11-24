@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 public record NoticeResponse(
         Long id,
+        long version,
         String title,
         String content,
         String author,

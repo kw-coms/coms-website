@@ -9,16 +9,23 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.LocalDateTime;
 
 @Entity
+@DynamicUpdate // A concurrent atomic view increment must survive an editorial write.
 @Table(name = "notices")
 public class Notice {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     @Column(nullable = false)
     private String title;
@@ -64,6 +71,7 @@ public class Notice {
     }
 
     public Long getId() { return id; }
+    public long getVersion() { return version; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getContent() { return content; }
