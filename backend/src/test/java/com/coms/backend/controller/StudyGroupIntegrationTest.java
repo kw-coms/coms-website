@@ -122,9 +122,11 @@ class StudyGroupIntegrationTest {
 
     @Test void capacityAndApprovalProtectMembership() throws Exception {
         long id = propose();
+        String otherApplicant = "2026112406";
+        save(otherApplicant, Member.Role.USER);
         mvc.perform(post("/api/study-groups/{id}/approve", id).cookie(cookie(MANAGER)).header("Origin", ORIGIN))
                 .andExpect(status().isOk());
-        mvc.perform(post("/api/study-groups/{id}/join", id).cookie(cookie(ASSOCIATE)).header("Origin", ORIGIN))
+        mvc.perform(post("/api/study-groups/{id}/join", id).cookie(cookie(otherApplicant)).header("Origin", ORIGIN))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PENDING"));
         mvc.perform(post("/api/study-groups/{id}/join", id).cookie(cookie(MEMBER)).header("Origin", ORIGIN))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PENDING"));
@@ -205,6 +207,21 @@ class StudyGroupIntegrationTest {
                 .andExpect(status().isForbidden());
         mvc.perform(post("/api/study-groups/{id}/end", id).cookie(cookie(MANAGER)).header("Origin", ORIGIN))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ENDED"));
+    }
+
+    @Test void associatesCanViewAndExpressInterestButOnlyFullMembersCanApply() throws Exception {
+        long id = propose();
+        mvc.perform(post("/api/study-groups/{id}/approve", id).cookie(cookie(MANAGER)).header("Origin", ORIGIN))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/study-groups/{id}", id).cookie(cookie(ASSOCIATE))).andExpect(status().isOk());
+        mvc.perform(put("/api/study-groups/{id}/interest", id).cookie(cookie(ASSOCIATE)).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"slots\":[\"MON_MORNING\"]}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/study-groups/{id}/join", id).cookie(cookie(ASSOCIATE)).header("Origin", ORIGIN))
+                .andExpect(status().isForbidden());
+        assertThat(memberships.findByGroupIdAndStudentId(id, ASSOCIATE)).isEmpty();
+        mvc.perform(post("/api/study-groups/{id}/join", id).cookie(cookie(MEMBER)).header("Origin", ORIGIN))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PENDING"));
     }
 
     @Test void deletedLeaderLosesMembershipAndGroupIsEnded() throws Exception {

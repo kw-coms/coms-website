@@ -163,6 +163,7 @@ public class StudyGroupService {
     public MemberView join(Long id, String actorId) {
         StudyGroup group = groups.findByIdForUpdate(id).orElseThrow(() -> notFound());
         Member actor = access.requireMember(actorId);
+        requireFullMember(actor);
         if (group.getStatus() != StudyGroup.Status.RECRUITING && group.getStatus() != StudyGroup.Status.ACTIVE)
             throw conflict("현재 가입 신청을 받지 않습니다.");
         if (memberships.findByGroupIdAndStudentId(id, actorId).isPresent()) throw conflict("이미 가입하거나 신청한 스터디입니다.");
@@ -333,7 +334,7 @@ public class StudyGroupService {
     }
 
     private static void requireFullMember(Member actor) {
-        if (!actor.getRole().isAtLeast(Member.Role.USER)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "정회원부터 스터디를 제안하거나 리더를 맡을 수 있습니다.");
+        if (!actor.getRole().isAtLeast(Member.Role.USER)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "정회원부터 스터디에 가입하거나 스터디를 제안하고 리더를 맡을 수 있습니다.");
     }
 
     private String name(String studentId) { return members.findByStudentId(studentId).map(Member::getName).orElse("탈퇴한 회원"); }

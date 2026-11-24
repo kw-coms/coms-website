@@ -67,8 +67,9 @@ function InterestPanel({ group, refresh }: { group: GroupView; refresh: () => vo
 }
 
 function IntroTab({ group, refresh }: { group: GroupView; refresh: () => void }) {
+  const { user } = useAuth()
   const action = useAction(refresh)
-  const canJoin = (group.status === 'RECRUITING' || group.status === 'ACTIVE') && !group.myMembership
+  const canJoin = user && user.role !== 'ASSOCIATE' && (group.status === 'RECRUITING' || group.status === 'ACTIVE') && !group.myMembership
   return <div className="study-group-stack">
     <section className={cardClass}><h2>모임 소개</h2><p className="study-group-description">{group.description}</p><dl className="study-group-details"><div><dt>주제</dt><dd>{group.topicTags.join(' · ') || '미정'}</dd></div><div><dt>학기</dt><dd>{group.term}</dd></div><div><dt>일정</dt><dd>{group.schedule || '협의 중'}</dd></div><div><dt>장소</dt><dd>{group.place || '협의 중'}</dd></div><div><dt>리더</dt><dd>{group.leaderName}</dd></div><div><dt>정원</dt><dd>{group.capacity ?? '제한 없음'}</dd></div></dl>
       {canJoin && <Button disabled={action.busy} onClick={() => void action.run(() => joinStudyGroup(group.id))}>참여 신청</Button>}

@@ -15,7 +15,8 @@ Group operations use `/api/study-groups`.
 | `GET /{id}` | Signed-in members. Interest identities appear for group managers. |
 | `PUT /{id}`, `POST /{id}/start` | Group managers. Start moves recruiting groups to active. |
 | `POST /{id}/approve`, `POST /{id}/end`, `PUT /{id}/leader` | Activity managers. Approval moves proposals to recruiting. |
-| `POST /{id}/join`, `DELETE /{id}/members/me` | Signed-in members may apply to recruiting or active groups and withdraw or leave. A leader can leave after replacement. |
+| `POST /{id}/join` | USER or higher may apply to recruiting or active groups. ASSOCIATE may view groups and express interest. |
+| `DELETE /{id}/members/me` | Signed-in members may withdraw or leave. A leader can leave after replacement. |
 | `GET /{id}/members` | Participants see approved members. Group managers also see pending applications. |
 | `PUT /{id}/members/{studentId}`, `DELETE /{id}/members/{studentId}` | Group managers may decide pending applications and remove members. |
 | `GET /{id}/interest` | Signed-in members see totals and breakdowns. Group managers also see respondent identities. |
