@@ -163,6 +163,21 @@ class HackathonIntegrationTest {
     }
 
     @Test
+    void membersWithTheSameNameAndCohortCanBothReviewOneProject() throws Exception {
+        Cookie first = account(Member.Role.USER, "namesake-one");
+        Cookie second = account(Member.Role.USER, "namesake-two");
+        String sameReview = body("wargether", 42, "Same Name");
+
+        mvc.perform(post("/api/hackathon/reviews").cookie(first).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(sameReview))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/hackathon/reviews").cookie(second).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(sameReview))
+                .andExpect(status().isCreated());
+        assertThat(reviews.count()).isEqualTo(2);
+    }
+
+    @Test
     void exhaustedGuestIpBudgetDoesNotBlockSignedInMembers() throws Exception {
         submit("wargether", 42, "Guest Alum").andExpect(status().isCreated());
         for (int attempt = 0; attempt < 9; attempt++) {

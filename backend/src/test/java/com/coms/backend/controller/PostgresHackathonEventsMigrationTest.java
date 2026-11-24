@@ -41,7 +41,11 @@ class PostgresHackathonEventsMigrationTest {
         assertThatThrownBy(() -> jdbc.update("INSERT INTO hackathon_reviews(project_id,event_id,generation,name,name_key,chair,theme_fit,creativity,technology,completeness,practicality,feedback) VALUES ('still',2,42,'잘못된 팀','bad',FALSE,18,17,16,15,14,'')"))
                 .hasMessageContaining("fk_hackathon_review_project");
         assertThatThrownBy(() -> jdbc.update("INSERT INTO hackathon_reviews(project_id,event_id,generation,name,name_key,chair,theme_fit,creativity,technology,completeness,practicality,feedback) VALUES ('fresh-team',2,42,'중복','기존회원',FALSE,18,17,16,15,14,'')"))
-                .hasMessageContaining("uq_hackathon_review_identity");
+                .hasMessageContaining("uq_hackathon_review_guest_identity");
+        jdbc.update("INSERT INTO hackathon_reviews(project_id,event_id,generation,name,name_key,chair,theme_fit,creativity,technology,completeness,practicality,feedback,reviewer_student_id) VALUES ('fresh-team',2,42,'동명이인','기존회원',FALSE,18,17,16,15,14,'','2026000001')");
+        jdbc.update("INSERT INTO hackathon_reviews(project_id,event_id,generation,name,name_key,chair,theme_fit,creativity,technology,completeness,practicality,feedback,reviewer_student_id) VALUES ('fresh-team',2,42,'동명이인','기존회원',FALSE,18,17,16,15,14,'','2026000002')");
+        assertThatThrownBy(() -> jdbc.update("INSERT INTO hackathon_reviews(project_id,event_id,generation,name,name_key,chair,theme_fit,creativity,technology,completeness,practicality,feedback,reviewer_student_id) VALUES ('fresh-team',2,43,'재평가','다른이름',FALSE,18,17,16,15,14,'','2026000001')"))
+                .hasMessageContaining("uq_hackathon_review_member");
         jdbc.execute("DROP SCHEMA hackathon_decoy CASCADE");
     }
 }

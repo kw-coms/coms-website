@@ -12,8 +12,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "hackathon_reviews", uniqueConstraints =
-        {@UniqueConstraint(name = "uq_hackathon_review_identity", columnNames = {"event_id", "project_id", "generation", "name_key"}),
-         @UniqueConstraint(name = "uq_hackathon_review_ip", columnNames = {"event_id", "project_id", "ip_key"}),
+        {@UniqueConstraint(name = "uq_hackathon_review_ip", columnNames = {"event_id", "project_id", "ip_key"}),
          @UniqueConstraint(name = "uq_hackathon_review_member", columnNames = {"event_id", "project_id", "reviewer_student_id"})})
 public class HackathonReview {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)

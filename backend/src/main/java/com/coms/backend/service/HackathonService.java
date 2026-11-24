@@ -95,7 +95,7 @@ public class HackathonService {
                     throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "비회원 평가는 허용되지 않습니다.");
                 }
                 if (!projects.existsByEventIdAndIdAndPublishedTrue(eventId, request.projectId())) throw notFound();
-                if (reviews.existsByEventIdAndProjectIdAndGenerationAndNameKey(eventId, request.projectId(), generation, nameKey)) {
+                if (reviewerStudentId == null && reviews.existsByEventIdAndProjectIdAndGenerationAndNameKeyAndReviewerStudentIdIsNull(eventId, request.projectId(), generation, nameKey)) {
                     throw duplicate();
                 }
                 if (reviewerStudentId == null && reviews.existsByEventIdAndProjectIdAndIpKey(eventId, request.projectId(), clientIp)) throw duplicateIp();
@@ -114,7 +114,7 @@ public class HackathonService {
             });
         } catch (DataIntegrityViolationException ex) {
             // The unique key decides when two requests pass the preliminary duplicate check together.
-            if (reviews.existsByEventIdAndProjectIdAndGenerationAndNameKey(eventId, request.projectId(), generation, nameKey)) {
+            if (reviewerStudentId == null && reviews.existsByEventIdAndProjectIdAndGenerationAndNameKeyAndReviewerStudentIdIsNull(eventId, request.projectId(), generation, nameKey)) {
                 throw duplicate();
             }
             if (reviewerStudentId == null && reviews.existsByEventIdAndProjectIdAndIpKey(eventId, request.projectId(), clientIp)) throw duplicateIp();
