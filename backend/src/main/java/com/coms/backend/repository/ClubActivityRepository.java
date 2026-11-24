@@ -9,7 +9,9 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface ClubActivityRepository extends JpaRepository<ClubActivity, Long> {
+    @Query("SELECT a FROM ClubActivity a ORDER BY CASE WHEN a.eventDate IS NULL THEN 1 ELSE 0 END, a.eventDate DESC, a.createdAt DESC")
     List<ClubActivity> findAllByOrderByEventDateDescCreatedAtDesc();
+    List<ClubActivity> findByShowOnTimelineTrue();
 
     long countByCategory(String category);
 

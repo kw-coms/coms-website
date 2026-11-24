@@ -30,6 +30,23 @@ class CalendarAuditLogControllerTest {
     private final ClubActivityService clubActivityService = mock(ClubActivityService.class);
     private final StorageService storageService = mock(StorageService.class);
     private final AuditLogService auditLogService = mock(AuditLogService.class);
+
+    @Test
+    void dateUndecidedCreateClearsEvenSuppliedDatesAndTimes() throws Exception {
+        when(clubActivityService.create(eq("ACTIVITY"), eq("EVENT"), eq("날짜 미정"), isNull(),
+                isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), eq("2026000001"),
+                eq("PLANNED"), eq(true), eq("2026 2학기"), isNull(), isNull()))
+                .thenReturn(activityResponse(42L, "ACTIVITY", "날짜 미정", null));
+
+        clubActivityController.create("ACTIVITY", "EVENT", "날짜 미정", null,
+                LocalDate.of(2026, 6, 11), LocalDate.of(2026, 6, 12), "18:00", "19:00",
+                null, null, "PLANNED", true, "2026 2학기", null, null, true,
+                new TestingAuthenticationToken("2026000001", "password"));
+
+        verify(clubActivityService).create(eq("ACTIVITY"), eq("EVENT"), eq("날짜 미정"), isNull(),
+                isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), eq("2026000001"),
+                eq("PLANNED"), eq(true), eq("2026 2학기"), isNull(), isNull());
+    }
     private final ClubActivityController clubActivityController = new ClubActivityController(
             clubActivityService,
             storageService,

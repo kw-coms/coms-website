@@ -94,6 +94,47 @@ class ClubActivityServiceTest {
     }
 
     @Test
+    void undatedActivityIsSavedAndSortedAfterDatedItems() throws Exception {
+        var undated = clubActivityService.create("SCHEDULE", "EVENT", "날짜 미정", null,
+                null, null, null, null, null, null, "2026123456",
+                "PLANNED", true, "2026 2학기", "12월 중", null);
+        clubActivityService.create("SCHEDULE", "EVENT", "날짜 확정", null,
+                LocalDate.of(2026, 12, 10), null, "2026123456");
+
+        assertThat(undated.eventDate()).isNull();
+        assertThat(undated.endDate()).isNull();
+        assertThat(clubActivityService.list()).extracting("title").containsExactly("날짜 확정", "날짜 미정");
+
+        var changed = clubActivityService.update(undated.id(), null, null, null, null,
+                LocalDate.of(2026, 12, 11), null, null, null, null, "2026123456",
+                "", null, "", "", null, false);
+        assertThat(changed.eventDate()).isEqualTo(LocalDate.of(2026, 12, 11));
+        assertThat(changed.timelineStatus()).isNull();
+        assertThat(changed.timelineTerm()).isEqualTo("2026 2학기");
+        var cleared = clubActivityService.update(undated.id(), null, null, null, null,
+                null, null, null, null, null, "2026123456",
+                null, null, null, null, null, true);
+        assertThat(cleared.eventDate()).isNull();
+        assertThat(cleared.endDate()).isNull();
+    }
+
+    @Test
+    void categoryChangeDropsSeedKindLabelOverride() throws Exception {
+        var seeded = clubActivityService.create("ACTIVITY", "ACHIEVEMENT", "해커톤 결과", null,
+                null, null, null, null, null, null, "2026123456",
+                "DONE", true, "2026 2학기", null, null);
+        var row = clubActivityRepository.findById(seeded.id()).orElseThrow();
+        row.setTimelineKindLabel("해커톤");
+        clubActivityRepository.saveAndFlush(row);
+
+        clubActivityService.update(seeded.id(), null, "PROJECT", null, null,
+                null, null, null, null, null, "2026123456");
+
+        assertThat(clubActivityService.timeline(false)).filteredOn(item -> item.id().equals(seeded.id()))
+                .singleElement().satisfies(item -> assertThat(item.kindLabel()).isEqualTo("프로젝트"));
+    }
+
+    @Test
     void createsScheduleRangeWithTimes() throws Exception {
         var response = clubActivityService.create(
                 "SCHEDULE",
