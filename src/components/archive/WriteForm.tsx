@@ -34,7 +34,8 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
   const { user } = useAuth()
   const { can } = usePermissions()
   const canSetRestricted = can(PERMISSIONS.archiveVisibility)
-  const canChangeVisibility = !initialFile || ownsArchive(user, initialFile) || canSetRestricted
+  const canChangeVisibility = !initialFile || canSetRestricted ||
+    ownsArchive(user, initialFile) && ['PUBLIC', 'MEMBERS'].includes(initialFile.visibility || 'MEMBERS')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)

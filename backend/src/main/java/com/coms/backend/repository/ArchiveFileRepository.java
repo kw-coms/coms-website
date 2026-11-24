@@ -21,10 +21,11 @@ public interface ArchiveFileRepository extends JpaRepository<ArchiveFile, Long> 
             select a from ArchiveFile a where
               :admin = true or a.visibility = com.coms.backend.domain.ArchiveFile.Visibility.PUBLIC or
               (:studentId is not null and (
+                a.uploadedBy = :studentId or
                 a.visibility = com.coms.backend.domain.ArchiveFile.Visibility.MEMBERS or
                 (:officer = true and a.visibility = com.coms.backend.domain.ArchiveFile.Visibility.OFFICERS) or
                 (a.visibility = com.coms.backend.domain.ArchiveFile.Visibility.SELECTED and
-                  (a.uploadedBy = :studentId or :studentId member of a.selectedStudentIds))))
+                  :studentId member of a.selectedStudentIds)))
             order by a.uploadedAt desc
             """)
     List<ArchiveFile> findVisible(@Param("studentId") String studentId, @Param("officer") boolean officer,

@@ -100,10 +100,11 @@ public class ArchiveFile {
         if (viewer != null && viewer.getRole() == Member.Role.ADMIN) return true;
         if (visibility == Visibility.PUBLIC) return true;
         if (viewer == null) return false;
+        if (viewer.getStudentId().equals(uploadedBy)) return true;
         return switch (visibility) {
             case MEMBERS -> true;
             case OFFICERS -> viewer.getRole() == Member.Role.OFFICER || viewer.getRole() == Member.Role.VICE_PRESIDENT;
-            case SELECTED -> viewer.getStudentId().equals(uploadedBy) || selectedStudentIds.contains(viewer.getStudentId());
+            case SELECTED -> selectedStudentIds.contains(viewer.getStudentId());
             case PUBLIC -> true;
         };
     }

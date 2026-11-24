@@ -2,8 +2,11 @@ package com.coms.backend.controller;
 
 import com.coms.backend.domain.ArchiveFile;
 import com.coms.backend.domain.Member;
+import com.coms.backend.domain.MemberPermissionOverride;
+import com.coms.backend.domain.Permission;
 import com.coms.backend.repository.ArchiveFileRepository;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.MemberPermissionOverrideRepository;
 import com.coms.backend.security.JwtTokenProvider;
 import com.coms.backend.service.ArchiveService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -18,7 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.EnumMap;
@@ -30,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 
 @SpringBootTest(properties = {
         "jwt.secret=test-secret-key-with-at-least-32-chars",
@@ -43,6 +47,7 @@ class ArchiveVisibilityIntegrationTest {
     @Autowired ArchiveService archiveService;
     @Autowired ArchiveFileRepository files;
     @Autowired MemberRepository members;
+    @Autowired MemberPermissionOverrideRepository overrides;
     @Autowired JwtTokenProvider tokens;
     @Autowired JdbcTemplate jdbc;
     private final ObjectMapper json = new ObjectMapper();
@@ -172,11 +177,85 @@ class ArchiveVisibilityIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"visibility\":\"PUBLIC\"}"), uploaderId);
         assertThat(memberDefault).isEqualTo(403);
         assertThat(status(patch("/api/files/%d/visibility".formatted(selectedId))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"visibility\":\"PUBLIC\"}"), uploaderId)).isEqualTo(200);
+                .contentType(MediaType.APPLICATION_JSON).content("{\"visibility\":\"PUBLIC\"}"), uploaderId)).isEqualTo(403);
         assertThat(status(patch("/api/files/%d/visibility".formatted(selectedId))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"visibility\":\"SELECTED\",\"selectedStudentIds\":[\"" + chosenId + "\"]}"), uploaderId)).isEqualTo(403);
         assertThat(status(get("/api/files/visibility-members?query=2026"), uploaderId)).isEqualTo(403);
         assertThat(status(get("/api/files/visibility-members?query=2026"), ids.get(Member.Role.ADMIN))).isEqualTo(200);
+    }
+
+    @Test
+    void uploaderWithoutGrantCanOnlySwitchBetweenPublicAndMembers() throws Exception {
+        for (boolean put : List.of(false, true)) {
+            for (ArchiveFile.Visibility from : ArchiveFile.Visibility.values()) {
+                for (ArchiveFile.Visibility to : ArchiveFile.Visibility.values()) {
+                    Long id = upload("transition", from, uploaderId,
+                            from == ArchiveFile.Visibility.SELECTED ? Set.of(chosenId) : Set.of());
+                    boolean basic = (from == ArchiveFile.Visibility.PUBLIC || from == ArchiveFile.Visibility.MEMBERS)
+                            && (to == ArchiveFile.Visibility.PUBLIC || to == ArchiveFile.Visibility.MEMBERS);
+                    assertThat(changeVisibility(id, to, uploaderId, put))
+                            .as("%s %s -> %s", put ? "PUT" : "PATCH", from, to).isEqualTo(basic ? 200 : 403);
+                    assertThat(files.findById(id).orElseThrow().getVisibility()).isEqualTo(basic ? to : from);
+                }
+            }
+        }
+    }
+
+    @Test
+    void individualVisibilityGrantAllowsRestrictedChangesAndRevokeStopsThem() throws Exception {
+        overrides.saveAndFlush(new MemberPermissionOverride(uploaderId, Permission.ARCHIVE_VISIBILITY,
+                MemberPermissionOverride.Effect.GRANT, ids.get(Member.Role.ADMIN)));
+        for (boolean put : List.of(false, true)) {
+            assertThat(changeVisibility(selectedId, ArchiveFile.Visibility.OFFICERS, uploaderId, put)).isEqualTo(200);
+            assertThat(changeVisibility(selectedId, ArchiveFile.Visibility.SELECTED, uploaderId, put)).isEqualTo(200);
+            assertThat(changeVisibility(selectedId, ArchiveFile.Visibility.PUBLIC, uploaderId, put)).isEqualTo(200);
+            assertThat(changeVisibility(selectedId, ArchiveFile.Visibility.SELECTED, uploaderId, put)).isEqualTo(200);
+        }
+        overrides.saveAndFlush(new MemberPermissionOverride(uploaderId, Permission.ARCHIVE_VISIBILITY,
+                MemberPermissionOverride.Effect.REVOKE, ids.get(Member.Role.ADMIN)));
+        for (boolean put : List.of(false, true)) {
+            assertThat(changeVisibility(selectedId, ArchiveFile.Visibility.PUBLIC, uploaderId, put)).isEqualTo(403);
+            assertThat(changeVisibility(selectedId, ArchiveFile.Visibility.OFFICERS, uploaderId, put)).isEqualTo(403);
+            assertThat(files.findById(selectedId).orElseThrow().getVisibility()).isEqualTo(ArchiveFile.Visibility.SELECTED);
+        }
+    }
+
+    @Test
+    void uploaderVisibilityRevokeOverridesRoleGrant() throws Exception {
+        String vicePresident = ids.get(Member.Role.VICE_PRESIDENT);
+        Long id = upload("role grant revoked", ArchiveFile.Visibility.SELECTED, vicePresident, Set.of(chosenId));
+        assertThat(changeVisibility(id, ArchiveFile.Visibility.OFFICERS, vicePresident, false)).isEqualTo(200);
+        overrides.saveAndFlush(new MemberPermissionOverride(vicePresident, Permission.ARCHIVE_VISIBILITY,
+                MemberPermissionOverride.Effect.REVOKE, ids.get(Member.Role.ADMIN)));
+        for (boolean put : List.of(false, true)) {
+            assertThat(changeVisibility(id, ArchiveFile.Visibility.PUBLIC, vicePresident, put)).isEqualTo(403);
+        }
+    }
+
+    @Test
+    void uploaderCanReadAndEditOfficerFileWithoutChangingItsVisibility() throws Exception {
+        Long id = upload("own officer file", ArchiveFile.Visibility.OFFICERS, uploaderId, Set.of());
+        assertThat(body(get("/api/files/" + id), uploaderId).path("id").asLong()).isEqualTo(id);
+        assertThat(body(get("/api/files"), uploaderId).toString()).contains("\"id\":" + id + ",");
+        assertThat(archiveService.listLimited(1, uploaderId)).extracting("id").containsExactly(id);
+        assertThat(status(get("/api/files/" + id + "/download"), uploaderId)).isEqualTo(200);
+        var edited = archiveService.updateGroup(uploaderId, id, "edited title", null, "GENERAL", null, null);
+        assertThat(edited.title()).isEqualTo("edited title");
+        assertThat(edited.visibility()).isEqualTo("OFFICERS");
+        assertThat(status(get("/api/files/" + id), chosenId)).isEqualTo(404);
+        assertThat(body(get("/api/files"), chosenId).toString()).doesNotContain("\"id\":" + id + ",");
+    }
+
+    private int changeVisibility(Long id, ArchiveFile.Visibility visibility, String actor, boolean put) throws Exception {
+        if (put) {
+            var request = multipart(org.springframework.http.HttpMethod.PUT, "/api/files/" + id)
+                    .param("title", "updated").param("category", "GENERAL").param("visibility", visibility.name());
+            if (visibility == ArchiveFile.Visibility.SELECTED) request.param("selectedStudentIds", chosenId);
+            return status(request, actor);
+        }
+        return status(patch("/api/files/" + id + "/visibility").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("visibility", visibility.name(),
+                        "selectedStudentIds", visibility == ArchiveFile.Visibility.SELECTED ? List.of(chosenId) : List.of()))), actor);
     }
 
     private Long upload(String title, ArchiveFile.Visibility visibility, String uploader, Set<String> selected) throws Exception {
@@ -202,13 +281,13 @@ class ArchiveVisibilityIntegrationTest {
         members.save(member);
     }
 
-    private int status(MockHttpServletRequestBuilder request, String id) throws Exception {
+    private int status(AbstractMockHttpServletRequestBuilder<?> request, String id) throws Exception {
         if (id != null) request.cookie(new Cookie("token", tokens.generateToken(id, 0)));
         request.header("Origin", "http://localhost:5173");
         return mvc.perform(request).andReturn().getResponse().getStatus();
     }
 
-    private JsonNode body(MockHttpServletRequestBuilder request, String id) throws Exception {
+    private JsonNode body(AbstractMockHttpServletRequestBuilder<?> request, String id) throws Exception {
         if (id != null) request.cookie(new Cookie("token", tokens.generateToken(id, 0)));
         var response = mvc.perform(request).andReturn().getResponse();
         assertThat(response.getStatus()).isEqualTo(200);

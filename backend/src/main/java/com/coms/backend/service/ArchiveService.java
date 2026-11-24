@@ -117,7 +117,7 @@ public class ArchiveService {
         String cleanedDescription = sanitizeDescription(description);
         Member member = memberRepository.findByStudentId(uploaderStudentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        VisibilitySelection selection = visibilitySelection(visibility, selectedStudentIds, member, false);
+        VisibilitySelection selection = visibilitySelection(visibility, selectedStudentIds, member, null);
         validateGroup(files);
 
         List<String> newStoredNames = new ArrayList<>();
@@ -181,7 +181,7 @@ public class ArchiveService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         VisibilitySelection selection = visibility == null && selectedStudentIds == null ? null
-                : visibilitySelection(visibility, selectedStudentIds, editor, true);
+                : visibilitySelection(visibility, selectedStudentIds, editor, entity.getVisibility());
         if (selection != null && !Objects.equals(entity.getUploadedBy(), editorStudentId)
                 && !permissionService.has(editor, Permission.ARCHIVE_VISIBILITY)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
@@ -389,7 +389,7 @@ public class ArchiveService {
                 && !permissionService.has(actor, Permission.ARCHIVE_VISIBILITY)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        VisibilitySelection selection = visibilitySelection(visibility, selectedStudentIds, actor, true);
+        VisibilitySelection selection = visibilitySelection(visibility, selectedStudentIds, actor, file.getVisibility());
         String before = file.getVisibility().name();
         file.setVisibility(selection.visibility());
         file.setSelectedStudentIds(selection.studentIds());
@@ -417,8 +417,8 @@ public class ArchiveService {
     private record VisibilitySelection(ArchiveFile.Visibility visibility, Set<String> studentIds) {}
 
     private VisibilitySelection visibilitySelection(String value, List<String> selectedIds, Member actor,
-                                                    boolean required) {
-        if (required && (value == null || value.isBlank())) {
+                                                    ArchiveFile.Visibility previousVisibility) {
+        if (previousVisibility != null && (value == null || value.isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "공개 범위가 비어 있습니다.");
         }
         ArchiveFile.Visibility visibility;
@@ -427,7 +427,8 @@ public class ArchiveService {
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바르지 않은 공개 범위입니다.");
         }
-        if ((visibility == ArchiveFile.Visibility.OFFICERS || visibility == ArchiveFile.Visibility.SELECTED)
+        if ((previousVisibility == ArchiveFile.Visibility.OFFICERS || previousVisibility == ArchiveFile.Visibility.SELECTED
+                || visibility == ArchiveFile.Visibility.OFFICERS || visibility == ArchiveFile.Visibility.SELECTED)
                 && !permissionService.has(actor, Permission.ARCHIVE_VISIBILITY)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }

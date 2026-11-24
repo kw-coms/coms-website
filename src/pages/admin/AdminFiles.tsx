@@ -126,7 +126,7 @@ export default function AdminFiles() {
         : <div className="space-y-2">{visibleFiles.map((file) => {
           const Icon = ICONS[archiveFileType(file)]
           const owns = ownsArchive(user, file)
-          const canChange = owns || canSetRestricted
+          const canChange = canSetRestricted || owns && ['PUBLIC', 'MEMBERS'].includes(file.visibility || 'MEMBERS')
           return <article key={file.id} className="apple-soft-panel min-w-0 p-4">
             <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 flex-1 gap-3"><Icon size={20} aria-hidden="true" className="mt-1 shrink-0 text-[var(--app-accent-text)]" /><div className="min-w-0 flex-1">
