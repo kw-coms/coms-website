@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildr
 import type { ApiError } from '../services/apiClient'
 import { getCurrentUser, logoutUser } from '../services/authApi'
 import { getMyPermissions } from '../services/permissionsApi'
-import { clearSessionHint, hasSessionHint, setSessionExpiredHandler } from '../services/apiClient'
+import { advanceSessionGeneration, clearSessionHint, hasSessionHint, sessionGeneration, setSessionExpiredHandler } from '../services/apiClient'
 import { setUserContext } from '../services/observability'
 import { queryClient } from '../services/queryClient'
 import { showToast } from '../components/common/Toast'
@@ -58,6 +58,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   // leaving a logged-in shell whose every panel errors.
   useEffect(() => {
     setSessionExpiredHandler(() => {
+      setLoading(false)
       // Logged-out visitors reach this on every page load (/me is refused, and so is the
       // refresh). There is no session to end, and clearing the query cache here would cancel
       // the public queries that are still loading.
@@ -74,7 +75,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let mounted = true
 
-    if (!hasSessionHint()) return () => { mounted = false }
+    if (!hasSessionHint()) {
+      queueMicrotask(() => { if (mounted) setLoading(false) })
+      return () => { mounted = false }
+    }
+    const started = sessionGeneration()
 
     // A transient blip (backend restart / deploy window / network hiccup) should
     // not log the user out. Retry /me a few times on non-auth errors (no status
@@ -89,22 +94,24 @@ export function AuthProvider({ children }: PropsWithChildren) {
       for (let attempt = 0; ; attempt++) {
         try {
           const data = await getCurrentUser()
-          if (mounted) { setUser(data); setAuthError(null) }
+          if (mounted && sessionGeneration().session === started.session) { setUser(data); setAuthError(null) }
           return
         } catch (error) {
           if (attempt < delays.length && isTransient(error)) {
             await new Promise((r) => setTimeout(r, delays[attempt]))
-            if (!mounted) return
+            if (!mounted || sessionGeneration().session !== started.session) return
             continue
           }
-          if (!mounted) return
+          if (!mounted || sessionGeneration().session !== started.session) return
           setUser(null)
           setAuthError(isLoggedOutAuthError(error) ? null : buildAuthLoadError(error))
           return
         }
       }
     }
-    load().finally(() => { if (mounted) setLoading(false) })
+    load().finally(() => {
+      if (mounted && sessionGeneration().session === started.session) setLoading(false)
+    })
 
     return () => {
       mounted = false
@@ -151,13 +158,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [])
 
   const login = useCallback(async (data) => {
+    advanceSessionGeneration()
+    const started = sessionGeneration()
+    setLoading(false)
     setAuthError(null)
     if (data) {
       setUser(data, true)
     }
     try {
       const currentUser = await getCurrentUser()
-      setUser(currentUser, !data)
+      if (sessionGeneration().session === started.session) setUser(currentUser, !data)
     } catch {
       // The login response is already authoritative for the visible session state.
     }
@@ -172,6 +182,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     forgetDrawStorage(userRef.current?.id)
     setUser(null)
     clearSessionHint()
+    setLoading(false)
     setAuthError(null)
     // Drop every cached query so the next account on a shared device can't see the previous
     // user's community list, bookmarks, or vote state (query keys aren't scoped per user).
@@ -215,19 +226,23 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const refreshUser = useCallback(async () => {
     setAuthError(null)
+    const started = sessionGeneration()
     const currentUser = await getCurrentUser()
-    setUser(currentUser)
-    return currentUser
+    if (sessionGeneration().session === started.session) setUser(currentUser)
+    return sessionGeneration().session === started.session ? currentUser : userRef.current
   }, [setUser])
 
   const retryAuth = useCallback(async () => {
     setLoading(true)
     setAuthError(null)
+    const started = sessionGeneration()
     try {
       const currentUser = await getCurrentUser()
+      if (sessionGeneration().session !== started.session) return userRef.current
       setUser(currentUser)
       return currentUser
     } catch (error) {
+      if (sessionGeneration().session !== started.session) return userRef.current
       setUser(null)
       if (isLoggedOutAuthError(error)) {
         setAuthError(null)
@@ -237,7 +252,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setAuthError(nextError)
       return null
     } finally {
-      setLoading(false)
+      if (sessionGeneration().session === started.session) setLoading(false)
     }
   }, [setUser])
 

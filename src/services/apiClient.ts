@@ -8,6 +8,7 @@ export function hasSessionHint() {
 }
 
 export function clearSessionHint() {
+  advanceSessionGeneration()
   if (typeof document !== 'undefined') document.cookie = 'comsSession=; Max-Age=0; Path=/; SameSite=Lax'
   clearLegacySessionOwnerHint()
 }
@@ -49,13 +50,18 @@ function notifySessionExpired() {
 //  - 'timeout'     the refresh did not answer within its own deadline (same handling as 'unavailable').
 type RefreshOutcome = 'refreshed' | 'rejected' | 'unavailable' | 'timeout'
 let refreshInFlight: Promise<RefreshOutcome> | null = null
+let refreshSession = 0
 // Bumped once per SUCCESSFUL refresh. A request that was already in flight when
 // someone else rotated the token gets a 401 from the token it was sent with, not
 // from the current one — refreshing again would rotate a perfectly good session
 // (and, with refresh-token rotation, can invalidate it). Comparing the generation
 // captured before the request against the current one tells the two cases apart:
 // if it moved, just retry; the cookie is already fresh.
-let refreshGeneration = 0
+let generation = { session: 0, refresh: 0 }
+export const sessionGeneration = () => generation
+export function advanceSessionGeneration() {
+  generation = { session: generation.session + 1, refresh: generation.refresh }
+}
 // The refresh has its own finite deadline: a stalled /api/auth/refresh must never hold every request of the
 // page (and each caller waiting on it) forever. It is raced as well as signalled, so it settles even when a
 // fetch implementation ignores the abort.
@@ -74,20 +80,23 @@ function refreshDeadline(): { signal: AbortSignal; expired: Promise<never> } {
   return { signal, expired }
 }
 async function tryRefreshToken(): Promise<RefreshOutcome> {
-  if (refreshInFlight) return refreshInFlight
+  const session = generation.session
+  if (refreshInFlight && refreshSession === session) return refreshInFlight
+  refreshSession = session
   refreshInFlight = (async (): Promise<RefreshOutcome> => {
     const deadline = refreshDeadline()
     try {
       const res = await Promise.race([fetch(apiUrl('/api/auth/refresh'), { method: 'POST', credentials: 'include', signal: deadline.signal }), deadline.expired])
+      if (generation.session !== session) return 'unavailable'
       if (res.ok) {
-        refreshGeneration += 1
+        generation = { session, refresh: generation.refresh + 1 }
         return 'refreshed'
       }
       return res.status === 401 ? 'rejected' : 'unavailable'
     } catch {
       return deadline.signal.aborted ? 'timeout' : 'unavailable'
     } finally {
-      refreshInFlight = null
+      if (refreshSession === session) refreshInFlight = null
     }
   })()
   return refreshInFlight
@@ -96,11 +105,12 @@ async function tryRefreshToken(): Promise<RefreshOutcome> {
 // For callers outside this client that hit a 401 on their own fetch (the study playground's /study/api/run):
 // the same single-flight refresh, generation guard and session-expiry notification as every other request.
 // Take the generation before sending, and after a 401 retry once when this returns true.
-export const sessionGeneration = () => refreshGeneration
-export async function renewSessionAfter401(generationBeforeRequest: number): Promise<RefreshOutcome> {
-  if (refreshGeneration > generationBeforeRequest) return 'refreshed' // someone already renewed the cookie
+export async function renewSessionAfter401(generationBeforeRequest: ReturnType<typeof sessionGeneration>): Promise<RefreshOutcome> {
+  if (generation.session !== generationBeforeRequest.session) return 'unavailable'
+  if (generation.refresh > generationBeforeRequest.refresh) return 'refreshed' // someone already renewed the cookie
   if (!hasSessionHint()) { notifySessionExpired(); return 'rejected' }
   const outcome = await tryRefreshToken()
+  if (generation.session !== generationBeforeRequest.session) return 'unavailable'
   if (outcome === 'rejected') { clearSessionHint(); notifySessionExpired() }
   return outcome
 }
@@ -114,9 +124,11 @@ export async function renewSessionAfter401(generationBeforeRequest: number): Pro
 async function recoverFromAuthFailure(path, response, generationBeforeRequest, fetchOnce) {
   const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
   if (!canRefresh || response.status !== 401) return response
-  if (refreshGeneration > generationBeforeRequest) return fetchOnce()
+  if (generation.session !== generationBeforeRequest.session) return response
+  if (generation.refresh > generationBeforeRequest.refresh) return fetchOnce()
   if (!hasSessionHint()) { notifySessionExpired(); return response }
   const outcome = await tryRefreshToken()
+  if (generation.session !== generationBeforeRequest.session) return response
   if (outcome === 'refreshed') return fetchOnce()
   // A refresh the server refuses means the session is gone: without this, an expired session
   // left the logged-in shell on screen with every panel stuck on a retry that could never
@@ -306,7 +318,7 @@ export async function request(path, options: RequestInit = {}) {
   // silently dropped the session cookie when it came first.
   const fetchOnce = () => fetchOrNetworkError(apiUrl(path), { ...options, headers, credentials: 'include' })
 
-  const generationBeforeRequest = refreshGeneration
+  const generationBeforeRequest = sessionGeneration()
   let response = await fetchOnce()
   response = await recoverFromAuthFailure(path, response, generationBeforeRequest, fetchOnce)
 
@@ -319,7 +331,7 @@ export async function request(path, options: RequestInit = {}) {
 
 export async function requestWithTotal(path: string): Promise<{ items: unknown; total: number }> {
   const fetchOnce = () => fetchOrNetworkError(apiUrl(path), { credentials: 'include' })
-  const generationBeforeRequest = refreshGeneration
+  const generationBeforeRequest = sessionGeneration()
   let response = await fetchOnce()
   response = await recoverFromAuthFailure(path, response, generationBeforeRequest, fetchOnce)
   if (!response.ok) await throwApiError(response)
@@ -334,7 +346,7 @@ export async function requestNoContent(path, options: RequestInit = {}) {
     : options.headers
   const fetchOnce = () => fetchOrNetworkError(apiUrl(path), { ...options, headers, credentials: 'include' })
 
-  const generationBeforeRequest = refreshGeneration
+  const generationBeforeRequest = sessionGeneration()
   let response = await fetchOnce()
   response = await recoverFromAuthFailure(path, response, generationBeforeRequest, fetchOnce)
 
@@ -346,7 +358,7 @@ export async function requestNoContent(path, options: RequestInit = {}) {
 export async function requestBlob(path, options: RequestInit = {}) {
   const fetchOnce = () => fetchOrNetworkError(apiUrl(path), { ...options, credentials: 'include' })
 
-  const generationBeforeRequest = refreshGeneration
+  const generationBeforeRequest = sessionGeneration()
   let response = await fetchOnce()
   response = await recoverFromAuthFailure(path, response, generationBeforeRequest, fetchOnce)
 
