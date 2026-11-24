@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
-import { mockOptionalApis, trackRequests } from './visualSupport.js'
+import { mockOptionalApis, signInHint, trackRequests } from './visualSupport.js'
 
 // 후원자 목록은 보는 사람에 따라 다르다(비회원: 익명 자리 표시자, 회원: 실명). 서버 응답을 흉내 내
-// 쿠키 대신 /api/auth/me 결과로 구분한다.
+// /api/auth/me의 응답이 완료되기 전에는 게스트 목록을 반환한다.
 
 const skipIntro = (page) => page.addInitScript(() => window.sessionStorage.setItem('coms.intro.played:v1', '1'))
 const ME = { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true }
@@ -31,6 +31,7 @@ test('guest sees the anonymous placeholder', async ({ page }) => {
 test('the list waits for /api/auth/me, so a member never gets (or caches) the guest list', async ({ page }) => {
   await skipIntro(page)
   await mockOptionalApis(page)
+  await signInHint(page)
   let loggedIn = false
   let release
   const held = new Promise((resolve) => { release = resolve })

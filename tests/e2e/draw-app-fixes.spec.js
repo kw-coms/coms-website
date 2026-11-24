@@ -74,6 +74,7 @@ test('draw names and results belong to one member and logout forgets them', asyn
   memberId = 1
   await page.close()
   page = await context.newPage()
+  await signInHint(context)
   await page.goto('/draw')
   names = page.getByRole('textbox', { name: /^이름/ })
   await expect(names).toHaveValue('첫 계정 이름\n첫 계정 친구')
