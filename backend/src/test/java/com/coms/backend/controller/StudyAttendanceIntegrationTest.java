@@ -14,6 +14,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -95,15 +96,15 @@ class StudyAttendanceIntegrationTest {
     @Test void studyCodeRejectsPendingAndOutsidersAndManualAbsentCanBeCorrectedByCode() throws Exception {
         long id = createRound(LEADER);
         String code = open(id);
-        mvc.perform(post("/api/attendance/check-in").cookie(cookie(PENDING)).header("Origin", ORIGIN)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"" + code + "\"}"))
-                .andExpect(status().isForbidden());
-        mvc.perform(post("/api/attendance/check-in").cookie(cookie(OFFICER)).header("Origin", ORIGIN)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"" + code + "\"}"))
-                .andExpect(status().isForbidden());
-        mvc.perform(post("/api/attendance/check-in").cookie(cookie(OUTSIDER)).header("Origin", ORIGIN)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"" + code + "\"}"))
-                .andExpect(status().isForbidden());
+        String wrongCode = code.equals("0000") ? "0001" : "0000";
+        JsonNode invalidCode = json(checkIn(PENDING, wrongCode).andExpect(status().isNotFound()).andReturn());
+        for (String applicant : new String[]{PENDING, OFFICER, OUTSIDER}) {
+            assertThat(json(checkIn(applicant, code).andExpect(status().isNotFound()).andReturn())).isEqualTo(invalidCode);
+        }
+        for (int attempt = 0; attempt < 8; attempt++) {
+            checkIn(PENDING, code).andExpect(status().isNotFound());
+        }
+        checkIn(PENDING, wrongCode).andExpect(status().isTooManyRequests());
         mvc.perform(put(path() + "/" + id + "/attendance/members/" + APPROVED).cookie(cookie(LEADER))
                 .header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"ABSENT\"}"))
                 .andExpect(status().isOk());
@@ -220,6 +221,10 @@ class StudyAttendanceIntegrationTest {
     }
 
     private String path() { return "/api/study-groups/" + groupId + "/sessions"; }
+    private ResultActions checkIn(String studentId, String code) throws Exception {
+        return mvc.perform(post("/api/attendance/check-in").cookie(cookie(studentId)).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"" + code + "\"}"));
+    }
     private String roundBody() { return "{\"date\":\"" + LocalDate.now() + "\",\"topic\":\"스택\",\"notes\":\"실습\"}"; }
     private long createRound(String actor) throws Exception {
         MvcResult result = mvc.perform(post(path()).cookie(cookie(actor)).header("Origin", ORIGIN)

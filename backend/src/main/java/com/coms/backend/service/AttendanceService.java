@@ -213,10 +213,7 @@ public class AttendanceService {
             // Serialize with manual marks, closing attendance and membership changes in this study.
             StudyGroup group = studyAccess.lockGroup(groupId);
             if (group.getStatus() == StudyGroup.Status.ENDED) throw invalidCode(key);
-            if (!studyAccess.isApprovedMember(groupId, studentId)) {
-                wrongCodesByMember.tryAcquire(key);
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "이 스터디의 승인된 멤버만 출석할 수 있습니다.");
-            }
+            if (!studyAccess.isApprovedMember(groupId, studentId)) throw invalidCode(key);
             now = LocalDateTime.now(clock);
         }
         AttendanceSession session = sessionRepository.findById(match.getId()).orElseThrow(() -> invalidCode(key));
