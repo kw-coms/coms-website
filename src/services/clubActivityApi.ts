@@ -4,29 +4,60 @@ export async function listClubActivities() {
   return request('/api/club-activities')
 }
 
-export async function createClubActivity({ kind, category, title, description, eventDate, endDate, startTime, endTime, colorHex, image }: {
+export async function listClubActivityTimeline() {
+  return request('/api/club-activities/timeline')
+}
+
+export async function previewClubActivityStatus({ eventDate, endDate, startTime, endTime }: {
+  eventDate?: string
+  endDate?: string
+  startTime?: string
+  endTime?: string
+}) {
+  const params = new URLSearchParams()
+  if (eventDate) params.set('eventDate', eventDate)
+  if (endDate) params.set('endDate', endDate)
+  if (startTime) params.set('startTime', startTime)
+  if (endTime) params.set('endTime', endTime)
+  return request(`/api/club-activities/status-preview${params.size ? `?${params}` : ''}`)
+}
+
+type TimelineInput = {
+  timelineStatus?: string
+  showOnTimeline?: boolean
+  timelineTerm?: string
+  dateLabel?: string
+  dateUndecided?: boolean
+}
+
+export async function createClubActivity({ kind, category, title, description, eventDate, endDate, startTime, endTime, colorHex, image, timelineStatus, showOnTimeline, timelineTerm, dateLabel, dateUndecided }: {
   kind: string
   category?: string
   title: string
   description?: string
-  eventDate: string
+  eventDate?: string
   endDate?: string
   startTime?: string
   endTime?: string
   colorHex?: string
   image?: File
-}) {
+} & TimelineInput) {
   const formData = new FormData()
   formData.append('kind', kind)
   formData.append('category', category || 'GENERAL')
   formData.append('title', title)
-  formData.append('eventDate', eventDate)
+  if (eventDate) formData.append('eventDate', eventDate)
   if (endDate) formData.append('endDate', endDate)
   if (startTime) formData.append('startTime', startTime)
   if (endTime) formData.append('endTime', endTime)
   if (colorHex) formData.append('colorHex', colorHex)
   if (description) formData.append('description', description)
   if (image) formData.append('image', image)
+  if (timelineStatus !== undefined) formData.append('timelineStatus', timelineStatus)
+  if (showOnTimeline !== undefined) formData.append('showOnTimeline', String(showOnTimeline))
+  if (timelineTerm !== undefined) formData.append('timelineTerm', timelineTerm)
+  if (dateLabel !== undefined) formData.append('dateLabel', dateLabel)
+  if (dateUndecided) formData.append('dateUndecided', 'true')
 
   return request('/api/club-activities', {
     method: 'POST',
@@ -34,7 +65,7 @@ export async function createClubActivity({ kind, category, title, description, e
   })
 }
 
-export async function updateClubActivity(id, { kind, category, title, description, eventDate, endDate, startTime, endTime, colorHex }: {
+export async function updateClubActivity(id, { kind, category, title, description, eventDate, endDate, startTime, endTime, colorHex, timelineStatus, showOnTimeline, timelineTerm, dateLabel, dateUndecided }: {
   kind?: string
   category?: string
   title?: string
@@ -44,7 +75,7 @@ export async function updateClubActivity(id, { kind, category, title, descriptio
   startTime?: string
   endTime?: string
   colorHex?: string
-}) {
+} & TimelineInput) {
   const formData = new FormData()
   if (kind != null) formData.append('kind', kind)
   if (category != null) formData.append('category', category)
@@ -55,6 +86,11 @@ export async function updateClubActivity(id, { kind, category, title, descriptio
   if (startTime != null) formData.append('startTime', startTime)
   if (endTime != null) formData.append('endTime', endTime)
   if (colorHex != null) formData.append('colorHex', colorHex)
+  if (timelineStatus !== undefined) formData.append('timelineStatus', timelineStatus)
+  if (showOnTimeline !== undefined) formData.append('showOnTimeline', String(showOnTimeline))
+  if (timelineTerm !== undefined) formData.append('timelineTerm', timelineTerm)
+  if (dateLabel !== undefined) formData.append('dateLabel', dateLabel)
+  if (dateUndecided) formData.append('dateUndecided', 'true')
   return request(`/api/club-activities/${id}`, {
     method: 'PATCH',
     body: formData,

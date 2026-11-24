@@ -6,6 +6,18 @@ import { asMember, mockOptionalApis, trackRequests } from './visualSupport.js'
 
 const skipIntro = (page) => page.addInitScript(() => window.sessionStorage.setItem('coms.intro.played:v1', '1'))
 const setTheme = (page, theme) => page.addInitScript((mode) => { try { localStorage.setItem('kwcoms-theme-mode:v2', mode) } catch { /* storage blocked */ } }, theme)
+const timelineItems = [
+  ['MT', 'DONE', '행사'],
+  ['고급 C 프로그래밍 스터디', 'CONFIRMED', '스터디'],
+  ['해커톤 결과 · 시상 공지', 'DONE', '해커톤'],
+  ['아두이노 · 알고리즘 스터디', 'PLANNED', '스터디'],
+  ['팀 프로젝트', 'PLANNED', '프로젝트'],
+  ['종강총회 · 에버랜드', 'PLANNED', '행사'],
+].map(([title, resolvedStatus, kindLabel], index) => ({
+  id: index + 1, title, resolvedStatus, kindLabel, kind: 'ACTIVITY',
+  timelineTerm: '2026 2학기', dateLabel: '2026 2학기', description: title,
+}))
+const mockTimeline = (page) => page.route('**/api/club-activities/timeline', (route) => route.fulfill({ status: 200, json: timelineItems }))
 
 test.describe('recruit facts (item 1)', () => {
   for (const path of ['/recruit', '/recruit-notice']) {
@@ -53,6 +65,7 @@ test.describe('recruit facts (item 1)', () => {
 test.describe('/activities for guests (items 2, 3)', () => {
   test('no drafting notes and no meeting agenda; every entry stays', async ({ page }) => {
     await mockOptionalApis(page)
+    await mockTimeline(page)
     await page.goto('/activities')
     const timeline = page.locator('#timeline')
     await expect(page.locator('#act-fall').getByRole('heading', { name: '개강총회' })).toBeVisible()
@@ -66,6 +79,7 @@ test.describe('/activities for guests (items 2, 3)', () => {
 
   test('a member sees the agenda line', async ({ page }) => {
     await mockOptionalApis(page)
+    await mockTimeline(page)
     await asMember(page)
     await page.route('**/member-media/**', (route) => route.fulfill({ status: 404, body: '' }))
     await page.goto('/activities')
@@ -76,6 +90,7 @@ test.describe('/activities for guests (items 2, 3)', () => {
   test('one login notice, quiet slots that are not focusable, no photo request', async ({ page }) => {
     const photoRequests = trackRequests(page, /\/member-media\//)
     await mockOptionalApis(page)
+    await mockTimeline(page)
     await page.goto('/activities')
     const notice = page.getByTestId('act-photo-notice')
     await expect(notice).toBeVisible()
@@ -90,6 +105,14 @@ test.describe('/activities for guests (items 2, 3)', () => {
     await expect(page.locator('#timeline .act-photo-locked a, #timeline .act-photo-locked button')).toHaveCount(0)
     await expect(slots.first()).toHaveAttribute('aria-hidden', 'true')
     expect(photoRequests).toEqual([])
+  })
+
+  test('shows static activities and an inline notice if timeline loading fails', async ({ page }) => {
+    await mockOptionalApis(page)
+    await page.route('**/api/club-activities/timeline', (route) => route.fulfill({ status: 503, body: '' }))
+    await page.goto('/activities')
+    await expect(page.locator('#act-fall').getByRole('heading', { name: '개강총회' })).toBeVisible()
+    await expect(page.locator('#timeline')).toContainText('활동 일정을 불러오지 못했습니다')
   })
 
 })

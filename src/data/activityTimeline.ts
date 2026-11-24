@@ -3,7 +3,7 @@
 // sources do not give is left out (dateLabel carries the semester only) rather than guessed.
 
 export type TimelineStatus = 'done' | 'live' | 'confirmed' | 'planned'
-export type TimelineTerm = 'spring' | 'fall' | 'upcoming'
+export type TimelineTerm = string
 
 export interface TimelinePhoto {
   id: string
@@ -29,7 +29,7 @@ export interface TimelineEvent {
   /** Machine-readable start (and end) for <time>; omitted when the day is unknown. */
   start?: string
   end?: string
-  /** Status when the dates do not decide it. Dated events with `start` + `end` are resolved at runtime. */
+  /** Static events with a date range resolve locally; DB events use the backend's resolved status. */
   status: TimelineStatus
   kind: string
   summary: string
@@ -37,6 +37,7 @@ export interface TimelineEvent {
   /** Internal agenda lines, shown to signed-in members only. */
   memberFacts?: string[]
   photoId?: string
+  fromDb?: true
 }
 
 const photo = (p: TimelinePhoto): TimelinePhoto => p
@@ -51,7 +52,6 @@ export const timelinePhotos: TimelinePhoto[] = [
   photo({ id: 'club-climbing', stem: 'club-climbing', width: 901, height: 1600, smallWidth: 450, alt: '클라이밍장 벽을 오르는 컴라이밍 소모임', caption: '소모임 컴라이밍, 클라이밍', focus: '50% 40%' }),
   photo({ id: 'club-badminton', stem: 'club-badminton', width: 1600, height: 1200, smallWidth: 800, alt: '배드민턴 코트에서 브이를 하는 컴스민턴 소모임 부원', caption: '소모임 컴스민턴, 배드민턴' }),
   photo({ id: 'fall-opening', stem: 'fall-opening', width: 1200, height: 1600, smallWidth: 600, alt: '2학기 개강총회 자리에서 브이를 하는 부원들', caption: '2학기 개강총회', focus: '50% 35%' }),
-  photo({ id: 'fall-mt', stem: 'fall-mt', width: 1600, height: 1200, smallWidth: 800, alt: 'MT 숙소 바닥에 둘러앉은 부원들', caption: '2학기 MT' }),
   photo({ id: 'founding-group', stem: 'founding-group', width: 1600, height: 1200, smallWidth: 800, alt: '57주년 창립제 단체 사진', caption: '57주년 창립제 단체 사진, 2026.11.07' }),
   photo({ id: 'founding-group-2', stem: 'founding-group-2', width: 1600, height: 1200, smallWidth: 800, alt: '창립제에서 손을 들어 인사하는 부원과 선배님들의 단체 사진', caption: '57주년 창립제 단체 사진 두 번째 컷' }),
   photo({ id: 'founding-presentation', stem: 'founding-presentation', width: 1600, height: 1200, smallWidth: 800, alt: '창립제 발표 화면 앞에 테이블별로 둘러앉은 모습', caption: '57주년 창립제 진행 모습' }),
@@ -164,25 +164,6 @@ export const timelineEvents: TimelineEvent[] = [
     photoId: 'fall-opening',
   },
   {
-    id: 'fall-mt',
-    term: 'fall',
-    title: 'MT',
-    dateLabel: '2026 2학기',
-    status: 'done',
-    kind: '행사',
-    summary: '2학기 친목 활동으로 다녀온 MT입니다.',
-    photoId: 'fall-mt',
-  },
-  {
-    id: 'fall-study',
-    term: 'fall',
-    title: '고급 C 프로그래밍 스터디',
-    dateLabel: '2026 2학기',
-    status: 'confirmed',
-    kind: '스터디',
-    summary: '고급 C 프로그래밍을 공부하는 2학기 스터디입니다.',
-  },
-  {
     id: 'fall-founding',
     term: 'fall',
     title: '57주년 COM’s 창립제',
@@ -210,43 +191,6 @@ export const timelineEvents: TimelineEvent[] = [
     ],
   },
 
-  // 예정
-  {
-    id: 'next-hackathon-result',
-    term: 'upcoming',
-    title: '해커톤 결과 · 시상 공지',
-    dateLabel: '평가 완료 후',
-    status: 'planned',
-    kind: '해커톤',
-    summary: '평가가 끝나면 결과와 시상을 공지합니다.',
-  },
-  {
-    id: 'next-study',
-    term: 'upcoming',
-    title: '아두이노 · 알고리즘 스터디',
-    dateLabel: '2026 2학기',
-    status: 'planned',
-    kind: '스터디',
-    summary: '2학기 스터디로 예정되어 있습니다.',
-  },
-  {
-    id: 'next-project',
-    term: 'upcoming',
-    title: '팀 프로젝트',
-    dateLabel: '2026 2학기',
-    status: 'planned',
-    kind: '프로젝트',
-    summary: '2학기 프로젝트 활동으로 예정되어 있습니다.',
-  },
-  {
-    id: 'next-closing',
-    term: 'upcoming',
-    title: '종강총회 · 에버랜드',
-    dateLabel: '2026 2학기',
-    status: 'planned',
-    kind: '행사',
-    summary: '2학기 친목 활동으로 종강총회와 에버랜드가 예정되어 있습니다.',
-  },
 ]
 
 export const summerClubs = [
