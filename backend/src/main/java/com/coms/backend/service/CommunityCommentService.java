@@ -160,7 +160,7 @@ class CommunityCommentService {
         }
         String content = textService.normalizeBounded(request.content(), "댓글", MAX_COMMENT_LENGTH);
         textService.rejectUnsafeText(content);
-        comment.markEdited(content);
+        comment.markEdited(content, LocalDateTime.now(clock));
         CommunityComment saved = commentRepository.save(comment);
         auditLogService.record(member.getStudentId(), "COMMUNITY_COMMENT_UPDATE", "COMMUNITY_COMMENT", String.valueOf(saved.getId()),
                 "postId=" + postId, null);

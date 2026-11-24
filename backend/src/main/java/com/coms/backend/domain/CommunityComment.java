@@ -72,9 +72,9 @@ public class CommunityComment {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public void setEdited(boolean edited) { this.edited = edited; }
 
-    public void markEdited(String content) {
+    public void markEdited(String content, LocalDateTime updatedAt) {
         this.content = content;
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = updatedAt;
         this.edited = true;
     }
 }

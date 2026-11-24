@@ -336,7 +336,7 @@ public class CommunityService {
         }
         mediaService.attachImage(post, image);
         if (titleChanged || !isInitialFinalization) {
-            post.markEdited();
+            post.markEdited(LocalDateTime.now(clock));
         }
         CommunityPost saved = communityPostRepository.save(post);
         auditLogService.record(member.getStudentId(), "COMMUNITY_POST_UPDATE", "COMMUNITY_POST", String.valueOf(saved.getId()), textService.safeTitle(saved.getTitle()), null);

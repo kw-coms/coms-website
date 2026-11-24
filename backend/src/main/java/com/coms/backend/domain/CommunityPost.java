@@ -63,9 +63,9 @@ public class CommunityPost {
     @Column(name = "author_name_overridden", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
     private boolean authorNameOverridden = false;
 
-    public void markEdited() {
+    public void markEdited(LocalDateTime updatedAt) {
         edited = true;
-        updatedAt = LocalDateTime.now();
+        this.updatedAt = updatedAt;
     }
 
     public enum Category {

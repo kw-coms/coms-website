@@ -12,11 +12,14 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "club_projects")
 public class ClubProject {
     public enum ReviewStatus { PENDING, APPROVED, REJECTED }
+
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -61,14 +64,14 @@ public class ClubProject {
     private int position = 0;
 
     @Column(nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(SEOUL);
 
     @Column(nullable = false)
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    private LocalDateTime updatedAt = createdAt;
 
     @PreUpdate
-    void touch() {
-        updatedAt = LocalDateTime.now();
+    public void touch() {
+        updatedAt = LocalDateTime.now(SEOUL);
     }
 
     public Long getId() { return id; }

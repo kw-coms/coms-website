@@ -23,7 +23,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -109,8 +108,6 @@ public class ClubProjectService {
         ClubProject project = new ClubProject();
         applyFields(project, category, title, description, eyebrow, madeBy, linkUrl, displayUrl);
         project.setPosition(position != null ? position : nextPosition());
-        project.setCreatedAt(LocalDateTime.now());
-        project.setUpdatedAt(LocalDateTime.now());
         ClubProject saved = repository.save(project);
         return toResponse(saved);
     }
@@ -207,7 +204,7 @@ public class ClubProjectService {
         if (position != null) {
             project.setPosition(position);
         }
-        project.setUpdatedAt(LocalDateTime.now());
+        project.touch();
         ClubProject saved = repository.saveAndFlush(project);
         return toResponse(saved);
     }
@@ -253,7 +250,7 @@ public class ClubProjectService {
             String contentType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
             ClubProjectFile saved = fileRepository.save(new ClubProjectFile(
                     project.getId(), stored, cleanOriginalFilename(file), contentType, file.getSize(), existing.size()));
-            project.setUpdatedAt(LocalDateTime.now());
+            project.touch();
             repository.saveAndFlush(project);
             return saved.getId();
         } catch (IOException e) {
@@ -270,7 +267,7 @@ public class ClubProjectService {
         ClubProject project = get(id);
         deleteAfterCommit(file.getStoredName());
         fileRepository.delete(file);
-        project.setUpdatedAt(LocalDateTime.now());
+        project.touch();
         repository.saveAndFlush(project);
     }
 
@@ -334,7 +331,7 @@ public class ClubProjectService {
             });
         }
         project.setReviewStatus(ClubProject.ReviewStatus.PENDING);
-        project.setUpdatedAt(LocalDateTime.now());
+        project.touch();
         repository.saveAndFlush(project);
         return ids;
     }
@@ -357,7 +354,7 @@ public class ClubProjectService {
         checkEditor(project, studentId, manager);
         deleteAfterCommit(image.getStoredName());
         imageRepository.delete(image);
-        project.setUpdatedAt(LocalDateTime.now());
+        project.touch();
         repository.saveAndFlush(project);
     }
 

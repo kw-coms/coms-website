@@ -52,6 +52,22 @@ class RecruitApplicationServiceTest {
     }
 
     @Test
+    void applicationStatusUpdateUsesTheSameSeoulClockAsSubmission() {
+        var application = new RecruitApplication();
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findById(1L)).thenReturn(Optional.of(application));
+        Clock clock = Clock.fixed(Instant.parse("2026-11-30T15:30:00Z"), ZoneId.of("Asia/Seoul"));
+        var service = new RecruitApplicationService(
+                mock(JavaMailSender.class), repository, mock(NotificationService.class),
+                mock(EligibleMemberService.class), mock(RecruitPromotionLogRepository.class),
+                clock, false, "no-reply@coms.kw.ac.kr", "recruit@coms.kw.ac.kr");
+
+        var updated = service.updateStatus(1L, new RecruitApplicationStatusUpdateRequest("REVIEWING", "검토 중"), "admin");
+
+        assertThat(updated.updatedAt()).isEqualTo(LocalDateTime.of(2026, 12, 1, 0, 30));
+    }
+
+    @Test
     void sendApplicationSendsMailToRecruitRecipient() {
         JavaMailSender mailSender = mock(JavaMailSender.class);
         RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);

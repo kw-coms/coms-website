@@ -3,7 +3,6 @@ package com.coms.backend.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
@@ -29,11 +28,6 @@ public class RolePermission {
 
     public RolePermission(RolePermissionId id) {
         this.id = id;
-    }
-
-    @PreUpdate
-    void touch() {
-        updatedAt = LocalDateTime.now();
     }
 
     public RolePermissionId getId() {

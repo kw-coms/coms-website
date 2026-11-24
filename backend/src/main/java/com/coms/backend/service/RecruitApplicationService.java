@@ -249,6 +249,7 @@ public class RecruitApplicationService {
         RecruitApplication.Status status = parseStatus(request.status());
         application.setStatus(status);
         application.setAdminNote(trimToNull(request.adminNote()));
+        application.setUpdatedAt(LocalDateTime.now(clock));
         RecruitApplicationAdminResponse response = RecruitApplicationAdminResponse.from(application);
         if (status == RecruitApplication.Status.ACCEPTED) {
             promote(application, adminStudentId);

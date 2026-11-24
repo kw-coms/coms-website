@@ -96,6 +96,7 @@ class PermissionServiceTransactionTest {
                 matrixGranting(Member.Role.OFFICER, Permission.ARCHIVE_DELETE), "2026000002", first.updatedAt());
 
         assertThat(second.allowed().get("OFFICER")).contains("archive.delete");
+        assertThat(permissionService.matrix().updatedAt()).isEqualTo(second.updatedAt());
         assertThat(permissionService.allows(Member.Role.OFFICER, Permission.ARCHIVE_DELETE)).isTrue();
     }
 

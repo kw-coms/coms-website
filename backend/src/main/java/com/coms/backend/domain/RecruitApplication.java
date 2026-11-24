@@ -93,12 +93,10 @@ public class RecruitApplication {
     public Status getStatus() { return status; }
     public void setStatus(Status status) {
         this.status = status;
-        this.updatedAt = LocalDateTime.now();
     }
     public String getAdminNote() { return adminNote; }
     public void setAdminNote(String adminNote) {
         this.adminNote = adminNote;
-        this.updatedAt = LocalDateTime.now();
     }
     public String getClientIp() { return clientIp; }
     public void setClientIp(String clientIp) { this.clientIp = clientIp; }
