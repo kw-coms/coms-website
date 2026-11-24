@@ -15,7 +15,7 @@ import AdminActivityRow from './AdminActivityRow'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 import { ActivityTimelineFields } from './ActivityTimelineFields'
-import { selectedTerm } from './activityTimelineForm'
+import { eventDatePatch, selectedTerm } from './activityTimelineForm'
 
 const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
@@ -187,7 +187,7 @@ export default function AdminActivities() {
             <input
               type="date"
               value={form.eventDate}
-              onChange={(event) => setForm((prev) => ({ ...prev, eventDate: event.target.value }))}
+              onChange={(event) => setForm((prev) => ({ ...prev, ...eventDatePatch(event.target.value, prev.timelineTerm) }))}
               disabled={form.dateUndecided}
               className={inputClass}
             />

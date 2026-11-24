@@ -8,7 +8,7 @@ import {
   uploadClubActivityImages,
 } from '../../services/clubActivityApi'
 import { ActivityTimelineFields } from './ActivityTimelineFields'
-import { selectedTerm } from './activityTimelineForm'
+import { eventDatePatch, selectedTerm } from './activityTimelineForm'
 
 const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
@@ -226,7 +226,7 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
             <input
               type="date"
               value={draft.eventDate}
-              onChange={(event) => setDraft((prev) => ({ ...prev, eventDate: event.target.value }))}
+              onChange={(event) => setDraft((prev) => ({ ...prev, ...eventDatePatch(event.target.value, prev.timelineTerm) }))}
               disabled={draft.dateUndecided}
               className={ADMIN_INPUT_CLASS}
             />
