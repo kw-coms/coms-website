@@ -126,7 +126,7 @@ export default function AdminFiles() {
         : <div className="space-y-2">{visibleFiles.map((file) => {
           const Icon = ICONS[archiveFileType(file)]
           const owns = ownsArchive(user, file)
-          const canChange = canSetRestricted || owns && ['PUBLIC', 'MEMBERS'].includes(file.visibility || 'MEMBERS')
+          const canChange = file.visibility !== 'GROUP' && (canSetRestricted || owns && ['PUBLIC', 'MEMBERS'].includes(file.visibility || 'MEMBERS'))
           return <article key={file.id} className="apple-soft-panel min-w-0 p-4">
             <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 flex-1 gap-3"><Icon size={20} aria-hidden="true" className="mt-1 shrink-0 text-[var(--app-accent-text)]" /><div className="min-w-0 flex-1">
@@ -147,7 +147,7 @@ export default function AdminFiles() {
                 if (visibility === 'SELECTED') { setSelectedFile(file); setSelectedIds(file.selectedStudentIds || []); return }
                 void changeVisibility(file, visibility)
               }} className={`${FILTER_CLASS} ml-2`}>
-                {Object.entries(ARCHIVE_VISIBILITY_LABELS).map(([value, label]) => <option key={value} value={value} disabled={!canSetRestricted && (value === 'OFFICERS' || value === 'SELECTED')}>{label}</option>)}
+                {Object.entries(ARCHIVE_VISIBILITY_LABELS).filter(([value]) => value !== 'GROUP').map(([value, label]) => <option key={value} value={value} disabled={!canSetRestricted && (value === 'OFFICERS' || value === 'SELECTED')}>{label}</option>)}
               </select></label>
               {canSetRestricted && file.visibility === 'SELECTED' && <button type="button" onClick={() => { setSelectedFile(file); setSelectedIds(file.selectedStudentIds || []) }} className={ACTION_CLASS}>지정 회원 수정</button>}
             </div>}

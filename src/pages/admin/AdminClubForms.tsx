@@ -2,8 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
-import { deadlineText, deleteClubForm, FORM_CATEGORIES, isFormCategory, listAdminClubForms, listClubFormResponses, QUESTION_KINDS, saveClubForm, type ClubForm, type ClubFormWrite, type FormCategory, type Question, type QuestionKind } from '../../services/clubFormApi'
+import { deadlineText, deleteClubForm, FORM_CATEGORIES, getClubFormAggregates, isFormCategory, listAdminClubForms, listClubFormResponses, QUESTION_KINDS, saveClubForm, type ClubForm, type ClubFormWrite, type FormCategory, type Question, type QuestionKind } from '../../services/clubFormApi'
 import { listAdminHackathonEvents } from '../../services/hackathonApi'
+import { useAuth } from '../../contexts/useAuth'
 
 const action = 'apple-action-secondary inline-flex min-h-10 items-center px-3 text-sm'
 const input = 'mt-1 w-full rounded-lg border border-[var(--app-hairline-strong)] bg-[var(--app-bg)] px-3 py-2 text-sm text-[var(--app-text)]'
@@ -21,11 +22,15 @@ function initialForm(category: FormCategory, eventId: number | null): ClubFormWr
     title: '팀 프로젝트 수요조사', description: '', category, hackathonEventId: null, accepting: false, closesAt: null,
     questions: [question('팀 프로젝트에 참여하고 싶나요?', 'SINGLE', ['참여 희망', '고민 중', '참여 어려움']), question('관심 있는 분야나 해 보고 싶은 프로젝트', 'LONG')],
   }
+  if (category === 'STUDY') return {
+    title: '스터디 수요조사', description: '', category, hackathonEventId: null, accepting: false, closesAt: null,
+    questions: [question('관심 있는 스터디 주제', 'LONG'), question('참여 의향', 'SINGLE', ['참여 희망', '관심 있음', '참여 어려움'])],
+  }
   return { title: '', description: '', category, hackathonEventId: null, accepting: false, closesAt: null, questions: [question()] }
 }
 
-function FormEditor({ initial, eventId, category, schemaLocked, onSaved }: {
-  initial?: ClubForm; eventId: number | null; category: FormCategory; schemaLocked: boolean; onSaved: (form: ClubForm) => void
+function FormEditor({ initial, eventId, category, schemaLocked, studyOnly, onSaved }: {
+  initial?: ClubForm; eventId: number | null; category: FormCategory; schemaLocked: boolean; studyOnly: boolean; onSaved: (form: ClubForm) => void
 }) {
   const [draft, setDraft] = useState<ClubFormWrite>(() => initial ?? initialForm(category, eventId))
   const [pending, setPending] = useState(false)
@@ -47,7 +52,7 @@ function FormEditor({ initial, eventId, category, schemaLocked, onSaved }: {
   return <form onSubmit={submit} className={box + ' grid gap-4'}>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h3 className="font-bold">{initial ? '양식 수정' : '새 양식 만들기'}</h3>
-      {!initial && <div className="flex flex-wrap gap-2">
+      {!initial && !studyOnly && <div className="flex flex-wrap gap-2">
         <button type="button" className={action} onClick={() => setDraft(initialForm('HACKATHON', eventId))} disabled={pending}>해커톤 신청 양식</button>
         <button type="button" className={action} onClick={() => setDraft(initialForm('TEAM_PROJECT', null))} disabled={pending}>팀프 수요조사 양식</button>
       </div>}
@@ -56,7 +61,7 @@ function FormEditor({ initial, eventId, category, schemaLocked, onSaved }: {
       <label className={label}>제목<input className={input} value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} required maxLength={120} /></label>
       <label className={label}>참여 안내<textarea className={input} value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} maxLength={3000} rows={3} /></label>
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className={label}>접수 종류<select className={input} value={draft.category} disabled={schemaLocked} onChange={e => setDraft({ ...draft, category: e.target.value as FormCategory, hackathonEventId: null })}>{Object.entries(FORM_CATEGORIES).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></label>
+        <label className={label}>접수 종류<select className={input} value={draft.category} disabled={schemaLocked || studyOnly} onChange={e => setDraft({ ...draft, category: e.target.value as FormCategory, hackathonEventId: null })}>{Object.entries(FORM_CATEGORIES).filter(([key]) => !studyOnly || key === 'STUDY').map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></label>
         <label className={label}>마감 일시 (한국 시간)<input className={input} type="datetime-local" value={draft.closesAt?.slice(0, 16) ?? ''} onChange={e => setDraft({ ...draft, closesAt: e.target.value || null })} /></label>
       </div>
       {draft.category === 'HACKATHON' && <label className={label}>연결할 해커톤<select className={input} disabled={schemaLocked || !events.data} value={draft.hackathonEventId ?? ''} onChange={e => setDraft({ ...draft, hackathonEventId: Number(e.target.value) || null })}>
@@ -88,9 +93,22 @@ function FormEditor({ initial, eventId, category, schemaLocked, onSaved }: {
 }
 
 function ResponseList({ form, page, setPage }: { form: ClubForm; page: number; setPage: (value: number) => void }) {
-  const results = useQuery({ queryKey: ['admin', 'club-forms', 'responses', form.id, page], queryFn: () => listClubFormResponses(form.id, page) })
+  const { user } = useAuth()
+  const results = useQuery({ queryKey: ['admin', 'club-forms', 'responses', user?.studentId, form.id, page], queryFn: () => listClubFormResponses(form.id, page) })
+  const aggregates = useQuery({ queryKey: ['admin', 'club-forms', 'aggregates', user?.studentId, form.id], queryFn: () => getClubFormAggregates(form.id) })
   return <section className={box + ' space-y-3'} aria-label={form.title + ' 응답 현황'}>
     <h3 className="font-bold">응답 현황{results.data ? ' · ' + results.data.total + '건' : ''}</h3>
+    {aggregates.isPending && <p role="status">전체 응답을 집계하는 중…</p>}
+    {aggregates.isError && <p role="alert">집계를 불러오지 못했습니다. <button type="button" className="min-h-11 underline" onClick={() => void aggregates.refetch()}>다시 불러오기</button></p>}
+    {aggregates.data && <div className="grid gap-4" aria-label="질문별 전체 응답 집계">{aggregates.data.questions.map(field => <div key={field.id} className={box}>
+      <h4 className="break-words text-sm font-bold">{field.label}</h4>
+      {isChoice(field.kind) ? <ul className="mt-3 grid list-none gap-3 p-0">{Object.entries(field.counts).map(([option, count]) => {
+        const max = Math.max(1, ...Object.values(field.counts))
+        return <li key={option} className="text-sm"><div className="flex justify-between gap-2"><span className="break-words">{option}</span><span>{count}명</span></div>
+          <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--app-hairline)]" aria-hidden="true"><div className="h-full rounded-full bg-[var(--app-accent)]" style={{ width: `${count / max * 100}%` }} /></div>
+        </li>
+      })}</ul> : <ul className="mt-3 grid list-none gap-2 p-0">{field.answers.length ? field.answers.map((answer, index) => <li key={answer.studentId + ':' + index} className="break-words text-sm"><span className="font-semibold">{answer.name} ({answer.studentId})</span> · <span className="whitespace-pre-wrap">{answer.value}</span></li>) : <li className="text-sm text-[var(--app-muted)]">응답 없음</li>}</ul>}
+    </div>)}</div>}
     {results.isPending && <p role="status">응답을 불러오는 중…</p>}
     {results.isError && <p role="alert">응답을 불러오지 못했습니다. <button type="button" className="underline" onClick={() => void results.refetch()}>다시 불러오기</button></p>}
     {results.data?.total === 0 && <p className="text-sm">아직 접수된 응답이 없습니다.</p>}
@@ -107,11 +125,13 @@ function ResponseList({ form, page, setPage }: { form: ClubForm; page: number; s
 }
 
 export default function AdminClubForms() {
+  const { user } = useAuth()
+  const studyOnly = user?.role !== 'ADMIN'
   const [params] = useSearchParams()
   const client = useQueryClient()
-  const list = useQuery({ queryKey: ['admin', 'club-forms', 'list'], queryFn: listAdminClubForms })
+  const list = useQuery({ queryKey: ['admin', 'club-forms', 'list', user?.studentId], queryFn: listAdminClubForms, enabled: Boolean(user) })
   const categoryParam = params.get('category')
-  const category = isFormCategory(categoryParam) ? categoryParam : 'OTHER'
+  const category = studyOnly ? 'STUDY' : isFormCategory(categoryParam) ? categoryParam : 'OTHER'
   const eventParam = Number(params.get('hackathon'))
   const eventId = category === 'HACKATHON' && Number.isSafeInteger(eventParam) && eventParam > 0 ? eventParam : null
   const [selected, setSelected] = useState<number | null>(null)
@@ -121,7 +141,7 @@ export default function AdminClubForms() {
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
   const current = list.data?.find(item => item.id === selected)
-  const responses = useQuery({ queryKey: ['admin', 'club-forms', 'responses', current?.id, 0], queryFn: () => listClubFormResponses(current!.id, 0), enabled: Boolean(current) })
+  const responses = useQuery({ queryKey: ['admin', 'club-forms', 'responses', user?.studentId, current?.id, 0], queryFn: () => listClubFormResponses(current!.id, 0), enabled: Boolean(current) })
   const refresh = () => Promise.all([client.invalidateQueries({ queryKey: ['admin', 'club-forms'] }), client.invalidateQueries({ queryKey: ['club-forms'] })])
   const saved = (value: ClubForm) => {
     setEditor(null); setSelected(value.id); setPage(0); setError(''); setNotice('양식을 저장했습니다.')
@@ -145,7 +165,7 @@ export default function AdminClubForms() {
     </div>
     {notice && <p role="status" className="text-sm">{notice}</p>}
     {error && <p role="alert" className="text-sm text-[var(--app-danger)]">{error}</p>}
-    {editor === 'new' && <FormEditor key="new" eventId={eventId} category={category} schemaLocked={false} onSaved={saved} />}
+    {editor === 'new' && <FormEditor key="new" eventId={eventId} category={category} schemaLocked={false} studyOnly={studyOnly} onSaved={saved} />}
     {list.isPending && <p role="status">양식을 불러오는 중…</p>}
     {list.isError && <p role="alert">양식을 불러오지 못했습니다. <button type="button" className="underline" onClick={() => void list.refetch()}>다시 불러오기</button></p>}
     {list.data?.length === 0 && <p className="text-sm">아직 만든 양식이 없습니다.</p>}
@@ -160,7 +180,7 @@ export default function AdminClubForms() {
         <button type="button" className={action} onClick={() => void copy(current)}>링크 복사</button>
         {responses.data?.total === 0 && <button type="button" disabled={deleting} className={action} onClick={() => void remove(current)}>양식 삭제</button>}
       </div>
-      {editor === 'edit' && <FormEditor key={current.id} initial={current} eventId={eventId} category={category} schemaLocked={responses.data?.total !== 0} onSaved={saved} />}
+      {editor === 'edit' && <FormEditor key={current.id} initial={current} eventId={eventId} category={category} schemaLocked={responses.data?.total !== 0} studyOnly={studyOnly} onSaved={saved} />}
       <ResponseList form={current} page={page} setPage={setPage} />
     </div>}
   </section>

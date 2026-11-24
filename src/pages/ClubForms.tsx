@@ -94,7 +94,7 @@ function FormsList({ studentId }: { studentId: string }) {
     && (!event || item.hackathonEventId === null || item.hackathonEventId === event))
   return <>
     <PageHeading>신청·수요조사</PageHeading>
-    <p className="mt-3 max-w-xl text-[var(--app-muted)]">해커톤 참가 신청, 팀 프로젝트 수요조사, 동아리 활동 접수를 모았습니다.</p>
+    <p className="mt-3 max-w-xl text-[var(--app-muted)]">해커톤 참가 신청, 팀 프로젝트·스터디 수요조사, 동아리 활동 접수를 모았습니다.</p>
     <label className="mt-5 block max-w-60 text-sm font-semibold">접수 종류<select className={input} value={category ?? ''} onChange={e => setParams(e.target.value ? { category: e.target.value } : {})}><option value="">전체</option>{Object.entries(FORM_CATEGORIES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
     {event && <Link to="/forms?category=HACKATHON" className="mt-2 inline-block text-sm underline">해커톤 양식 전체 보기</Link>}
     {query.isPending && <p role="status" className="mt-5">양식을 불러오는 중…</p>}

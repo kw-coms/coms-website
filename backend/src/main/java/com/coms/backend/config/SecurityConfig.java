@@ -100,6 +100,7 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.POST, "/api/recruit/apply", "/api/recruit/status").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/site-settings").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/opportunities").permitAll();
+                auth.requestMatchers(HttpMethod.GET, "/api/study-groups").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/api/ask").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/hackathon").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/api/hackathon/reviews").permitAll();
@@ -117,6 +118,8 @@ public class SecurityConfig {
                         "/api/admin/club-project-categories/**", "/api/admin/recurring-schedules/**").authenticated();
                 // The controller enforces activity.write for every review and collection action.
                 auth.requestMatchers("/api/admin/opportunities", "/api/admin/opportunities/**").authenticated();
+                // Per-category ADMIN / activity.write checks remain in ClubFormController.
+                auth.requestMatchers("/api/admin/club-forms", "/api/admin/club-forms/**").authenticated();
                 // community.moderate 권한으로 열리는 중재 화면(신고, 삭제 보관함).
                 auth.requestMatchers("/api/admin/community/**").authenticated();
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN");

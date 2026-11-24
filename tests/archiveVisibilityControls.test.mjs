@@ -13,10 +13,10 @@ const host = document.createElement('div')
 document.body.append(host)
 const root = createRoot(host)
 
-for (const visibility of ['PUBLIC', 'MEMBERS', 'OFFICERS', 'SELECTED']) {
+for (const visibility of ['PUBLIC', 'MEMBERS', 'OFFICERS', 'SELECTED', 'GROUP']) {
   for (const granted of [false, true]) {
     rows = [{ id: 1, title: '내 자료', originalName: 'own.txt', uploadedBy: 'owner', visibility, selectedStudentIds: [], uploadedAt: '2026-11-24T00:00:00' }]
-    const mayChange = granted || visibility === 'PUBLIC' || visibility === 'MEMBERS'
+    const mayChange = visibility !== 'GROUP' && (granted || visibility === 'PUBLIC' || visibility === 'MEMBERS')
     await act(async () => {
       root.render(h(AuthContext.Provider, { value: {
         user: { studentId: 'owner', role: 'USER' }, loading: false,
@@ -34,6 +34,8 @@ for (const visibility of ['PUBLIC', 'MEMBERS', 'OFFICERS', 'SELECTED']) {
     assert.ok(publicChoice, 'the owner can still open the metadata editor')
     assert.equal(publicChoice.disabled, !mayChange,
       `form visibility control: ${visibility}, grant=${granted}`)
+    assert.equal(!!host.querySelector('input[type="radio"][value="GROUP"]'), visibility === 'GROUP',
+      'only existing study materials display the fixed group audience')
   }
 }
 await act(async () => root.unmount())

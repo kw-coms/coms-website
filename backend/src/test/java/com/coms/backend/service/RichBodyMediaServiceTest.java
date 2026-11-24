@@ -21,15 +21,37 @@ class RichBodyMediaServiceTest {
     private final RichBodyMediaRepository rows = mock(RichBodyMediaRepository.class);
     private final MemberRepository members = mock(MemberRepository.class);
     private final com.coms.backend.repository.ArchiveFileRepository archiveFiles = mock(com.coms.backend.repository.ArchiveFileRepository.class);
+    private final StudyAccessService studyAccess = mock(StudyAccessService.class);
     private final StorageService storage = mock(StorageService.class);
     private final MediaUploadValidator validator = mock(MediaUploadValidator.class);
     private final RichBodyMediaDeleter deleter = mock(RichBodyMediaDeleter.class);
     private final org.springframework.transaction.PlatformTransactionManager transactions =
             mock(org.springframework.transaction.PlatformTransactionManager.class);
     private final RichBodyMediaService service = new RichBodyMediaService(rows, members, storage, validator,
-            Clock.fixed(java.time.Instant.parse("2026-11-06T00:00:00Z"), ZoneOffset.UTC), deleter, transactions, 8L << 30, 60, archiveFiles);
+            Clock.fixed(java.time.Instant.parse("2026-11-06T00:00:00Z"), ZoneOffset.UTC), deleter, transactions, 8L << 30, 60, archiveFiles,
+            studyAccess);
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 6, 0, 0);
     private static final RichBodyMedia.Scope NOTICE = RichBodyMedia.Scope.NOTICE;
+
+    @Test void archiveBodyMediaRequiresCurrentStudyMembership() {
+        var media = row(7, RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.ARCHIVE, 100);
+        media.attach(50L, NOW);
+        when(rows.findById(7L)).thenReturn(Optional.of(media));
+        var file = new com.coms.backend.domain.ArchiveFile();
+        file.setStudyGroupId(3L);
+        file.setVisibility(com.coms.backend.domain.ArchiveFile.Visibility.GROUP);
+        file.setUploadedBy("former-member");
+        when(archiveFiles.findById(50L)).thenReturn(Optional.of(file));
+        Member reader = new Member();
+        reader.setStudentId("former-member");
+        when(members.findByStudentId("former-member")).thenReturn(Optional.of(reader));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.get(7L, "former-member"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode().value()).isEqualTo(404));
+        when(studyAccess.canReadMaterials(3L, "former-member")).thenReturn(true);
+        assertThat(service.get(7L, "former-member")).isSameAs(media);
+    }
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = {"0", "-1", "1.5", "\"1\"", "9223372036854775808"})
@@ -158,7 +180,7 @@ class RichBodyMediaServiceTest {
         var file = new org.springframework.mock.web.MockMultipartFile(
                 "file", "../reports/report..final.pdf", "application/pdf", "%PDF-1.7".getBytes());
         var realValidatorService = new RichBodyMediaService(rows, members, storage, new MediaUploadValidator(),
-                Clock.systemUTC(), deleter, transactions, 8L << 30, 60, archiveFiles);
+                Clock.systemUTC(), deleter, transactions, 8L << 30, 60, archiveFiles, mock(StudyAccessService.class));
         when(storage.store(file, "pdf")).thenReturn("uuid.pdf");
         when(rows.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -441,7 +463,8 @@ class RichBodyMediaServiceTest {
 
     @Test void uploadsAreRateLimitedPerMember() throws Exception {
         var limited = new RichBodyMediaService(rows, members, storage, validator,
-                Clock.fixed(java.time.Instant.parse("2026-11-06T00:00:00Z"), ZoneOffset.UTC), deleter, transactions, 8L << 30, 2, archiveFiles);
+                Clock.fixed(java.time.Instant.parse("2026-11-06T00:00:00Z"), ZoneOffset.UTC), deleter, transactions, 8L << 30, 2, archiveFiles,
+                mock(StudyAccessService.class));
         var file = prepareUpload();
         when(rows.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         limited.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor");

@@ -19,6 +19,7 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -73,6 +74,41 @@ class NotificationServicePreferencesTest {
         clearInvocations(pushNotificationSender);
         author = saveMember("2026910001", "글쓴이");
         commenter = saveMember("2026910002", "댓글러");
+    }
+
+    @Test
+    void studyNotificationsLinkToTheGroupAndFollowNoticePreferences() {
+        notificationService.notifyStudy(author.getStudentId(), commenter.getStudentId(), 42L, "가입 요청이 있습니다.");
+        List<Notification> notifications = notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(author.getStudentId());
+        assertThat(notifications).hasSize(1);
+        assertThat(notifications.getFirst().getType()).isEqualTo(Notification.Type.STUDY_ACTIVITY);
+        assertThat(notifications.getFirst().getAcceptUrl()).isEqualTo("/study/groups/42");
+        verify(pushNotificationSender, timeout(2000)).sendToMember(eq(author.getStudentId()), eq("스터디 알림"),
+                eq("가입 요청이 있습니다."), eq(java.util.Map.of("type", "STUDY_ACTIVITY", "url", "/study/groups/42")));
+
+        notificationService.notifyStudy(author.getStudentId(), author.getStudentId(), 42L, "내 요청");
+        notificationService.updatePreferences(author.getStudentId(),
+                new NotificationPreferencesRequest(true, true, false, true, true, true, true));
+        notificationService.notifyStudy(author.getStudentId(), commenter.getStudentId(), 42L, "다른 요청");
+        assertThat(notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(author.getStudentId())).hasSize(1);
+    }
+
+    @Test
+    void studyAttendanceNotificationsLoadPreferencesOnceAndRespectOptOut() {
+        Member optedOut = saveMember("2026910003", "알림 끈 회원");
+        notificationService.updatePreferences(optedOut.getStudentId(),
+                new NotificationPreferencesRequest(true, true, false, true, true, true, true));
+        clearInvocations(notificationPreferenceRepository);
+        Set<String> recipients = Set.of(author.getStudentId(), commenter.getStudentId(), optedOut.getStudentId());
+
+        notificationService.notifyStudyMembers(recipients, author.getStudentId(), 42L, "출석이 열렸습니다.");
+
+        verify(notificationPreferenceRepository).findByMemberStudentIdIn(recipients);
+        verify(notificationPreferenceRepository, never()).findByMemberStudentId(anyString());
+        assertThat(notificationRepository.findAll()).singleElement().satisfies(notification -> {
+            assertThat(notification.getRecipientStudentId()).isEqualTo(commenter.getStudentId());
+            assertThat(notification.getAcceptUrl()).isEqualTo("/study/groups/42");
+        });
     }
 
     @Test

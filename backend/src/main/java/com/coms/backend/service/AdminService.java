@@ -65,6 +65,7 @@ public class AdminService {
     private final MeetingPollService meetingPollService;
     private final AttendanceService attendanceService;
     private final GatheringService gatheringService;
+    private final StudyGroupService studyGroupService;
     private final ClubProjectSocialService clubProjectSocialService;
 
     public AdminService(MemberRepository memberRepository, EligibleMemberService eligibleMemberService,
@@ -81,7 +82,8 @@ public class AdminService {
                         MeetingPollService meetingPollService,
                         AttendanceService attendanceService,
                         GatheringService gatheringService,
-                        ClubProjectSocialService clubProjectSocialService) {
+                        ClubProjectSocialService clubProjectSocialService,
+                        StudyGroupService studyGroupService) {
         this.memberRepository = memberRepository;
         this.eligibleMemberService = eligibleMemberService;
         this.passwordEncoder = passwordEncoder;
@@ -102,6 +104,7 @@ public class AdminService {
         this.meetingPollService = meetingPollService;
         this.attendanceService = attendanceService;
         this.gatheringService = gatheringService;
+        this.studyGroupService = studyGroupService;
         this.clubProjectSocialService = clubProjectSocialService;
     }
 
@@ -209,7 +212,7 @@ public class AdminService {
     }
 
     public DeletedMemberSnapshot deleteMember(Long id) {
-        Member member = memberRepository.findById(id)
+        Member member = memberRepository.findWithLockById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         ensureNotFinalAdmin(member, "마지막 관리자는 삭제할 수 없습니다.");
         DeletedMemberSnapshot snapshot = DeletedMemberSnapshot.from(member);
@@ -219,7 +222,7 @@ public class AdminService {
     }
 
     public DeletedMemberSnapshot deleteByStudentId(String studentId) {
-        Member member = memberRepository.findByStudentId(studentId)
+        Member member = memberRepository.findWithLockByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         ensureNotFinalAdmin(member, "마지막 관리자는 탈퇴할 수 없습니다.");
         DeletedMemberSnapshot snapshot = DeletedMemberSnapshot.from(member);
@@ -253,6 +256,7 @@ public class AdminService {
         attendanceService.deleteDataForMember(studentId);
         // 모임 신청: 이 회원이 신청한 내역과, 이 회원이 연 모임(안의 신청 포함)을 함께 지운다.
         gatheringService.deleteDataForMember(studentId);
+        studyGroupService.deleteDataForMember(studentId);
         // 지원서에는 이름/연락처/이메일이 그대로 남고, 로그인 실패 기록에는 학번과 IP 가 남는다.
         // 둘 다 감사 기록이 아니라 개인정보이므로 탈퇴 시 함께 지운다.
         recruitApplicationRepository.deleteByStudentId(studentId);

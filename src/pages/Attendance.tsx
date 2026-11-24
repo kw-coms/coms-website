@@ -128,7 +128,7 @@ function CheckInPanel({ openSessions, loaded, onChecked }: {
   const [code, setCode] = useState('')
   const [result, setResult] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
   const mutation = useMutation({
-    mutationFn: checkInToAttendance,
+    mutationFn: (code: string) => checkInToAttendance(code),
     onSuccess: (checked) => {
       setCode('')
       setResult({

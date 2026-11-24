@@ -42,6 +42,12 @@ public class AttendanceSession {
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
 
+    @Column(name = "study_session_id", unique = true)
+    private Long studySessionId;
+
+    @Column(name = "first_opened_at")
+    private LocalDateTime firstOpenedAt;
+
     /** True while members can still check in. */
     public boolean isOpenAt(LocalDateTime now) {
         return closedAt == null && closesAt.isAfter(now);
@@ -62,4 +68,8 @@ public class AttendanceSession {
     public void setClosesAt(LocalDateTime closesAt) { this.closesAt = closesAt; }
     public LocalDateTime getClosedAt() { return closedAt; }
     public void setClosedAt(LocalDateTime closedAt) { this.closedAt = closedAt; }
+    public Long getStudySessionId() { return studySessionId; }
+    public void setStudySessionId(Long studySessionId) { this.studySessionId = studySessionId; }
+    public LocalDateTime getFirstOpenedAt() { return firstOpenedAt; }
+    public void setFirstOpenedAt(LocalDateTime firstOpenedAt) { this.firstOpenedAt = firstOpenedAt; }
 }

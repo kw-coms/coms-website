@@ -38,6 +38,7 @@ public class RichBodyMediaService {
     private final RichBodyMediaRepository repository;
     private final MemberRepository members;
     private final ArchiveFileRepository archiveFiles;
+    private final StudyAccessService studyAccess;
     private final StorageService storage;
     private final MediaUploadValidator validator;
     private final Clock clock;
@@ -51,9 +52,10 @@ public class RichBodyMediaService {
                                 PlatformTransactionManager transactionManager,
                                 @Value("${coms.media.pending-total-max-bytes:8589934592}") long pendingTotalMaxBytes,
                                 @Value("${coms.media.uploads-per-10-minutes:60}") int uploadsPer10Minutes,
-                                ArchiveFileRepository archiveFiles) {
+                                ArchiveFileRepository archiveFiles, StudyAccessService studyAccess) {
         this.repository = repository; this.members = members; this.storage = storage;
         this.archiveFiles = archiveFiles;
+        this.studyAccess = studyAccess;
         this.validator = validator; this.clock = clock; this.deleter = deleter;
         this.uploadTransaction = new TransactionTemplate(transactionManager);
         this.pendingTotalMaxBytes = pendingTotalMaxBytes;
@@ -141,7 +143,9 @@ public class RichBodyMediaService {
             }
         } else if (media.getScope() == RichBodyMedia.Scope.ARCHIVE) {
             var reader = studentId == null ? null : members.findByStudentId(studentId).orElse(null);
-            archiveFiles.findById(media.getOwnerId()).filter(file -> file.isVisibleTo(reader))
+            archiveFiles.findById(media.getOwnerId()).filter(file -> file.isVisibleTo(reader,
+                            file.getStudyGroupId() != null && reader != null
+                                    && studyAccess.canReadMaterials(file.getStudyGroupId(), reader.getStudentId())))
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         } else if (media.getScope() != RichBodyMedia.Scope.SPONSOR && studentId == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);

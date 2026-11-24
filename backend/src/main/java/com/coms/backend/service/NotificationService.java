@@ -575,6 +575,32 @@ public class NotificationService {
         }
     }
 
+    public void notifyStudy(String recipientStudentId, String actorStudentId, Long groupId, String message) {
+        if (recipientStudentId == null || recipientStudentId.equals(actorStudentId)
+                || !isCategoryEnabled(recipientStudentId, Notification.Type.STUDY_ACTIVITY)) return;
+        saveStudyNotification(recipientStudentId, actorStudentId, groupId, message);
+    }
+
+    public void notifyStudyMembers(Set<String> studentIds, String actorStudentId, Long groupId, String message) {
+        Map<String, NotificationPreference> preferences = preferencesByStudentId(studentIds);
+        for (String studentId : studentIds) {
+            if (!studentId.equals(actorStudentId)
+                    && isCategoryEnabled(preferences, studentId, Notification.Type.STUDY_ACTIVITY)) {
+                saveStudyNotification(studentId, actorStudentId, groupId, message);
+            }
+        }
+    }
+
+    private void saveStudyNotification(String recipientStudentId, String actorStudentId, Long groupId, String message) {
+        String url = "/study/groups/" + groupId;
+        Notification notification = build(recipientStudentId, actorStudentId, Notification.Type.STUDY_ACTIVITY,
+                null, null, null, message);
+        notification.setAcceptUrl(url);
+        notificationRepository.save(notification);
+        sendPush(recipientStudentId, "스터디 알림", fitMessage(message),
+                Map.of("type", "STUDY_ACTIVITY", "url", url));
+    }
+
     public void notifyNoticeCreated(Notice notice) {
         String message = "새 공지: " + notice.getTitle();
         // Ids-only projection: fan-out never needs the full Member entity.

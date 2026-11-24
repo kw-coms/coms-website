@@ -94,7 +94,7 @@ public class AttendanceController {
     @PostMapping("/check-in")
     public ResponseEntity<AttendanceCheckInResponse> checkInToAttendance(@Valid @RequestBody AttendanceCheckInRequest request,
                                                                          Authentication authentication) {
-        return ResponseEntity.ok(attendanceService.checkIn(request.code(), authentication.getName()));
+        return ResponseEntity.ok(attendanceService.checkIn(request, authentication.getName()));
     }
 
     private void audit(Authentication authentication, String action, Long sessionId, String detail) {

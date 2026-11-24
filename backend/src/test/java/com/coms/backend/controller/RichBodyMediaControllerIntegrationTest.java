@@ -133,7 +133,8 @@ class RichBodyMediaControllerIntegrationTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.EnumSource(com.coms.backend.domain.ArchiveFile.Visibility.class)
+    @org.junit.jupiter.params.provider.EnumSource(value = com.coms.backend.domain.ArchiveFile.Visibility.class,
+            names = {"PUBLIC", "MEMBERS", "OFFICERS", "SELECTED"})
     void archiveBodyMediaUsesParentVisibilityForInlineAndDownload(com.coms.backend.domain.ArchiveFile.Visibility visibility) throws Exception {
         String[] readers = {null, "2026000110", "2026000111", "2026000102", "2026000112", "2026000113", "2026000114", "2026000103", "2026000101"};
         members.save(member("2026000110", Member.Role.ASSOCIATE));
@@ -152,6 +153,7 @@ class RichBodyMediaControllerIntegrationTest {
                 case MEMBERS -> i > 0;
                 case OFFICERS -> i == 3 || i == 4;
                 case SELECTED -> i == 5 || i == 6;
+                case GROUP -> false;
             };
             for (String suffix : new String[]{"", "/download"}) {
                 var request = get("/api/rich-media/" + id + suffix);

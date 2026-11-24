@@ -75,12 +75,15 @@ public class ArchiveService {
     private final AuditLogService auditLogService;
     private final RichBodyMediaService richBodyMediaService;
     private final PermissionService permissionService;
+    private final StudyAccessService studyAccess;
+    private final com.coms.backend.repository.StudySessionRepository studySessions;
 
     public ArchiveService(ArchiveFileRepository repo, ArchiveAttachmentRepository attachmentRepository,
                           StorageService storage, MemberRepository memberRepository,
                           ArchiveFileVoteRepository voteRepository, RichContentSanitizer richContentSanitizer,
                           AuditLogService auditLogService, RichBodyMediaService richBodyMediaService,
-                          PermissionService permissionService) {
+                          PermissionService permissionService, StudyAccessService studyAccess,
+                          com.coms.backend.repository.StudySessionRepository studySessions) {
         this.repo = repo;
         this.attachmentRepository = attachmentRepository;
         this.storage = storage;
@@ -90,6 +93,8 @@ public class ArchiveService {
         this.auditLogService = auditLogService;
         this.richBodyMediaService = richBodyMediaService;
         this.permissionService = permissionService;
+        this.studyAccess = studyAccess;
+        this.studySessions = studySessions;
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -112,12 +117,33 @@ public class ArchiveService {
     public ArchiveFileResponse uploadGroup(String title, String description, String category,
                                            List<MultipartFile> files, String uploaderStudentId,
                                            String visibility, List<String> selectedStudentIds) throws IOException {
+        return uploadGroup(title, description, category, files, uploaderStudentId,
+                visibility, selectedStudentIds, null, null);
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    public ArchiveFileResponse uploadGroup(String title, String description, String category,
+                                           List<MultipartFile> files, String uploaderStudentId,
+                                           String visibility, List<String> selectedStudentIds,
+                                           Long studyGroupId, Long studySessionId) throws IOException {
         ArchiveFile.Category parsedCategory = parseCategory(category);
         String typedTitle = normalizeTitle(title);
         String cleanedDescription = sanitizeDescription(description);
         Member member = memberRepository.findByStudentId(uploaderStudentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        VisibilitySelection selection = visibilitySelection(visibility, selectedStudentIds, member, null);
+        VisibilitySelection selection;
+        if (studyGroupId == null) {
+            if (studySessionId != null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "스터디 회차에는 모임이 필요합니다.");
+            selection = visibilitySelection(visibility, selectedStudentIds, member, null);
+        } else {
+            studyAccess.requireParticipant(studyGroupId, uploaderStudentId);
+            if (visibility != null && !"GROUP".equals(visibility))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "스터디 자료는 모임 공개만 가능합니다.");
+            if (selectedStudentIds != null && !selectedStudentIds.isEmpty())
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "스터디 자료는 회원을 개별 선택할 수 없습니다.");
+            requireStudySession(studyGroupId, studySessionId);
+            selection = new VisibilitySelection(ArchiveFile.Visibility.GROUP, Set.of());
+        }
         validateGroup(files);
 
         List<String> newStoredNames = new ArrayList<>();
@@ -139,6 +165,8 @@ public class ArchiveService {
             entity.setUploaderName(member.getName());
             entity.setVisibility(selection.visibility());
             entity.setSelectedStudentIds(selection.studentIds());
+            entity.setStudyGroupId(studyGroupId);
+            entity.setStudySessionId(studySessionId);
             ArchiveFile saved = repo.save(entity);
             richBodyMediaService.syncAttachments(RichBodyMedia.Scope.ARCHIVE, saved.getId(), saved.getDescription(), uploaderStudentId);
             for (int i = 0; i < files.size(); i++) {
@@ -173,7 +201,7 @@ public class ArchiveService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         ArchiveFile entity = repo.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!entity.isVisibleTo(editor)) {
+        if (!isVisibleTo(entity, editor)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         if (!Objects.equals(entity.getUploadedBy(), editor.getStudentId())
@@ -181,7 +209,11 @@ public class ArchiveService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         VisibilitySelection selection = visibility == null && selectedStudentIds == null ? null
+                : entity.getStudyGroupId() != null && "GROUP".equals(visibility)
+                && (selectedStudentIds == null || selectedStudentIds.isEmpty()) ? null
                 : visibilitySelection(visibility, selectedStudentIds, editor, entity.getVisibility());
+        if (entity.getStudyGroupId() != null && selection != null && selection.visibility() != ArchiveFile.Visibility.GROUP)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "스터디 자료는 모임 공개만 가능합니다.");
         if (selection != null && !Objects.equals(entity.getUploadedBy(), editorStudentId)
                 && !permissionService.has(editor, Permission.ARCHIVE_VISIBILITY)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
@@ -249,7 +281,7 @@ public class ArchiveService {
     public ArchiveFileResponse updateAuthor(Long id, String uploaderName, String studentId, String editorStudentId) {
         Member editor = requireMember(editorStudentId);
         ArchiveFile entity = repo.findByIdForUpdate(id)
-                .filter(file -> file.isVisibleTo(editor))
+                .filter(file -> isVisibleTo(file, editor))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (!permissionService.has(editor, Permission.ARCHIVE_AUTHOR_CHANGE)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
@@ -288,8 +320,22 @@ public class ArchiveService {
 
     @Transactional(readOnly = true)
     public List<ArchiveFileResponse> list(String studentId) {
+        return list(studentId, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ArchiveFileResponse> list(String studentId, Long studyGroupId, Long studySessionId) {
+        if (studySessionId != null && studyGroupId == null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "스터디 회차에는 모임이 필요합니다.");
+        if (studyGroupId != null) {
+            studyAccess.requireParticipant(studyGroupId, studentId);
+            requireStudySession(studyGroupId, studySessionId);
+        }
         Member viewer = member(studentId);
-        List<ArchiveFile> files = repo.findVisible(studentId(viewer), officer(viewer), admin(viewer), Pageable.unpaged());
+        List<ArchiveFile> files = repo.findVisible(studentId(viewer), officer(viewer), admin(viewer), activityWriter(viewer), Pageable.unpaged());
+        if (studyGroupId != null) files = files.stream()
+                .filter(file -> studyGroupId.equals(file.getStudyGroupId())
+                        && (studySessionId == null || studySessionId.equals(file.getStudySessionId()))).toList();
         Map<Long, VoteSummary> stats = voteStats(files);
         Map<Long, List<ArchiveAttachment>> attachments = attachmentsFor(files);
         return files.stream().map(file -> toResponse(file, stats, studentId, attachments.get(file.getId()))).toList();
@@ -302,7 +348,7 @@ public class ArchiveService {
     @Transactional(readOnly = true)
     public List<ArchiveFileResponse> listLimited(int limit, String studentId) {
         Member viewer = member(studentId);
-        List<ArchiveFile> files = repo.findVisible(studentId(viewer), officer(viewer), admin(viewer), PageRequest.of(0, limit));
+        List<ArchiveFile> files = repo.findVisible(studentId(viewer), officer(viewer), admin(viewer), activityWriter(viewer), PageRequest.of(0, limit));
         Map<Long, VoteSummary> stats = voteStats(files);
         Map<Long, List<ArchiveAttachment>> attachments = attachmentsFor(files);
         return files.stream().map(file -> toResponse(file, stats, studentId, attachments.get(file.getId()))).toList();
@@ -311,14 +357,14 @@ public class ArchiveService {
     @Transactional(readOnly = true)
     public ArchiveFile get(Long id, String studentId) {
         Member viewer = member(studentId);
-        return repo.findById(id).filter(file -> file.isVisibleTo(viewer))
+        return repo.findById(id).filter(file -> isVisibleTo(file, viewer))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     public ArchiveFileResponse getAndIncrementView(Long id, String studentId) {
         Member viewer = member(studentId);
         ArchiveFile file = repo.findById(id)
-                .filter(row -> row.isVisibleTo(viewer))
+                .filter(row -> isVisibleTo(row, viewer))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (viewer != null) {
             repo.incrementViewCount(id);
@@ -363,7 +409,7 @@ public class ArchiveService {
         Member actor = requireMember(actorStudentId);
         ArchiveFile file = repo.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!file.isVisibleTo(actor)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (!isVisibleTo(file, actor)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         if (!Objects.equals(file.getUploadedBy(), actorStudentId)
                 && !permissionService.has(actor, Permission.ARCHIVE_DELETE)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
@@ -384,7 +430,9 @@ public class ArchiveService {
         Member actor = requireMember(actorStudentId);
         ArchiveFile file = repo.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!file.isVisibleTo(actor)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (!isVisibleTo(file, actor)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (file.getStudyGroupId() != null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "스터디 자료는 모임 공개만 가능합니다.");
         if (!Objects.equals(file.getUploadedBy(), actorStudentId)
                 && !permissionService.has(actor, Permission.ARCHIVE_VISIBILITY)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
@@ -427,6 +475,8 @@ public class ArchiveService {
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바르지 않은 공개 범위입니다.");
         }
+        if (visibility == ArchiveFile.Visibility.GROUP)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "모임 공개는 스터디 자료 업로드에서만 사용합니다.");
         if ((previousVisibility == ArchiveFile.Visibility.OFFICERS || previousVisibility == ArchiveFile.Visibility.SELECTED
                 || visibility == ArchiveFile.Visibility.OFFICERS || visibility == ArchiveFile.Visibility.SELECTED)
                 && !permissionService.has(actor, Permission.ARCHIVE_VISIBILITY)) {
@@ -459,6 +509,22 @@ public class ArchiveService {
                 || member.getRole() == Member.Role.VICE_PRESIDENT);
     }
     private boolean admin(Member member) { return member != null && member.getRole() == Member.Role.ADMIN; }
+    private boolean activityWriter(Member member) {
+        return member != null && permissionService.has(member, Permission.ACTIVITY_WRITE);
+    }
+
+    private boolean isVisibleTo(ArchiveFile file, Member viewer) {
+        return file.isVisibleTo(viewer, file.getStudyGroupId() != null && viewer != null
+                && studyAccess.canReadMaterials(file.getStudyGroupId(), viewer.getStudentId()));
+    }
+
+    private void requireStudySession(Long groupId, Long sessionId) {
+        if (sessionId == null) return;
+        var session = studySessions.findById(sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "스터디 회차를 찾을 수 없습니다."));
+        if (!groupId.equals(session.getGroupId()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "다른 모임의 회차입니다.");
+    }
 
     private List<String> selectedIdsForResponse(ArchiveFile file, String studentId) {
         if (file.getVisibility() != ArchiveFile.Visibility.SELECTED) return List.of();
@@ -505,6 +571,8 @@ public class ArchiveService {
                 file.getCategory().name(),
                 file.getVisibility().name(),
                 selectedIdsForResponse(file, studentId),
+                file.getStudyGroupId(),
+                file.getStudySessionId(),
                 file.getViewCount(),
                 votes.upvotes(),
                 votes.myVote(studentId),

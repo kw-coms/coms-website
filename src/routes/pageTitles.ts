@@ -23,6 +23,7 @@ const ROUTE_LABELS: Array<[pattern: RegExp, label: string | ((...groups: string[
   [/^\/gatherings(\/[^/]+)?$/, '모임 신청'],
   [/^\/projects$/, '프로젝트'],
   [/^\/study$/, '스터디'],
+  [/^\/study\/groups(?:\/[^/]+)?$/, '스터디 모임'],
   [/^\/study\/algorithms$/, '알고리즘 문제'],
   [/^\/study\/algorithms\/settings$/, '코딩 설정'],
   [/^\/study\/algorithms\/battles$/, '친선 배틀'],

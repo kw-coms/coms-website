@@ -102,6 +102,7 @@ const ARCHIVE_PERMISSIONS = [PERMISSIONS.archiveDelete, PERMISSIONS.archiveAutho
 export const TAB_PERMISSIONS: Record<string, PermissionKey | PermissionKey[]> = {
   activities: PERMISSIONS.activityWrite,
   'external-opportunities': PERMISSIONS.activityWrite,
+  'club-forms': PERMISSIONS.activityWrite,
   projects: PERMISSIONS.projectWrite,
   'site-settings': PERMISSIONS.siteSettingsEdit,
   files: ARCHIVE_PERMISSIONS,

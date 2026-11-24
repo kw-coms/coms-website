@@ -53,7 +53,7 @@ public class ArchiveFile {
     @Column(nullable = false)
     private Category category = Category.GENERAL;
 
-    public enum Visibility { PUBLIC, MEMBERS, OFFICERS, SELECTED }
+    public enum Visibility { PUBLIC, MEMBERS, OFFICERS, SELECTED, GROUP }
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -63,6 +63,12 @@ public class ArchiveFile {
     @CollectionTable(name = "archive_file_selected_members", joinColumns = @JoinColumn(name = "archive_file_id"))
     @Column(name = "student_id", nullable = false)
     private Set<String> selectedStudentIds = new HashSet<>();
+
+    @Column(name = "study_group_id")
+    private Long studyGroupId;
+
+    @Column(name = "study_session_id")
+    private Long studySessionId;
 
     @Column(name = "view_count", nullable = false)
     private long viewCount = 0;
@@ -97,7 +103,15 @@ public class ArchiveFile {
     public void setVisibility(Visibility visibility) { this.visibility = visibility; }
     public Set<String> getSelectedStudentIds() { return selectedStudentIds; }
     public void setSelectedStudentIds(Set<String> selectedStudentIds) { this.selectedStudentIds = new HashSet<>(selectedStudentIds); }
+    public Long getStudyGroupId() { return studyGroupId; }
+    public void setStudyGroupId(Long studyGroupId) { this.studyGroupId = studyGroupId; }
+    public Long getStudySessionId() { return studySessionId; }
+    public void setStudySessionId(Long studySessionId) { this.studySessionId = studySessionId; }
     public boolean isVisibleTo(Member viewer) {
+        return isVisibleTo(viewer, false);
+    }
+    public boolean isVisibleTo(Member viewer, boolean groupAccess) {
+        if (studyGroupId != null) return visibility == Visibility.GROUP && groupAccess;
         if (viewer != null && viewer.getRole() == Member.Role.ADMIN) return true;
         if (visibility == Visibility.PUBLIC) return true;
         if (viewer == null) return false;
@@ -106,6 +120,7 @@ public class ArchiveFile {
             case MEMBERS -> true;
             case OFFICERS -> viewer.getRole() == Member.Role.OFFICER || viewer.getRole() == Member.Role.VICE_PRESIDENT;
             case SELECTED -> selectedStudentIds.contains(viewer.getStudentId());
+            case GROUP -> false;
             case PUBLIC -> true;
         };
     }

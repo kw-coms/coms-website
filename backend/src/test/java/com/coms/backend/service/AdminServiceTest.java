@@ -58,6 +58,7 @@ class AdminServiceTest {
     private final ClubActivityVoteRepository clubActivityVoteRepository = mock(ClubActivityVoteRepository.class);
     private final RecruitApplicationRepository recruitApplicationRepository = mock(RecruitApplicationRepository.class);
     private final LoginFailureRepository loginFailureRepository = mock(LoginFailureRepository.class);
+    private final StudyGroupService studyGroupService = mock(StudyGroupService.class);
     private final AdminService adminService = new AdminService(
             memberRepository,
             eligibleMemberService,
@@ -79,7 +80,8 @@ class AdminServiceTest {
             mock(MeetingPollService.class),
             mock(AttendanceService.class),
             mock(GatheringService.class),
-            mock(ClubProjectSocialService.class)
+            mock(ClubProjectSocialService.class),
+            studyGroupService
     );
 
     @Autowired
@@ -188,7 +190,7 @@ class AdminServiceTest {
     @Test
     void deleteMemberRejectsRemovingFinalAdmin() {
         Member admin = member("admin", Member.Role.ADMIN);
-        when(memberRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(memberRepository.findWithLockById(1L)).thenReturn(Optional.of(admin));
         when(memberRepository.countByRole(Member.Role.ADMIN)).thenReturn(1L);
 
         assertThatThrownBy(() -> adminService.deleteMember(1L))
@@ -204,7 +206,7 @@ class AdminServiceTest {
     @Test
     void deleteByStudentIdRejectsFinalAdminWithdrawal() {
         Member admin = member("admin", Member.Role.ADMIN);
-        when(memberRepository.findByStudentId("admin")).thenReturn(Optional.of(admin));
+        when(memberRepository.findWithLockByStudentId("admin")).thenReturn(Optional.of(admin));
         when(memberRepository.countByRole(Member.Role.ADMIN)).thenReturn(1L);
 
         assertThatThrownBy(() -> adminService.deleteByStudentId("admin"))
@@ -220,7 +222,7 @@ class AdminServiceTest {
     @Test
     void withdrawalPurgesRecruitApplicationsAndLoginFailures() {
         Member user = member("2026123456", Member.Role.USER);
-        when(memberRepository.findByStudentId("2026123456")).thenReturn(Optional.of(user));
+        when(memberRepository.findWithLockByStudentId("2026123456")).thenReturn(Optional.of(user));
 
         adminService.deleteByStudentId("2026123456");
 
@@ -233,7 +235,7 @@ class AdminServiceTest {
     @Test
     void rejectedWithdrawalPurgesNothing() {
         Member admin = member("admin", Member.Role.ADMIN);
-        when(memberRepository.findByStudentId("admin")).thenReturn(Optional.of(admin));
+        when(memberRepository.findWithLockByStudentId("admin")).thenReturn(Optional.of(admin));
         when(memberRepository.countByRole(Member.Role.ADMIN)).thenReturn(1L);
 
         assertThatThrownBy(() -> adminService.deleteByStudentId("admin"))

@@ -840,3 +840,11 @@
 .study-page .circuit[data-offscreen] .circuit-svg .waves.on circle { animation-play-state: paused; }
 
 .study-page [data-scroll-region]:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+
+/* Live study groups sit alongside the existing self-study library. */
+.study-hub-groups { margin: 34px 0; min-width: 0; }
+.study-hub-groups-head { display: flex; align-items: end; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.study-hub-groups-head h2 { font-size: 24px; font-weight: 800; }
+.study-hub-groups-head p { color: var(--app-muted); margin: 4px 0; }
+.study-hub-groups-head a, .study-hub-propose { min-height: 44px; display: inline-flex; align-items: center; padding: 8px 14px; }
+.study-hub-propose { margin-top: 16px; }

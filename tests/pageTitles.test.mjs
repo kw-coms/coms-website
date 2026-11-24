@@ -34,7 +34,16 @@ assert.ok(long.startsWith('가'.repeat(59) + '…'))
 // Study pages are titled from the registry; an unknown study id is a 404.
 assert.equal(documentTitleFor('/study'), "스터디 | KW COM's")
 assert.equal(documentTitleFor('/study/web'), "웹 기초 | KW COM's")
+assert.equal(documentTitleFor('/study/groups'), "스터디 모임 | KW COM's")
+assert.equal(documentTitleFor('/study/groups/42'), "스터디 모임 | KW COM's")
+assert.ok(appStudyRouteOrder(), 'group routes precede the static course parameter route')
 assert.equal(routeLabel('/study/nope'), null)
+
+function appStudyRouteOrder() {
+  const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
+  const course = source.indexOf('path="/study/:id"')
+  return source.indexOf('path="/study/groups"') < course && source.indexOf('path="/study/groups/:groupId"') < course
+}
 
 // Unknown paths render the 404 page; the title must say so and ignore any stale detail.
 assert.equal(routeLabel('/nope'), null)
