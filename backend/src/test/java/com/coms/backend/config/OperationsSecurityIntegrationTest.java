@@ -116,6 +116,22 @@ class OperationsSecurityIntegrationTest {
     }
 
     @Test
+    void publicSettingsStayPublicWhilePrivateNoticesRequireMembership() throws Exception {
+        mockMvc.perform(get("/api/site-settings"))
+                .andExpect(status().isOk());
+        String privateBody = mockMvc.perform(post("/api/notices")
+                        .cookie(officerCookie).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content(NOTICE_BODY))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long privateId = objectMapper.readTree(privateBody).get("id").asLong();
+        mockMvc.perform(get("/api/notices"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+        mockMvc.perform(get("/api/notices/{id}", privateId)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/notices/{id}", privateId).cookie(userCookie)).andExpect(status().isOk());
+    }
+
+    @Test
     void publicSettingsAndSelectedNoticesAreAvailableToGuests() throws Exception {
         mockMvc.perform(get("/api/site-settings"))
                 .andExpect(status().isOk());
@@ -125,10 +141,6 @@ class OperationsSecurityIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content(NOTICE_BODY))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         long privateId = objectMapper.readTree(privateBody).get("id").asLong();
-        mockMvc.perform(get("/api/notices"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isEmpty());
-
         String publicBody = mockMvc.perform(post("/api/notices")
                         .cookie(officerCookie).header("Origin", ORIGIN)
                         .contentType(MediaType.APPLICATION_JSON)

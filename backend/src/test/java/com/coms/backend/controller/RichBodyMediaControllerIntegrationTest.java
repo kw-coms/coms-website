@@ -128,6 +128,17 @@ class RichBodyMediaControllerIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    @Test void attachedSponsorMediaIsPublicWhileAttachedNoticeMediaIsHiddenFromAnonymous() throws Exception {
+        long sponsorId = uploadId("sponsor", admin);
+        long noticeId = uploadId("notice", officer);
+        media.findById(sponsorId).orElseThrow().attach(1L, java.time.LocalDateTime.now());
+        media.findById(noticeId).orElseThrow().attach(Long.MAX_VALUE, java.time.LocalDateTime.now());
+        mvc.perform(get("/api/rich-media/{id}", sponsorId)).andExpect(status().isOk());
+        mvc.perform(get("/api/rich-media/{id}", noticeId)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/rich-media/{id}", noticeId).cookie(member)).andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("private")));
+    }
+
     @Test void guestNoticeMediaFollowsItsOwnNoticeVisibility() throws Exception {
         long sponsorId = uploadId("sponsor", admin);
         long publicMediaId = uploadId("notice", officer);

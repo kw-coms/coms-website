@@ -9,7 +9,6 @@ import { GroupCards } from './groups/StudyGroupCards'
 import { ArrowRight, CircuitBoard, Code2, Coffee } from 'lucide-react'
 import { STUDIES } from './studies'
 import { readProgress } from './exercises/progress'
-import { useAuth } from '../../contexts/useAuth'
 import './study.css'
 
 const StudyPracticeSummary = lazy(() => import('./exercises/StudyPracticeSummary'))
@@ -48,7 +47,6 @@ function studiesWithResume() {
 }
 
 export default function StudyHubPage() {
-  const { user } = useAuth()
   // Decided before the lazy summaries arrive, so each card reserves its "이어서 풀기" row only when it will be shown.
   const { user } = useAuth()
   const groups = useQuery({ queryKey: [...GROUPS_KEY, user?.studentId], queryFn: () => listStudyGroups() })
