@@ -18,10 +18,14 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.HexFormat;
 
 @Service
 public class AskService {
@@ -91,20 +95,21 @@ public class AskService {
         if (reply.isEmpty() && member != null) reply = member.getEmail();
         if (!AskEmailAddress.isValid(reply)) throw invalid();
 
-        String ipKey = "ip:" + clientIp;
+        String ipKey = (member == null ? "guest-ip:" : "member-ip:") + ipBucket(clientIp);
         String memberKey = member == null ? null : "member:" + member.getId();
+        String siteKey = member == null ? "guest" : "member";
         synchronized (this) {
             if (shortLimit.isExhausted(ipKey) || dailyLimit.isExhausted(ipKey)
                     || (memberKey != null && (shortLimit.isExhausted(memberKey) || dailyLimit.isExhausted(memberKey)))
-                    || globalLimit.isExhausted("site") || globalDailyLimit.isExhausted("site")) throw tooMany();
+                    || globalLimit.isExhausted(siteKey) || globalDailyLimit.isExhausted(siteKey)) throw tooMany();
             shortLimit.record(ipKey);
             dailyLimit.record(ipKey);
             if (memberKey != null) {
                 shortLimit.record(memberKey);
                 dailyLimit.record(memberKey);
             }
-            globalLimit.record("site");
-            globalDailyLimit.record("site");
+            globalLimit.record(siteKey);
+            globalDailyLimit.record(siteKey);
         }
 
         String topic = request.topic() == AskRequest.Topic.COLLABORATION ? "협업 제안" : "질문";
@@ -148,6 +153,19 @@ public class AskService {
         } catch (URISyntaxException ex) {
             throw invalid();
         }
+    }
+
+    private static String ipBucket(String clientIp) {
+        if (clientIp == null || !clientIp.contains(":")) return clientIp;
+        try {
+            InetAddress address = InetAddress.getByName(clientIp);
+            if (address instanceof Inet6Address) {
+                return HexFormat.of().formatHex(address.getAddress(), 0, 8) + "/64";
+            }
+        } catch (UnknownHostException ignored) {
+            // ClientIpResolver already validates proxy addresses; retain the original key otherwise.
+        }
+        return clientIp;
     }
 
     private static String trimmed(String value) {
