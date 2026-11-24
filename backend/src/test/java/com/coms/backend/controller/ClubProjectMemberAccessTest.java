@@ -106,6 +106,13 @@ class ClubProjectMemberAccessTest {
                 .file(image).cookie(owner).header("Origin", ORIGIN)).andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "$[0]")).intValue();
         mvc.perform(get("/api/club-projects/{id}/images/{imageId}", id, imageId))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/club-projects/{id}", id).cookie(owner))
+                .andExpect(jsonPath("$.reviewStatus").value("PENDING"));
+        mvc.perform(patch("/api/club-projects/{id}/review", id).cookie(manager)
+                .header("Origin", ORIGIN).param("status", "APPROVED"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/club-projects/{id}/images/{imageId}", id, imageId))
                 .andExpect(status().isOk()).andExpect(header().string("X-Content-Type-Options", "nosniff"));
         mvc.perform(delete("/api/club-projects/{id}/images/{imageId}", id, imageId).cookie(other).header("Origin", ORIGIN))
                 .andExpect(status().isForbidden());
@@ -125,5 +132,30 @@ class ClubProjectMemberAccessTest {
         mvc.perform(patch("/api/club-projects/{id}", id).cookie(owner).header("Origin", ORIGIN)
                 .param("description", "수정한 설명"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.reviewStatus").value("PENDING"));
+    }
+
+    @Test
+    void adminCanUnpublishApprovedAndApproveRejectedButNotReopenRejected() throws Exception {
+        Cookie owner = member("2099000021");
+        Cookie manager = member("2099000022", Member.Role.ADMIN);
+        long id = ((Number) JsonPath.read(mvc.perform(post("/api/club-projects")
+                .cookie(owner).header("Origin", ORIGIN).param("category", "APP").param("title", "검토 작품"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id")).longValue();
+        review(id, manager, "APPROVED", 200);
+        mvc.perform(get("/api/club-projects/{id}", id)).andExpect(status().isOk());
+        review(id, manager, "APPROVED", 409);
+        review(id, manager, "PENDING", 200);
+        mvc.perform(get("/api/club-projects/{id}", id)).andExpect(status().isNotFound());
+        review(id, manager, "PENDING", 409);
+        review(id, manager, "REJECTED", 200);
+        review(id, manager, "PENDING", 409);
+        review(id, manager, "APPROVED", 200);
+        review(id, manager, "REJECTED", 200);
+        mvc.perform(get("/api/club-projects/{id}", id)).andExpect(status().isNotFound());
+    }
+
+    private void review(long id, Cookie manager, String status, int expected) throws Exception {
+        mvc.perform(patch("/api/club-projects/{id}/review", id).cookie(manager)
+                .header("Origin", ORIGIN).param("status", status)).andExpect(status().is(expected));
     }
 }

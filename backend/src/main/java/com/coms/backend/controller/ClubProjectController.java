@@ -229,8 +229,11 @@ public class ClubProjectController {
     public ResponseEntity<List<Long>> uploadImages(@PathVariable Long id,
                                                     @RequestParam("images") List<MultipartFile> images,
                                                     Authentication authentication) {
-        projectService.requireEditor(id, authentication.getName(), canManageAll(authentication));
-        return ResponseEntity.status(HttpStatus.CREATED).body(projectService.addImages(id, images));
+        boolean manager = canManageAll(authentication);
+        projectService.requireEditor(id, authentication.getName(), manager);
+        List<Long> ids = projectService.addImages(id, images);
+        if (!manager) projectService.returnToReview(id);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ids);
     }
 
     @GetMapping("/{id}/images/{imageId}")

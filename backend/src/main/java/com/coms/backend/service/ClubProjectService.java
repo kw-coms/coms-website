@@ -140,16 +140,24 @@ public class ClubProjectService {
     }
 
     public ClubProjectResponse review(Long id, ClubProject.ReviewStatus status) {
-        if (status == ClubProject.ReviewStatus.PENDING) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        }
         ClubProject project = repository.findWithLockById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (project.getReviewStatus() != ClubProject.ReviewStatus.PENDING) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "검토 대기 중인 작품만 처리할 수 있습니다.");
+        ClubProject.ReviewStatus current = project.getReviewStatus();
+        // PENDING -> APPROVED/REJECTED, APPROVED -> PENDING/REJECTED (unpublish), REJECTED -> APPROVED.
+        if (status == current || (status == ClubProject.ReviewStatus.PENDING && current == ClubProject.ReviewStatus.REJECTED)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "처리할 수 없는 검토 상태 변경입니다.");
         }
         project.setReviewStatus(status);
         return toResponse(repository.save(project), null, true);
+    }
+
+    /** Owner changed the project's media after review: it must be reviewed again before staying public. */
+    public void returnToReview(Long id) {
+        ClubProject project = get(id);
+        if (project.getReviewStatus() != ClubProject.ReviewStatus.PENDING) {
+            project.setReviewStatus(ClubProject.ReviewStatus.PENDING);
+            repository.save(project);
+        }
     }
 
     public void requireEditor(Long id, String studentId, boolean manager) {

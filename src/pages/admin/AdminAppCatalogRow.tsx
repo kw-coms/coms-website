@@ -122,7 +122,7 @@ export default function AdminAppCatalogRow({ item, categories, linkState = null,
     }
   }
 
-  const review = async (status: 'APPROVED' | 'REJECTED') => {
+  const review = async (status: 'PENDING' | 'APPROVED' | 'REJECTED') => {
     setBusy(true)
     setRowError('')
     try {
@@ -148,10 +148,9 @@ export default function AdminAppCatalogRow({ item, categories, linkState = null,
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          {item.reviewStatus === 'PENDING' && <>
-            <button type="button" disabled={busy} onClick={() => review('APPROVED')} className="text-xs font-semibold text-[var(--app-accent-text)]">승인</button>
-            <button type="button" disabled={busy} onClick={() => review('REJECTED')} className="text-xs font-semibold text-red-500">반려</button>
-          </>}
+          {item.reviewStatus !== 'APPROVED' && <button type="button" disabled={busy} onClick={() => review('APPROVED')} className="text-xs font-semibold text-[var(--app-accent-text)]">승인</button>}
+          {item.reviewStatus !== 'REJECTED' && <button type="button" disabled={busy} onClick={() => review('REJECTED')} className="text-xs font-semibold text-red-500">반려</button>}
+          {item.reviewStatus === 'APPROVED' && <button type="button" disabled={busy} onClick={() => review('PENDING')} className="text-xs font-semibold text-[var(--theme-body-muted)]">공개 중단</button>}
           <button
             type="button"
             onClick={() => (editing ? setEditing(false) : startEdit())}
