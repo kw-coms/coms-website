@@ -57,20 +57,20 @@ const officer = { studentId: '2023123456', name: '임원', role: 'OFFICER' }
   await page.unmount()
 }
 
-// A role the defaults already admit gets in before /api/permissions/me answers.
+// Even a role whose defaults admit the panel waits for effective permissions.
 {
   const page = await mountAdminRoute({ user: officer })
-  assert.equal(page.text(), ADMIN_PANEL)
+  assert.match(page.text(), /권한을 확인하는 중/)
   await page.unmount()
 }
 
-// The regression: a 회원 the 회장 granted archive.manage in the matrix. The role defaults deny
+// The regression: a 회원 the 회장 granted archive.delete in the matrix. The role defaults deny
 // the panel, so the guard must hold the verdict until the real permissions arrive instead of
-// redirecting home on the optimistic defaults.
+// redirecting home before the server responds.
 {
   const page = await mountAdminRoute({ user: member })
   assert.match(page.text(), /권한을 확인하는 중/)
-  await page.update({ user: member, permissions: ['club_room.view', 'archive.manage'] })
+  await page.update({ user: member, permissions: ['club_room.view', 'archive.delete'] })
   assert.equal(page.text(), ADMIN_PANEL)
   await page.unmount()
 }
@@ -92,18 +92,18 @@ const officer = { studentId: '2023123456', name: '임원', role: 'OFFICER' }
 }
 
 // /api/permissions/me failed: the context reports the request as settled with no answer. There
-// is nothing left to wait for, so the guard decides on the role defaults straight away.
+// is nothing left to wait for, so the guard denies access.
 {
   const denied = await mountAdminRoute({ user: member, permissions: null, permissionsSettled: true })
   assert.equal(denied.text(), 'HOME_SCREEN')
   await denied.unmount()
   const admitted = await mountAdminRoute({ user: officer, permissions: null, permissionsSettled: true })
-  assert.equal(admitted.text(), ADMIN_PANEL)
+  assert.equal(admitted.text(), 'HOME_SCREEN')
   await admitted.unmount()
 }
 
 // /api/permissions/me never answers at all: the wait is bounded, and the guard then falls back
-// to the role defaults rather than hanging. The wait is the only timer of that length, so
+// to a denial rather than hanging. The wait is the only timer of that length, so
 // capture it instead of sleeping through it.
 {
   const realSetTimeout = globalThis.setTimeout

@@ -32,7 +32,10 @@ export const PERMISSIONS = {
   noticeWrite: 'notice.write',
   activityWrite: 'activity.write',
   projectWrite: 'project.write',
-  archiveManage: 'archive.manage',
+  archiveDelete: 'archive.delete',
+  archiveAuthorChange: 'archive.author_change',
+  archiveEditAny: 'archive.edit_any',
+  archiveVisibility: 'archive.visibility',
   siteSettingsEdit: 'site_settings.edit',
   operationsPanel: 'operations.panel',
 } as const
@@ -63,7 +66,10 @@ const DEFAULT_PERMISSIONS_BY_ROLE: Record<string, PermissionKey[]> = {
     PERMISSIONS.noticeWrite,
     PERMISSIONS.activityWrite,
     PERMISSIONS.projectWrite,
-    PERMISSIONS.archiveManage,
+    PERMISSIONS.archiveDelete,
+    PERMISSIONS.archiveAuthorChange,
+    PERMISSIONS.archiveEditAny,
+    PERMISSIONS.archiveVisibility,
     PERMISSIONS.siteSettingsEdit,
     PERMISSIONS.operationsPanel,
   ],
@@ -91,18 +97,20 @@ function hasAny(permissions: PermissionSet, keys: PermissionKey[]) {
 }
 
 // 운영 탭 ↔ 권한. 여기에 없는 탭은 회장 전용(회원/모집/명부/후원자/폰트/차단/로그 등).
-export const TAB_PERMISSIONS: Record<string, PermissionKey> = {
+const ARCHIVE_PERMISSIONS = [PERMISSIONS.archiveDelete, PERMISSIONS.archiveAuthorChange, PERMISSIONS.archiveEditAny, PERMISSIONS.archiveVisibility]
+
+export const TAB_PERMISSIONS: Record<string, PermissionKey | PermissionKey[]> = {
   activities: PERMISSIONS.activityWrite,
   'external-opportunities': PERMISSIONS.activityWrite,
   projects: PERMISSIONS.projectWrite,
   'site-settings': PERMISSIONS.siteSettingsEdit,
-  files: PERMISSIONS.archiveManage,
+  files: ARCHIVE_PERMISSIONS,
   community: PERMISSIONS.communityModerate,
   'deleted-posts': PERMISSIONS.communityModerate,
 }
 
 const OPERATIONS_PERMISSIONS: PermissionKey[] = [
-  ...new Set(Object.values(TAB_PERMISSIONS)),
+  ...new Set(Object.values(TAB_PERMISSIONS).flat()),
   PERMISSIONS.noticeWrite,
 ]
 
@@ -174,9 +182,9 @@ export function canUseAnonymousBoard(permissions: PermissionSet) {
   return has(permissions, PERMISSIONS.communityAnonymousBoard)
 }
 
-// 자료실 삭제·작성자 변경: archive.manage (기본 부회장 이상).
+// 자료실 관리 탭은 네 개 작업 권한 중 하나라도 있으면 표시한다.
 export function canManageArchive(permissions: PermissionSet) {
-  return has(permissions, PERMISSIONS.archiveManage)
+  return hasAny(permissions, ARCHIVE_PERMISSIONS)
 }
 
 // 사이트 문구·동방 비번 편집: site_settings.edit (기본 임원 이상).
@@ -199,15 +207,18 @@ export function adminTabsForRole<T extends { id: string }>(role: Role, permissio
   if (canManageSensitiveAdmin(role)) return tabs
   return tabs.filter((tab) => {
     const required = TAB_PERMISSIONS[tab.id]
-    return Boolean(required) && has(permissions, required)
+    return Boolean(required) && (Array.isArray(required) ? hasAny(permissions, required) : has(permissions, required))
   })
 }
 
 export function defaultOperationsTab(role: Role, permissions: PermissionSet, requested?: string | null) {
   if (canManageSensitiveAdmin(role)) return requested || 'overview'
   const required = requested ? TAB_PERMISSIONS[requested] : undefined
-  if (required && has(permissions, required)) return requested as string
-  const firstAllowed = Object.keys(TAB_PERMISSIONS).find((id) => has(permissions, TAB_PERMISSIONS[id]))
+  if (required && (Array.isArray(required) ? hasAny(permissions, required) : has(permissions, required))) return requested as string
+  const firstAllowed = Object.keys(TAB_PERMISSIONS).find((id) => {
+    const permission = TAB_PERMISSIONS[id]
+    return Array.isArray(permission) ? hasAny(permissions, permission) : has(permissions, permission)
+  })
   // No tab permission at all (e.g. a role granted only notice.write, which has no admin
   // tab of its own) — don't guess a tab; let the caller render its empty/forbidden state.
   return firstAllowed || null

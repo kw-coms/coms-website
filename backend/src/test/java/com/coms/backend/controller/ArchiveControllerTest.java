@@ -28,11 +28,12 @@ class ArchiveControllerTest {
     @Test
     void bareDownloadAndInlineUrlsArePrivateNoStoreBecauseArchiveBytesCanBeReplaced() {
         ArchiveFile file = file("versioned.pdf", "stored-versioned.pdf", "application/pdf");
-        when(archiveService.get(1L)).thenReturn(file);
+        when(archiveService.get(1L, "2026123456")).thenReturn(file);
         when(storageService.load("stored-versioned.pdf")).thenReturn(new ByteArrayResource("%PDF-1.4".getBytes()));
 
-        var download = controller.download(1L);
-        var inline = controller.inline(1L);
+        var authentication = new TestingAuthenticationToken("2026123456", "password");
+        var download = controller.download(1L, authentication);
+        var inline = controller.inline(1L, authentication);
 
         assertThat(download.getHeaders().getCacheControl()).contains("no-store", "private");
         assertThat(inline.getHeaders().getCacheControl()).contains("no-store", "private");
@@ -46,10 +47,10 @@ class ArchiveControllerTest {
         // a script type would pass both nosniff and script-src 'self'.
         for (String declared : new String[] {"text/javascript", "text/css", "text/html", "image/svg+xml"}) {
             ArchiveFile file = file("upload.bin", "stored-upload.bin", declared);
-            when(archiveService.get(2L)).thenReturn(file);
+            when(archiveService.get(2L, "2026123456")).thenReturn(file);
             when(storageService.load("stored-upload.bin")).thenReturn(new ByteArrayResource("x".getBytes()));
 
-            var inline = controller.inline(2L);
+            var inline = controller.inline(2L, new TestingAuthenticationToken("2026123456", "password"));
 
             assertThat(inline.getHeaders().getContentType()).as(declared)
                     .isEqualTo(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM);
@@ -57,23 +58,23 @@ class ArchiveControllerTest {
         }
 
         ArchiveFile image = file("photo.png", "stored-photo.png", "image/png");
-        when(archiveService.get(3L)).thenReturn(image);
+        when(archiveService.get(3L, "2026123456")).thenReturn(image);
         when(storageService.load("stored-photo.png")).thenReturn(new ByteArrayResource("x".getBytes()));
-        assertThat(controller.inline(3L).getHeaders().getContentType()).isEqualTo(org.springframework.http.MediaType.IMAGE_PNG);
+        assertThat(controller.inline(3L, new TestingAuthenticationToken("2026123456", "password")).getHeaders().getContentType()).isEqualTo(org.springframework.http.MediaType.IMAGE_PNG);
     }
 
     @Test
     void attachmentDownloadUsesChildBlobWithPrivateNoStoreHeaders() {
         ArchiveAttachment attachment = new ArchiveAttachment(1L, "second.pdf", "stored-second.pdf", "application/pdf", 12, 1);
-        when(archiveService.getAttachment(1L, 2L)).thenReturn(attachment);
+        when(archiveService.getAttachment(1L, 2L, "2026123456")).thenReturn(attachment);
         when(storageService.load("stored-second.pdf")).thenReturn(new ByteArrayResource("%PDF-1.4".getBytes()));
 
-        var response = controller.downloadAttachment(1L, 2L);
+        var response = controller.downloadAttachment(1L, 2L, new TestingAuthenticationToken("2026123456", "password"));
 
         assertThat(response.getHeaders().getCacheControl()).contains("no-store", "private");
         assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).contains("attachment", "second.pdf");
         assertThat(response.getBody()).isNotNull();
-        org.mockito.Mockito.verify(archiveService).incrementView(1L);
+        org.mockito.Mockito.verify(archiveService).incrementView(1L, "2026123456");
     }
 
     @Test
@@ -89,7 +90,8 @@ class ArchiveControllerTest {
         org.mockito.Mockito.verify(archiveService).uploadGroup(org.mockito.ArgumentMatchers.eq("중간 족보"),
                 org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq("GENERAL"),
                 org.mockito.ArgumentMatchers.argThat(files -> files.size() == 2),
-                org.mockito.ArgumentMatchers.eq("2026123456"));
+                org.mockito.ArgumentMatchers.eq("2026123456"),
+                org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull());
     }
 
     private ArchiveFile file(String originalName, String storedName, String mimeType) {

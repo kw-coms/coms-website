@@ -11,17 +11,32 @@ export async function listFiles() {
   return request('/api/files')
 }
 
-export async function createPost({ title, description, category, file, files }: {
+export type ArchiveVisibility = 'PUBLIC' | 'MEMBERS' | 'OFFICERS' | 'SELECTED'
+export type ArchiveVisibilityInput = { visibility: ArchiveVisibility; selectedStudentIds?: string[] }
+
+export function updateArchiveVisibility(id: number, input: ArchiveVisibilityInput) {
+  return request(`/api/files/${id}/visibility`, { method: 'PATCH', body: JSON.stringify(input) })
+}
+
+export function searchArchiveVisibilityMembers(query: string): Promise<{ studentId: string; name: string; role: string }[]> {
+  return request(`/api/files/visibility-members?query=${encodeURIComponent(query)}`)
+}
+
+export async function createPost({ title, description, category, file, files, visibility = 'MEMBERS', selectedStudentIds = [] }: {
   title: string
   description?: string
   category?: string
   file?: File
   files?: File[]
+  visibility?: ArchiveVisibility
+  selectedStudentIds?: string[]
 }) {
   const formData = new FormData()
   formData.append('title', title)
   if (description) formData.append('description', description)
   formData.append('category', category || 'GENERAL')
+  formData.append('visibility', visibility)
+  if (visibility === 'SELECTED') selectedStudentIds.forEach(id => formData.append('selectedStudentIds', id))
   if (file) formData.append('file', file)
   files?.forEach(attachment => formData.append('files', attachment))
   return request('/api/files', {
@@ -46,11 +61,13 @@ export function attachmentDownloadUrl(postId, attachmentId, contentVersion?: str
   return apiUrl(`/api/files/${postId}/attachments/${attachmentId}/download${contentVersion ? `?v=${encodeURIComponent(contentVersion)}` : ''}`)
 }
 
-export function updateArchiveFile(id, { title, description, category, file, files }: { title: string; description: string; category: string; file?: File; files?: File[] }) {
+export function updateArchiveFile(id, { title, description, category, file, files, visibility, selectedStudentIds = [] }: { title: string; description: string; category: string; file?: File; files?: File[]; visibility?: ArchiveVisibility; selectedStudentIds?: string[] }) {
   const body = new FormData()
   body.append('title', title)
   body.append('description', description)
   body.append('category', category)
+  if (visibility) body.append('visibility', visibility)
+  if (visibility === 'SELECTED') selectedStudentIds.forEach(studentId => body.append('selectedStudentIds', studentId))
   if (file) body.append('file', file)
   files?.forEach(attachment => body.append('files', attachment))
   return request(`/api/files/${id}`, { method: 'PUT', body })

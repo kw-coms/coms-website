@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "spring.datasource.url=jdbc:h2:mem:community-service-audit-log-test;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
         "storage.location=./build/test-uploads/community-service-audit-log"
 })
-@WithMockUser(roles = "ADMIN")
+@WithMockUser(username = "2026123456", roles = "ADMIN")
 class CommunityServiceAuditLogTest {
 
     // 업로드 검증이 매직 바이트를 확인하므로 이미지 픽스처는 실제 PNG 여야 한다.

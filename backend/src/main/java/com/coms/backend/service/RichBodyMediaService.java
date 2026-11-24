@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.RichBodyMedia;
 import com.coms.backend.domain.Member;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.ArchiveFileRepository;
 import com.coms.backend.repository.RichBodyMediaRepository;
 import com.coms.backend.security.SlidingWindowRateLimiter;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -36,6 +37,7 @@ public class RichBodyMediaService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RichBodyMediaService.class);
     private final RichBodyMediaRepository repository;
     private final MemberRepository members;
+    private final ArchiveFileRepository archiveFiles;
     private final StorageService storage;
     private final MediaUploadValidator validator;
     private final Clock clock;
@@ -48,8 +50,10 @@ public class RichBodyMediaService {
                                 StorageService storage, MediaUploadValidator validator, Clock clock, RichBodyMediaDeleter deleter,
                                 PlatformTransactionManager transactionManager,
                                 @Value("${coms.media.pending-total-max-bytes:8589934592}") long pendingTotalMaxBytes,
-                                @Value("${coms.media.uploads-per-10-minutes:60}") int uploadsPer10Minutes) {
+                                @Value("${coms.media.uploads-per-10-minutes:60}") int uploadsPer10Minutes,
+                                ArchiveFileRepository archiveFiles) {
         this.repository = repository; this.members = members; this.storage = storage;
+        this.archiveFiles = archiveFiles;
         this.validator = validator; this.clock = clock; this.deleter = deleter;
         this.uploadTransaction = new TransactionTemplate(transactionManager);
         this.pendingTotalMaxBytes = pendingTotalMaxBytes;
@@ -135,6 +139,10 @@ public class RichBodyMediaService {
                     && !reader.getId().equals(media.getUploaderId()))) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND);
             }
+        } else if (media.getScope() == RichBodyMedia.Scope.ARCHIVE) {
+            var reader = studentId == null ? null : members.findByStudentId(studentId).orElse(null);
+            archiveFiles.findById(media.getOwnerId()).filter(file -> file.isVisibleTo(reader))
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         } else if (media.getScope() != RichBodyMedia.Scope.SPONSOR && studentId == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }

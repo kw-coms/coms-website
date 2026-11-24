@@ -49,6 +49,9 @@ class LatestMigrationsSmokeTest {
                     new ClassPathResource("db/migration/V87__eligible_member_initial_role.sql"));
             ScriptUtils.executeSqlScript(connection,
                     new ClassPathResource("db/migration/V88__sponsors.sql"));
+            // V90 targets the legacy keys; today's Hibernate enum CHECK intentionally excludes archive.manage.
+            jdbcTemplate.execute("DROP TABLE role_permissions");
+            executeV90WithH2OnConflictAdapter();
             executeV90WithH2OnConflictAdapter();
         }
 

@@ -36,7 +36,6 @@ import { serializeRichBody, richBodyPlainText } from '../components/richEditor/s
 import { parseRichBodyBlocks } from '../components/richEditor/parseRichBodyBlocks'
 import { parsePostBlocks } from './community/postEditorUtils'
 import { canDeleteNotice, canEditNotice, canManageSensitiveAdmin, canWriteNotice } from '../utils/roleAccess'
-import { usePermissions } from '../contexts/usePermissions'
 import Chip from '../components/common/Chip'
 import DraftNotice, { DraftConflictNotice } from '../components/common/DraftNotice'
 import { confirmEditorLeave, useEditorDraft } from '../hooks/useEditorDraft'
@@ -253,8 +252,8 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
 export default function Notices() {
   const { id: urlId } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
-  const { permissions } = usePermissions()
+  const { user, permissions: effectivePermissions, displayPermissions } = useAuth()
+  const permissions = displayPermissions ?? effectivePermissions
   const { notices, setNotices, refreshNotices, loading, error } = useNotices()
   const [mode, setMode] = useState('list')
   const [selectedNotice, setSelectedNotice] = useState(null)

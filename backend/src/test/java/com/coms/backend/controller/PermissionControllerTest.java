@@ -92,7 +92,7 @@ class PermissionControllerTest {
                 "ASSOCIATE", List.of(),
                 "USER", List.of("club_room.view"),
                 "OFFICER", List.of("notice.write"),
-                "VICE_PRESIDENT", List.of("archive.manage")
+                "VICE_PRESIDENT", List.of("archive.delete")
         ), expectedUpdatedAt);
         PermissionMatrixResponse refreshed = new PermissionMatrixResponse(
                 List.of("ASSOCIATE", "USER", "OFFICER", "VICE_PRESIDENT"),
@@ -105,7 +105,7 @@ class PermissionControllerTest {
                 Member.Role.ASSOCIATE, Set.of(),
                 Member.Role.USER, Set.of(Permission.CLUB_ROOM_VIEW),
                 Member.Role.OFFICER, Set.of(Permission.NOTICE_WRITE),
-                Member.Role.VICE_PRESIDENT, Set.of(Permission.ARCHIVE_MANAGE)
+                Member.Role.VICE_PRESIDENT, Set.of(Permission.ARCHIVE_DELETE)
         )), eq("2026000001"), eq(expectedUpdatedAt))).thenReturn(refreshed);
 
         var response = controller.replace(request, new TestingAuthenticationToken("2026000001", "password")).getBody();
@@ -115,7 +115,7 @@ class PermissionControllerTest {
                 Member.Role.ASSOCIATE, Set.of(),
                 Member.Role.USER, Set.of(Permission.CLUB_ROOM_VIEW),
                 Member.Role.OFFICER, Set.of(Permission.NOTICE_WRITE),
-                Member.Role.VICE_PRESIDENT, Set.of(Permission.ARCHIVE_MANAGE)
+                Member.Role.VICE_PRESIDENT, Set.of(Permission.ARCHIVE_DELETE)
         )), eq("2026000001"), eq(expectedUpdatedAt));
     }
 

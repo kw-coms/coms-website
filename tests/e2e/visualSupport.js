@@ -210,7 +210,10 @@ export async function mockAdminApis(page) {
     { key: 'notice.write', label: '공지 작성·수정·삭제·고정', description: '공지사항을 작성, 수정, 삭제, 고정할 수 있습니다.' },
     { key: 'activity.write', label: '활동·일정·이벤트·정기일정·카테고리 관리', description: '활동, 일정, 이벤트, 정기일정, 활동 카테고리를 관리할 수 있습니다.' },
     { key: 'project.write', label: "COM's 프로젝트 관리", description: "COM's 프로젝트와 프로젝트 카테고리를 관리할 수 있습니다." },
-    { key: 'archive.manage', label: '자료실 삭제·작성자 변경', description: '자료실 파일을 삭제하고 작성자를 변경할 수 있습니다.' },
+    { key: 'archive.delete', label: '자료실 삭제', description: '다른 회원의 자료실 파일을 삭제할 수 있습니다.' },
+    { key: 'archive.author_change', label: '자료실 작성자 변경', description: '자료실 파일의 작성자를 변경할 수 있습니다.' },
+    { key: 'archive.edit_any', label: '자료실 타인 자료 수정', description: '다른 회원의 자료실 파일을 수정할 수 있습니다.' },
+    { key: 'archive.visibility', label: '자료실 공개 범위 관리', description: '임원 또는 지정 회원에게 공개할 수 있습니다.' },
     { key: 'site_settings.edit', label: '사이트 문구·동방 비번 편집', description: '사이트 공개 문구와 동방 비밀번호를 편집할 수 있습니다.' },
     { key: 'operations.panel', label: '운영 패널 접근', description: '운영 패널과 권한이 허용된 운영 탭에 접근할 수 있습니다.' },
   ]

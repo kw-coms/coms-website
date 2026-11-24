@@ -1,7 +1,12 @@
 package com.coms.backend.controller;
 
 import com.coms.backend.domain.Member;
+import com.coms.backend.domain.MemberPermissionOverride;
+import com.coms.backend.domain.MemberPermissionOverride.Effect;
 import com.coms.backend.domain.Permission;
+import com.coms.backend.dto.MemberPermissionResponse;
+import com.coms.backend.dto.MemberPermissionSummary;
+import com.coms.backend.dto.MemberPermissionUpdateRequest;
 import com.coms.backend.dto.MyPermissionsResponse;
 import com.coms.backend.dto.PermissionMatrixResponse;
 import com.coms.backend.dto.PermissionMatrixUpdateRequest;
@@ -12,14 +17,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +64,78 @@ public class PermissionController {
                                                             Authentication authentication) {
         return ResponseEntity.ok(permissionService.replace(
                 parse(request), authentication.getName(), request.expectedUpdatedAt()));
+    }
+
+    @GetMapping("/admin/permissions/members")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<MemberPermissionSummary>> members(@RequestParam(defaultValue = "") String query) {
+        String term = query.trim();
+        if (term.length() > 100) throw badRequest("검색어는 100자 이하여야 합니다.");
+        return ResponseEntity.ok(memberRepository
+                .findTop20ByNameContainingIgnoreCaseOrStudentIdContainingIgnoreCaseOrderByNameAsc(term, term)
+                .stream().map(member -> new MemberPermissionSummary(
+                        member.getStudentId(), member.getName(), member.getRole().name(), Map.of())).toList());
+    }
+
+    @GetMapping("/admin/permissions/overrides")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<MemberPermissionSummary>> overrides() {
+        Map<String, Map<String, String>> grouped = new java.util.LinkedHashMap<>();
+        for (MemberPermissionOverride row : permissionService.overrides()) {
+            grouped.computeIfAbsent(row.getId().studentId(), ignored -> new java.util.LinkedHashMap<>())
+                    .put(row.getId().permissionKey(), row.getEffect().name());
+        }
+        Map<String, Member> members = new HashMap<>();
+        memberRepository.findByStudentIdIn(grouped.keySet()).forEach(member -> members.put(member.getStudentId(), member));
+        return ResponseEntity.ok(grouped.entrySet().stream()
+                .filter(entry -> members.containsKey(entry.getKey()))
+                .map(entry -> {
+                    Member member = members.get(entry.getKey());
+                    return new MemberPermissionSummary(member.getStudentId(), member.getName(),
+                            member.getRole().name(), entry.getValue());
+                }).toList());
+    }
+
+    @GetMapping("/admin/permissions/overrides/{studentId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<MemberPermissionResponse> memberOverrides(@PathVariable String studentId) {
+        return ResponseEntity.ok(memberPermissions(studentId));
+    }
+
+    @PutMapping("/admin/permissions/overrides/{studentId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<MemberPermissionResponse> replaceMemberOverrides(
+            @PathVariable String studentId, @RequestBody MemberPermissionUpdateRequest request,
+            Authentication authentication) {
+        if (request == null || request.overrides() == null) throw badRequest("권한 설정이 비어 있습니다.");
+        Member member = findMember(studentId);
+        Map<Permission, Effect> parsed = new EnumMap<>(Permission.class);
+        for (Map.Entry<String, String> entry : request.overrides().entrySet()) {
+            if (entry.getKey() == null || entry.getValue() == null) throw badRequest("권한 값이 올바르지 않습니다.");
+            Permission permission = Permission.fromKey(entry.getKey());
+            try {
+                parsed.put(permission, Effect.valueOf(entry.getValue()));
+            } catch (IllegalArgumentException exception) {
+                throw badRequest("권한 효과는 GRANT 또는 REVOKE여야 합니다.");
+            }
+        }
+        permissionService.replaceOverrides(member, parsed, authentication.getName());
+        return ResponseEntity.ok(memberPermissions(studentId));
+    }
+
+    private MemberPermissionResponse memberPermissions(String studentId) {
+        Member member = findMember(studentId);
+        Map<String, String> overrides = new java.util.LinkedHashMap<>();
+        permissionService.overrides(studentId).forEach(row ->
+                overrides.put(row.getId().permissionKey(), row.getEffect().name()));
+        return new MemberPermissionResponse(member.getStudentId(), member.getName(), member.getRole().name(),
+                permissionService.rolePermissions(member.getRole()).stream().map(Permission::key).toList(),
+                overrides, permissionService.effective(member).stream().map(Permission::key).toList());
+    }
+
+    private Member findMember(String studentId) {
+        return memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     private Map<Member.Role, Set<Permission>> parse(PermissionMatrixUpdateRequest request) {

@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "storage.location=./build/test-uploads/club-activity-service"
 })
 @Transactional
-@WithMockUser(roles = "ADMIN")
+@WithMockUser(username = "2026123456", roles = "ADMIN")
 class ClubActivityServiceTest {
 
     @Autowired

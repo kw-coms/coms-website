@@ -12,8 +12,14 @@ import { clearMemberDrafts } from '../utils/editorDraft'
 import { clearNoticeReadState } from '../utils/noticeReads'
 import { beginMemberLogout, cancelMemberLogout, finishMemberLogout, isMemberSessionCurrent, setMemberSessionOwner } from '../utils/memberSession'
 import { forgetDrawStorage } from '../utils/draw'
+import { defaultPermissionsForRole } from '../utils/roleAccess'
 
 const logoutChannel = 'coms:auth:logout'
+const PERMISSIONS_TIMEOUT_MS = 5_000
+const permissionOwner = (member) => {
+  const id = member?.id ?? member?.studentId
+  return id == null ? '' : JSON.stringify([id, member.role])
+}
 const notifyOtherTabs = (memberId?: number | string) => {
   if (memberId == null || typeof BroadcastChannel === 'undefined') return
   const channel = new BroadcastChannel(logoutChannel)
@@ -24,15 +30,21 @@ const notifyOtherTabs = (memberId?: number | string) => {
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUserState] = useState(null)
   const userRef = useRef(null)
+  const [permissionSnapshot, setPermissionSnapshot] = useState<{ owner: string; request: string; values: string[] } | null>(null)
+  const [settledPermissionsRequest, setSettledPermissionsRequest] = useState('')
+  const [permissionsNonce, setPermissionsNonce] = useState(0)
   const setUser = useCallback((next, freshLogin = false) => {
+    if (freshLogin || permissionOwner(next) !== permissionOwner(userRef.current)) {
+      setPermissionSnapshot(null)
+      setSettledPermissionsRequest('')
+    }
+    if (freshLogin) setPermissionsNonce((value) => value + 1)
     setMemberSessionOwner(next?.studentId, freshLogin)
     userRef.current = next
     setUserState(next)
   }, [])
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState(null)
-  // 회장이 조정한 직급별 권한. null = 아직 못 받음 → 직급 기본값으로 대체(usePermissions).
-  const [permissions, setPermissions] = useState<string[] | null>(null)
 
   // Keep Sentry's user context in sync with the session (no-op when Sentry is disabled).
   useEffect(() => {
@@ -52,9 +64,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (!userRef.current) return
       notifyOtherTabs(userRef.current.id)
       forgetDrawStorage(userRef.current.id)
-      userRef.current = null
       setUser(null)
-      setPermissions(null)
       queryClient.clear()
       showToast({ message: '로그인이 만료되었습니다. 다시 로그인해주세요.' })
     })
@@ -99,35 +109,40 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, [setUser])
 
-  const studentId = user?.studentId
-  const role = user?.role
-  const [permissionsNonce, setPermissionsNonce] = useState(0)
+  const owner = permissionOwner(user)
   // Which permissions request has come back, successfully or not. `permissions === null` alone
   // cannot tell "still on its way" from "failed", and a route guard has to: it waits for the
   // first and must not wait for the second.
-  const permissionsRequest = studentId ? `${studentId}|${role}|${permissionsNonce}` : ''
-  const [settledPermissionsRequest, setSettledPermissionsRequest] = useState('')
+  const permissionsRequest = owner ? `${owner}|${permissionsNonce}` : ''
+  const permissions = permissionSnapshot?.request === permissionsRequest ? permissionSnapshot.values : null
   const permissionsSettled = Boolean(permissionsRequest) && settledPermissionsRequest === permissionsRequest
+  // Controls can use the last answer for this member and role, or the role's defaults on first load.
+  const previousPermissions = permissionSnapshot?.owner === owner ? permissionSnapshot.values : null
+  const displayPermissions = permissions ?? (permissionsSettled ? previousPermissions ?? defaultPermissionsForRole(user?.role) : null)
 
   // 로그인한 사용자가 바뀌면(또는 권한 매트릭스를 저장한 뒤) 유효 권한을 다시 읽는다.
   useEffect(() => {
-    // 로그아웃/세션 만료는 각자 permissions 를 비우므로 여기서 다시 지울 필요는 없다.
-    if (!studentId) return undefined
+    if (!permissionsRequest) return undefined
     let mounted = true
-    getMyPermissions()
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), PERMISSIONS_TIMEOUT_MS)
+    getMyPermissions(controller.signal)
       .then((data) => {
-        if (mounted) setPermissions(Array.isArray(data?.permissions) ? data.permissions : null)
+        if (mounted && Array.isArray(data?.permissions)) {
+          setPermissionSnapshot({ owner, request: permissionsRequest, values: data.permissions })
+        }
       })
-      .catch(() => {
-        // 실패해도 로그인 상태를 흔들지 않는다 — 직급 기본값으로 화면을 그린다.
-        if (mounted) setPermissions(null)
-      })
+      .catch(() => { /* Keep the previous snapshot for display only. */ })
       .finally(() => {
+        clearTimeout(timeout)
         if (mounted) setSettledPermissionsRequest(permissionsRequest)
       })
-    return () => { mounted = false }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- permissionsRequest is derived from these three
-  }, [studentId, role, permissionsNonce])
+    return () => {
+      mounted = false
+      clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [owner, permissionsRequest])
 
   const refreshPermissions = useCallback(() => {
     setPermissionsNonce((value) => value + 1)
@@ -153,10 +168,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     // before the next render from announcing an expiry on top of the caller's own message.
     if (notify) notifyOtherTabs(userRef.current?.id)
     forgetDrawStorage(userRef.current?.id)
-    userRef.current = null
     setUser(null)
     setAuthError(null)
-    setPermissions(null)
     // Drop every cached query so the next account on a shared device can't see the previous
     // user's community list, bookmarks, or vote state (query keys aren't scoped per user).
     queryClient.clear()
@@ -227,10 +240,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo(
     () => ({
-      user, loading, authError, permissions, permissionsSettled, refreshPermissions,
+      user, loading, authError, permissions, displayPermissions, permissionsSettled, refreshPermissions,
       login, logout, clearSession, refreshUser, retryAuth, setUser,
     }),
-    [user, loading, authError, permissions, permissionsSettled, refreshPermissions, login, logout, clearSession, refreshUser, retryAuth, setUser]
+    [user, loading, authError, permissions, displayPermissions, permissionsSettled, refreshPermissions, login, logout, clearSession, refreshUser, retryAuth, setUser]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

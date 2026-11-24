@@ -63,7 +63,7 @@ public class MobileController {
         return ResponseEntity.ok(new MobileHomeResponse(
                 noticeService.listLimited(5),
                 communityService.listLimited(studentId, 5),
-                archiveService.listLimited(4, null),
+                archiveService.listLimited(4, studentId),
                 notificationService.summary(studentId),
                 notificationService.list(studentId)
         ));

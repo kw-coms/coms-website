@@ -4,6 +4,7 @@ import com.coms.backend.domain.ArchiveFile;
 import com.coms.backend.domain.ArchiveAttachment;
 import com.coms.backend.dto.ArchiveAuthorUpdateRequest;
 import com.coms.backend.dto.ArchiveFileResponse;
+import com.coms.backend.dto.ArchiveVisibilityUpdateRequest;
 import com.coms.backend.dto.EngagementVoteRequest;
 import com.coms.backend.service.ArchiveService;
 import com.coms.backend.service.StorageService;
@@ -59,17 +60,19 @@ public class ArchiveController {
             @RequestParam(value = "category", defaultValue = "GENERAL") String category,
             @RequestParam(value = "file", required = false) MultipartFile file,
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
+            @RequestParam(value = "visibility", required = false) String visibility,
+            @RequestParam(value = "selectedStudentIds", required = false) List<String> selectedStudentIds,
             Authentication authentication) throws IOException {
         if (file != null && files != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "file과 files를 함께 보낼 수 없습니다.");
         }
         if (files != null) {
-            return ResponseEntity.ok(archiveService.uploadGroup(title, description, category, files, authentication.getName()));
+            return ResponseEntity.ok(archiveService.uploadGroup(title, description, category, files, authentication.getName(), visibility, selectedStudentIds));
         }
         if (file == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일을 선택해주세요.");
         }
-        return ResponseEntity.ok(archiveService.upload(title, description, category, file, authentication.getName()));
+        return ResponseEntity.ok(archiveService.uploadGroup(title, description, category, List.of(file), authentication.getName(), visibility, selectedStudentIds));
     }
 
     @GetMapping
@@ -80,8 +83,18 @@ public class ArchiveController {
                 archiveService.list(authentication == null ? null : authentication.getName()), page, size);
     }
 
-    // archive.manage 권한 — 기본값은 부회장(VICE_PRESIDENT)이고, 회장이 권한 매트릭스에서 조정한다.
-    @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
+    @GetMapping("/{id}")
+    public ResponseEntity<ArchiveFileResponse> detail(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(archiveService.getAndIncrementView(id, studentId(authentication)));
+    }
+
+    @GetMapping("/visibility-members")
+    public ResponseEntity<List<ArchiveService.VisibilityMember>> visibilityMembers(@RequestParam String query,
+                                                                                   Authentication authentication) {
+        return ResponseEntity.ok(archiveService.visibilityMembers(query, authentication.getName()));
+    }
+
+    @PreAuthorize("@perm.has(authentication,'ARCHIVE_AUTHOR_CHANGE')")
     @PatchMapping("/{id}/author")
     public ResponseEntity<ArchiveFileResponse> updateAuthor(@PathVariable Long id,
                                                             @Valid @RequestBody ArchiveAuthorUpdateRequest request,
@@ -96,11 +109,20 @@ public class ArchiveController {
                                                       @RequestParam(value = "description", required = false) String description,
                                                       @RequestParam(value = "category", defaultValue = "GENERAL") String category,
                                                       @RequestParam(value = "file", required = false) MultipartFile file,
-                                                      @RequestParam(value = "files", required = false) List<MultipartFile> files) throws IOException {
+                                                      @RequestParam(value = "files", required = false) List<MultipartFile> files,
+                                                      @RequestParam(value = "visibility", required = false) String visibility,
+                                                      @RequestParam(value = "selectedStudentIds", required = false) List<String> selectedStudentIds) throws IOException {
         if (file != null && files != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "file과 files를 함께 보낼 수 없습니다.");
         }
-        return ResponseEntity.ok(archiveService.updateGroup(authentication.getName(), id, title, description, category, file, files));
+        return ResponseEntity.ok(archiveService.updateGroup(authentication.getName(), id, title, description, category, file, files, visibility, selectedStudentIds));
+    }
+
+    @PatchMapping("/{id}/visibility")
+    public ResponseEntity<ArchiveFileResponse> updateVisibility(@PathVariable Long id,
+                                                                 @RequestBody ArchiveVisibilityUpdateRequest request,
+                                                                 Authentication authentication) {
+        return ResponseEntity.ok(archiveService.updateVisibility(id, request.visibility(), request.selectedStudentIds(), authentication.getName()));
     }
 
     @PostMapping("/{id}/vote")
@@ -111,9 +133,9 @@ public class ArchiveController {
     }
 
     @GetMapping("/{id}/download")
-    public ResponseEntity<Resource> download(@PathVariable Long id) {
-        ArchiveFile file = archiveService.get(id);
-        archiveService.incrementView(id);
+    public ResponseEntity<Resource> download(@PathVariable Long id, Authentication authentication) {
+        ArchiveFile file = archiveService.get(id, studentId(authentication));
+        archiveService.incrementView(id, studentId(authentication));
         Resource resource = storageService.load(file.getStoredName());
         ContentDisposition disposition = ContentDisposition.attachment()
                 .filename(file.getOriginalName(), StandardCharsets.UTF_8)
@@ -127,9 +149,10 @@ public class ArchiveController {
     }
 
     @GetMapping("/{id}/attachments/{attachmentId}/download")
-    public ResponseEntity<Resource> downloadAttachment(@PathVariable Long id, @PathVariable Long attachmentId) {
-        ArchiveAttachment attachment = archiveService.getAttachment(id, attachmentId);
-        archiveService.incrementView(id);
+    public ResponseEntity<Resource> downloadAttachment(@PathVariable Long id, @PathVariable Long attachmentId,
+                                                       Authentication authentication) {
+        ArchiveAttachment attachment = archiveService.getAttachment(id, attachmentId, studentId(authentication));
+        archiveService.incrementView(id, studentId(authentication));
         Resource resource = storageService.load(attachment.getStoredName());
         ContentDisposition disposition = ContentDisposition.attachment()
                 .filename(attachment.getOriginalName(), StandardCharsets.UTF_8)
@@ -142,8 +165,8 @@ public class ArchiveController {
     }
 
     @GetMapping("/{id}/inline")
-    public ResponseEntity<Resource> inline(@PathVariable Long id) {
-        ArchiveFile file = archiveService.get(id);
+    public ResponseEntity<Resource> inline(@PathVariable Long id, Authentication authentication) {
+        ArchiveFile file = archiveService.get(id, studentId(authentication));
         Resource resource = storageService.load(file.getStoredName());
         MediaType declared = mediaType(file.getMimeType());
         // Only render images and PDFs inline. Anything else (HTML, SVG, scripts, ...) is forced to
@@ -184,10 +207,13 @@ public class ArchiveController {
         }
     }
 
-    @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
         archiveService.delete(id, authentication.getName());
         return ResponseEntity.noContent().build();
+    }
+
+    private String studentId(Authentication authentication) {
+        return authentication == null ? null : authentication.getName();
     }
 }

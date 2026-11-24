@@ -44,7 +44,10 @@ assert.deepEqual(ALL_PERMISSION_KEYS, [
   'notice.write',
   'activity.write',
   'project.write',
-  'archive.manage',
+  'archive.delete',
+  'archive.author_change',
+  'archive.edit_any',
+  'archive.visibility',
   'site_settings.edit',
   'operations.panel',
 ])
@@ -66,7 +69,10 @@ assert.deepEqual(of('VICE_PRESIDENT'), [
   'notice.write',
   'activity.write',
   'project.write',
-  'archive.manage',
+  'archive.delete',
+  'archive.author_change',
+  'archive.edit_any',
+  'archive.visibility',
   'site_settings.edit',
   'operations.panel',
 ])
@@ -141,10 +147,13 @@ assert.equal(canSeeClubRoom(memberWithClubRoomOnly), true)
 // 동방 비번만 열어준 회원은 운영 패널에 들어오지 못한다.
 assert.equal(canAccessOperationsPanel(memberWithClubRoomOnly), false)
 
-const memberWithArchive = [PERMISSIONS.archiveManage]
+const memberWithArchive = [PERMISSIONS.archiveDelete]
 assert.equal(canAccessOperationsPanel(memberWithArchive), true)
 assert.deepEqual(adminTabsForRole('USER', memberWithArchive, tabs).map((tab) => tab.id), ['files'])
 assert.equal(defaultOperationsTab('USER', memberWithArchive, 'members'), 'files')
+for (const permission of [PERMISSIONS.archiveAuthorChange, PERMISSIONS.archiveEditAny, PERMISSIONS.archiveVisibility]) {
+  assert.deepEqual(adminTabsForRole('USER', [permission], tabs).map((tab) => tab.id), ['files'])
+}
 
 // 공지 권한만 가진 회원은 운영 패널엔 들어오지만(canAccessOperationsPanel) 탭은 하나도
 // 없다 — defaultOperationsTab 이 'activities' 로 새면 권한 없는 탭이 열려버린다.

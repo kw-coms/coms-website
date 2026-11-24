@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockAdminApis, mockOptionalApis, expectMembersGate } from './visualSupport.js'
+import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
 
 // The footer's "화면 설정" control: one button that opens a popover (desktop) or a bottom sheet (phones).
 const trigger = (page) => page.getByRole('button', { name: '화면 설정', exact: true })
@@ -78,15 +78,22 @@ test('footer has the four Korean sitemap groups and keeps external destinations'
   await expect(sitemap.getByRole('link', { name: /^역대 회장단/ }).locator('[data-member-lock]')).toHaveCount(1)
   await expect(sitemap.getByRole('link', { name: /^팀 프로젝트/ }).locator('[data-member-lock]')).toHaveCount(1)
   await expect(sitemap.getByRole('link', { name: /^공지/ }).locator('[data-member-lock]')).toHaveCount(1)
+  await expect(sitemap.getByRole('link', { name: '자료실' }).locator('[data-member-lock]')).toHaveCount(0)
   await expect(page.locator('.coms-footer-wordmark')).toHaveAttribute('aria-hidden', 'true')
   await expect(page.locator('.coms-footer-wordmark')).toHaveCSS('-webkit-text-stroke-width', '1px')
   for (const [name, url] of [['Instagram', 'https://www.instagram.com/kw_coms'], ['GitHub', 'https://github.com/kw-coms'], ['YouTube', 'https://www.youtube.com/@kw_coms'], ['메일', 'mailto:kwcoms69@gmail.com']]) {
     await expect(page.locator('footer').getByRole('link', { name, exact: true })).toHaveAttribute('href', url)
   }
-  await sitemap.getByRole('link', { name: /^자료실/ }).click()
-  await expectMembersGate(page, '/resources')
-  await page.getByRole('link', { name: '로그인', exact: true }).click()
-  await expect(page).toHaveURL(/\/login$/)
+  let listRequests = 0
+  await page.route('**/api/files', (route) => {
+    listRequests += 1
+    return route.fulfill({ json: [] })
+  })
+  await sitemap.getByRole('link', { name: '자료실' }).click()
+  await expect(page).toHaveURL(/\/resources$/)
+  await expect(page.getByRole('heading', { name: '자료실', exact: true })).toBeVisible()
+  await expect(page.locator('[data-members-gate]')).toHaveCount(0)
+  expect(listRequests).toBeGreaterThan(0)
 })
 
 test('signed-in footer removes locks and internal links stay in the SPA', async ({ page }) => {

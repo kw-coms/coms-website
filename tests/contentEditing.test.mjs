@@ -3,6 +3,7 @@ import { canEditArchive, authorChangePayload } from '../src/utils/contentEditing
 
 assert.equal(canEditArchive({ role: 'ADMIN', studentId: 'boss' }, { uploadedBy: 'other' }), true)
 assert.equal(canEditArchive({ role: 'VICE_PRESIDENT', studentId: 'vp' }, { uploadedBy: 'other' }), false)
+assert.equal(canEditArchive({ role: 'USER', studentId: 'editor' }, { uploadedBy: 'other' }, ['archive.edit_any']), true)
 assert.equal(canEditArchive({ role: 'USER', studentId: 'owner' }, { uploadedBy: 'owner' }), true)
 assert.equal(canEditArchive(null, { uploadedBy: null }), false)
 assert.deepEqual(authorChangePayload('name', ' 박채현 ', 'ignored'), { name: '박채현' })

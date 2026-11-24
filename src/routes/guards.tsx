@@ -54,10 +54,8 @@ export function RequireAdmin({ children }: PropsWithChildren) {
   }, [awaitingPermissions])
 
   const allowed = canAccessOperationsPanel(permissions)
-  // Until the server answers, `permissions` is only the role's default set. A role the 회장
-  // opened up in the matrix (e.g. 회원 + archive.manage) is denied by those defaults, so
-  // deciding on them sent such a member to the home page on every hard reload of /admin.
-  // Roles the defaults already admit still get in right away; only the denial waits.
+  // Unknown permissions stay empty: wait for the effective set before denying a member
+  // who may have an individual grant. A failed or timed-out lookup stays closed.
   const verdictPending = !allowed && awaitingPermissions && !permissionsWaitExpired
 
   if (loading || verdictPending) return (

@@ -23,6 +23,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     @org.springframework.data.jpa.repository.Query("select m from Member m where trim(m.name) in :names")
     List<Member> findByNormalizedNameIn(@org.springframework.data.repository.query.Param("names") Collection<String> names);
     List<Member> findByRole(Member.Role role);
+    List<Member> findTop20ByNameContainingIgnoreCaseOrStudentIdContainingIgnoreCaseOrderByNameAsc(String name, String studentId);
 
     // Fan-out only needs recipient ids — avoids loading full Member entities
     // (including the long aspiration/interests text columns) for every member.

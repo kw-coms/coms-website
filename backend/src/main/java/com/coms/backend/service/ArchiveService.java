@@ -4,6 +4,7 @@ import com.coms.backend.domain.ArchiveFile;
 import com.coms.backend.domain.ArchiveAttachment;
 import com.coms.backend.domain.ArchiveFileVote;
 import com.coms.backend.domain.Member;
+import com.coms.backend.domain.Permission;
 import com.coms.backend.domain.RichBodyMedia;
 import com.coms.backend.dto.ArchiveFileResponse;
 import com.coms.backend.dto.ArchiveAttachmentResponse;
@@ -16,7 +17,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -72,11 +74,13 @@ public class ArchiveService {
     private final RichContentSanitizer richContentSanitizer;
     private final AuditLogService auditLogService;
     private final RichBodyMediaService richBodyMediaService;
+    private final PermissionService permissionService;
 
     public ArchiveService(ArchiveFileRepository repo, ArchiveAttachmentRepository attachmentRepository,
                           StorageService storage, MemberRepository memberRepository,
                           ArchiveFileVoteRepository voteRepository, RichContentSanitizer richContentSanitizer,
-                          AuditLogService auditLogService, RichBodyMediaService richBodyMediaService) {
+                          AuditLogService auditLogService, RichBodyMediaService richBodyMediaService,
+                          PermissionService permissionService) {
         this.repo = repo;
         this.attachmentRepository = attachmentRepository;
         this.storage = storage;
@@ -85,6 +89,7 @@ public class ArchiveService {
         this.richContentSanitizer = richContentSanitizer;
         this.auditLogService = auditLogService;
         this.richBodyMediaService = richBodyMediaService;
+        this.permissionService = permissionService;
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -100,11 +105,19 @@ public class ArchiveService {
     @Transactional(rollbackFor = IOException.class)
     public ArchiveFileResponse uploadGroup(String title, String description, String category,
                                            List<MultipartFile> files, String uploaderStudentId) throws IOException {
+        return uploadGroup(title, description, category, files, uploaderStudentId, null, List.of());
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    public ArchiveFileResponse uploadGroup(String title, String description, String category,
+                                           List<MultipartFile> files, String uploaderStudentId,
+                                           String visibility, List<String> selectedStudentIds) throws IOException {
         ArchiveFile.Category parsedCategory = parseCategory(category);
         String typedTitle = normalizeTitle(title);
         String cleanedDescription = sanitizeDescription(description);
         Member member = memberRepository.findByStudentId(uploaderStudentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        VisibilitySelection selection = visibilitySelection(visibility, selectedStudentIds, member, null);
         validateGroup(files);
 
         List<String> newStoredNames = new ArrayList<>();
@@ -124,6 +137,8 @@ public class ArchiveService {
             setPrimary(entity, primary, newStoredNames.get(0));
             entity.setUploadedBy(uploaderStudentId);
             entity.setUploaderName(member.getName());
+            entity.setVisibility(selection.visibility());
+            entity.setSelectedStudentIds(selection.studentIds());
             ArchiveFile saved = repo.save(entity);
             richBodyMediaService.syncAttachments(RichBodyMedia.Scope.ARCHIVE, saved.getId(), saved.getDescription(), uploaderStudentId);
             for (int i = 0; i < files.size(); i++) {
@@ -146,11 +161,29 @@ public class ArchiveService {
     public ArchiveFileResponse updateGroup(String editorStudentId, Long id, String title, String description,
                                            String category, MultipartFile replacement,
                                            List<MultipartFile> replacements) throws IOException {
+        return updateGroup(editorStudentId, id, title, description, category, replacement, replacements, null, null);
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    public ArchiveFileResponse updateGroup(String editorStudentId, Long id, String title, String description,
+                                           String category, MultipartFile replacement,
+                                           List<MultipartFile> replacements, String visibility,
+                                           List<String> selectedStudentIds) throws IOException {
         Member editor = memberRepository.findByStudentId(editorStudentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         ArchiveFile entity = repo.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!Objects.equals(entity.getUploadedBy(), editor.getStudentId()) && editor.getRole() != Member.Role.ADMIN) {
+        if (!entity.isVisibleTo(editor)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        if (!Objects.equals(entity.getUploadedBy(), editor.getStudentId())
+                && !permissionService.has(editor, Permission.ARCHIVE_EDIT_ANY)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        VisibilitySelection selection = visibility == null && selectedStudentIds == null ? null
+                : visibilitySelection(visibility, selectedStudentIds, editor, entity.getVisibility());
+        if (selection != null && !Objects.equals(entity.getUploadedBy(), editorStudentId)
+                && !permissionService.has(editor, Permission.ARCHIVE_VISIBILITY)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         ArchiveFile.Category parsedCategory = parseCategory(category);
@@ -197,6 +230,10 @@ public class ArchiveService {
             entity.setTitle(normalizedTitle != null ? normalizedTitle : entity.getOriginalName());
             entity.setDescription(cleanedDescription);
             entity.setCategory(parsedCategory);
+            if (selection != null) {
+                entity.setVisibility(selection.visibility());
+                entity.setSelectedStudentIds(selection.studentIds());
+            }
             ArchiveFile saved = repo.save(entity);
             richBodyMediaService.syncAttachments(RichBodyMedia.Scope.ARCHIVE, saved.getId(), saved.getDescription(), editorStudentId, true);
             auditLogService.record(editor.getStudentId(), "ARCHIVE_FILE_UPDATE", "ARCHIVE_FILE",
@@ -208,14 +245,15 @@ public class ArchiveService {
         }
     }
 
-    /**
-     * Display-name mode remains the archive.manage-compatible path enforced by the controller.
-     * Supplying studentId is ownership reassignment and is always ADMIN-only in the service.
-     */
-    @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
+    /** Supplying studentId is ownership reassignment and remains ADMIN-only. */
     public ArchiveFileResponse updateAuthor(Long id, String uploaderName, String studentId, String editorStudentId) {
-        ArchiveFile entity = repo.findById(id)
+        Member editor = requireMember(editorStudentId);
+        ArchiveFile entity = repo.findByIdForUpdate(id)
+                .filter(file -> file.isVisibleTo(editor))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!permissionService.has(editor, Permission.ARCHIVE_AUTHOR_CHANGE)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
         String cleaned = uploaderName == null ? "" : uploaderName.trim();
         String cleanedStudentId = studentId == null ? "" : studentId.trim();
         if (cleaned.isEmpty() == cleanedStudentId.isEmpty()) {
@@ -223,8 +261,6 @@ public class ArchiveService {
         }
         String detail;
         if (!cleanedStudentId.isEmpty()) {
-            Member editor = memberRepository.findByStudentId(editorStudentId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
             if (editor.getRole() != Member.Role.ADMIN) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN);
             }
@@ -246,57 +282,59 @@ public class ArchiveService {
         return toResponse(saved, voteStats(List.of(saved)), editorStudentId);
     }
 
-    @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
     public ArchiveFileResponse updateAuthor(Long id, String uploaderName, String editorStudentId) {
         return updateAuthor(id, uploaderName, null, editorStudentId);
     }
 
     @Transactional(readOnly = true)
-    public List<ArchiveFileResponse> list() {
-        return list(null);
-    }
-
-    @Transactional(readOnly = true)
     public List<ArchiveFileResponse> list(String studentId) {
-        List<ArchiveFile> files = repo.findAllByOrderByUploadedAtDesc();
+        Member viewer = member(studentId);
+        List<ArchiveFile> files = repo.findVisible(studentId(viewer), officer(viewer), admin(viewer), Pageable.unpaged());
         Map<Long, VoteSummary> stats = voteStats(files);
         Map<Long, List<ArchiveAttachment>> attachments = attachmentsFor(files);
         return files.stream().map(file -> toResponse(file, stats, studentId, attachments.get(file.getId()))).toList();
     }
 
     /**
-     * Returns at most {@code limit} files in the same order as {@link #list()}, pushing the cap into the
+     * Returns at most {@code limit} files in the same order as {@link #list(String)}, pushing the cap into the
      * query instead of loading every row and trimming in memory. Used by the mobile home preview.
      */
     @Transactional(readOnly = true)
     public List<ArchiveFileResponse> listLimited(int limit, String studentId) {
-        List<ArchiveFile> files = repo.findAllByOrderByUploadedAtDesc(
-                org.springframework.data.domain.PageRequest.of(0, limit));
+        Member viewer = member(studentId);
+        List<ArchiveFile> files = repo.findVisible(studentId(viewer), officer(viewer), admin(viewer), PageRequest.of(0, limit));
         Map<Long, VoteSummary> stats = voteStats(files);
         Map<Long, List<ArchiveAttachment>> attachments = attachmentsFor(files);
         return files.stream().map(file -> toResponse(file, stats, studentId, attachments.get(file.getId()))).toList();
     }
 
     @Transactional(readOnly = true)
-    public ArchiveFile get(Long id) {
-        return repo.findById(id)
+    public ArchiveFile get(Long id, String studentId) {
+        Member viewer = member(studentId);
+        return repo.findById(id).filter(file -> file.isVisibleTo(viewer))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     public ArchiveFileResponse getAndIncrementView(Long id, String studentId) {
-        ArchiveFile file = get(id);
-        file.incrementViewCount();
-        ArchiveFile saved = repo.save(file);
-        return toResponse(saved, voteStats(List.of(saved)), studentId);
+        Member viewer = member(studentId);
+        ArchiveFile file = repo.findById(id)
+                .filter(row -> row.isVisibleTo(viewer))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (viewer != null) {
+            repo.incrementViewCount(id);
+            file = get(id, studentId);
+        }
+        return toResponse(file, voteStats(List.of(file)), studentId);
     }
 
-    public void incrementView(Long id) {
+    public void incrementView(Long id, String studentId) {
         // Atomic increment avoids the lost-update race of read-then-save under concurrent views.
-        repo.incrementViewCount(id);
+        if (studentId != null) repo.incrementViewCount(id);
     }
 
     @Transactional(readOnly = true)
-    public ArchiveAttachment getAttachment(Long archiveFileId, Long attachmentId) {
+    public ArchiveAttachment getAttachment(Long archiveFileId, Long attachmentId, String studentId) {
+        get(archiveFileId, studentId);
         return attachmentRepository.findByIdAndArchiveFileId(attachmentId, archiveFileId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
@@ -307,7 +345,7 @@ public class ArchiveService {
         }
         memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        ArchiveFile file = get(id);
+        ArchiveFile file = get(id, studentId);
         Optional<ArchiveFileVote> existing = voteRepository.findByArchiveFileIdAndStudentId(file.getId(), studentId);
         if (value == 0 || existing.isPresent()) {
             existing.ifPresent(voteRepository::delete);
@@ -321,12 +359,15 @@ public class ArchiveService {
         return toResponse(file, voteStats(List.of(file)), studentId);
     }
 
-    // archive.manage-gated — second lock behind ArchiveController's own @PreAuthorize; the
-    // /api/files/** URL rule in SecurityConfig only requires a logged-in member.
-    @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
     public void delete(Long id, String actorStudentId) {
+        Member actor = requireMember(actorStudentId);
         ArchiveFile file = repo.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!file.isVisibleTo(actor)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (!Objects.equals(file.getUploadedBy(), actorStudentId)
+                && !permissionService.has(actor, Permission.ARCHIVE_DELETE)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
         List<ArchiveAttachment> attachments = attachmentsFor(file);
         richBodyMediaService.detachAttachments(RichBodyMedia.Scope.ARCHIVE, id, actorStudentId);
         attachmentRepository.deleteAll(attachments);
@@ -336,6 +377,95 @@ public class ArchiveService {
         } else {
             attachments.forEach(attachment -> deleteAfterCommit(attachment.getStoredName()));
         }
+    }
+
+    public ArchiveFileResponse updateVisibility(Long id, String visibility, List<String> selectedStudentIds,
+                                                String actorStudentId) {
+        Member actor = requireMember(actorStudentId);
+        ArchiveFile file = repo.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!file.isVisibleTo(actor)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (!Objects.equals(file.getUploadedBy(), actorStudentId)
+                && !permissionService.has(actor, Permission.ARCHIVE_VISIBILITY)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        VisibilitySelection selection = visibilitySelection(visibility, selectedStudentIds, actor, file.getVisibility());
+        String before = file.getVisibility().name();
+        file.setVisibility(selection.visibility());
+        file.setSelectedStudentIds(selection.studentIds());
+        ArchiveFile saved = repo.save(file);
+        auditLogService.record(actorStudentId, "ARCHIVE_FILE_VISIBILITY_UPDATE", "ARCHIVE_FILE",
+                String.valueOf(id), before + "->" + saved.getVisibility().name(), null);
+        return toResponse(saved, voteStats(List.of(saved)), actorStudentId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<VisibilityMember> visibilityMembers(String query, String actorStudentId) {
+        Member actor = requireMember(actorStudentId);
+        if (!permissionService.has(actor, Permission.ARCHIVE_VISIBILITY)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        String term = query == null ? "" : query.trim();
+        if (term.length() < 2) return List.of();
+        return memberRepository.findTop20ByNameContainingIgnoreCaseOrStudentIdContainingIgnoreCaseOrderByNameAsc(term, term)
+                .stream().map(member -> new VisibilityMember(member.getStudentId(), member.getName(), member.getRole().name()))
+                .toList();
+    }
+
+    public record VisibilityMember(String studentId, String name, String role) {}
+
+    private record VisibilitySelection(ArchiveFile.Visibility visibility, Set<String> studentIds) {}
+
+    private VisibilitySelection visibilitySelection(String value, List<String> selectedIds, Member actor,
+                                                    ArchiveFile.Visibility previousVisibility) {
+        if (previousVisibility != null && (value == null || value.isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "공개 범위가 비어 있습니다.");
+        }
+        ArchiveFile.Visibility visibility;
+        try {
+            visibility = value == null ? ArchiveFile.Visibility.MEMBERS : ArchiveFile.Visibility.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바르지 않은 공개 범위입니다.");
+        }
+        if ((previousVisibility == ArchiveFile.Visibility.OFFICERS || previousVisibility == ArchiveFile.Visibility.SELECTED
+                || visibility == ArchiveFile.Visibility.OFFICERS || visibility == ArchiveFile.Visibility.SELECTED)
+                && !permissionService.has(actor, Permission.ARCHIVE_VISIBILITY)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        List<String> ids = selectedIds == null ? List.of() : selectedIds;
+        if (visibility != ArchiveFile.Visibility.SELECTED && !ids.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "선택 공개가 아닙니다.");
+        }
+        Set<String> unique = new java.util.HashSet<>(ids);
+        if (unique.stream().anyMatch(id -> id == null || id.isBlank() || !id.equals(id.trim()))
+                || memberRepository.findByStudentIdIn(unique).size() != unique.size()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "선택한 회원을 찾을 수 없습니다.");
+        }
+        return new VisibilitySelection(visibility, unique);
+    }
+
+    private Member requireMember(String studentId) {
+        return memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+    }
+
+    private Member member(String studentId) {
+        return studentId == null ? null : memberRepository.findByStudentId(studentId).orElse(null);
+    }
+
+    private String studentId(Member member) { return member == null ? null : member.getStudentId(); }
+    private boolean officer(Member member) {
+        return member != null && (member.getRole() == Member.Role.OFFICER
+                || member.getRole() == Member.Role.VICE_PRESIDENT);
+    }
+    private boolean admin(Member member) { return member != null && member.getRole() == Member.Role.ADMIN; }
+
+    private List<String> selectedIdsForResponse(ArchiveFile file, String studentId) {
+        if (file.getVisibility() != ArchiveFile.Visibility.SELECTED) return List.of();
+        Member actor = member(studentId);
+        if (actor == null || (!Objects.equals(file.getUploadedBy(), studentId)
+                && !permissionService.has(actor, Permission.ARCHIVE_VISIBILITY))) return List.of();
+        return file.getSelectedStudentIds().stream().sorted().toList();
     }
 
     private Map<Long, VoteSummary> voteStats(List<ArchiveFile> files) {
@@ -370,9 +500,11 @@ public class ArchiveService {
                 file.getOriginalName(),
                 file.getMimeType(),
                 file.getFileSize(),
-                file.getUploadedBy(),
+                studentId == null ? null : file.getUploadedBy(),
                 file.getUploaderName(),
                 file.getCategory().name(),
+                file.getVisibility().name(),
+                selectedIdsForResponse(file, studentId),
                 file.getViewCount(),
                 votes.upvotes(),
                 votes.myVote(studentId),

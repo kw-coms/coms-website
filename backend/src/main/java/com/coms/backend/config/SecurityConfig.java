@@ -174,10 +174,15 @@ public class SecurityConfig {
                 auth.requestMatchers("/api/mini-apps/**").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/files").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/files/*/vote").authenticated();
-                // archive.manage — ArchiveController 의 @perm.has 가 실제 게이트. 명시 matcher 는
-                // 아래 authenticated() catch-all 보다 앞서 있어야 의도가 드러난다.
+                // ArchiveService checks ownership, visibility and each split permission.
                 auth.requestMatchers(HttpMethod.DELETE, "/api/files/**").authenticated();
                 auth.requestMatchers(HttpMethod.PATCH, "/api/files/**").authenticated();
+                auth.requestMatchers(HttpMethod.PUT, "/api/files/**").authenticated();
+                auth.requestMatchers(HttpMethod.GET, "/api/files/visibility-members").authenticated();
+                // Only these reads may reach the service as guests; each enforces PUBLIC.
+                auth.requestMatchers(HttpMethod.GET, "/api/files", "/api/files/*",
+                        "/api/files/*/download", "/api/files/*/inline",
+                        "/api/files/*/attachments/*/download").permitAll();
                 auth.requestMatchers("/api/files", "/api/files/**").authenticated();
                 // community.moderate — CommunityController 의 @perm.has 가 실제 게이트.
                 auth.requestMatchers(HttpMethod.PATCH, "/api/community/posts/*/pin").authenticated();

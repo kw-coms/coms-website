@@ -532,10 +532,9 @@ public class NotificationService {
 
     private void alertModeratorsOfReport(CommunityPost post) {
         String message = "커뮤니티 신고 접수: " + (post.getTitle() == null ? "제목 없음" : post.getTitle());
-        // 중재 권한(community.moderate)을 실제로 가진 직급으로 수신자를 뽑는다 —
-        // 회장이 임원에게 중재를 열어주면 임원도 신고 알림을 받아야 한다.
-        List<String> moderators = memberRepository.findStudentIdsByRoleIn(
-                permissionService.rolesWith(com.coms.backend.domain.Permission.COMMUNITY_MODERATE));
+        // 직급 매트릭스와 개인별 허용·차단을 모두 반영해 신고 알림 수신자를 뽑는다.
+        List<String> moderators = permissionService.studentIdsWith(
+                com.coms.backend.domain.Permission.COMMUNITY_MODERATE);
         List<Notification> notifications = moderators.stream()
                 .map(studentId -> build(
                         studentId,

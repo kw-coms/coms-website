@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -92,8 +93,8 @@ class RolePermissionMatrixTest {
                         () -> get("/api/admin/recurring-schedules")),
                 new Case(Permission.PROJECT_WRITE, 404, 403,
                         () -> origin(delete("/api/admin/club-project-categories/999999"))),
-                new Case(Permission.ARCHIVE_MANAGE, 404, 403,
-                        () -> origin(delete("/api/files/999999"))),
+                new Case(Permission.ARCHIVE_AUTHOR_CHANGE, 404, 403,
+                        () -> origin(json(patch("/api/files/999999/author"), "{\"uploaderName\":\"test\"}"))),
                 new Case(Permission.SITE_SETTINGS_EDIT, 200, 403,
                         () -> get("/api/admin/site-settings"))
         );

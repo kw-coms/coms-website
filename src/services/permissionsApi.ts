@@ -19,9 +19,24 @@ export type PermissionMatrix = {
   updatedBy?: string | null
 }
 
+export type PermissionMember = {
+  studentId: string
+  name: string
+  role: string
+}
+
+export type PermissionEffect = 'GRANT' | 'REVOKE'
+export type MemberPermissionOverrides = PermissionMember & {
+  overrides: Record<string, PermissionEffect>
+}
+export type MemberPermissionDetail = MemberPermissionOverrides & {
+  rolePermissions: string[]
+  permissions: string[]
+}
+
 // 로그인한 본인의 유효 권한 — 회장이 매트릭스를 바꾸면 다음 로드부터 반영된다.
-export function getMyPermissions(): Promise<MyPermissions> {
-  return request('/api/permissions/me')
+export function getMyPermissions(signal?: AbortSignal): Promise<MyPermissions> {
+  return request('/api/permissions/me', { signal })
 }
 
 // 회장 전용 — 직급 × 권한 매트릭스 전체.
@@ -40,5 +55,27 @@ export function updatePermissionMatrix(
   return request('/api/admin/permissions', {
     method: 'PUT',
     body: JSON.stringify({ allowed, expectedUpdatedAt: expectedUpdatedAt ?? null }),
+  })
+}
+
+export function searchPermissionMembers(query: string): Promise<PermissionMember[]> {
+  return request(`/api/admin/permissions/members?query=${encodeURIComponent(query)}`)
+}
+
+export function listMemberPermissionOverrides(): Promise<MemberPermissionOverrides[]> {
+  return request('/api/admin/permissions/overrides')
+}
+
+export function getMemberPermissionOverrides(studentId: string): Promise<MemberPermissionDetail> {
+  return request(`/api/admin/permissions/overrides/${encodeURIComponent(studentId)}`)
+}
+
+export function updateMemberPermissionOverrides(
+  studentId: string,
+  overrides: Record<string, PermissionEffect>
+): Promise<MemberPermissionDetail> {
+  return request(`/api/admin/permissions/overrides/${encodeURIComponent(studentId)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ overrides }),
   })
 }

@@ -16,16 +16,22 @@ import { ArchiveDetailView } from '../components/archive/ArchiveDetailView'
 import { ArchiveListView } from '../components/archive/ArchiveListView'
 import { WriteForm } from '../components/archive/WriteForm'
 import { ARCHIVE_CATEGORIES, archiveFileSize, categoryLabel } from '../components/archive/archiveUtils'
-import { canManageArchive } from '../utils/roleAccess'
+import { PERMISSIONS } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
 import { showToast } from '../components/common/Toast'
 
 export default function Archive({ onBack }: { onBack: () => void }) {
+  const { user, loading } = useAuth()
+  if (loading) return <div role="status" className="p-6 text-sm text-[var(--app-muted)]">자료실을 불러오는 중...</div>
+  return <ArchiveContent key={`${user?.studentId || 'guest'}:${user?.role || ''}`} onBack={onBack} />
+}
+
+function ArchiveContent({ onBack }: { onBack: () => void }) {
   // 자료 상세는 /resources/:id 로 열린다 — 브라우저 뒤로가기가 자료실 목록으로 돌아오도록.
   const navigate = useNavigate()
   const { id: urlId } = useParams()
   const { user } = useAuth()
-  const { permissions } = usePermissions()
+  const { permissions, can } = usePermissions()
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -59,7 +65,8 @@ export default function Archive({ onBack }: { onBack: () => void }) {
 
   useScrollReveal([files.length, loading])
 
-  const isAdmin = canManageArchive(permissions)
+  const canEdit = (file) => canEditArchive(user, file, permissions)
+  const canDelete = (file) => !!user && (user.studentId === file.uploadedBy || can(PERMISSIONS.archiveDelete))
 
   const loadFiles = ({ showLoading = true } = {}) => {
     if (showLoading) setLoading(true)
@@ -164,7 +171,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
 
   const [voting, setVoting] = useState(false)
   const handleVote = async () => {
-    if (!detailFile || voting) return
+    if (!user || !detailFile || voting) return
     setVoting(true)
     try {
       const updated = await voteArchiveFile(detailFile.id, detailFile.myVote === 1 ? 0 : 1)
@@ -231,7 +238,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
                 {view === 'list' ? '세미나, 프로젝트, 학술회지 자료를 카테고리와 검색으로 빠르게 다시 찾습니다.' : ''}
               </p>
             </div>
-            {view === 'list' ? (
+            {view === 'list' && user ? (
               <button
                 type="button"
                 onClick={() => setMode('write')}
@@ -240,7 +247,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
                 <FileUp size={15} />
                 자료 올리기
               </button>
-            ) : (
+            ) : view !== 'list' ? (
               <button
                 type="button"
                 onClick={backToList}
@@ -249,16 +256,16 @@ export default function Archive({ onBack }: { onBack: () => void }) {
                 <ArrowLeft size={15} />
                 목록
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
-        {view === 'write' && (
+        {view === 'write' && user && (
           <div className="bg-[var(--app-surface-soft)] p-5 sm:p-7">
             <WriteForm onCancel={backToList} onSave={handleSave} />
           </div>
         )}
-        {view === 'edit' && detailFile && canEditArchive(user, detailFile) && <WriteForm key={detailFile.id} initialFile={detailFile} onCancel={() => setEditingId(null)} onSave={handleSave} />}
+        {view === 'edit' && detailFile && canEdit(detailFile) && <WriteForm key={detailFile.id} initialFile={detailFile} onCancel={() => setEditingId(null)} onSave={handleSave} />}
 
         {view === 'list' && (
           <ArchiveListView
@@ -284,10 +291,11 @@ export default function Archive({ onBack }: { onBack: () => void }) {
 
         {view === 'detail' && detailFile && (
           <ArchiveDetailView
-            onAuthorEdit={setAuthorFile}
-            onEdit={canEditArchive(user, detailFile) ? () => setEditingId(detailFile.id) : undefined}
+            onAuthorEdit={can(PERMISSIONS.archiveAuthorChange) ? setAuthorFile : undefined}
+            onEdit={canEdit(detailFile) ? () => setEditingId(detailFile.id) : undefined}
             detailFile={detailFile}
-            isAdmin={isAdmin}
+            canDelete={canDelete(detailFile)}
+            canVote={!!user}
             voting={voting}
             onVote={handleVote}
             onDelete={handleDelete}
