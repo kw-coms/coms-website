@@ -35,6 +35,10 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select m from Member m where m.id = :id")
     Optional<Member> findWithLockById(@org.springframework.data.repository.query.Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select m from Member m where m.studentId = :studentId")
+    Optional<Member> findWithLockByStudentId(@org.springframework.data.repository.query.Param("studentId") String studentId);
     Optional<Member> findByEmail(String email);
     Optional<Member> findByEmailIgnoreCase(String email);
     List<Member> findByStudentIdIn(Collection<String> studentIds);

@@ -190,7 +190,7 @@ class AdminServiceTest {
     @Test
     void deleteMemberRejectsRemovingFinalAdmin() {
         Member admin = member("admin", Member.Role.ADMIN);
-        when(memberRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(memberRepository.findWithLockById(1L)).thenReturn(Optional.of(admin));
         when(memberRepository.countByRole(Member.Role.ADMIN)).thenReturn(1L);
 
         assertThatThrownBy(() -> adminService.deleteMember(1L))
@@ -206,7 +206,7 @@ class AdminServiceTest {
     @Test
     void deleteByStudentIdRejectsFinalAdminWithdrawal() {
         Member admin = member("admin", Member.Role.ADMIN);
-        when(memberRepository.findByStudentId("admin")).thenReturn(Optional.of(admin));
+        when(memberRepository.findWithLockByStudentId("admin")).thenReturn(Optional.of(admin));
         when(memberRepository.countByRole(Member.Role.ADMIN)).thenReturn(1L);
 
         assertThatThrownBy(() -> adminService.deleteByStudentId("admin"))
@@ -222,7 +222,7 @@ class AdminServiceTest {
     @Test
     void withdrawalPurgesRecruitApplicationsAndLoginFailures() {
         Member user = member("2026123456", Member.Role.USER);
-        when(memberRepository.findByStudentId("2026123456")).thenReturn(Optional.of(user));
+        when(memberRepository.findWithLockByStudentId("2026123456")).thenReturn(Optional.of(user));
 
         adminService.deleteByStudentId("2026123456");
 
@@ -235,7 +235,7 @@ class AdminServiceTest {
     @Test
     void rejectedWithdrawalPurgesNothing() {
         Member admin = member("admin", Member.Role.ADMIN);
-        when(memberRepository.findByStudentId("admin")).thenReturn(Optional.of(admin));
+        when(memberRepository.findWithLockByStudentId("admin")).thenReturn(Optional.of(admin));
         when(memberRepository.countByRole(Member.Role.ADMIN)).thenReturn(1L);
 
         assertThatThrownBy(() -> adminService.deleteByStudentId("admin"))

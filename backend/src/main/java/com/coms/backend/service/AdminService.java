@@ -212,7 +212,7 @@ public class AdminService {
     }
 
     public DeletedMemberSnapshot deleteMember(Long id) {
-        Member member = memberRepository.findById(id)
+        Member member = memberRepository.findWithLockById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         ensureNotFinalAdmin(member, "마지막 관리자는 삭제할 수 없습니다.");
         DeletedMemberSnapshot snapshot = DeletedMemberSnapshot.from(member);
@@ -222,7 +222,7 @@ public class AdminService {
     }
 
     public DeletedMemberSnapshot deleteByStudentId(String studentId) {
-        Member member = memberRepository.findByStudentId(studentId)
+        Member member = memberRepository.findWithLockByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         ensureNotFinalAdmin(member, "마지막 관리자는 탈퇴할 수 없습니다.");
         DeletedMemberSnapshot snapshot = DeletedMemberSnapshot.from(member);

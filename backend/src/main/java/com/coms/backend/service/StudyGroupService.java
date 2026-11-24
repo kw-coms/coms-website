@@ -72,15 +72,11 @@ public class StudyGroupService {
     }
 
     public View create(Write write, String actorId, boolean direct) {
-        Member actor = access.requireMember(actorId);
-        Member leaderAccount = actor;
-        if (direct) {
-            requireActivityWrite(actor);
-            if (write.leaderStudentId() != null && !write.leaderStudentId().isBlank()) {
-                leaderAccount = members.findByStudentId(write.leaderStudentId().trim())
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "리더로 지정할 회원을 찾을 수 없습니다."));
-            }
-        }
+        String leaderId = direct && write.leaderStudentId() != null && !write.leaderStudentId().isBlank()
+                ? write.leaderStudentId().trim() : actorId;
+        if (direct && !leaderId.equals(actorId)) requireActivityWrite(access.requireMember(actorId));
+        Member leaderAccount = lockLeaderAccount(leaderId);
+        if (direct && leaderId.equals(actorId)) requireActivityWrite(leaderAccount);
         requireFullMember(leaderAccount);
         StudyGroup group = new StudyGroup();
         applyWrite(group, write);
@@ -133,10 +129,10 @@ public class StudyGroupService {
     }
 
     public View appointLeader(Long id, String newLeaderId, String actorId) {
+        if (!newLeaderId.equals(actorId)) requireActivityWrite(access.requireMember(actorId));
+        Member next = lockLeaderAccount(newLeaderId);
+        if (newLeaderId.equals(actorId)) requireActivityWrite(next);
         StudyGroup group = groups.findByIdForUpdate(id).orElseThrow(() -> notFound());
-        requireActivityWrite(access.requireMember(actorId));
-        Member next = members.findByStudentId(newLeaderId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "리더로 지정할 회원을 찾을 수 없습니다."));
         requireFullMember(next);
         String previousLeaderId = group.getLeaderStudentId();
         if (group.getStatus() == StudyGroup.Status.ENDED && previousLeaderId != null) throw conflict("종료된 스터디입니다.");
@@ -267,13 +263,21 @@ public class StudyGroupService {
     /** Erase account-linked participation while retaining the group's historical record. */
     public void deleteDataForMember(String studentId) {
         if (studentId == null || studentId.isBlank()) return;
+        List<StudyGroup> affected = groups.findAccountGroupsForUpdate(studentId);
         interests.deleteByStudentId(studentId);
         memberships.deleteByStudentId(studentId);
-        for (StudyGroup group : groups.findByLeaderStudentId(studentId)) {
-            group.setLeaderStudentId(null);
-            group.setStatus(StudyGroup.Status.ENDED);
+        for (StudyGroup group : affected) {
+            if (studentId.equals(group.getLeaderStudentId())) {
+                group.setLeaderStudentId(null);
+                group.setStatus(StudyGroup.Status.ENDED);
+            }
+            if (studentId.equals(group.getCreatedBy())) group.setCreatedBy("removed");
         }
-        for (StudyGroup group : groups.findByCreatedBy(studentId)) group.setCreatedBy("removed");
+    }
+
+    private Member lockLeaderAccount(String studentId) {
+        return members.findWithLockByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "리더로 지정할 회원을 찾을 수 없습니다."));
     }
 
     private InterestSummary interestSummary(Long id, boolean manager) {
