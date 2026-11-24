@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.AttendanceRecord;
 import com.coms.backend.domain.AttendanceSession;
 import com.coms.backend.domain.Member;
+import com.coms.backend.domain.StudyGroup;
 import com.coms.backend.dto.AttendanceCheckInResponse;
 import com.coms.backend.dto.AttendanceDetailResponse;
 import com.coms.backend.dto.AttendanceOpenRequest;
@@ -11,6 +12,7 @@ import com.coms.backend.dto.AttendanceSummaryResponse;
 import com.coms.backend.repository.AttendanceRecordRepository;
 import com.coms.backend.repository.AttendanceSessionRepository;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.StudySessionRepository;
 import com.coms.backend.security.SlidingWindowRateLimiter;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -45,6 +47,8 @@ public class AttendanceService {
     private final AttendanceSessionRepository sessionRepository;
     private final AttendanceRecordRepository recordRepository;
     private final MemberRepository memberRepository;
+    private final StudyAccessService studyAccess;
+    private final StudySessionRepository studySessions;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
     /** A code is four digits, so guessing is bounded per member: wrong codes count, right ones do not. */
@@ -53,11 +57,13 @@ public class AttendanceService {
     public AttendanceService(AttendanceSessionRepository sessionRepository,
                              AttendanceRecordRepository recordRepository,
                              MemberRepository memberRepository,
-                             Clock clock) {
+                             Clock clock, StudyAccessService studyAccess, StudySessionRepository studySessions) {
         this.sessionRepository = sessionRepository;
         this.recordRepository = recordRepository;
         this.memberRepository = memberRepository;
         this.clock = clock;
+        this.studyAccess = studyAccess;
+        this.studySessions = studySessions;
         this.wrongCodesByMember = new SlidingWindowRateLimiter(MAX_CHECK_IN_ATTEMPTS, CHECK_IN_ATTEMPT_WINDOW, clock);
     }
 
@@ -65,7 +71,7 @@ public class AttendanceService {
     @Transactional(readOnly = true)
     public List<AttendanceSessionResponse> list(String studentId, boolean manager) {
         Member member = requireMember(studentId);
-        List<AttendanceSession> sessions = sessionRepository.findTop100ByOrderByOpenedAtDescIdDesc();
+        List<AttendanceSession> sessions = sessionRepository.findTop100ByStudySessionIdIsNullOrderByOpenedAtDescIdDesc();
         if (sessions.isEmpty()) return List.of();
         Map<Long, List<AttendanceRecord>> bySession = recordRepository
                 .findBySessionIdIn(sessions.stream().map(AttendanceSession::getId).toList())
@@ -85,19 +91,50 @@ public class AttendanceService {
         }
         LocalDateTime now = LocalDateTime.now(clock);
         AttendanceSession session = new AttendanceSession();
-        session.setTitle(title);
-        session.setCode(newCode(now));
-        session.setOpenedByStudentId(member.getStudentId());
-        session.setOpenedByName(displayName(member));
-        session.setOpenedAt(now);
-        session.setClosesAt(now.plusMinutes(request.minutes()));
+        startSession(session, title, request.minutes(), member, now);
         return toResponse(sessionRepository.save(session), List.of(), member, true, now);
+    }
+
+    public void openStudy(Long studySessionId, String title, int minutes, String studentId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        AttendanceSession session = sessionRepository.findByStudySessionId(studySessionId)
+                .orElseGet(() -> newStudySession(studySessionId, now));
+        if (session.getId() != null && session.isOpenAt(now)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 열린 출석이 있습니다.");
+        }
+        startSession(session, title, minutes, requireMember(studentId), now);
+        sessionRepository.save(session);
+    }
+
+    AttendanceSession startManualStudy(Long studySessionId, String title, String studentId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        AttendanceSession session = newStudySession(studySessionId, now);
+        startSession(session, title, 0, requireMember(studentId), now);
+        return sessionRepository.save(session);
+    }
+
+    private static AttendanceSession newStudySession(Long studySessionId, LocalDateTime now) {
+        AttendanceSession session = new AttendanceSession();
+        session.setStudySessionId(studySessionId);
+        session.setFirstOpenedAt(now);
+        return session;
+    }
+
+    private void startSession(AttendanceSession session, String title, int minutes, Member opener, LocalDateTime now) {
+        session.setTitle(title);
+        session.setCode(minutes == 0 ? "" : newCode(now));
+        session.setOpenedByStudentId(opener.getStudentId());
+        session.setOpenedByName(displayName(opener));
+        session.setOpenedAt(now);
+        session.setClosesAt(now.plusMinutes(minutes));
+        session.setClosedAt(minutes == 0 ? now : null);
     }
 
     @Transactional(readOnly = true)
     public AttendanceDetailResponse detail(Long id, String studentId) {
         Member member = requireMember(studentId);
         AttendanceSession session = requireSession(id);
+        if (session.getStudySessionId() != null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         List<AttendanceRecord> records = recordRepository.findBySessionIdOrderByCheckedAtAscIdAsc(session.getId());
         return new AttendanceDetailResponse(
                 toResponse(session, records, member, true, LocalDateTime.now(clock)),
@@ -111,7 +148,7 @@ public class AttendanceService {
     @Transactional(readOnly = true)
     public AttendanceSummaryResponse summary(String studentId) {
         requireMember(studentId);
-        List<AttendanceSession> sessions = sessionRepository.findTop100ByOrderByOpenedAtDescIdDesc();
+        List<AttendanceSession> sessions = sessionRepository.findTop100ByStudySessionIdIsNullOrderByOpenedAtDescIdDesc();
         if (sessions.isEmpty()) return new AttendanceSummaryResponse(List.of(), List.of());
         List<AttendanceRecord> records = recordRepository
                 .findBySessionIdIn(sessions.stream().map(AttendanceSession::getId).toList());
@@ -139,6 +176,7 @@ public class AttendanceService {
     public AttendanceSessionResponse close(Long id, String studentId) {
         Member member = requireMember(studentId);
         AttendanceSession session = requireSession(id);
+        if (session.getStudySessionId() != null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         LocalDateTime now = LocalDateTime.now(clock);
         if (session.isOpenAt(now)) {
             session.setClosedAt(now);
@@ -149,6 +187,7 @@ public class AttendanceService {
 
     public void delete(Long id) {
         AttendanceSession session = requireSession(id);
+        if (session.getStudySessionId() != null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         recordRepository.deleteBySessionId(session.getId());
         sessionRepository.delete(session);
     }
@@ -166,19 +205,32 @@ public class AttendanceService {
         }
         String code = rawCode == null ? "" : rawCode.replaceAll("\\s+", "");
         LocalDateTime now = LocalDateTime.now(clock);
-        AttendanceSession session = sessionRepository.findByClosedAtIsNullAndClosesAtAfter(now).stream()
-                .filter(open -> open.getCode().equals(code))
-                .findFirst()
-                .orElse(null);
-        if (session == null) {
-            wrongCodesByMember.tryAcquire(key);
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "코드가 맞지 않거나 출석이 마감되었습니다.");
+        AttendanceSessionRepository.OpenCodeMatch match = sessionRepository
+                .findFirstByCodeAndClosedAtIsNullAndClosesAtAfterOrderById(code, now)
+                .orElseThrow(() -> invalidCode(key));
+        if (match.getStudySessionId() != null) {
+            Long groupId = studySessions.findById(match.getStudySessionId()).orElseThrow(() -> invalidCode(key)).getGroupId();
+            // Serialize with manual marks, closing attendance and membership changes in this study.
+            StudyGroup group = studyAccess.lockGroup(groupId);
+            if (group.getStatus() == StudyGroup.Status.ENDED) throw invalidCode(key);
+            if (!studyAccess.isApprovedMember(groupId, studentId)) {
+                wrongCodesByMember.tryAcquire(key);
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "이 스터디의 승인된 멤버만 출석할 수 있습니다.");
+            }
+            now = LocalDateTime.now(clock);
         }
-        AttendanceRecord existing = recordRepository.findBySessionIdOrderByCheckedAtAscIdAsc(session.getId()).stream()
-                .filter(record -> record.getStudentId().equals(member.getStudentId()))
-                .findFirst()
+        AttendanceSession session = sessionRepository.findById(match.getId()).orElseThrow(() -> invalidCode(key));
+        if (!session.isOpenAt(now) || !session.getCode().equals(code)) throw invalidCode(key);
+        AttendanceRecord existing = recordRepository.findBySessionIdAndStudentId(session.getId(), key)
                 .orElse(null);
         if (existing != null) {
+            if (existing.getStatus() == AttendanceRecord.Status.ABSENT) {
+                existing.setStatus(AttendanceRecord.Status.PRESENT);
+                existing.setSource(AttendanceRecord.Source.CODE);
+                existing.setCheckedAt(now);
+                recordRepository.save(existing);
+                return new AttendanceCheckInResponse(session.getId(), session.getTitle(), now, false);
+            }
             return new AttendanceCheckInResponse(session.getId(), session.getTitle(), existing.getCheckedAt(), true);
         }
         AttendanceRecord record = new AttendanceRecord();
@@ -188,6 +240,11 @@ public class AttendanceService {
         record.setCheckedAt(now);
         recordRepository.saveAndFlush(record);
         return new AttendanceCheckInResponse(session.getId(), session.getTitle(), now, false);
+    }
+
+    private ResponseStatusException invalidCode(String key) {
+        wrongCodesByMember.tryAcquire(key);
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "코드가 맞지 않거나 출석이 마감되었습니다.");
     }
 
     /**

@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
@@ -30,8 +31,19 @@ public class AttendanceRecord {
     @Column(name = "member_name", nullable = false, length = 100)
     private String memberName;
 
-    @Column(name = "checked_at", nullable = false)
+    @Column(name = "checked_at")
     private LocalDateTime checkedAt = LocalDateTime.now();
+
+    @Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(nullable = false, length = 12)
+    private Status status = Status.PRESENT;
+
+    @Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(nullable = false, length = 12)
+    private Source source = Source.CODE;
+
+    public enum Status { PRESENT, ABSENT, LATE }
+    public enum Source { CODE, MANUAL }
 
     public Long getId() { return id; }
     public Long getSessionId() { return sessionId; }
@@ -42,4 +54,8 @@ public class AttendanceRecord {
     public void setMemberName(String memberName) { this.memberName = memberName; }
     public LocalDateTime getCheckedAt() { return checkedAt; }
     public void setCheckedAt(LocalDateTime checkedAt) { this.checkedAt = checkedAt; }
+    public Status getStatus() { return status; }
+    public void setStatus(Status status) { this.status = status; }
+    public Source getSource() { return source; }
+    public void setSource(Source source) { this.source = source; }
 }
