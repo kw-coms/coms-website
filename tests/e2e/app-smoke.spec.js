@@ -130,7 +130,7 @@ test('archive non-owner vice president cannot see the content edit action', asyn
 
 test('notice author can edit after reassignment but cannot pin or delete', async ({ page }) => {
   await mockAdminApis(page)
-  const notice = { id: 913, title: '이관된 공지', content: '기존 본문', category: 'GENERAL', author: '회원', authorStudentId: 'owner', pinned: true, createdAt: '2026-09-01T00:00:00' }
+  const notice = { id: 913, version: 0, title: '이관된 공지', content: '기존 본문', category: 'GENERAL', author: '회원', authorStudentId: 'owner', pinned: true, createdAt: '2026-09-01T00:00:00' }
   let edited = null
   await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { studentId: 'owner', name: '회원', role: 'USER', emailVerified: true } }))
@@ -154,6 +154,7 @@ test('notice author can edit after reassignment but cannot pin or delete', async
   await page.getByRole('button', { name: /수정|저장/ }).last().click()
   await expect.poll(() => edited?.title).toBe('수정된 공지 제목')
   expect(edited.pinned).toBe(true)
+  expect(edited.version).toBe(0)
 })
 
 test('notice write permission does not expose another authors edit action', async ({ page }) => {
@@ -169,6 +170,43 @@ test('notice write permission does not expose another authors edit action', asyn
   await expect(page.getByRole('button', { name: '수정', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '고정', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '삭제', exact: true })).toBeVisible()
+})
+
+test('notice editor sends its loaded version and only changes visibility explicitly', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'ADMIN', permissions: ['notice.write'] } }))
+  let notice = { id: 915, version: 3, publicVisible: true, title: '공개 공지', content: '기존 공지 본문', category: 'GENERAL', author: '관리자', pinned: false }
+  const saves = []
+  await page.route('**/api/notices', route => route.fulfill({ json: [notice] }))
+  await page.route('**/api/notices/915', async route => {
+    if (route.request().method() !== 'PUT') return route.fulfill({ json: notice })
+    const body = route.request().postDataJSON()
+    saves.push(body)
+    if (body.version !== notice.version) return route.fulfill({ status: 409, json: {} })
+    notice = { ...notice, ...body, version: notice.version + 1 }
+    return route.fulfill({ json: notice })
+  })
+
+  await page.goto('/notices/915')
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  const visibility = page.getByRole('checkbox', { name: '비회원에게도 공개' })
+  await expect(visibility).toBeChecked()
+  await expect(page.locator('[contenteditable="true"]').first()).toContainText('기존 공지 본문')
+  notice = { ...notice, version: 4, publicVisible: false }
+  await page.getByPlaceholder('제목', { exact: true }).fill('편집 중인 제목')
+  await page.getByRole('button', { name: '저장', exact: true }).click()
+  await expect.poll(() => saves[0]).toMatchObject({ version: 3, title: '편집 중인 제목' })
+  expect(saves[0]).not.toHaveProperty('publicVisible')
+  await expect(page.getByText(/새로고침.*다시 시도/)).toBeVisible()
+  await expect(page.getByPlaceholder('제목', { exact: true })).toHaveValue('편집 중인 제목')
+
+  await page.reload()
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  await expect(page.locator('[contenteditable="true"]').first()).toContainText('기존 공지 본문')
+  await expect(visibility).not.toBeChecked()
+  await visibility.check()
+  await page.getByRole('button', { name: '저장', exact: true }).click()
+  await expect.poll(() => saves[1]).toMatchObject({ version: 4, publicVisible: true })
 })
 
 function multipartField(body, name) {

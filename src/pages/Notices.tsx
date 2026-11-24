@@ -116,7 +116,7 @@ function noticeCategoryMeta(value) {
 }
 
 type NoticeFormProps = {
-  initialNotice?: { id?: number; title?: string; category?: string; content?: string; publicVisible?: boolean; [key: string]: unknown } | null
+  initialNotice?: { id?: number; version?: number; title?: string; category?: string; content?: string; publicVisible?: boolean; [key: string]: unknown } | null
   defaultCategory?: string
   onCancel: () => void
   onSave: (saved: unknown) => void
@@ -133,6 +133,8 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
   const storageKey = draftStorageKey(user?.studentId, 'notice', initialNotice?.id)
   const [stored] = useState(() => readDraft(storageKey))
   const [baseRevision] = useState(() => initialNotice ? draftRevision(initialNotice) : undefined)
+  const [version] = useState(initialNotice?.version)
+  const [initialPublicVisible] = useState(initialNotice?.publicVisible ?? false)
   const conflict = draftIsStale(stored, baseRevision)
   const [restored, setRestored] = useState(conflict ? null : stored)
   const [pendingDraft, setPendingDraft] = useState(conflict ? stored : null)
@@ -140,7 +142,7 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
   const [formData, setFormData] = useState({
     title: restored?.title ?? (initialNotice?.title || ''),
     category: restored?.category || savedCategory,
-    publicVisible: restored?.publicVisible ?? initialNotice?.publicVisible ?? false,
+    publicVisible: initialNotice ? initialPublicVisible : restored?.publicVisible ?? false,
   })
   const [editorKey, setEditorKey] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -155,7 +157,7 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
   const draft = useEditorDraft({
     storageKey,
     baseRevision,
-    baseline: () => ({ title: initialNotice?.title || '', category: savedCategory, publicVisible: initialNotice?.publicVisible ?? false, anonymousName: '', content: serializeRichBody(originalBlocks) }),
+    baseline: () => ({ title: initialNotice?.title || '', category: savedCategory, publicVisible: initialPublicVisible, anonymousName: '', content: serializeRichBody(originalBlocks) }),
     current: () => {
       const blocks = editorApiRef.current?.getBlocks()
       return { title: formData.title, category: formData.category, publicVisible: formData.publicVisible, anonymousName: '', content: serializeRichBody(blocks ?? initialBlocks) }
@@ -164,7 +166,7 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
     paused: Boolean(pendingDraft),
   })
   const applyDraft = (picked) => {
-    setFormData({ title: picked.title, category: picked.category || savedCategory, publicVisible: picked.publicVisible ?? initialNotice?.publicVisible ?? false })
+    setFormData({ title: picked.title, category: picked.category || savedCategory, publicVisible: initialNotice ? initialPublicVisible : picked.publicVisible ?? false })
     setInitialBlocks(parseRichBodyBlocks(picked.content))
     setEditorKey((key) => key + 1)
     setRestored(picked)
@@ -177,7 +179,7 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
   const discardDraft = () => {
     draft.reset()
     setRestored(null)
-    setFormData({ title: initialNotice?.title || '', category: savedCategory, publicVisible: initialNotice?.publicVisible ?? false })
+    setFormData({ title: initialNotice?.title || '', category: savedCategory, publicVisible: initialPublicVisible })
     setInitialBlocks(savedBlocks())
     setEditorKey((key) => key + 1)
   }
@@ -191,15 +193,22 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
     try {
       const uploaded = await uploadPendingRichBlocks(blocks, 'notice', (id, patch) => editorApiRef.current?.updateFigureMeta(id, patch))
       const content = serializeRichBody(uploaded)
-      const body = { ...formData, content, pinned: Boolean(initialNotice?.pinned) }
+      const { publicVisible, ...fields } = formData
+      const body = { ...fields, content, pinned: Boolean(initialNotice?.pinned) }
       const saved = initialNotice
-        ? await updateNotice(initialNotice.id, body)
-        : await createNotice(body)
+        ? await updateNotice(initialNotice.id, {
+          ...body,
+          version,
+          ...(publicVisible !== initialPublicVisible ? { publicVisible } : {}),
+        })
+        : await createNotice({ ...body, publicVisible })
       draft.clear()
       onSave(saved)
     } catch (err) {
       resetRejectedRichBlocks(blocks, err, (id, patch) => editorApiRef.current?.updateFigureMeta(id, patch))
-      setError(err.message || '저장 중 오류가 발생했습니다.')
+      setError(err.status === 409 && initialNotice
+        ? '다른 요청에서 공지를 변경했습니다. 새로고침 후 다시 시도해주세요.'
+        : err.message || '저장 중 오류가 발생했습니다.')
     } finally {
       setSaving(false)
     }

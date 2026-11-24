@@ -184,6 +184,12 @@ public class NoticeService {
     public NoticeResponse update(String authorStudentId, Long id, NoticeRequest request) {
         Notice notice = getEntity(id);
         boolean canManageNotice = requireEditable(authorStudentId, notice);
+        if (request.version() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "공지 버전이 필요합니다. 새로고침 후 다시 시도해주세요.");
+        }
+        if (notice.getVersion() != request.version()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "다른 요청에서 공지를 변경했습니다. 새로고침 후 다시 시도해주세요.");
+        }
         if (request.publicVisible() != null && request.publicVisible() != notice.isPublicVisible()) {
             Member editor = memberRepository.findByStudentId(authorStudentId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));

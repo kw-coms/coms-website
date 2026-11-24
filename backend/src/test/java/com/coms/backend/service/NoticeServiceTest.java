@@ -51,9 +51,11 @@ class NoticeServiceTest {
         var notice = noticeService.create("2026123000", new NoticeRequest("공지", body, null, false, "GENERAL"));
         assertThat(richBodyMediaRepository.findById(first.getId()).orElseThrow().getOwnerId()).isEqualTo(notice.id());
         assertThat(richBodyMediaRepository.findById(otherScope.getId()).orElseThrow().getOwnerId()).isNull();
-        noticeService.update("2026123000", notice.id(), new NoticeRequest("공지", "내용", null, false, "GENERAL"));
+        var withoutFile = noticeService.update("2026123000", notice.id(),
+                new NoticeRequest("공지", "내용", null, false, "GENERAL", null, notice.version()));
         assertThat(richBodyMediaRepository.findById(first.getId()).orElseThrow().getOwnerId()).isNull();
-        noticeService.update("2026123000", notice.id(), new NoticeRequest("공지", body, null, false, "GENERAL"));
+        noticeService.update("2026123000", notice.id(),
+                new NoticeRequest("공지", body, null, false, "GENERAL", null, withoutFile.version()));
         noticeService.delete("2026123000", notice.id());
         assertThat(richBodyMediaRepository.findById(first.getId()).orElseThrow().getOwnerId()).isNull();
     }
@@ -93,7 +95,7 @@ class NoticeServiceTest {
                         ex -> assertThat(ex.getStatusCode().value()).isEqualTo(404));
 
         noticeService.update("2026123000", notice.id(),
-                new NoticeRequest("공개", body, null, false, null, true));
+                new NoticeRequest("공개", body, null, false, null, true, notice.version()));
         assertThat(richBodyMediaService.get(file.getId(), null).getOwnerId()).isEqualTo(notice.id());
     }
 
@@ -101,10 +103,10 @@ class NoticeServiceTest {
     void authorWithoutNoticeWriteCannotChangeVisibility() {
         memberRepository.save(user("2026000001", "선택회원"));
         var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
-        noticeService.updateAuthor("2026123000", notice.id(), null, "2026000001");
+        var reassigned = noticeService.updateAuthor("2026123000", notice.id(), null, "2026000001");
 
         assertThatThrownBy(() -> noticeService.update("2026000001", notice.id(),
-                new NoticeRequest("수정", "내용", null, false, null, true)))
+                new NoticeRequest("수정", "내용", null, false, null, true, reassigned.version())))
                 .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
                         ex -> assertThat(ex.getStatusCode().value()).isEqualTo(403));
         assertThat(noticeRepository.findById(notice.id()).orElseThrow().isPublicVisible()).isFalse();
@@ -117,7 +119,8 @@ class NoticeServiceTest {
             Member editor = user("2026999999", "운영진");
             editor.setRole(role);
             memberRepository.save(editor);
-            assertThatThrownBy(() -> noticeService.update(editor.getStudentId(), notice.id(), new NoticeRequest("변경", "변경 내용", null, false, "GENERAL")))
+            assertThatThrownBy(() -> noticeService.update(editor.getStudentId(), notice.id(),
+                    new NoticeRequest("변경", "변경 내용", null, false, "GENERAL", null, notice.version())))
                     .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
                             ex -> assertThat(ex.getStatusCode().value()).isEqualTo(403));
             memberRepository.delete(editor);
@@ -227,7 +230,8 @@ class NoticeServiceTest {
     void updateIgnoresClientSuppliedAuthor() {
         var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", "가짜", false, null));
 
-        var updated = noticeService.update("2026123000", notice.id(), new NoticeRequest("수정", "수정 내용", "다른 작성자", false, "GENERAL"));
+        var updated = noticeService.update("2026123000", notice.id(),
+                new NoticeRequest("수정", "수정 내용", "다른 작성자", false, "GENERAL", null, notice.version()));
 
         assertThat(updated.author()).isEqualTo("관리자");
         assertThat(updated.title()).isEqualTo("수정");
@@ -241,7 +245,8 @@ class NoticeServiceTest {
         assertThat(overridden.author()).isEqualTo("동아리 임원진");
         assertThat(overridden.authorStudentId()).isEqualTo("2026123000");
 
-        var updated = noticeService.update("2026123000", notice.id(), new NoticeRequest("수정", "내용", null, false, "GENERAL"));
+        var updated = noticeService.update("2026123000", notice.id(),
+                new NoticeRequest("수정", "내용", null, false, "GENERAL", null, overridden.version()));
         assertThat(updated.author()).isEqualTo("동아리 임원진");
         assertThat(updated.authorStudentId()).isEqualTo("2026123000");
     }
@@ -281,12 +286,12 @@ class NoticeServiceTest {
     void reassignedOwnerCanEditContentButCannotChangePinnedStateWithoutNoticeWrite() {
         memberRepository.save(user("2026000001", "선택회원"));
         var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
-        noticeService.updateAuthor("2026123000", notice.id(), null, "2026000001");
+        var reassigned = noticeService.updateAuthor("2026123000", notice.id(), null, "2026000001");
 
         var updated = noticeService.update(
                 "2026000001",
                 notice.id(),
-                new NoticeRequest("회원 수정", "회원 수정 내용", null, true, "PROMOTION")
+                new NoticeRequest("회원 수정", "회원 수정 내용", null, true, "PROMOTION", null, reassigned.version())
         );
 
         assertThat(updated.title()).isEqualTo("회원 수정");
@@ -299,13 +304,13 @@ class NoticeServiceTest {
     void ownerWithoutNoticeWriteCannotAttachPendingMediaOnEdit() {
         memberRepository.save(user("2026000001", "선택회원"));
         var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
-        noticeService.updateAuthor("2026123000", notice.id(), null, "2026000001");
+        var reassigned = noticeService.updateAuthor("2026123000", notice.id(), null, "2026000001");
         var pending = richBodyMediaService.upload(RichBodyMedia.Scope.NOTICE, RichBodyMedia.Kind.FILE,
                 new MockMultipartFile("file", "guide.pdf", "application/pdf", "%PDF-1.4 guide".getBytes()), "2026000001");
         String body = "[{\"type\":\"file\",\"fileId\":" + pending.getId() + "}]";
 
         assertThatThrownBy(() -> noticeService.update("2026000001", notice.id(),
-                new NoticeRequest("수정", body, null, false, "GENERAL")))
+                new NoticeRequest("수정", body, null, false, "GENERAL", null, reassigned.version())))
                 .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
                         ex -> assertThat(ex.getStatusCode().value()).isEqualTo(400));
         assertThat(richBodyMediaRepository.findById(pending.getId()).orElseThrow().getOwnerId()).isNull();

@@ -8,6 +8,7 @@ import com.coms.backend.dto.NoticeRequest;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.NoticeRepository;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -38,6 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class NoticeConcurrencyTest {
     private static final String ADMIN = "2026123451";
     private static final String OWNER = "2026123452";
+    private static Flyway postgresSchema;
 
     @DynamicPropertySource
     static void postgres(DynamicPropertyRegistry registry) {
@@ -46,7 +48,8 @@ class NoticeConcurrencyTest {
         String schema = "notice_concurrency_test";
         String user = System.getenv().getOrDefault("COMS_PG_TEST_USER", "postgres");
         String password = System.getenv().getOrDefault("COMS_PG_TEST_PASSWORD", "postgres");
-        Flyway.configure().dataSource(url, user, password).schemas(schema).cleanDisabled(false).load().clean();
+        postgresSchema = Flyway.configure().dataSource(url, user, password).schemas(schema).cleanDisabled(false).load();
+        postgresSchema.clean();
         registry.add("spring.datasource.url", () -> url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.datasource.username", () -> user);
@@ -56,6 +59,11 @@ class NoticeConcurrencyTest {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.jpa.defer-datasource-initialization", () -> false);
         registry.add("spring.sql.init.mode", () -> "never");
+    }
+
+    @AfterAll
+    static void cleanPostgresSchema() {
+        if (postgresSchema != null) postgresSchema.clean();
     }
 
     @Autowired private NoticeService noticeService;
@@ -72,7 +80,7 @@ class NoticeConcurrencyTest {
                 new MockMultipartFile("file", "guide.pdf", "application/pdf", "%PDF-1.4 guide".getBytes()), ADMIN);
         String body = "[{\"type\":\"file\",\"fileId\":" + file.getId() + "}]";
         var notice = noticeService.create(ADMIN, new NoticeRequest("공개", body, null, false, null, true));
-        noticeService.updateAuthor(ADMIN, notice.id(), null, OWNER);
+        var assigned = noticeService.updateAuthor(ADMIN, notice.id(), null, OWNER);
         assertThat(richBodyMediaService.get(file.getId(), null).getOwnerId()).isEqualTo(notice.id());
 
         var mvc = MockMvcBuilders.standaloneSetup(new NoticeController(noticeService))
@@ -89,7 +97,9 @@ class NoticeConcurrencyTest {
                     int status = mvc.perform(put("/api/notices/{id}", notice.id())
                                     .principal(new UsernamePasswordAuthenticationToken(OWNER, null, List.of()))
                                     .contentType("application/json")
-                                    .content("{\"title\":\"오래된 수정\",\"content\":\"오래된 본문\"}"))
+                                    .content("""
+                                            {"title":"오래된 수정","content":"오래된 본문","version":%d}
+                                            """.formatted(assigned.version())))
                             .andReturn().getResponse().getStatus();
                     if (status != 200) tx.setRollbackOnly();
                     return status;
@@ -98,7 +108,7 @@ class NoticeConcurrencyTest {
                 }
             }));
             assertThat(authorLoaded.await(10, TimeUnit.SECONDS)).isTrue();
-            noticeService.update(ADMIN, notice.id(), new NoticeRequest("비공개", body, null, false, null, false));
+            noticeService.update(ADMIN, notice.id(), new NoticeRequest("비공개", body, null, false, null, false, assigned.version()));
             adminCommitted.countDown();
             assertThat(staleSave.get(10, TimeUnit.SECONDS)).isEqualTo(409);
         } finally {
@@ -124,5 +134,36 @@ class NoticeConcurrencyTest {
         member.setPassword("password");
         member.setRole(role);
         return member;
+    }
+
+    @Test
+    void editorMustSubmitTheVersionItOpenedBeforeChangingContentOrVisibility() throws Exception {
+        String editor = "2026123453";
+        memberRepository.save(member(editor, Member.Role.ADMIN));
+        var opened = noticeService.create(editor, new NoticeRequest("열어 둔 공지", "본문", null, false, null, true));
+        var hidden = noticeService.update(editor, opened.id(), new NoticeRequest("열어 둔 공지", "본문", null, false, null, false, opened.version()));
+        var mvc = MockMvcBuilders.standaloneSetup(new NoticeController(noticeService))
+                .setControllerAdvice(new ApiExceptionHandler()).build();
+        var principal = new UsernamePasswordAuthenticationToken(editor, null, List.of());
+        String edit = "\"title\":\"편집한 공지\",\"content\":\"수정한 본문\"";
+
+        mvc.perform(put("/api/notices/{id}", opened.id()).principal(principal).contentType("application/json")
+                        .content("{" + edit + ",\"publicVisible\":true,\"version\":" + opened.version() + "}"))
+                .andExpect(status().isConflict());
+        mvc.perform(put("/api/notices/{id}", opened.id()).principal(principal).contentType("application/json")
+                        .content("{" + edit + ",\"version\":" + opened.version() + "}"))
+                .andExpect(status().isConflict());
+        mvc.perform(put("/api/notices/{id}", opened.id()).principal(principal).contentType("application/json")
+                        .content("{" + edit + "}"))
+                .andExpect(status().isBadRequest());
+        assertThat(noticeRepository.findById(opened.id()).orElseThrow().getTitle()).isEqualTo("열어 둔 공지");
+
+        mvc.perform(put("/api/notices/{id}", opened.id()).principal(principal).contentType("application/json")
+                        .content("{" + edit + ",\"version\":" + hidden.version() + "}"))
+                .andExpect(status().isOk());
+        var edited = noticeRepository.findById(opened.id()).orElseThrow();
+        assertThat(edited.getTitle()).isEqualTo("편집한 공지");
+        assertThat(edited.isPublicVisible()).isFalse();
+        assertThat(edited.getVersion()).isGreaterThan(hidden.version());
     }
 }
