@@ -84,8 +84,8 @@ public class ClubProjectService {
         List<ClubProject> projects = repository.findAllByOrderByPositionAscIdAsc().stream()
                 .filter(project -> canView(project, viewerStudentId, manager)).toList();
         Map<String, String> categoryNames = categoryService.keyToNameMap();
-        Map<Long, List<ClubProjectFile>> files = filesByProject(projects);
-        Map<Long, List<ClubProjectImage>> images = imagesByProject(projects);
+        Map<Long, List<ClubProjectFile>> files = filesByProject(projects, viewerStudentId, manager);
+        Map<Long, List<ClubProjectImage>> images = imagesByProject(projects, viewerStudentId, manager);
         EngagementCounts engagement = engagement(projects, viewerStudentId);
         return projects.stream()
                 .map(project -> toResponse(project, categoryNames, files, images, engagement, viewerStudentId, manager))
@@ -154,17 +154,11 @@ public class ClubProjectService {
         return toResponse(repository.saveAndFlush(project), null, true);
     }
 
-    /** Owner changed the project's media after review: it must be reviewed again before staying public. */
-    public void returnToReview(Long id) {
-        ClubProject project = get(id);
-        if (project.getReviewStatus() != ClubProject.ReviewStatus.PENDING) {
-            project.setReviewStatus(ClubProject.ReviewStatus.PENDING);
-            repository.saveAndFlush(project);
-        }
+    public void requireEditor(Long id, String studentId, boolean manager) {
+        checkEditor(get(id), studentId, manager);
     }
 
-    public void requireEditor(Long id, String studentId, boolean manager) {
-        ClubProject project = get(id);
+    private void checkEditor(ClubProject project, String studentId, boolean manager) {
         if (!manager && (studentId == null || !studentId.equals(project.getOwnerStudentId()))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인 작품만 수정할 수 있습니다.");
         }
@@ -223,11 +217,11 @@ public class ClubProjectService {
         commentRepository.deleteByClubProjectId(id);
         likeRepository.deleteByClubProjectId(id);
         for (ClubProjectImage image : imageRepository.findByClubProjectIdOrderByPositionAsc(id)) {
-            storageService.delete(image.getStoredName());
+            deleteAfterCommit(image.getStoredName());
         }
         imageRepository.deleteByClubProjectId(id);
         for (ClubProjectFile file : fileRepository.findByClubProjectIdOrderByPositionAsc(id)) {
-            storageService.delete(file.getStoredName());
+            deleteAfterCommit(file.getStoredName());
         }
         fileRepository.deleteByClubProjectId(id);
         repository.delete(project);
@@ -249,6 +243,13 @@ public class ClubProjectService {
         }
         try {
             String stored = storageService.store(file);
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override public void afterCompletion(int status) {
+                        if (status != STATUS_COMMITTED) storageService.delete(stored);
+                    }
+                });
+            }
             String contentType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
             ClubProjectFile saved = fileRepository.save(new ClubProjectFile(
                     project.getId(), stored, cleanOriginalFilename(file), contentType, file.getSize(), existing.size()));
@@ -267,7 +268,7 @@ public class ClubProjectService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         ClubProject project = get(id);
-        storageService.delete(file.getStoredName());
+        deleteAfterCommit(file.getStoredName());
         fileRepository.delete(file);
         project.setUpdatedAt(LocalDateTime.now());
         repository.saveAndFlush(project);
@@ -284,12 +285,23 @@ public class ClubProjectService {
     }
 
     @Transactional(readOnly = true)
+    public ClubProjectFile loadVisibleFileMeta(Long id, Long fileId, String viewer, boolean manager) {
+        return fileRepository.findVisible(id, fileId, ClubProject.ReviewStatus.APPROVED, manager, viewer)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
     public Resource loadFileResource(Long id, Long fileId) {
         return storageService.load(loadFileMeta(id, fileId).getStoredName());
     }
 
-    public List<Long> addImages(Long id, List<MultipartFile> images) {
-        get(id);
+    public Resource loadFileResource(ClubProjectFile file) {
+        return storageService.load(file.getStoredName());
+    }
+
+    public List<Long> addImages(Long id, List<MultipartFile> images, String studentId, boolean manager) {
+        ClubProject project = get(id);
+        checkEditor(project, studentId, manager);
         if (images == null || images.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "사진을 선택하세요.");
         }
@@ -321,6 +333,9 @@ public class ClubProjectService {
                 }
             });
         }
+        project.setReviewStatus(ClubProject.ReviewStatus.PENDING);
+        project.setUpdatedAt(LocalDateTime.now());
+        repository.saveAndFlush(project);
         return ids;
     }
 
@@ -336,10 +351,24 @@ public class ClubProjectService {
         }
     }
 
-    public void deleteImage(Long id, Long imageId) {
+    public void deleteImage(Long id, Long imageId, String studentId, boolean manager) {
         ClubProjectImage image = loadImageMeta(id, imageId);
-        storageService.delete(image.getStoredName());
+        ClubProject project = get(id);
+        checkEditor(project, studentId, manager);
+        deleteAfterCommit(image.getStoredName());
         imageRepository.delete(image);
+        project.setUpdatedAt(LocalDateTime.now());
+        repository.saveAndFlush(project);
+    }
+
+    private void deleteAfterCommit(String storedName) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() { storageService.delete(storedName); }
+            });
+        } else {
+            storageService.delete(storedName);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -351,8 +380,18 @@ public class ClubProjectService {
     }
 
     @Transactional(readOnly = true)
+    public ClubProjectImage loadVisibleImageMeta(Long id, Long imageId, String viewer, boolean manager) {
+        return imageRepository.findVisible(id, imageId, ClubProject.ReviewStatus.APPROVED, manager, viewer)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
     public Resource loadImageResource(Long id, Long imageId) {
         return storageService.load(loadImageMeta(id, imageId).getStoredName());
+    }
+
+    public Resource loadImageResource(ClubProjectImage image) {
+        return storageService.load(image.getStoredName());
     }
 
     @Transactional(readOnly = true)
@@ -471,29 +510,30 @@ public class ClubProjectService {
         return value.matches("^[A-Za-z][A-Za-z0-9+.-]*:.*");
     }
 
-    private Map<Long, List<ClubProjectFile>> filesByProject(List<ClubProject> projects) {
+    private Map<Long, List<ClubProjectFile>> filesByProject(List<ClubProject> projects, String viewer, boolean manager) {
         List<Long> ids = projects.stream().map(ClubProject::getId).filter(Objects::nonNull).toList();
         if (ids.isEmpty()) {
             return Map.of();
         }
-        return fileRepository.findByClubProjectIdInOrderByPositionAsc(ids).stream()
+        return fileRepository.findVisibleByProjectIds(ids, ClubProject.ReviewStatus.APPROVED, manager, viewer).stream()
                 .collect(Collectors.groupingBy(ClubProjectFile::getClubProjectId));
     }
 
-    private Map<Long, List<ClubProjectImage>> imagesByProject(List<ClubProject> projects) {
+    private Map<Long, List<ClubProjectImage>> imagesByProject(List<ClubProject> projects, String viewer, boolean manager) {
         List<Long> ids = projects.stream().map(ClubProject::getId).filter(Objects::nonNull).toList();
         if (ids.isEmpty()) return Map.of();
-        return imageRepository.findByClubProjectIdInOrderByPositionAsc(ids).stream()
+        return imageRepository.findVisibleByProjectIds(ids, ClubProject.ReviewStatus.APPROVED, manager, viewer).stream()
                 .collect(Collectors.groupingBy(ClubProjectImage::getClubProjectId));
     }
 
     private ClubProjectResponse toResponse(ClubProject project) {
-        return toResponse(project, null, false);
+        return toResponse(project, null, true);
     }
 
     private ClubProjectResponse toResponse(ClubProject project, String viewerStudentId, boolean manager) {
-        return toResponse(project, categoryService.keyToNameMap(), filesByProject(List.of(project)),
-                imagesByProject(List.of(project)), engagement(List.of(project), viewerStudentId), viewerStudentId, manager);
+        return toResponse(project, categoryService.keyToNameMap(), filesByProject(List.of(project), viewerStudentId, manager),
+                imagesByProject(List.of(project), viewerStudentId, manager),
+                engagement(List.of(project), viewerStudentId), viewerStudentId, manager);
     }
 
     private record EngagementCounts(Map<Long, Long> likes, Map<Long, Long> comments, Set<Long> likedByViewer) {}

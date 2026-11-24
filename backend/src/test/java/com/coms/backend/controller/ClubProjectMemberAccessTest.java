@@ -122,6 +122,8 @@ class ClubProjectMemberAccessTest {
                 .andExpect(status().isForbidden());
         mvc.perform(delete("/api/club-projects/{id}/images/{imageId}", id, imageId).cookie(owner).header("Origin", ORIGIN))
                 .andExpect(status().isNoContent());
+        mvc.perform(get("/api/club-projects/{id}", id).cookie(owner))
+                .andExpect(jsonPath("$.reviewStatus").value("APPROVED"));
 
         mvc.perform(patch("/api/club-projects/{id}", id).cookie(owner).header("Origin", ORIGIN)
                 .param("linkUrl", "https://new.example.com"))

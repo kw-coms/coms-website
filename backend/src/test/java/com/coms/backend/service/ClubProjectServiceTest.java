@@ -33,6 +33,12 @@ class ClubProjectServiceTest {
     private ClubProjectRepository clubProjectRepository;
 
     @Autowired
+    private com.coms.backend.repository.ClubProjectImageRepository imageRepository;
+
+    @Autowired
+    private com.coms.backend.repository.ClubProjectFileRepository fileRepository;
+
+    @Autowired
     private com.coms.backend.repository.MemberRepository memberRepository;
 
     @Test
@@ -111,20 +117,46 @@ class ClubProjectServiceTest {
     void imageUploadChecksActualBytesAndCountsCoverFirst() {
         var project = clubProjectService.create("APP", "사진 작품", null, null, "제작자", null, null, null);
         var fake = new MockMultipartFile("images", "fake.png", "image/png", "not an image".getBytes());
-        assertThatThrownBy(() -> clubProjectService.addImages(project.id(), java.util.List.of(fake)))
+        assertThatThrownBy(() -> clubProjectService.addImages(project.id(), java.util.List.of(fake), null, true))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value()).isEqualTo(400));
         byte[] png = java.util.Base64.getDecoder().decode(
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lWQAAAAASUVORK5CYII=");
         var image = new MockMultipartFile("images", "cover.png", "image/png", png);
-        Long imageId = clubProjectService.addImages(project.id(), java.util.List.of(image)).getFirst();
-        assertThat(clubProjectService.list().stream().filter(p -> p.id().equals(project.id())).findFirst().orElseThrow().images())
+        Long imageId = clubProjectService.addImages(project.id(), java.util.List.of(image), null, true).getFirst();
+        assertThat(clubProjectService.list(null, true).stream().filter(p -> p.id().equals(project.id())).findFirst().orElseThrow().images())
                 .singleElement().satisfies(info -> assertThat(info.url()).endsWith("/images/" + imageId));
         assertThat(clubProjectService.loadImageResource(project.id(), imageId).exists()).isTrue();
-        assertThatThrownBy(() -> clubProjectService.addImages(project.id(), java.util.Collections.nCopies(6, image)))
+        assertThatThrownBy(() -> clubProjectService.addImages(project.id(), java.util.Collections.nCopies(6, image), null, true))
                 .isInstanceOf(ResponseStatusException.class);
-        clubProjectService.deleteImage(project.id(), imageId);
-        assertThat(clubProjectService.list().stream().filter(p -> p.id().equals(project.id())).findFirst().orElseThrow().images()).isEmpty();
+        clubProjectService.deleteImage(project.id(), imageId, null, true);
+        assertThat(clubProjectService.list(null, true).stream().filter(p -> p.id().equals(project.id())).findFirst().orElseThrow().images()).isEmpty();
+    }
+
+    @Test
+    void addingAnImageRequeuesAnApprovedProjectBeforeReturning() {
+        var project = clubProjectService.create("APP", "새 이미지 작품", null, null, "제작자", null, null, null);
+        var fileId = clubProjectService.addFile(project.id(),
+                new MockMultipartFile("file", "release.zip", "application/zip", ZIP_BYTES));
+        byte[] png = java.util.Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lWQAAAAASUVORK5CYII=");
+        var image = new MockMultipartFile("images", "new.png", "image/png", png);
+
+        Long imageId = clubProjectService.addImages(project.id(), java.util.List.of(image), null, true).getFirst();
+
+        assertThat(clubProjectRepository.findById(project.id()).orElseThrow().getReviewStatus())
+                .isEqualTo(com.coms.backend.domain.ClubProject.ReviewStatus.PENDING);
+        assertThat(clubProjectRepository.findById(project.id()).orElseThrow().getVersion()).isGreaterThan(project.version());
+        assertThatThrownBy(() -> clubProjectService.loadVisibleImageMeta(project.id(), imageId, null, false))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> clubProjectService.loadVisibleFileMeta(project.id(), fileId, null, false))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(imageRepository.findVisibleByProjectIds(java.util.List.of(project.id()),
+                com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED, false, null)).isEmpty();
+        assertThat(fileRepository.findVisibleByProjectIds(java.util.List.of(project.id()),
+                com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED, false, null)).isEmpty();
+        assertThat(imageRepository.findVisibleByProjectIds(java.util.List.of(project.id()),
+                com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED, true, null)).hasSize(1);
     }
 
     @Test

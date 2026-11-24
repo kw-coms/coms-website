@@ -203,9 +203,10 @@ public class ClubProjectController {
     @GetMapping("/{id}/files/{fileId}/download")
     public ResponseEntity<Resource> downloadFile(@PathVariable Long id, @PathVariable Long fileId,
                                                  Authentication authentication) {
-        requireVisible(id, authentication);
-        ClubProjectFile meta = projectService.loadFileMeta(id, fileId);
-        Resource resource = projectService.loadFileResource(id, fileId);
+        ClubProjectFile meta = projectService.loadVisibleFileMeta(id, fileId,
+                authentication == null ? null : authentication.getName(),
+                authentication != null && canManageAll(authentication));
+        Resource resource = projectService.loadFileResource(meta);
         String filename = meta.getOriginalName() == null || meta.getOriginalName().isBlank() ? "download" : meta.getOriginalName();
         // Always octet-stream + attachment: this endpoint is public, and echoing back the
         // client-supplied mime type would let an upload choose how browsers render it.
@@ -231,29 +232,27 @@ public class ClubProjectController {
                                                     @RequestParam("images") List<MultipartFile> images,
                                                     Authentication authentication) {
         boolean manager = canManageAll(authentication);
-        projectService.requireEditor(id, authentication.getName(), manager);
-        List<Long> ids = projectService.addImages(id, images);
-        if (!manager) projectService.returnToReview(id);
+        List<Long> ids = projectService.addImages(id, images, authentication.getName(), manager);
         return ResponseEntity.status(HttpStatus.CREATED).body(ids);
     }
 
     @GetMapping("/{id}/images/{imageId}")
     public ResponseEntity<Resource> image(@PathVariable Long id, @PathVariable Long imageId,
                                           Authentication authentication) {
-        requireVisible(id, authentication);
-        ClubProjectImage meta = projectService.loadImageMeta(id, imageId);
+        ClubProjectImage meta = projectService.loadVisibleImageMeta(id, imageId,
+                authentication == null ? null : authentication.getName(),
+                authentication != null && canManageAll(authentication));
         return ResponseEntity.ok()
                 .contentType("image/png".equals(meta.getMimeType()) ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG)
                 .header("X-Content-Type-Options", "nosniff")
-                .body(projectService.loadImageResource(id, imageId));
+                .body(projectService.loadImageResource(meta));
     }
 
     @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{id}/images/{imageId}")
     public ResponseEntity<Void> deleteImage(@PathVariable Long id, @PathVariable Long imageId,
                                              Authentication authentication) {
-        projectService.requireEditor(id, authentication.getName(), canManageAll(authentication));
-        projectService.deleteImage(id, imageId);
+        projectService.deleteImage(id, imageId, authentication.getName(), canManageAll(authentication));
         return ResponseEntity.noContent().build();
     }
 
