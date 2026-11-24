@@ -13,6 +13,7 @@ import jakarta.persistence.Version;
 import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @DynamicUpdate // A concurrent atomic view increment must survive an editorial write.
@@ -62,8 +63,9 @@ public class Notice {
     private LocalDateTime updatedAt = LocalDateTime.now();
 
     @PreUpdate
-    void onUpdate() {
-        updatedAt = LocalDateTime.now();
+    public void markEdited() {
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
+        updatedAt = now.isAfter(updatedAt) ? now : updatedAt.plus(1, ChronoUnit.MICROS);
     }
 
     public enum Category {

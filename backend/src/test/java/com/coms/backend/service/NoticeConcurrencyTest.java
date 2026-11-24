@@ -5,6 +5,7 @@ import com.coms.backend.controller.NoticeController;
 import com.coms.backend.domain.Member;
 import com.coms.backend.domain.RichBodyMedia;
 import com.coms.backend.dto.NoticeRequest;
+import com.coms.backend.dto.NoticeResponse;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.NoticeRepository;
 import org.flywaydb.core.Flyway;
@@ -12,12 +13,14 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
@@ -54,6 +57,7 @@ class NoticeConcurrencyTest {
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.datasource.username", () -> user);
         registry.add("spring.datasource.password", () -> password);
+        registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.PostgreSQLDialect");
         registry.add("spring.flyway.enabled", () -> true);
         registry.add("spring.flyway.schemas", () -> schema);
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
@@ -135,6 +139,59 @@ class NoticeConcurrencyTest {
         member.setRole(role);
         return member;
     }
+
+    @Test
+    void staleAttachmentOnlyEditCannotRestoreGuestAccessToRemovedMedia() {
+        String editor = "2026123454";
+        var fixture = createPublicNoticeWithFile(editor);
+        var notice = fixture.notice();
+        long fileId = fixture.fileId();
+        var remover = new TransactionTemplate(transactions);
+        remover.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        assertThatThrownBy(() -> new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+            var loaded = noticeRepository.findById(notice.id()).orElseThrow();
+            assertThat(loaded.getVersion()).isEqualTo(notice.version());
+            remover.executeWithoutResult(inner -> noticeService.update(editor, notice.id(),
+                    new NoticeRequest(notice.title(), "첨부 삭제", null, false, null, null, notice.version())));
+
+            // Every notice column still matches this transaction's snapshot.
+            noticeService.update(editor, notice.id(), new NoticeRequest(
+                    notice.title(), notice.content(), null, false, null, null, notice.version()));
+        })).isInstanceOf(OptimisticLockingFailureException.class);
+
+        assertThat(noticeRepository.findById(notice.id()).orElseThrow().getContent()).isEqualTo("첨부 삭제");
+        assertThat(richBodyMediaService.get(fileId, editor).getOwnerId()).isNull();
+        assertThatThrownBy(() -> richBodyMediaService.get(fileId, null))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode().value()).isEqualTo(404));
+    }
+
+    @Test
+    void successfulAttachmentOnlyEditReturnsThePersistedNextVersion() {
+        String editor = "2026123455";
+        var fixture = createPublicNoticeWithFile(editor);
+        var notice = fixture.notice();
+        richBodyMediaService.detachAttachments(RichBodyMedia.Scope.NOTICE, notice.id(), editor);
+
+        var saved = noticeService.update(editor, notice.id(), new NoticeRequest(
+                notice.title(), notice.content(), null, false, null, null, notice.version()));
+
+        assertThat(saved.version()).isEqualTo(notice.version() + 1);
+        assertThat(noticeRepository.findById(notice.id()).orElseThrow().getVersion()).isEqualTo(saved.version());
+        assertThat(richBodyMediaService.get(fixture.fileId(), null).getOwnerId()).isEqualTo(notice.id());
+    }
+
+    private NoticeWithFile createPublicNoticeWithFile(String editor) {
+        memberRepository.save(member(editor, Member.Role.ADMIN));
+        var file = richBodyMediaService.upload(RichBodyMedia.Scope.NOTICE, RichBodyMedia.Kind.FILE,
+                new MockMultipartFile("file", "guide.pdf", "application/pdf", "%PDF-1.4 guide".getBytes()), editor);
+        String body = "[{\"type\":\"file\",\"fileId\":" + file.getId() + "}]";
+        var notice = noticeService.create(editor, new NoticeRequest("공개", body, null, false, null, true));
+        return new NoticeWithFile(notice, file.getId());
+    }
+
+    private record NoticeWithFile(NoticeResponse notice, long fileId) {}
 
     @Test
     void editorMustSubmitTheVersionItOpenedBeforeChangingContentOrVisibility() throws Exception {

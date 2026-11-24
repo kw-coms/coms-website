@@ -172,6 +172,7 @@ public class NoticeService {
             notice.setAuthor(cleaned);
             detail = "author=(custom)";
         }
+        notice.markEdited();
         repo.flush();
         auditLogService.record(editorStudentId, "NOTICE_AUTHOR_UPDATE", "NOTICE", String.valueOf(notice.getId()), detail, null);
         return toResponse(notice, voteStats(List.of(notice)), editorStudentId);
@@ -203,6 +204,8 @@ public class NoticeService {
         applyRequest(notice, request, notice.getAuthor(), canManageNotice);
         richBodyMediaService.syncAttachments(RichBodyMedia.Scope.NOTICE, notice.getId(), notice.getContent(),
                 canManageNotice ? authorStudentId : null, true);
+        // Attachment-only edits must also flush a version-checked notice update.
+        notice.markEdited();
         repo.flush();
         auditLogService.record(authorStudentId, "NOTICE_UPDATE", "NOTICE", String.valueOf(notice.getId()), "title=" + notice.getTitle(), null);
         return toResponse(notice, voteStats(List.of(notice)), authorStudentId);
@@ -211,6 +214,7 @@ public class NoticeService {
     public NoticeResponse setPinned(String authorStudentId, Long id, boolean pinned) {
         Notice notice = getEntity(id);
         notice.setPinned(pinned);
+        notice.markEdited();
         repo.flush();
         auditLogService.record(authorStudentId, "NOTICE_PIN", "NOTICE", String.valueOf(notice.getId()), "pinned=" + pinned, null);
         return toResponse(notice, voteStats(List.of(notice)), authorStudentId);
