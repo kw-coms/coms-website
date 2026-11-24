@@ -5,6 +5,7 @@ import { createClubActivity, uploadClubActivityFile, uploadClubActivityImages } 
 import { CLUB_ACTIVITIES_QUERY_KEY, normalizeRichTextForSubmit } from '../../shared/homeUi'
 import { activityTemplateOptions } from './activityTemplates'
 import { RichTextComposer } from '../../shared/RichText'
+import { showToast } from '../../components/common/Toast'
 
 function ActivityComposer({
   categories,
@@ -56,7 +57,9 @@ function ActivityComposer({
         } catch (err) {
           attachmentError = err.message || '첨부를 올리지 못했습니다.'
         }
-        await queryClient.invalidateQueries({ queryKey: CLUB_ACTIVITIES_QUERY_KEY }).catch(() => {})
+        await queryClient.invalidateQueries({ queryKey: CLUB_ACTIVITIES_QUERY_KEY }, { throwOnError: true }).catch((err) => {
+          showToast({ message: err.message || '활동 목록을 새로고침하지 못했습니다.', tone: 'error' })
+        })
       }
       if (attachmentError) {
         // A notice, not the section's error: that one replaces the whole list with

@@ -60,7 +60,7 @@ export default function AdminAppCatalog() {
         setCategories(list)
         setForm((prev) => (prev.category || list.length === 0 ? prev : { ...prev, category: list[0].key }))
       })
-      .catch(() => {})
+      .catch((err) => showToast({ message: err.message || '작품 분류를 다시 불러오지 못했습니다.', tone: 'error' }))
   }
 
   useEffect(() => {
@@ -77,7 +77,7 @@ export default function AdminAppCatalog() {
       .finally(() => { if (mounted) setLoading(false) })
     listClubProjectLinkStatuses()
       .then((statuses) => { if (mounted) setLinkStatuses(statuses) })
-      .catch(() => {})
+      .catch((err) => { if (mounted) showToast({ message: err.message || '작품 링크 상태를 불러오지 못했습니다.', tone: 'error' }) })
     return () => { mounted = false }
   }, [])
 
@@ -110,7 +110,10 @@ export default function AdminAppCatalog() {
         } catch (err) {
           fileError = err.message || '배포 파일을 올리지 못했습니다.'
         }
-        const refreshed = await listClubProjects().catch(() => null)
+        const refreshed = await listClubProjects().catch((err) => {
+          showToast({ message: err.message || '등록된 작품 목록을 새로고침하지 못했습니다.', tone: 'error' })
+          return null
+        })
         if (Array.isArray(refreshed)) setItems(refreshed)
       }
       if (fileError) {
