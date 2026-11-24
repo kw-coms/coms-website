@@ -33,13 +33,6 @@
 		text-transform: var(--appearance-label-case, none);
 	}
 
-	& :is(.page-crumb, .apple-eyebrow, .scene-kicker, .coms-eyebrow, .coms-card-eyebrow, .act-subhead)::before {
-		content: var(--appearance-prompt, none) / '';
-		display: inline;
-		color: var(--preset-ink);
-		background: none;
-	}
-
 	& :is(.page-heading, .act-term-head, .coms-sec .detail-head, .apple-footer-directory) {
 		background: var(--appearance-section-rule);
 		border-block-end-color: transparent;
@@ -60,7 +53,10 @@
 		.club-event-list-card, .club-event-entry-card, .club-event-status-card, .club-event-upload-panel,
 		.hackathon-card, .hackathon-intro, .hackathon-identity, .hackathon-project, .of-card, .tp-card, .coms-error-state,
 		.appearance-auth-panel,
-		:where(article, section, aside, details, form, div, li, ul).border:is(.rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl)
+		/* Generic bordered boxes opt out with data-appearance-plain; code editor panels keep their borders. */
+		:where(article, section, aside, details, form, div, li, ul).border:is(.rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl):not(
+			[data-appearance-plain], .ex-editor, .coding-settings-editor, .authoring-code, :has(.cm-editor)
+		)
 	) {
 		--legacy-surface-shadow: var(--appearance-card-frame);
 		border-radius: var(--appearance-card-radius);
@@ -239,6 +235,14 @@
 
 /* Keep badge punctuation inline when it replaces the dot on terminal. */
 :root[data-appearance-theme='terminal'] {
+	/* Only terminal defines a prompt; retro and blueprint keep the original eyebrow decorations. */
+	& :is(.page-crumb, .apple-eyebrow, .scene-kicker, .coms-eyebrow, .coms-card-eyebrow, .act-subhead)::before {
+		content: var(--appearance-prompt) / '';
+		display: inline;
+		color: var(--preset-ink);
+		background: none;
+	}
+
 	& :is(.act-status, .hackathon-status, .judge-tier, .club-tournament-status, .authoring-chip)::before {
 		content: var(--appearance-badge-start) / '';
 	}
