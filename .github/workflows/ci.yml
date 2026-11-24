@@ -108,13 +108,20 @@ jobs:
         run: REQUIRE_DIST=1 node --import tsx tests/backdropFilterBuild.test.mjs
 
       - name: Install Playwright browser
+        timeout-minutes: 17
         run: |
           # Retain calibrated CJK fonts when a package mirror is unavailable.
           if [ -f /etc/apt/apt-mirrors.txt ]; then
             printf '%s\tpriority:1\n%s\tpriority:2\n' 'https://mirrors.edge.kernel.org/ubuntu/' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
           fi
           fc-match :lang=ko
-          npx playwright install --with-deps chromium
+          # A stalled apt mirror once hung this step until the 30-minute job timeout. Bound each attempt and retry.
+          for attempt in 1 2 3; do
+            timeout -k 10 300 npx playwright install --with-deps chromium && break
+            [ "$attempt" = 3 ] && exit 1
+            echo "::warning::playwright install attempt $attempt timed out or failed; retrying"
+            sleep 10
+          done
           fc-match :lang=ko
 
       - name: Smoke test
@@ -497,11 +504,18 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser for the stack e2e
+        timeout-minutes: 17
         run: |
           if [ -f /etc/apt/apt-mirrors.txt ]; then
             printf '%s\tpriority:1\n%s\tpriority:2\n' 'https://mirrors.edge.kernel.org/ubuntu/' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
           fi
-          npx playwright install --with-deps chromium
+          # A stalled apt mirror once hung this step until the 30-minute job timeout. Bound each attempt and retry.
+          for attempt in 1 2 3; do
+            timeout -k 10 300 npx playwright install --with-deps chromium && break
+            [ "$attempt" = 3 ] && exit 1
+            echo "::warning::playwright install attempt $attempt timed out or failed; retrying"
+            sleep 10
+          done
 
       # "직접 해보기" in a real browser against the real frontend container, backend and runner (nothing mocked).
       # The runner allows a member ten runs a minute and the step above used them up: start a fresh minute.
@@ -602,11 +616,18 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
+        timeout-minutes: 17
         run: |
           if [ -f /etc/apt/apt-mirrors.txt ]; then
             printf '%s\tpriority:1\n%s\tpriority:2\n' 'https://mirrors.edge.kernel.org/ubuntu/' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
           fi
-          npx playwright install --with-deps chromium
+          # A stalled apt mirror once hung this step until the 30-minute job timeout. Bound each attempt and retry.
+          for attempt in 1 2 3; do
+            timeout -k 10 300 npx playwright install --with-deps chromium && break
+            [ "$attempt" = 3 ] && exit 1
+            echo "::warning::playwright install attempt $attempt timed out or failed; retrying"
+            sleep 10
+          done
 
       - name: Backend-auth e2e
         run: npm run test:e2e:backend
