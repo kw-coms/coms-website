@@ -349,9 +349,9 @@ public class ClubProjectService {
     }
 
     public void deleteImage(Long id, Long imageId, String studentId, boolean manager) {
-        ClubProjectImage image = loadImageMeta(id, imageId);
         ClubProject project = get(id);
         checkEditor(project, studentId, manager);
+        ClubProjectImage image = loadImageMeta(id, imageId);
         deleteAfterCommit(image.getStoredName());
         imageRepository.delete(image);
         project.touch();
