@@ -35,7 +35,7 @@ import static org.mockito.Mockito.doThrow;
         "storage.location=./build/test-uploads/club-event-service"
 })
 @Transactional
-@WithMockUser(roles = "ADMIN")
+@WithMockUser(username = "2026123456", roles = "ADMIN")
 class ClubEventServiceTest {
 
     @Autowired

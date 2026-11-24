@@ -43,16 +43,15 @@ class SecurityConfigSourceTest {
         assertThat(noticeController.split("@PreAuthorize\\(\"@perm.has\\(authentication,'NOTICE_WRITE'\\)\"\\)", -1))
                 .hasSize(4); // create, pin, delete; update is service-level owner-or-president
         assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/files\").authenticated()");
-        // Archive moderation is archive.manage — the explicit DELETE/PATCH matchers must
-        // still exist (ahead of the /api/files/** catch-all) so the intent is readable,
-        // and ArchiveController carries the real permission gate.
+        // Archive mutations require authentication; service checks ownership and split grants.
         assertThat(source).contains("auth.requestMatchers(HttpMethod.DELETE, \"/api/files/**\").authenticated()");
         assertThat(source).contains("auth.requestMatchers(HttpMethod.PATCH, \"/api/files/**\").authenticated()");
         assertThat(source.indexOf("auth.requestMatchers(HttpMethod.PATCH, \"/api/files/**\")"))
                 .isLessThan(source.indexOf("auth.requestMatchers(\"/api/files\", \"/api/files/**\").authenticated()"));
         String archiveController = controller("ArchiveController.java");
-        assertThat(archiveController.split("@PreAuthorize\\(\"@perm.has\\(authentication,'ARCHIVE_MANAGE'\\)\"\\)", -1))
-                .hasSize(3); // author edit, delete
+        assertThat(archiveController).contains("@PreAuthorize(\"@perm.has(authentication,'ARCHIVE_AUTHOR_CHANGE')\")");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.GET, \"/api/files/visibility-members\").authenticated()");
+        assertThat(source).contains("\"/api/files/*/attachments/*/download\").permitAll()");
         assertThat(source).contains("public RoleHierarchy roleHierarchy()");
     }
 

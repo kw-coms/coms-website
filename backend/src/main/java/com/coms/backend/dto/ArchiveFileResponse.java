@@ -13,6 +13,8 @@ public record ArchiveFileResponse(
         String uploadedBy,
         String uploaderName,
         String category,
+        String visibility,
+        List<String> selectedStudentIds,
         long viewCount,
         long upvotes,
         int myVote,

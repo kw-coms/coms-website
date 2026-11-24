@@ -46,10 +46,28 @@ public enum Permission {
             "COM's 프로젝트와 프로젝트 카테고리를 관리할 수 있습니다.",
             Set.of(Member.Role.OFFICER, Member.Role.VICE_PRESIDENT)
     ),
-    ARCHIVE_MANAGE(
-            "archive.manage",
-            "자료실 삭제·작성자 변경",
-            "자료실 파일을 삭제하고 작성자를 변경할 수 있습니다.",
+    ARCHIVE_DELETE(
+            "archive.delete",
+            "자료실 파일 삭제",
+            "다른 회원이 올린 자료실 파일을 삭제할 수 있습니다.",
+            Set.of(Member.Role.VICE_PRESIDENT)
+    ),
+    ARCHIVE_AUTHOR_CHANGE(
+            "archive.author_change",
+            "자료실 작성자 변경",
+            "자료실 파일의 작성자 표시를 변경할 수 있습니다.",
+            Set.of(Member.Role.VICE_PRESIDENT)
+    ),
+    ARCHIVE_EDIT_ANY(
+            "archive.edit_any",
+            "다른 회원 자료 수정",
+            "다른 회원이 올린 자료실 파일을 수정할 수 있습니다.",
+            Set.of(Member.Role.VICE_PRESIDENT)
+    ),
+    ARCHIVE_VISIBILITY(
+            "archive.visibility",
+            "자료실 공개 범위 관리",
+            "임원 전용 또는 지정 회원 공개 범위를 설정할 수 있습니다.",
             Set.of(Member.Role.VICE_PRESIDENT)
     ),
     SITE_SETTINGS_EDIT(

@@ -266,7 +266,7 @@ class OperationsSecurityIntegrationTest {
     }
 
     @Test
-    void archiveUpdateHttpAllowsOwnerAndPresidentButNotVicePresidentNonOwner() throws Exception {
+    void archiveUpdateHttpAllowsOwnerPresidentAndGrantedEditorButRejectsUngrantedOfficer() throws Exception {
         JsonNode uploaded = uploadArchive(userCookie, "원제목", "old.pdf", "%PDF-1.4 old");
         long id = uploaded.get("id").asLong();
         String initialVersion = uploaded.get("contentVersion").asText();
@@ -296,15 +296,24 @@ class OperationsSecurityIntegrationTest {
                         .isEqualTo("%PDF-1.4 new".getBytes()));
 
         mockMvc.perform(multipart("/api/files/{id}", id)
-                        .param("title", "부회장 수정")
+                        .param("title", "권한 없는 임원 수정")
                         .param("category", "GENERAL")
-                        .cookie(vicePresidentCookie)
+                        .cookie(officerCookie)
                         .header("Origin", ORIGIN)
                         .with(request -> {
                             request.setMethod("PUT");
                             return request;
                         }))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(multipart("/api/files/{id}", id)
+                        .param("title", "부회장 수정")
+                        .param("category", "GENERAL")
+                        .cookie(vicePresidentCookie)
+                        .header("Origin", ORIGIN)
+                        .with(request -> { request.setMethod("PUT"); return request; }))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("부회장 수정"));
 
         mockMvc.perform(multipart("/api/files/{id}", id)
                         .param("title", "회장 수정")
@@ -321,7 +330,7 @@ class OperationsSecurityIntegrationTest {
     }
 
     @Test
-    void archiveAuthorHttpKeepsDisplayModeArchiveManageAndMakesReassignmentPresidentOnly() throws Exception {
+    void archiveAuthorHttpRequiresAuthorChangeAndMakesReassignmentPresidentOnly() throws Exception {
         JsonNode uploaded = uploadArchive(userCookie, "작성자 테스트", "author.pdf", "%PDF-1.4 author");
         long id = uploaded.get("id").asLong();
 

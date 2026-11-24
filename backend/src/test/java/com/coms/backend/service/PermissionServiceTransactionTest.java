@@ -51,68 +51,68 @@ class PermissionServiceTransactionTest {
 
     @Test
     void rolledBackReplaceLeavesTheCacheAndDatabaseUnchanged() {
-        // ARCHIVE_MANAGE defaults to VICE_PRESIDENT only, so USER starts out disallowed.
-        assertThat(permissionService.allows(Member.Role.USER, Permission.ARCHIVE_MANAGE)).isFalse();
+        // ARCHIVE_DELETE defaults to VICE_PRESIDENT only, so USER starts out disallowed.
+        assertThat(permissionService.allows(Member.Role.USER, Permission.ARCHIVE_DELETE)).isFalse();
 
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> {
-            permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_MANAGE), "2026000001", null);
+            permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_DELETE), "2026000001", null);
             throw new RuntimeException("force rollback after the write");
         })).hasMessage("force rollback after the write");
 
         assertThat(rolePermissionRepository.findAll()).isEmpty();
-        assertThat(permissionService.allows(Member.Role.USER, Permission.ARCHIVE_MANAGE)).isFalse();
+        assertThat(permissionService.allows(Member.Role.USER, Permission.ARCHIVE_DELETE)).isFalse();
     }
 
     @Test
     void committedReplaceUpdatesTheCache() {
-        permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_MANAGE), "2026000001", null);
+        permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_DELETE), "2026000001", null);
 
-        assertThat(permissionService.allows(Member.Role.USER, Permission.ARCHIVE_MANAGE)).isTrue();
+        assertThat(permissionService.allows(Member.Role.USER, Permission.ARCHIVE_DELETE)).isTrue();
     }
 
     @Test
     void staleExpectedUpdatedAtIsRejectedWithConflictAndDoesNotChangeTheMatrix() {
-        permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_MANAGE), "2026000001", null);
+        permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_DELETE), "2026000001", null);
 
         // A second admin still holding the pre-save updatedAt (null, since the table was empty when
         // they loaded the screen) tries to save on top of it.
         assertThatThrownBy(() -> permissionService.replace(
-                matrixGranting(Member.Role.OFFICER, Permission.ARCHIVE_MANAGE), "2026000002", null))
+                matrixGranting(Member.Role.OFFICER, Permission.ARCHIVE_DELETE), "2026000002", null))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(409))
                 .hasMessageContaining("다른 관리자가 먼저 저장했습니다");
 
-        assertThat(permissionService.allows(Member.Role.USER, Permission.ARCHIVE_MANAGE)).isTrue();
-        assertThat(permissionService.allows(Member.Role.OFFICER, Permission.ARCHIVE_MANAGE)).isFalse();
+        assertThat(permissionService.allows(Member.Role.USER, Permission.ARCHIVE_DELETE)).isTrue();
+        assertThat(permissionService.allows(Member.Role.OFFICER, Permission.ARCHIVE_DELETE)).isFalse();
     }
 
     @Test
     void freshExpectedUpdatedAtSucceeds() {
         PermissionMatrixResponse first =
-                permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_MANAGE), "2026000001", null);
+                permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_DELETE), "2026000001", null);
 
         PermissionMatrixResponse second = permissionService.replace(
-                matrixGranting(Member.Role.OFFICER, Permission.ARCHIVE_MANAGE), "2026000002", first.updatedAt());
+                matrixGranting(Member.Role.OFFICER, Permission.ARCHIVE_DELETE), "2026000002", first.updatedAt());
 
-        assertThat(second.allowed().get("OFFICER")).contains("archive.manage");
-        assertThat(permissionService.allows(Member.Role.OFFICER, Permission.ARCHIVE_MANAGE)).isTrue();
+        assertThat(second.allowed().get("OFFICER")).contains("archive.delete");
+        assertThat(permissionService.allows(Member.Role.OFFICER, Permission.ARCHIVE_DELETE)).isTrue();
     }
 
     @Test
     void deletingARowDeniesUntilSelfHealReseedsIt() {
-        // ARCHIVE_MANAGE defaults to VICE_PRESIDENT only.
-        permissionService.replace(matrixGranting(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE), "2026000001", null);
-        assertThat(permissionService.allows(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE)).isTrue();
+        // ARCHIVE_DELETE defaults to VICE_PRESIDENT only.
+        permissionService.replace(matrixGranting(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_DELETE), "2026000001", null);
+        assertThat(permissionService.allows(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_DELETE)).isTrue();
 
-        rolePermissionRepository.deleteById(new RolePermissionId(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE));
+        rolePermissionRepository.deleteById(new RolePermissionId(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_DELETE));
         permissionService.invalidate();
 
-        assertThat(permissionService.allows(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE)).isFalse();
+        assertThat(permissionService.allows(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_DELETE)).isFalse();
 
         permissionService.selfHealMissingRows();
 
-        assertThat(permissionService.allows(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE)).isTrue();
+        assertThat(permissionService.allows(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_DELETE)).isTrue();
     }
 
     private Map<Member.Role, Set<Permission>> matrixGranting(Member.Role grantedRole, Permission permission) {

@@ -7,6 +7,7 @@ import com.coms.backend.domain.RolePermissionId;
 import com.coms.backend.dto.MyPermissionsResponse;
 import com.coms.backend.dto.PermissionMatrixResponse;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.MemberPermissionOverrideRepository;
 import com.coms.backend.repository.RolePermissionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.TestingAuthenticationToken;
@@ -37,31 +38,32 @@ class PermissionServiceTest {
 
     private final RolePermissionRepository repository = mock(RolePermissionRepository.class);
     private final MemberRepository memberRepository = mock(MemberRepository.class);
+    private final MemberPermissionOverrideRepository overrideRepository = mock(MemberPermissionOverrideRepository.class);
     private final AuditLogService auditLogService = mock(AuditLogService.class);
-    private final PermissionService service = new PermissionService(repository, memberRepository, auditLogService);
+    private final PermissionService service = new PermissionService(repository, memberRepository, overrideRepository, auditLogService);
 
     @Test
-    void adminAuthenticationShortCircuitsWithoutRepositoryAccess() {
+    void forgedAdminAuthorityWithoutMemberFailsClosed() {
         var authentication = new TestingAuthenticationToken("2026000001", "password", "ROLE_ADMIN");
 
-        assertThat(service.has(authentication, Permission.ARCHIVE_MANAGE)).isTrue();
+        assertThat(service.has(authentication, Permission.ARCHIVE_DELETE)).isFalse();
 
         verify(repository, never()).findById(any());
-        verify(memberRepository, never()).findByStudentId(any());
+        verify(memberRepository).findByStudentId("2026000001");
     }
 
     @Test
     void databaseValueIsCachedAndOverridesEnumDefault() {
-        RolePermission row = row(Member.Role.USER, Permission.ARCHIVE_MANAGE, true, "admin");
-        when(repository.findById(new RolePermissionId(Member.Role.USER, Permission.ARCHIVE_MANAGE)))
+        RolePermission row = row(Member.Role.USER, Permission.ARCHIVE_DELETE, true, "admin");
+        when(repository.findById(new RolePermissionId(Member.Role.USER, Permission.ARCHIVE_DELETE)))
                 .thenReturn(Optional.of(row));
 
         Member user = member(Member.Role.USER);
 
-        assertThat(service.has(user, Permission.ARCHIVE_MANAGE)).isTrue();
-        assertThat(service.has(user, Permission.ARCHIVE_MANAGE)).isTrue();
+        assertThat(service.has(user, Permission.ARCHIVE_DELETE)).isTrue();
+        assertThat(service.has(user, Permission.ARCHIVE_DELETE)).isTrue();
 
-        verify(repository).findById(new RolePermissionId(Member.Role.USER, Permission.ARCHIVE_MANAGE));
+        verify(repository).findById(new RolePermissionId(Member.Role.USER, Permission.ARCHIVE_DELETE));
     }
 
     @Test
@@ -168,40 +170,40 @@ class PermissionServiceTest {
 
     @Test
     void invalidateForcesARepositoryReReadOnTheNextCheck() {
-        RolePermissionId id = new RolePermissionId(Member.Role.USER, Permission.ARCHIVE_MANAGE);
+        RolePermissionId id = new RolePermissionId(Member.Role.USER, Permission.ARCHIVE_DELETE);
         when(repository.findById(id))
-                .thenReturn(Optional.of(row(Member.Role.USER, Permission.ARCHIVE_MANAGE, true, "admin")));
+                .thenReturn(Optional.of(row(Member.Role.USER, Permission.ARCHIVE_DELETE, true, "admin")));
 
-        assertThat(service.allows(Member.Role.USER, Permission.ARCHIVE_MANAGE)).isTrue();
-        assertThat(service.allows(Member.Role.USER, Permission.ARCHIVE_MANAGE)).isTrue();
+        assertThat(service.allows(Member.Role.USER, Permission.ARCHIVE_DELETE)).isTrue();
+        assertThat(service.allows(Member.Role.USER, Permission.ARCHIVE_DELETE)).isTrue();
         verify(repository, times(1)).findById(id);
 
         service.invalidate();
 
-        assertThat(service.allows(Member.Role.USER, Permission.ARCHIVE_MANAGE)).isTrue();
+        assertThat(service.allows(Member.Role.USER, Permission.ARCHIVE_DELETE)).isTrue();
         verify(repository, times(2)).findById(id);
     }
 
     @Test
     void replacePersistsAllEditableRowsRefreshesCacheAndRecordsAuditDiff() {
-        when(repository.findById(new RolePermissionId(Member.Role.USER, Permission.ARCHIVE_MANAGE)))
-                .thenReturn(Optional.of(row(Member.Role.USER, Permission.ARCHIVE_MANAGE, false, "before")));
+        when(repository.findById(new RolePermissionId(Member.Role.USER, Permission.ARCHIVE_DELETE)))
+                .thenReturn(Optional.of(row(Member.Role.USER, Permission.ARCHIVE_DELETE, false, "before")));
         when(repository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        assertThat(service.has(member(Member.Role.USER), Permission.ARCHIVE_MANAGE)).isFalse();
+        assertThat(service.has(member(Member.Role.USER), Permission.ARCHIVE_DELETE)).isFalse();
 
         PermissionMatrixResponse response = service.replace(Map.of(
                 Member.Role.ASSOCIATE, Set.of(),
-                Member.Role.USER, Set.of(Permission.ARCHIVE_MANAGE),
+                Member.Role.USER, Set.of(Permission.ARCHIVE_DELETE),
                 Member.Role.OFFICER, Set.of(Permission.NOTICE_WRITE),
-                Member.Role.VICE_PRESIDENT, Set.of(Permission.ARCHIVE_MANAGE)
+                Member.Role.VICE_PRESIDENT, Set.of(Permission.ARCHIVE_DELETE)
         ), "2026000001", null);
 
-        assertThat(response.allowed().get("USER")).containsExactly("archive.manage");
-        assertThat(service.has(member(Member.Role.USER), Permission.ARCHIVE_MANAGE)).isTrue();
+        assertThat(response.allowed().get("USER")).containsExactly("archive.delete");
+        assertThat(service.has(member(Member.Role.USER), Permission.ARCHIVE_DELETE)).isTrue();
         verify(repository).saveAll(argThat((Iterable<RolePermission> rows) -> {
-            assertThat(rows).hasSize(36);
+            assertThat(rows).hasSize(PermissionService.editableRoles().size() * Permission.values().length);
             assertThat(rows).anySatisfy(row ->
-                    assertThat(row.getId()).isEqualTo(new RolePermissionId(Member.Role.USER, Permission.ARCHIVE_MANAGE)));
+                    assertThat(row.getId()).isEqualTo(new RolePermissionId(Member.Role.USER, Permission.ARCHIVE_DELETE)));
             return true;
         }));
         verify(auditLogService).record(
@@ -209,7 +211,7 @@ class PermissionServiceTest {
                 eq("ADMIN_PERMISSIONS_UPDATE"),
                 eq("ROLE_PERMISSIONS"),
                 eq(null),
-                argThat(detail -> detail.contains("added=USER:archive.manage") && detail.contains("removed=")),
+                argThat(detail -> detail.contains("added=USER:archive.delete") && detail.contains("removed=")),
                 eq(null)
         );
     }
@@ -219,7 +221,7 @@ class PermissionServiceTest {
         LocalDateTime updatedAt = LocalDateTime.of(2026, 9, 4, 12, 30);
         when(repository.findAll()).thenReturn(java.util.List.of(
                 row(Member.Role.USER, Permission.CLUB_ROOM_VIEW, true, updatedAt, "2026000001"),
-                row(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE, true, updatedAt.plusMinutes(1), "2026000002")
+                row(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_DELETE, true, updatedAt.plusMinutes(1), "2026000002")
         ));
 
         PermissionMatrixResponse response = service.matrix();
@@ -233,7 +235,10 @@ class PermissionServiceTest {
                         "notice.write",
                         "activity.write",
                         "project.write",
-                        "archive.manage",
+                        "archive.delete",
+                        "archive.author_change",
+                        "archive.edit_any",
+                        "archive.visibility",
                         "site_settings.edit",
                         "operations.panel"
                 );
@@ -254,7 +259,10 @@ class PermissionServiceTest {
                 "notice.write",
                 "activity.write",
                 "project.write",
-                "archive.manage",
+                "archive.delete",
+                "archive.author_change",
+                "archive.edit_any",
+                "archive.visibility",
                 "site_settings.edit",
                 "operations.panel"
         );

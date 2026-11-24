@@ -1,6 +1,7 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.Member;
+import com.coms.backend.domain.ArchiveFile;
 import com.coms.backend.domain.RichBodyMedia;
 import com.coms.backend.repository.AuditLogRepository;
 import com.coms.backend.repository.ArchiveFileRepository;
@@ -26,6 +27,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.List;
+import java.util.Optional;
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -126,7 +128,7 @@ class ArchiveServiceTest {
         assertThat(archiveFileRepository.count()).isEqualTo(1);
         assertThat(created.attachments()).extracting("originalName").containsExactly("one.pdf", "two.pdf");
         assertThat(created.attachments()).allSatisfy(attachment ->
-                assertThat(archiveService.getAttachment(created.id(), attachment.id()).getStoredName()).isNotBlank());
+                assertThat(archiveService.getAttachment(created.id(), attachment.id(), "2026123456").getStoredName()).isNotBlank());
         assertThat(attachmentRepository.count()).isEqualTo(2);
     }
 
@@ -152,7 +154,7 @@ class ArchiveServiceTest {
                 .thenThrow(new IOException("second write failed"));
         ArchiveService failingService = new ArchiveService(files, attachments, failingStorage, members,
                 mock(ArchiveFileVoteRepository.class), mock(RichContentSanitizer.class), mock(AuditLogService.class),
-                mock(RichBodyMediaService.class));
+                mock(RichBodyMediaService.class), mock(PermissionService.class));
 
         assertThatThrownBy(() -> failingService.uploadGroup("자료", null, "GENERAL",
                 List.of(pdf("first.pdf", "%PDF-1.4 first"), pdf("second.pdf", "%PDF-1.4 second")), "2026123456"))
@@ -196,12 +198,12 @@ class ArchiveServiceTest {
                 List.of(pdf("first.pdf", "%PDF-1.4"), pdf("second.pdf", "%PDF-1.4")), "2026123456");
         var second = archiveService.upload("둘째 글", null, pdf("other.pdf", "%PDF-1.4"), "2026000001");
 
-        assertThatThrownBy(() -> archiveService.getAttachment(second.id(), first.attachments().get(1).id()))
+        assertThatThrownBy(() -> archiveService.getAttachment(second.id(), first.attachments().get(1).id(), "2026123456"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex -> assertThat(ex.getStatusCode().value()).isEqualTo(404));
         assertThatThrownBy(() -> archiveService.updateGroup("2026000001", first.id(), "침범", null, "GENERAL", null,
                 List.of(pdf("new.pdf", "%PDF-1.4"))))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex -> assertThat(ex.getStatusCode().value()).isEqualTo(403));
-        assertThat(archiveService.list()).filteredOn(file -> file.id().equals(first.id())).singleElement()
+        assertThat(archiveService.list("2026123456")).filteredOn(file -> file.id().equals(first.id())).singleElement()
                 .extracting(file -> file.attachments().size()).isEqualTo(2);
     }
 
@@ -295,7 +297,7 @@ class ArchiveServiceTest {
     }
 
     @Test
-    void adminCanEditAnotherMembersArchiveButVicePresidentCannot() throws Exception {
+    void adminAndVicePresidentWithEditAnyCanEditAnotherMembersArchive() throws Exception {
         saveMember("2026000001", "회장", Member.Role.ADMIN);
         saveMember("2026000002", "부회장", Member.Role.VICE_PRESIDENT);
         var created = archiveService.upload("원제목", null, pdf("old.pdf", "%PDF-1.4 old"), "2026123456");
@@ -303,9 +305,44 @@ class ArchiveServiceTest {
         var adminEdit = archiveService.update("2026000001", created.id(), "회장수정", null, "GENERAL", null);
         assertThat(adminEdit.title()).isEqualTo("회장수정");
 
-        assertThatThrownBy(() -> archiveService.update("2026000002", created.id(), "부회장수정", null, "GENERAL", null))
-                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
-                        assertThat(ex.getStatusCode().value()).isEqualTo(403));
+        var vicePresidentEdit = archiveService.update("2026000002", created.id(), "부회장수정", null, "GENERAL", null);
+        assertThat(vicePresidentEdit.title()).isEqualTo("부회장수정");
+    }
+
+    @Test
+    void detailChecksVisibilityUnderWriteLockBeforeUpdatingViewCount() {
+        ArchiveFileRepository files = mock(ArchiveFileRepository.class);
+        MemberRepository members = mock(MemberRepository.class);
+        Member viewer = new Member();
+        viewer.setStudentId("2026123456");
+        viewer.setRole(Member.Role.USER);
+        ArchiveFile privateFile = new ArchiveFile();
+        privateFile.setUploadedBy("another-member");
+        privateFile.setVisibility(ArchiveFile.Visibility.SELECTED);
+        when(members.findByStudentId(viewer.getStudentId())).thenReturn(Optional.of(viewer));
+        when(files.findByIdForUpdate(88L)).thenReturn(Optional.of(privateFile));
+        ArchiveService service = new ArchiveService(files, mock(ArchiveAttachmentRepository.class),
+                mock(StorageService.class), members, mock(ArchiveFileVoteRepository.class),
+                mock(RichContentSanitizer.class), mock(AuditLogService.class),
+                mock(RichBodyMediaService.class), mock(PermissionService.class));
+
+        assertThatThrownBy(() -> service.getAndIncrementView(88L, viewer.getStudentId()))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode().value()).isEqualTo(404));
+        verify(files).findByIdForUpdate(88L);
+        verify(files, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void uploaderCanDeleteOwnFileButAnotherMemberCannot() throws Exception {
+        saveMember("2026000001", "다른 회원", Member.Role.USER);
+        var created = archiveService.upload("내 자료", null, pdf("own.pdf", "%PDF-1.4"), "2026123456");
+
+        assertThatThrownBy(() -> archiveService.delete(created.id(), "2026000001"))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode().value()).isEqualTo(403));
+        archiveService.delete(created.id(), "2026123456");
+        assertThat(archiveFileRepository.findById(created.id())).isEmpty();
     }
 
     @Test

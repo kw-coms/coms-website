@@ -42,6 +42,7 @@ class RichBodyMediaControllerIntegrationTest {
     @Autowired MemberRepository members;
     @Autowired JwtTokenProvider jwt;
     @Autowired com.coms.backend.repository.RichBodyMediaRepository media;
+    @Autowired com.coms.backend.repository.ArchiveFileRepository archives;
 
     private Cookie member;
     private Cookie officer;
@@ -131,6 +132,60 @@ class RichBodyMediaControllerIntegrationTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(com.coms.backend.domain.ArchiveFile.Visibility.class)
+    void archiveBodyMediaUsesParentVisibilityForInlineAndDownload(com.coms.backend.domain.ArchiveFile.Visibility visibility) throws Exception {
+        String[] readers = {null, "2026000110", "2026000111", "2026000102", "2026000112", "2026000113", "2026000101", "2026000103"};
+        members.save(member("2026000110", Member.Role.ASSOCIATE));
+        members.save(member("2026000111", Member.Role.USER));
+        members.save(member("2026000112", Member.Role.VICE_PRESIDENT));
+        members.save(member("2026000113", Member.Role.USER));
+        var archive = archive(visibility);
+        archive.setSelectedStudentIds(java.util.Set.of("2026000113"));
+        archives.saveAndFlush(archive);
+        long id = uploadId("archive", member);
+        media.findById(id).orElseThrow().attach(archive.getId(), java.time.LocalDateTime.now());
+
+        for (int i = 0; i < readers.length; i++) {
+            boolean allowed = i == 7 || switch (visibility) {
+                case PUBLIC -> true;
+                case MEMBERS -> i > 0;
+                case OFFICERS -> i == 3 || i == 4;
+                case SELECTED -> i == 5 || i == 6;
+            };
+            for (String suffix : new String[]{"", "/download"}) {
+                var request = get("/api/rich-media/" + id + suffix);
+                if (readers[i] != null) request.cookie(cookie(readers[i]));
+                var result = mvc.perform(request).andExpect(status().is(allowed ? 200 : 404));
+                if (allowed) result.andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
+            }
+        }
+    }
+
+    @Test void archiveBodyMediaHidesMissingParentAndReflectsVisibilityChangeOnNextRequest() throws Exception {
+        var archive = archives.saveAndFlush(archive(com.coms.backend.domain.ArchiveFile.Visibility.PUBLIC));
+        long id = uploadId("archive", member);
+        var row = media.findById(id).orElseThrow();
+        row.attach(archive.getId(), java.time.LocalDateTime.now());
+        mvc.perform(get("/api/rich-media/{id}", id)).andExpect(status().isOk());
+        archive.setVisibility(com.coms.backend.domain.ArchiveFile.Visibility.OFFICERS);
+        archives.saveAndFlush(archive);
+        mvc.perform(get("/api/rich-media/{id}", id).cookie(member)).andExpect(status().isNotFound());
+        row.attach(Long.MAX_VALUE, java.time.LocalDateTime.now());
+        mvc.perform(get("/api/rich-media/{id}", id).cookie(admin)).andExpect(status().isNotFound());
+    }
+
+    private com.coms.backend.domain.ArchiveFile archive(com.coms.backend.domain.ArchiveFile.Visibility visibility) {
+        var archive = new com.coms.backend.domain.ArchiveFile();
+        archive.setOriginalName("private.pdf");
+        archive.setStoredName("unused.pdf");
+        archive.setMimeType("application/pdf");
+        archive.setFileSize(1L);
+        archive.setUploadedBy("2026000101");
+        archive.setVisibility(visibility);
+        return archive;
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = {"notice", "archive", "sponsor"})
     void pendingMediaIsOnlyReadableByUploaderOrAdmin(String scope) throws Exception {
         Cookie uploader = scope.equals("sponsor") ? admin : officer;
@@ -147,7 +202,8 @@ class RichBodyMediaControllerIntegrationTest {
     @Test void detachedMediaIsPrivateAgain() throws Exception {
         long id = uploadId("archive", officer);
         var row = media.findById(id).orElseThrow();
-        row.attach(2L, java.time.LocalDateTime.now());
+        var parent = archives.saveAndFlush(archive(com.coms.backend.domain.ArchiveFile.Visibility.MEMBERS));
+        row.attach(parent.getId(), java.time.LocalDateTime.now());
         mvc.perform(get("/api/rich-media/{id}", id).cookie(member)).andExpect(status().isOk());
         row.detach(java.time.LocalDateTime.now(), null);
         mvc.perform(get("/api/rich-media/{id}", id).cookie(member)).andExpect(status().isNotFound());

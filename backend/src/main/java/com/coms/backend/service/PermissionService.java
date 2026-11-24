@@ -1,18 +1,21 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.Member;
+import com.coms.backend.domain.MemberPermissionOverride;
+import com.coms.backend.domain.MemberPermissionOverride.Effect;
+import com.coms.backend.domain.MemberPermissionOverrideId;
 import com.coms.backend.domain.Permission;
 import com.coms.backend.domain.RolePermission;
 import com.coms.backend.domain.RolePermissionId;
 import com.coms.backend.dto.PermissionMatrixResponse;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.MemberPermissionOverrideRepository;
 import com.coms.backend.repository.RolePermissionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -52,6 +55,7 @@ public class PermissionService {
 
     private final RolePermissionRepository repository;
     private final MemberRepository memberRepository;
+    private final MemberPermissionOverrideRepository overrideRepository;
     private final AuditLogService auditLogService;
 
     /**
@@ -64,9 +68,11 @@ public class PermissionService {
 
     public PermissionService(RolePermissionRepository repository,
                              MemberRepository memberRepository,
+                             MemberPermissionOverrideRepository overrideRepository,
                              AuditLogService auditLogService) {
         this.repository = repository;
         this.memberRepository = memberRepository;
+        this.overrideRepository = overrideRepository;
         this.auditLogService = auditLogService;
     }
 
@@ -74,11 +80,6 @@ public class PermissionService {
     public boolean has(Authentication authentication, Permission permission) {
         if (authentication == null || !authentication.isAuthenticated()) {
             return false;
-        }
-        if (authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch("ROLE_ADMIN"::equals)) {
-            return true;
         }
         return memberRepository.findByStudentId(authentication.getName())
                 .map(member -> has(member, permission))
@@ -95,7 +96,12 @@ public class PermissionService {
         if (member == null || permission == null) {
             return false;
         }
-        return allows(member.getRole(), permission);
+        if (member.getRole() == Member.Role.ADMIN) {
+            return true;
+        }
+        return overrideRepository.findById(new MemberPermissionOverrideId(member.getStudentId(), permission.key()))
+                .map(row -> row.getEffect() == Effect.GRANT)
+                .orElseGet(() -> allows(member.getRole(), permission));
     }
 
     /**
@@ -154,6 +160,19 @@ public class PermissionService {
     }
 
     @Transactional(readOnly = true)
+    public List<String> studentIdsWith(Permission permission) {
+        Set<String> ids = new HashSet<>(memberRepository.findStudentIdsByRoleIn(rolesWith(permission)));
+        Set<String> adminIds = new HashSet<>(memberRepository.findStudentIdsByRoleIn(List.of(Member.Role.ADMIN)));
+        for (MemberPermissionOverride row : overrideRepository.findAll()) {
+            if (!row.getId().permissionKey().equals(permission.key())) continue;
+            if (row.getEffect() == Effect.GRANT) ids.add(row.getId().studentId());
+            else ids.remove(row.getId().studentId());
+        }
+        ids.addAll(adminIds);
+        return new ArrayList<>(ids);
+    }
+
+    @Transactional(readOnly = true)
     public Set<Permission> effective(Member member) {
         EnumSet<Permission> permissions = EnumSet.noneOf(Permission.class);
         if (member == null) {
@@ -164,11 +183,58 @@ public class PermissionService {
             return permissions;
         }
         for (Permission permission : Permission.values()) {
-            if (has(member, permission)) {
-                permissions.add(permission);
-            }
+            if (allows(member.getRole(), permission)) permissions.add(permission);
+        }
+        for (MemberPermissionOverride row : overrideRepository.findByIdStudentId(member.getStudentId())) {
+            Permission permission = Permission.fromKey(row.getId().permissionKey());
+            if (row.getEffect() == Effect.GRANT) permissions.add(permission);
+            else permissions.remove(permission);
         }
         return permissions;
+    }
+
+    @Transactional(readOnly = true)
+    public Set<Permission> rolePermissions(Member.Role role) {
+        EnumSet<Permission> result = EnumSet.noneOf(Permission.class);
+        for (Permission permission : Permission.values()) {
+            if (allows(role, permission)) result.add(permission);
+        }
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public List<MemberPermissionOverride> overrides(String studentId) {
+        return overrideRepository.findByIdStudentId(studentId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MemberPermissionOverride> overrides() {
+        return overrideRepository.findAll();
+    }
+
+    @Transactional
+    public void replaceOverrides(Member member, Map<Permission, Effect> next, String updatedBy) {
+        if (member.getRole() == Member.Role.ADMIN) {
+            throw new ResponseStatusException(BAD_REQUEST, "회장 권한은 편집할 수 없습니다.");
+        }
+        Member locked = memberRepository.findWithLockById(member.getId())
+                .orElseThrow(() -> new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND));
+        if (locked.getRole() == Member.Role.ADMIN) {
+            throw new ResponseStatusException(BAD_REQUEST, "회장 권한은 편집할 수 없습니다.");
+        }
+        List<MemberPermissionOverride> previous = overrideRepository.findByIdStudentId(member.getStudentId());
+        Map<String, Effect> old = new LinkedHashMap<>();
+        previous.forEach(row -> old.put(row.getId().permissionKey(), row.getEffect()));
+        Map<String, Effect> requested = new LinkedHashMap<>();
+        next.forEach((key, effect) -> requested.put(key.key(), effect));
+        if (old.equals(requested)) return;
+        overrideRepository.deleteAll(previous);
+        overrideRepository.flush();
+        overrideRepository.saveAll(next.entrySet().stream()
+                .map(entry -> new MemberPermissionOverride(member.getStudentId(), entry.getKey(), entry.getValue(), updatedBy))
+                .toList());
+        auditLogService.record(updatedBy, "MEMBER_PERMISSION_OVERRIDE_UPDATE", "MEMBER",
+                member.getStudentId(), "before=" + old + "\nafter=" + requested, null);
     }
 
     @Transactional(readOnly = true)
