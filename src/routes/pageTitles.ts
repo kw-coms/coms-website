@@ -84,7 +84,10 @@ export function documentTitleFor(pathname: string, detail?: string | null): stri
   const label = routeLabel(pathname)
   if (label === '') return SITE_TITLE
   const parts = [label ?? NOT_FOUND_LABEL, SITE_NAME]
-  const cleanDetail = detail ? clampDetail(detail) : ''
+  const detailParts = (detail || '').replace(/\s+/g, ' ').trim().split(/\s*\|\s*/)
+  // Detail hooks may pass the section label or an already formatted tab title.
+  while (detailParts.length && [label, SITE_NAME].includes(detailParts.at(-1))) detailParts.pop()
+  const cleanDetail = clampDetail(detailParts.join(' | '))
   if (label !== null && cleanDetail) parts.unshift(cleanDetail)
   return parts.join(' | ')
 }
