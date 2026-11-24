@@ -102,6 +102,54 @@ class StudyGroupIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test void staleGroupEditCannotOverwriteTheLatestName() throws Exception {
+        long id = propose();
+        String path = "/api/study-groups/" + id;
+        var initial = json.readTree(mvc.perform(get(path).cookie(cookie(LEADER)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
+        long version = initial.path("version").asLong();
+        var first = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(write());
+        first.put("version", version).put("name", "새 스터디 이름");
+        mvc.perform(put(path).cookie(cookie(MANAGER)).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content(first.toString()))
+                .andExpect(status().isOk());
+        var stale = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(write());
+        stale.put("version", version).put("description", "오래된 초안의 새 소개");
+        mvc.perform(put(path).cookie(cookie(LEADER)).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content(stale.toString()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("새로고침")));
+        mvc.perform(get(path).cookie(cookie(LEADER))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("새 스터디 이름"))
+                .andExpect(jsonPath("$.description").value("함께 공부해요"))
+                .andExpect(jsonPath("$.version").value(org.hamcrest.Matchers.greaterThan((int) version)));
+    }
+
+    @Test void staleRoundEditCannotOverwriteTheLatestTopicAndDate() throws Exception {
+        long id = propose();
+        mvc.perform(post("/api/study-groups/{id}/approve", id).cookie(cookie(MANAGER)).header("Origin", ORIGIN))
+                .andExpect(status().isOk());
+        String rounds = "/api/study-groups/" + id + "/sessions";
+        var draft = json.createObjectNode().put("date", "2025-09-01").put("topic", "이전 주제").put("notes", "이전 메모");
+        var initial = json.readTree(mvc.perform(post(rounds).cookie(cookie(LEADER)).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content(draft.toString()))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsByteArray());
+        long version = initial.path("version").asLong();
+        String path = rounds + "/" + initial.get("id").asLong();
+        var first = draft.deepCopy().put("version", version).put("date", "2025-09-02").put("topic", "새 주제");
+        mvc.perform(put(path).cookie(cookie(MANAGER)).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content(first.toString()))
+                .andExpect(status().isOk());
+        draft.put("version", version).put("notes", "오래된 초안의 새 메모");
+        mvc.perform(put(path).cookie(cookie(LEADER)).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content(draft.toString()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("새로고침")));
+        mvc.perform(get(path).cookie(cookie(LEADER))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.topic").value("새 주제"))
+                .andExpect(jsonPath("$.date").value("2025-09-02"))
+                .andExpect(jsonPath("$.notes").value("이전 메모"))
+                .andExpect(jsonPath("$.version").value(org.hamcrest.Matchers.greaterThan((int) version)));
+    }
+
     @Test void guestInterestSortDoesNotRevealDemandOrder() throws Exception {
         long popular = propose();
         mvc.perform(put("/api/study-groups/{id}/interest", popular).cookie(cookie(ASSOCIATE)).header("Origin", ORIGIN)
@@ -184,7 +232,8 @@ class StudyGroupIntegrationTest {
         mvc.perform(put("/api/study-groups/{id}", id).cookie(cookie(MEMBER)).header("Origin", ORIGIN)
                 .contentType(MediaType.APPLICATION_JSON).content(write())).andExpect(status().isForbidden());
         mvc.perform(put("/api/study-groups/{id}", id).cookie(cookie(LEADER)).header("Origin", ORIGIN)
-                .contentType(MediaType.APPLICATION_JSON).content(write())).andExpect(status().isOk());
+                .contentType(MediaType.APPLICATION_JSON).content(write().replace("}", ",\"version\":0}")))
+                .andExpect(status().isOk());
         mvc.perform(post("/api/study-groups/{id}/approve", id).cookie(cookie(MANAGER)).header("Origin", ORIGIN))
                 .andExpect(status().isOk());
         mvc.perform(post("/api/study-groups/{id}/start", id).cookie(cookie(MEMBER)).header("Origin", ORIGIN))

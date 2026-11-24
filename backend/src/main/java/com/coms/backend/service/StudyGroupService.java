@@ -68,7 +68,7 @@ public class StudyGroupService {
                 group.getTerm(), group.getSchedule(), group.getPlace(),
                 group.getCapacity(), group.getStatus(), group.getCreatedBy(), group.getCreatedAt(), group.getUpdatedAt(),
                 summary.total(), summary, membership == null ? null : memberView(membership, name(actorId)),
-                own == null ? null : new InterestOwn(slots(own.getPreferredSlots()), own.getLevel()), manager);
+                own == null ? null : new InterestOwn(slots(own.getPreferredSlots()), own.getLevel()), manager, group.getVersion());
     }
 
     public View create(Write write, String actorId, boolean direct) {
@@ -98,6 +98,9 @@ public class StudyGroupService {
         StudyGroup group = groups.findByIdForUpdate(id).orElseThrow(() -> notFound());
         access.requireManager(id, actorId);
         if (group.getStatus() == StudyGroup.Status.ENDED) throw conflict("종료된 스터디는 수정할 수 없습니다.");
+        if (write.version() == null || write.version() != group.getVersion()) {
+            throw conflict("스터디 정보가 변경되었습니다. 새로고침한 뒤 다시 수정해 주세요.");
+        }
         applyWrite(group, write);
         if (group.getCapacity() != null && group.getCapacity() < memberships.countByGroupIdAndStatus(id, StudyGroupMember.Status.APPROVED))
             throw conflict("현재 승인된 인원보다 정원을 낮출 수 없습니다.");

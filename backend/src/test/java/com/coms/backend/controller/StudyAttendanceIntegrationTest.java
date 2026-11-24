@@ -266,7 +266,8 @@ class StudyAttendanceIntegrationTest {
         mvc.perform(put(detail).cookie(cookie(APPROVED)).header("Origin", ORIGIN)
                 .contentType(MediaType.APPLICATION_JSON).content(roundBody())).andExpect(status().isForbidden());
         mvc.perform(put(detail).cookie(cookie(OFFICER)).header("Origin", ORIGIN)
-                .contentType(MediaType.APPLICATION_JSON).content(roundBody())).andExpect(status().isOk());
+                .contentType(MediaType.APPLICATION_JSON).content(roundBody().replace("}", ",\"version\":0}")))
+                .andExpect(status().isOk());
         open(round);
         mvc.perform(put(detail + "/attendance/members/" + APPROVED).cookie(cookie(APPROVED)).header("Origin", ORIGIN)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"PRESENT\"}"))

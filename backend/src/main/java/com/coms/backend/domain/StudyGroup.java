@@ -20,6 +20,7 @@ public class StudyGroup {
     @Column(name = "created_by", nullable = false, length = 50) private String createdBy;
     @Column(name = "created_at", nullable = false) private LocalDateTime createdAt = LocalDateTime.now();
     @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt = LocalDateTime.now();
+    @Version @Column(nullable = false) private long version;
     @PreUpdate void touch() { updatedAt = LocalDateTime.now(); }
     public Long getId() { return id; }
     public String getName() { return name; }
@@ -44,4 +45,5 @@ public class StudyGroup {
     public void setCreatedBy(String value) { createdBy = value; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public long getVersion() { return version; }
 }

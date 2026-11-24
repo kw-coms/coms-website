@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "jwt.secret=test-secret-key-with-at-least-32-chars",
         "storage.location=./build/test-uploads/attendance-code-race"
 })
-class AttendanceCodeConcurrencyTest {
+class AttendanceCodeConcurrencyTest extends StudyConcurrencyDatabase {
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
         StudyConcurrencyDatabase.configure(registry, "attendance_code_concurrency");

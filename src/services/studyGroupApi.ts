@@ -6,8 +6,8 @@ export type GroupWrite = { name: string; description: string; topicTags: string[
 export type Interest = { level?: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | null; slots: string[] }
 export type InterestSummary = { total: number; levels: Record<string, number>; slots: Record<string, number>; names: { studentId: string; name: string }[] | null }
 export type Membership = { studentId: string; name: string; role: 'LEADER' | 'MEMBER'; status: 'PENDING' | 'APPROVED'; joinedAt: string }
-export type GroupView = GroupCard & { description: string | null; leaderStudentId: string | null; term: string; place: string | null; capacity: number | null; createdBy: string; createdAt: string; updatedAt: string; myMembership?: Membership | null; myInterest?: Interest | null; manager: boolean; interestSummary: InterestSummary }
-export type StudySession = { id: number; groupId: number; roundNo: number; date: string; topic: string; notes: string | null; attendanceSessionId: number | null; attendanceOpen: boolean; attendanceCode: string | null }
+export type GroupView = GroupCard & { description: string | null; leaderStudentId: string | null; term: string; place: string | null; capacity: number | null; createdBy: string; createdAt: string; updatedAt: string; myMembership?: Membership | null; myInterest?: Interest | null; manager: boolean; interestSummary: InterestSummary; version: number }
+export type StudySession = { id: number; groupId: number; roundNo: number; date: string; topic: string; notes: string | null; attendanceSessionId: number | null; attendanceOpen: boolean; attendanceCode: string | null; version: number }
 export type SessionWrite = { date: string; topic: string; notes: string }
 export type RosterRow = { studentId: string; name: string; status: 'PRESENT' | 'ABSENT' | 'LATE' | null; source: 'CODE' | 'MANUAL' | null; checkedAt: string | null; approvedMember: boolean }
 export type RateRow = { studentId: string; name: string; attended: number; eligible: number; rate: number }
@@ -19,7 +19,7 @@ const sessionPath = (groupId: number, id: number) => `${groupPath(groupId)}/sess
 export const listStudyGroups = (sort = ''): Promise<GroupCard[]> => request(base + (sort ? `?sort=${sort}` : ''))
 export const getStudyGroup = (id: number): Promise<GroupView> => request(groupPath(id))
 export const createStudyGroup = (data: GroupWrite, direct = false): Promise<GroupView> => request(base + (direct ? '?direct=true' : ''), { method: 'POST', body: JSON.stringify(data) })
-export const updateStudyGroup = (id: number, data: GroupWrite): Promise<GroupView> => request(groupPath(id), { method: 'PUT', body: JSON.stringify(data) })
+export const updateStudyGroup = (id: number, data: GroupWrite & { version: number }): Promise<GroupView> => request(groupPath(id), { method: 'PUT', body: JSON.stringify(data) })
 export const approveStudyGroup = (id: number): Promise<GroupView> => request(`${groupPath(id)}/approve`, { method: 'POST' })
 export const startStudyGroup = (id: number): Promise<GroupView> => request(`${groupPath(id)}/start`, { method: 'POST' })
 export const endStudyGroup = (id: number): Promise<GroupView> => request(`${groupPath(id)}/end`, { method: 'POST' })
@@ -32,8 +32,9 @@ export const removeStudyMember = (id: number, studentId: string): Promise<void> 
 export const saveStudyInterest = (id: number, interest: Interest): Promise<Interest> => request(`${groupPath(id)}/interest`, { method: 'PUT', body: JSON.stringify(interest) })
 export const removeStudyInterest = (id: number): Promise<void> => requestNoContent(`${groupPath(id)}/interest`, { method: 'DELETE' })
 export const listStudySessions = (id: number): Promise<StudySession[]> => request(`${groupPath(id)}/sessions`)
+export const getStudySession = (groupId: number, id: number): Promise<StudySession> => request(sessionPath(groupId, id))
 export const createStudySession = (groupId: number, data: SessionWrite): Promise<StudySession> => request(`${groupPath(groupId)}/sessions`, { method: 'POST', body: JSON.stringify(data) })
-export const updateStudySession = (groupId: number, id: number, data: SessionWrite): Promise<StudySession> => request(sessionPath(groupId, id), { method: 'PUT', body: JSON.stringify(data) })
+export const updateStudySession = (groupId: number, id: number, data: SessionWrite & { version: number }): Promise<StudySession> => request(sessionPath(groupId, id), { method: 'PUT', body: JSON.stringify(data) })
 export const openStudyAttendance = (groupId: number, id: number, minutes: number): Promise<StudySession> => request(`${sessionPath(groupId, id)}/attendance/open`, { method: 'POST', body: JSON.stringify({ minutes }) })
 export const closeStudyAttendance = (groupId: number, id: number): Promise<StudySession> => request(`${sessionPath(groupId, id)}/attendance/close`, { method: 'POST' })
 export const getStudyRoster = async (groupId: number, id: number): Promise<RosterRow[]> => (await request(`${sessionPath(groupId, id)}/attendance/roster`)).members

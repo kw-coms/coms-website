@@ -12,6 +12,7 @@ CREATE TABLE study_groups (
     created_by VARCHAR(50) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT ck_study_capacity CHECK (capacity IS NULL OR capacity > 0)
 );
 CREATE INDEX idx_study_groups_status ON study_groups(status, created_at DESC);

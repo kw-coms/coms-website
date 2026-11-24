@@ -21,6 +21,8 @@ public class StudySession {
     private String notes;
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+    @Version @Column(nullable = false)
+    private long version;
 
     public Long getId() { return id; }
     public Long getGroupId() { return groupId; }
@@ -34,4 +36,5 @@ public class StudySession {
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public long getVersion() { return version; }
 }

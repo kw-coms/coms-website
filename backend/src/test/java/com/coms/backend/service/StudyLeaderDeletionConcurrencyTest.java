@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
         "jwt.secret=test-secret-key-with-at-least-32-chars",
         "storage.location=./build/test-uploads/study-leader-deletion"
 })
-class StudyLeaderDeletionConcurrencyTest {
+class StudyLeaderDeletionConcurrencyTest extends StudyConcurrencyDatabase {
     @Autowired MemberRepository members;
     @Autowired StudyGroupRepository groups;
     @Autowired StudyGroupMemberRepository memberships;

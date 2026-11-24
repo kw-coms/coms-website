@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
         "jwt.secret=test-secret-key-with-at-least-32-chars",
         "storage.location=./build/test-uploads/study-round-date"
 })
-class StudyRoundDateConcurrencyTest {
+class StudyRoundDateConcurrencyTest extends StudyConcurrencyDatabase {
     @Autowired MemberRepository members;
     @Autowired StudyGroupRepository groups;
     @Autowired StudyGroupMemberRepository memberships;
@@ -83,18 +83,21 @@ class StudyRoundDateConcurrencyTest {
         row.setRole(StudyGroupMember.Role.LEADER);
         row.setStatus(StudyGroupMember.Status.APPROVED);
         memberships.saveAndFlush(row);
-        roundId = studyAttendance.create(groupId, new StudyAttendanceDto.Write(today, "회차", null), leader).id();
+        roundId = studyAttendance.create(groupId, new StudyAttendanceDto.Write(today, "회차", null, null), leader).id();
     }
 
     @Test
     void trackedRoundCannotMoveIntoTheFutureEvenAfterClosing() {
-        studyAttendance.open(groupId, roundId, new StudyAttendanceDto.Open(30), leader);
+        var opened = studyAttendance.open(groupId, roundId, new StudyAttendanceDto.Open(30), leader);
         studyAttendance.close(groupId, roundId, leader);
 
         assertThatThrownBy(() -> studyAttendance.edit(groupId, roundId,
-                new StudyAttendanceDto.Write(today.plusDays(1), "회차", null), leader))
+                new StudyAttendanceDto.Write(today.plusDays(1), "회차", null, opened.version()), leader))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
-                        error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+                        error -> {
+                            assertThat(error.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                            assertThat(error.getReason()).contains("미래 날짜");
+                        });
         assertThat(sessions.findById(roundId).orElseThrow().getDate()).isEqualTo(today);
     }
 

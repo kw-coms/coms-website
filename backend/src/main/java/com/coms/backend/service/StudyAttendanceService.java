@@ -69,11 +69,14 @@ public class StudyAttendanceService {
     public StudyAttendanceDto.Session edit(Long groupId, Long sessionId, StudyAttendanceDto.Write write, String actor) {
         StudyGroup group = lockGroupForRoundChanges(groupId, actor);
         StudySession session = require(groupId, sessionId);
+        if (write.version() == null || write.version() != session.getVersion()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "회차 정보가 변경되었습니다. 새로고침한 뒤 다시 수정해 주세요.");
+        }
         if (write.date().isAfter(LocalDate.now(clock.withZone(SEOUL))) && attendanceSessions.existsByStudySessionId(sessionId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "출석을 시작한 회차는 미래 날짜로 옮길 수 없습니다.");
         }
         apply(session, write);
-        return view(session, group, true);
+        return view(sessions.saveAndFlush(session), group, true);
     }
 
     public StudyAttendanceDto.Session open(Long groupId, Long sessionId, StudyAttendanceDto.Open request, String actor) {
@@ -234,6 +237,6 @@ public class StudyAttendanceService {
                 && group.getStatus() != StudyGroup.Status.ENDED;
         return new StudyAttendanceDto.Session(round.getId(), round.getGroupId(), round.getRoundNo(), round.getDate(), round.getTopic(),
                 round.getNotes(), check == null ? null : check.getId(), open,
-                open && manager ? check.getCode() : null);
+                open && manager ? check.getCode() : null, round.getVersion());
     }
 }

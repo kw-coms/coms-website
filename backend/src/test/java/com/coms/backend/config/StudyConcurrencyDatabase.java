@@ -1,12 +1,15 @@
 package com.coms.backend.config;
 
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.AfterAll;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.test.context.DynamicPropertyRegistry;
 
+import javax.sql.DataSource;
 import java.util.UUID;
 
-public final class StudyConcurrencyDatabase {
-    private StudyConcurrencyDatabase() {}
-
+public abstract class StudyConcurrencyDatabase {
     public static void configure(DynamicPropertyRegistry registry, String schema) {
         String url = System.getenv("COMS_PG_TEST_URL");
         if (url == null || url.isBlank()) {
@@ -27,5 +30,13 @@ public final class StudyConcurrencyDatabase {
         registry.add("spring.sql.init.mode", () -> "never");
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("spring.flyway.default-schema", () -> isolatedSchema);
+    }
+
+    @AfterAll
+    static void cleanPostgresSchema(@Autowired DataSource dataSource, @Autowired Environment environment) {
+        String schema = environment.getProperty("spring.flyway.default-schema");
+        if (schema != null && schema.matches("(study_|attendance_)[a-z_]+_[a-f0-9]{8}")) {
+            Flyway.configure().dataSource(dataSource).defaultSchema(schema).cleanDisabled(false).load().clean();
+        }
     }
 }

@@ -16,7 +16,8 @@ public final class StudyGroupDto {
     private StudyGroupDto() {}
     @Schema(name = "StudyGroupWrite")
     public record Write(String name, String description, List<String> topicTags, String term,
-                        String schedule, String place, Integer capacity, @Size(max = 50) String leaderStudentId) {}
+                        String schedule, String place, Integer capacity, @Size(max = 50) String leaderStudentId,
+                        @Schema(description = "Required when editing an existing group") Long version) {}
     @Schema(name = "StudyGroupCard")
     public record Card(Long id, String name, List<String> topicTags, String schedule, String leaderName,
                        StudyGroup.Status status, @JsonInclude(JsonInclude.Include.NON_NULL) Long interestCount) {}
@@ -39,7 +40,7 @@ public final class StudyGroupDto {
                        Integer capacity, StudyGroup.Status status, String createdBy,
                        LocalDateTime createdAt, LocalDateTime updatedAt, long interestCount,
                        InterestSummary interestSummary, MemberView myMembership,
-                       InterestOwn myInterest, boolean manager) {}
+                       InterestOwn myInterest, boolean manager, long version) {}
     @Schema(name = "StudyGroupLeaderWrite")
     public record LeaderWrite(@NotBlank @Size(max = 50) String studentId) {}
     @Schema(name = "StudyGroupMembershipDecision")

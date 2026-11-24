@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "jwt.secret=test-secret-key-with-at-least-32-chars",
         "cors.allowed-origins=https://coms.kw.ac.kr"
 })
-class StudyClubFormConcurrencyTest {
+class StudyClubFormConcurrencyTest extends StudyConcurrencyDatabase {
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
         StudyConcurrencyDatabase.configure(registry, "study_club_form_concurrency");

@@ -6,6 +6,7 @@ CREATE TABLE study_sessions (
     topic VARCHAR(160) NOT NULL,
     notes TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT uk_study_session_round UNIQUE (group_id, round_no)
 );
 CREATE INDEX idx_study_sessions_group ON study_sessions(group_id, round_no);

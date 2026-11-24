@@ -9,7 +9,7 @@ import { checkInToAttendance } from '../../../services/attendanceApi'
 import { requestBlob } from '../../../services/apiClient'
 import {
   approveStudyGroup, closeStudyAttendance, createStudySession, decideStudyMember, downloadStudyRates,
-  endStudyGroup, getStudyGroup, getStudyRates, getStudyRoster, joinStudyGroup, leaveStudyGroup,
+  endStudyGroup, getStudyGroup, getStudyRates, getStudyRoster, getStudySession, joinStudyGroup, leaveStudyGroup,
   listStudyMaterials, listStudyMembers, listStudySessions, markStudyAttendance, openStudyAttendance,
   removeStudyInterest, removeStudyMember, replaceStudyLeader, saveStudyInterest, startStudyGroup, updateStudyGroup,
   updateStudySession, uploadStudyMaterial, type GroupView, type GroupWrite, type Interest,
@@ -40,10 +40,10 @@ function revealTab(button: HTMLButtonElement | null) {
 function useAction(invalidate: () => void) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, refreshAfter = true) {
     if (busy) return
     setBusy(true); setError('')
-    try { await action(); invalidate() }
+    try { await action(); if (refreshAfter) invalidate() }
     catch (cause) { setError(cause instanceof Error ? cause.message : '요청을 처리하지 못했습니다.') }
     finally { setBusy(false) }
   }
@@ -108,8 +108,7 @@ function IntroTab({ group, refresh }: { group: GroupView; refresh: () => void })
 
 function RoundCard({ group, session, canEditRounds, refresh }: { group: GroupView; session: StudySession; canEditRounds: boolean; refresh: () => void }) {
   const { user } = useAuth()
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState<SessionWrite>({ date: session.date, topic: session.topic, notes: session.notes ?? '' })
+  const [draft, setDraft] = useState<(SessionWrite & { version: number }) | null>(null)
   const [code, setCode] = useState('')
   const action = useAction(refresh)
   const rosterQuery = useQuery({ queryKey: ['study', group.id, user?.studentId, 'session', session.id, 'roster'], queryFn: () => getStudyRoster(group.id, session.id), enabled: Boolean(group.manager || group.myMembership?.status === 'APPROVED') })
@@ -117,17 +116,35 @@ function RoundCard({ group, session, canEditRounds, refresh }: { group: GroupVie
   const refreshRoster = () => { void rosterQuery.refetch(); refresh() }
   const mark = useAction(refreshRoster)
   const canOpen = canEditRounds && session.date <= new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
-  async function save(event: FormEvent<HTMLFormElement>) { event.preventDefault(); await action.run(() => updateStudySession(group.id, session.id, draft)) }
+  function startEdit() {
+    void action.run(async () => {
+      const latest = await getStudySession(group.id, session.id)
+      setDraft({ date: latest.date, topic: latest.topic, notes: latest.notes ?? '', version: latest.version })
+    }, false)
+  }
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!draft) return
+    await action.run(async () => {
+      await updateStudySession(group.id, session.id, draft)
+      setDraft(null)
+    })
+  }
   return <article className={cardClass}>
     <header className="study-group-round-head"><div><h3>{session.roundNo}회 · {session.topic}</h3><p>{session.date}</p></div>{session.attendanceOpen && <span className="study-group-state">출석 진행 중</span>}</header>
     {session.notes && <p className="study-group-description">{session.notes}</p>}
     {group.manager && <div className="study-group-actions">
-      {canEditRounds && <Button secondary onClick={() => setEditing(!editing)}>{editing ? '수정 취소' : '회차 수정'}</Button>}
+      {canEditRounds && <Button secondary disabled={action.busy} onClick={draft ? () => setDraft(null) : startEdit}>{draft ? '수정 취소' : '회차 수정'}</Button>}
       {!session.attendanceOpen && canOpen && <Button disabled={action.busy} onClick={() => void action.run(() => openStudyAttendance(group.id, session.id, 30))}>출석 열기 (30분)</Button>}
       {session.attendanceOpen && <Button secondary disabled={action.busy} onClick={() => void action.run(() => closeStudyAttendance(group.id, session.id))}>출석 마감</Button>}
     </div>}
     {group.manager && session.attendanceOpen && session.attendanceCode && <p className="study-group-code">출석 코드 <strong>{session.attendanceCode}</strong></p>}
-    {canEditRounds && editing && <form className="study-group-form" onSubmit={save}><label>날짜 <input type="date" required value={draft.date} onChange={event => setDraft({ ...draft, date: event.target.value })} /></label><label>주제 <input required value={draft.topic} onChange={event => setDraft({ ...draft, topic: event.target.value })} /></label><label>메모 <textarea value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} /></label><button className="apple-action-primary">저장</button></form>}
+    {canEditRounds && draft && <form className="study-group-form" onSubmit={save}>
+      <label>날짜 <input type="date" required value={draft.date} onChange={event => setDraft({ ...draft, date: event.target.value })} /></label>
+      <label>주제 <input required value={draft.topic} onChange={event => setDraft({ ...draft, topic: event.target.value })} /></label>
+      <label>메모 <textarea value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} /></label>
+      <button className="apple-action-primary" disabled={action.busy}>저장</button>
+    </form>}
     {session.attendanceOpen && group.myMembership?.status === 'APPROVED' && <form className="study-group-checkin" onSubmit={event => { event.preventDefault(); void action.run(() => checkInToAttendance(code, { studyGroupId: group.id, studySessionId: session.id }).then(refreshRoster)) }}><label>코드 입력 <input inputMode="numeric" pattern="[0-9]{4}" maxLength={4} value={code} onChange={event => setCode(event.target.value.replace(/\D/g, ''))} required aria-label="출석 코드" /></label><button className="apple-action-primary" disabled={action.busy}>출석하기</button></form>}
     {action.error && <p role="alert" className="study-group-error">{action.error}</p>}
     {rosterQuery.isPending && <p role="status">출석 명단을 불러오는 중…</p>}
@@ -194,11 +211,43 @@ function MembersTab({ group, refresh }: { group: GroupView; refresh: () => void 
 
 function ManageTab({ group, refresh }: { group: GroupView; refresh: () => void }) {
   const { can } = usePermissions()
-  const [draft, setDraft] = useState<GroupWrite>({ name: group.name, description: group.description ?? '', topicTags: group.topicTags, term: group.term, schedule: group.schedule ?? '', place: group.place ?? '', capacity: group.capacity })
-  const [tags, setTags] = useState(group.topicTags.join(', '))
+  const [draft, setDraft] = useState<(GroupWrite & { version: number }) | null>(null)
+  const [tags, setTags] = useState('')
   const action = useAction(refresh)
+  function startEdit() {
+    void action.run(async () => {
+      const latest = await getStudyGroup(group.id)
+      setDraft({
+        name: latest.name, description: latest.description ?? '', topicTags: latest.topicTags, term: latest.term,
+        schedule: latest.schedule ?? '', place: latest.place ?? '', capacity: latest.capacity, version: latest.version,
+      })
+      setTags(latest.topicTags.join(', '))
+    }, false)
+  }
+  function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!draft) return
+    void action.run(async () => {
+      await updateStudyGroup(group.id, { ...draft, topicTags: tags.split(',').map(tag => tag.trim()).filter(Boolean) })
+      setDraft(null)
+    })
+  }
   if (!group.manager) return null
-  return <div className="study-group-stack"><form className="study-group-form" onSubmit={event => { event.preventDefault(); void action.run(() => updateStudyGroup(group.id, { ...draft, topicTags: tags.split(',').map(tag => tag.trim()).filter(Boolean) })) }}><h2>스터디 정보 수정</h2><label>이름 <input required value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label><label>소개 <textarea required value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} /></label><label>주제 태그 <input value={tags} onChange={event => setTags(event.target.value)} /></label><label>학기 <input value={draft.term} onChange={event => setDraft({ ...draft, term: event.target.value })} /></label><label>일정 <input value={draft.schedule} onChange={event => setDraft({ ...draft, schedule: event.target.value })} /></label><label>장소 <input value={draft.place} onChange={event => setDraft({ ...draft, place: event.target.value })} /></label><label>정원 <input type="number" min="1" value={draft.capacity ?? ''} onChange={event => setDraft({ ...draft, capacity: event.target.value ? Number(event.target.value) : null })} /></label><button className="apple-action-primary" disabled={action.busy}>정보 저장</button></form>
+  return <div className="study-group-stack">
+    {draft ? <form className="study-group-form" onSubmit={save}>
+      <h2>스터디 정보 수정</h2>
+      <label>이름 <input required value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
+      <label>소개 <textarea required value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} /></label>
+      <label>주제 태그 <input value={tags} onChange={event => setTags(event.target.value)} /></label>
+      <label>학기 <input value={draft.term} onChange={event => setDraft({ ...draft, term: event.target.value })} /></label>
+      <label>일정 <input value={draft.schedule} onChange={event => setDraft({ ...draft, schedule: event.target.value })} /></label>
+      <label>장소 <input value={draft.place} onChange={event => setDraft({ ...draft, place: event.target.value })} /></label>
+      <label>정원 <input type="number" min="1" value={draft.capacity ?? ''} onChange={event => setDraft({ ...draft, capacity: event.target.value ? Number(event.target.value) : null })} /></label>
+      <div className="study-group-actions">
+        <button className="apple-action-primary" disabled={action.busy}>정보 저장</button>
+        <Button secondary disabled={action.busy} onClick={() => setDraft(null)}>수정 취소</Button>
+      </div>
+    </form> : <section className={cardClass}><Button secondary disabled={action.busy} onClick={startEdit}>스터디 정보 수정</Button></section>}
     <section className={cardClass}><h2>운영 상태</h2><p>현재 {statusLabel(group.status)}</p><div className="study-group-actions">{group.status === 'PROPOSED' && can('activity.write') && <Button disabled={action.busy} onClick={() => void action.run(() => approveStudyGroup(group.id))}>제안 승인 · 모집 시작</Button>}{group.status === 'RECRUITING' && <Button disabled={action.busy} onClick={() => void action.run(() => startStudyGroup(group.id))}>진행 시작</Button>}{group.status !== 'ENDED' && can('activity.write') && <Button secondary disabled={action.busy} onClick={() => void action.run(() => endStudyGroup(group.id))}>스터디 종료</Button>}</div></section>
     {action.error && <p role="alert" className="study-group-error">{action.error}</p>}
   </div>
