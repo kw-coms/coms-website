@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildr
 import type { ApiError } from '../services/apiClient'
 import { getCurrentUser, logoutUser } from '../services/authApi'
 import { getMyPermissions } from '../services/permissionsApi'
-import { setSessionExpiredHandler } from '../services/apiClient'
+import { clearSessionHint, hasSessionHint, setSessionExpiredHandler } from '../services/apiClient'
 import { setUserContext } from '../services/observability'
 import { queryClient } from '../services/queryClient'
 import { showToast } from '../components/common/Toast'
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     userRef.current = next
     setUserState(next)
   }, [])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => hasSessionHint())
   const [authError, setAuthError] = useState(null)
 
   // Keep Sentry's user context in sync with the session (no-op when Sentry is disabled).
@@ -73,6 +73,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let mounted = true
+
+    if (!hasSessionHint()) return () => { mounted = false }
 
     // A transient blip (backend restart / deploy window / network hiccup) should
     // not log the user out. Retry /me a few times on non-auth errors (no status
@@ -169,6 +171,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (notify) notifyOtherTabs(userRef.current?.id)
     forgetDrawStorage(userRef.current?.id)
     setUser(null)
+    clearSessionHint()
     setAuthError(null)
     // Drop every cached query so the next account on a shared device can't see the previous
     // user's community list, bookmarks, or vote state (query keys aren't scoped per user).

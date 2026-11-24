@@ -78,6 +78,8 @@ class RefreshSessionRotationTest {
 
         MockHttpServletResponse response = new MockHttpServletResponse();
         assertThat(refresh(login.refreshToken(), response).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE))
+                .anySatisfy(cookie -> assertThat(cookie).contains("comsSession=1").doesNotContain("HttpOnly"));
 
         String rotated = cookieValue(response, "refreshToken");
         assertThat(jwtTokenProvider.getSessionId(rotated)).isNotEqualTo(firstJti);

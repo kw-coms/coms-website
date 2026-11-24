@@ -1,4 +1,16 @@
+import { clearLegacySessionOwnerHint, hasLegacySessionOwnerHint } from '../utils/memberSession'
+
 export const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || ''
+
+export function hasSessionHint() {
+  if (typeof document === 'undefined') return true
+  return document.cookie.split(';').some((cookie) => cookie.trim() === 'comsSession=1') || hasLegacySessionOwnerHint()
+}
+
+export function clearSessionHint() {
+  if (typeof document !== 'undefined') document.cookie = 'comsSession=; Max-Age=0; Path=/; SameSite=Lax'
+  clearLegacySessionOwnerHint()
+}
 
 const OPTIONAL_DEV_API_SKIP_KEY = 'kwcoms-dev-api-unavailable'
 const optionalDevApiInFlight = new Map()
@@ -87,8 +99,9 @@ async function tryRefreshToken(): Promise<RefreshOutcome> {
 export const sessionGeneration = () => refreshGeneration
 export async function renewSessionAfter401(generationBeforeRequest: number): Promise<RefreshOutcome> {
   if (refreshGeneration > generationBeforeRequest) return 'refreshed' // someone already renewed the cookie
+  if (!hasSessionHint()) { notifySessionExpired(); return 'rejected' }
   const outcome = await tryRefreshToken()
-  if (outcome === 'rejected') notifySessionExpired()
+  if (outcome === 'rejected') { clearSessionHint(); notifySessionExpired() }
   return outcome
 }
 
@@ -102,12 +115,13 @@ async function recoverFromAuthFailure(path, response, generationBeforeRequest, f
   const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
   if (!canRefresh || response.status !== 401) return response
   if (refreshGeneration > generationBeforeRequest) return fetchOnce()
+  if (!hasSessionHint()) { notifySessionExpired(); return response }
   const outcome = await tryRefreshToken()
   if (outcome === 'refreshed') return fetchOnce()
   // A refresh the server refuses means the session is gone: without this, an expired session
   // left the logged-in shell on screen with every panel stuck on a retry that could never
   // succeed. An unreachable refresh endpoint says nothing about the session, so it is left alone.
-  if (outcome === 'rejected') notifySessionExpired()
+  if (outcome === 'rejected') { clearSessionHint(); notifySessionExpired() }
   return response
 }
 

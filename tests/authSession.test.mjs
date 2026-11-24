@@ -25,6 +25,7 @@ const USER = { id: 7, studentId: '2026000001', name: '홍길동', role: 'USER', 
 const CACHE_KEY = ['community', 'posts']
 const DRAW_KEY = 'coms:draw:v2:7'
 window.localStorage.setItem(DRAW_KEY, 'names')
+document.cookie = 'comsSession=1; Path=/'
 
 const json = (status, body) => new Response(JSON.stringify(body), {
   status,
@@ -69,6 +70,7 @@ const toastCount = (text) => [...document.querySelectorAll('.coms-toast')]
 
 async function signIn() {
   sessionDead = false
+  document.cookie = 'comsSession=1; Path=/'
   await act(async () => { await auth.login({ studentId: USER.studentId, name: USER.name }) })
   await settle(signedIn, 'the session to load')
   queryClient.setQueryData(CACHE_KEY, [{ id: 1 }])
@@ -135,6 +137,7 @@ for (const [label, answer] of [
 
   assert.equal(result, true)
   assert.equal(auth.user, null)
+  assert.ok(!document.cookie.includes('comsSession='), 'logout clears the session hint')
   assert.equal(auth.permissions, null)
   assert.equal(queryClient.getQueryData(CACHE_KEY), undefined, 'the next account must not see cached data')
   assert.equal(window.localStorage.getItem(DRAW_KEY), null, 'logout removes saved names')
@@ -172,6 +175,7 @@ for (const [label, answer] of [
   await act(async () => { await request('/api/notices').catch(() => {}) })
 
   assert.equal(auth.user, null)
+  assert.ok(!document.cookie.includes('comsSession='), 'rejected refresh clears the session hint')
   assert.equal(window.localStorage.getItem(DRAW_KEY), null, 'session expiry removes saved names')
   assert.equal(toastCount('로그인이 만료되었습니다'), 1)
 }

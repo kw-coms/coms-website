@@ -97,6 +97,7 @@ public class AuthController {
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie(auth.token()).toString());
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(auth.refreshToken(), request.rememberMe()).toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, sessionHintCookie(request.rememberMe()).toString());
 
         return ResponseEntity.ok(new AuthResponse(null, auth.studentId(), auth.name(), auth.message()));
     }
@@ -151,6 +152,7 @@ public class AuthController {
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie(newAccessToken).toString());
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(newRefreshToken, rememberMe).toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, sessionHintCookie(rememberMe).toString());
 
         return ResponseEntity.noContent().build();
     }
@@ -178,6 +180,7 @@ public class AuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("refreshToken", "")
                 .httpOnly(true).secure(cookieSecure).sameSite(cookieSameSite)
                 .maxAge(Duration.ZERO).path("/api/auth/refresh").build().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, expiredSessionHintCookie().toString());
         return ResponseEntity.noContent().build();
     }
 
@@ -204,6 +207,7 @@ public class AuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("refreshToken", "")
                 .httpOnly(true).secure(cookieSecure).sameSite(cookieSameSite)
                 .maxAge(Duration.ZERO).path("/api/auth/refresh").build().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, expiredSessionHintCookie().toString());
         return ResponseEntity.noContent().build();
     }
 
@@ -263,6 +267,20 @@ public class AuthController {
             cookie.maxAge(REMEMBERED_REFRESH_COOKIE_AGE);
         }
         return cookie.build();
+    }
+
+    private ResponseCookie sessionHintCookie(boolean rememberMe) {
+        // Presence only; credentials remain exclusively in HttpOnly cookies.
+        ResponseCookie.ResponseCookieBuilder cookie = ResponseCookie.from("comsSession", "1")
+                .secure(cookieSecure).sameSite(cookieSameSite).path("/");
+        if (rememberMe) cookie.maxAge(REMEMBERED_REFRESH_COOKIE_AGE);
+        return cookie.build();
+    }
+
+    private ResponseCookie expiredSessionHintCookie() {
+        return ResponseCookie.from("comsSession", "")
+                .secure(cookieSecure).sameSite(cookieSameSite)
+                .maxAge(Duration.ZERO).path("/").build();
     }
 
     @PostMapping("/email-verification/request-signup")
