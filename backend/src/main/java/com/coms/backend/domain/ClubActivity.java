@@ -36,11 +36,29 @@ public class ClubActivity {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(nullable = false)
+    @Column
     private LocalDate eventDate;
 
-    @Column(nullable = false)
+    @Column
     private LocalDate endDate;
+
+    @Column(name = "timeline_status", length = 20)
+    private String timelineStatus;
+
+    @Column(name = "show_on_timeline", nullable = false)
+    private boolean showOnTimeline;
+
+    @Column(name = "timeline_term", length = 40)
+    private String timelineTerm;
+
+    @Column(name = "date_label", length = 40)
+    private String dateLabel;
+
+    @Column(name = "timeline_kind_label", length = 40)
+    private String timelineKindLabel;
+
+    @Column(name = "member_facts", columnDefinition = "TEXT")
+    private String memberFacts;
 
     @Column
     private LocalTime startTime;
@@ -95,6 +113,18 @@ public class ClubActivity {
     public void setEventDate(LocalDate eventDate) { this.eventDate = eventDate; }
     public LocalDate getEndDate() { return endDate; }
     public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+    public String getTimelineStatus() { return timelineStatus; }
+    public void setTimelineStatus(String timelineStatus) { this.timelineStatus = timelineStatus; }
+    public boolean isShowOnTimeline() { return showOnTimeline; }
+    public void setShowOnTimeline(boolean showOnTimeline) { this.showOnTimeline = showOnTimeline; }
+    public String getTimelineTerm() { return timelineTerm; }
+    public void setTimelineTerm(String timelineTerm) { this.timelineTerm = timelineTerm; }
+    public String getDateLabel() { return dateLabel; }
+    public void setDateLabel(String dateLabel) { this.dateLabel = dateLabel; }
+    public String getTimelineKindLabel() { return timelineKindLabel; }
+    public void setTimelineKindLabel(String timelineKindLabel) { this.timelineKindLabel = timelineKindLabel; }
+    public String getMemberFacts() { return memberFacts; }
+    public void setMemberFacts(String memberFacts) { this.memberFacts = memberFacts; }
     public LocalTime getStartTime() { return startTime; }
     public void setStartTime(LocalTime startTime) { this.startTime = startTime; }
     public LocalTime getEndTime() { return endTime; }
