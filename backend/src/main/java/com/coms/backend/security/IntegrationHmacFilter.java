@@ -129,6 +129,9 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
                 List.of(new SimpleGrantedAuthority("ROLE_INTEGRATION"))
         );
         SecurityContextHolder.getContext().setAuthentication(auth);
+        // ponytail: known ceiling - a failure after the DB commit (e.g. response write) releases the signature below,
+        // so a partner retry can duplicate a notification; history is also in-memory and lost on restart.
+        // Upgrade path: idempotency key table keyed by signature with the stored result.
         boolean processed = false;
         try {
             filterChain.doFilter(new CachedBodyRequest(request, body), response);
