@@ -117,7 +117,7 @@ jobs:
           fc-match :lang=ko
           # A stalled apt mirror once hung this step until the 30-minute job timeout. Bound each attempt and retry.
           for attempt in 1 2 3; do
-            timeout 300 npx playwright install --with-deps chromium && break
+            timeout -k 10 300 npx playwright install --with-deps chromium && break
             [ "$attempt" = 3 ] && exit 1
             echo "::warning::playwright install attempt $attempt timed out or failed; retrying"
             sleep 10
@@ -511,7 +511,7 @@ jobs:
           fi
           # A stalled apt mirror once hung this step until the 30-minute job timeout. Bound each attempt and retry.
           for attempt in 1 2 3; do
-            timeout 300 npx playwright install --with-deps chromium && break
+            timeout -k 10 300 npx playwright install --with-deps chromium && break
             [ "$attempt" = 3 ] && exit 1
             echo "::warning::playwright install attempt $attempt timed out or failed; retrying"
             sleep 10
@@ -623,7 +623,7 @@ jobs:
           fi
           # A stalled apt mirror once hung this step until the 30-minute job timeout. Bound each attempt and retry.
           for attempt in 1 2 3; do
-            timeout 300 npx playwright install --with-deps chromium && break
+            timeout -k 10 300 npx playwright install --with-deps chromium && break
             [ "$attempt" = 3 ] && exit 1
             echo "::warning::playwright install attempt $attempt timed out or failed; retrying"
             sleep 10
