@@ -217,7 +217,7 @@ function FallSpine({ events, now, onOpen }: { events: TimelineEvent[]; now: numb
         const status = event.fromDb ? event.status : resolveStatus(event, now)
         const photo = event.photoId ? photoById.get(event.photoId) : undefined
         return (
-          <li key={event.id} className="act-row" data-status={status}>
+          <li key={event.id} id={event.fromDb ? `act-${event.id}` : undefined} className="act-row" data-status={status}>
             <div className="act-date">
               {event.start ? <time dateTime={event.start.slice(0, 10)}>{event.dateLabel}</time> : <span>{event.dateLabel}</span>}
             </div>
@@ -311,6 +311,15 @@ export default function ActivityTimeline() {
   const { sections, upcoming, hasUndatedUpcoming, liveTerms } = useMemo(
     () => mergeActivityTimeline(dbResult.owner === memberId ? dbResult.items : [], now, timelineEvents), [dbResult, memberId, now])
   const spring = sections.find((section) => section.id === 'act-spring')?.events ?? []
+  const liveSchedules = sections.flatMap((section) => section.events.filter((event) =>
+    event.fromDb && event.start && event.status === 'live'))
+  const showUpcoming = !timelineLoading && upcoming.length + liveSchedules.length > 0
+
+  useEffect(() => {
+    if (showUpcoming && location.hash === '#act-upcoming') {
+      document.getElementById('act-upcoming')?.scrollIntoView({ block: 'start' })
+    }
+  }, [showUpcoming, location.hash])
 
   return (
     <section className="coms-sec coms-sec-top act-timeline" id="timeline" aria-labelledby="act-timeline-title">
@@ -325,7 +334,7 @@ export default function ActivityTimeline() {
               <b>{section.id === 'act-summer' ? summerClubs.length + section.events.length : section.events.length}</b>
               <span>{section.term}{liveTerms.has(section.term) ? ' · 진행 중' : ''}</span>
             </a>)}
-            {!timelineLoading && upcoming.length > 0 && <a href="#act-upcoming"><b>{upcoming.length}</b><span>예정</span></a>}
+            {showUpcoming && <a href="#act-upcoming"><b>{upcoming.length + liveSchedules.length}</b><span>{liveSchedules.length ? '진행 중 · 예정' : '예정'}</span></a>}
           </nav>
         </header>
 
@@ -350,12 +359,18 @@ export default function ActivityTimeline() {
             <FallSpine events={section.events.filter((event) => event.fromDb)} now={now} onOpen={open} />}
         </section>)}
 
-        {!timelineLoading && upcoming.length > 0 && <section className="act-term" id="act-upcoming" aria-labelledby="act-upcoming-title">
+        {showUpcoming && <section className="act-term" id="act-upcoming" aria-labelledby="act-upcoming-title">
           <div className="act-term-head">
-            <h3 id="act-upcoming-title" className="act-term-title">예정</h3>
-            <StatusBadge status="planned" />
+            <h3 id="act-upcoming-title" className="act-term-title">{liveSchedules.length ? '진행 중 · 예정' : '예정'}</h3>
+            <StatusBadge status={liveSchedules.length ? 'live' : 'planned'} />
           </div>
           <ul className="act-grid act-grid-planned">
+            {liveSchedules.map((event) => (
+              <li key={event.id} className="act-card act-card-planned" data-has-photo="false">
+                <p className="act-when">{event.dateLabel}</p>
+                <a className="act-recruit-link" href={`#act-${event.id}`}>{event.title} <ArrowRight size={16} aria-hidden="true" /></a>
+              </li>
+            ))}
             {upcoming.map((event) => (
               <li key={event.id} className="act-card act-card-planned" data-has-photo="false">
                 <EventBody event={event} status={event.status}>

@@ -266,6 +266,16 @@
 	font-weight: 700;
 }
 
+.home-next-activity .scene-notice {
+	min-height: 44px;
+	margin-top: 0.5rem;
+	text-decoration: none;
+}
+
+.home-next-activity svg {
+	flex-shrink: 0;
+}
+
 @media (max-width: 767px) {
 	.scene.scene-opening {
 		padding-top: 1.75rem;

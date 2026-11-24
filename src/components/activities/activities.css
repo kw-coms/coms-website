@@ -9,6 +9,10 @@
 	scroll-margin-top: var(--apple-nav-height);
 }
 
+.act-row[id] {
+	scroll-margin-top: calc(var(--apple-nav-height) + 1rem);
+}
+
 /* Header: title left, jump strip right (same split as the study hub) */
 .act-head {
 	display: grid;

@@ -40,6 +40,50 @@ const hiddenTextElements = (page) => page.evaluate(() => {
 
 const overflow = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
 
+test.describe('the next activity strip', () => {
+  test.use({ serviceWorkers: 'block', reducedMotion: 'reduce' })
+
+  for (const layout of ['scenes', 'compact']) {
+    test(`shows a dated ${layout === 'compact' ? 'live' : 'confirmed'} activity in ${layout} home`, async ({ page }) => {
+      await mockOptionalApis(page)
+      await page.clock.setFixedTime(new Date('2026-11-24T00:00:00+09:00'))
+      await page.addInitScript((value) => localStorage.setItem('kwcoms-home-layout:v1', value), layout)
+      let requests = 0
+      await page.route('**/api/club-activities/timeline', (route) => {
+        requests += 1
+        return route.fulfill({ json: [{
+          id: 101, kind: 'ACTIVITY', title: '정기 세미나', eventDate: '2026-11-24',
+          resolvedStatus: layout === 'compact' ? 'LIVE' : 'CONFIRMED',
+        }] })
+      })
+      await page.goto('/')
+      const strip = page.getByRole('link', { name: /다음 일정.*정기 세미나/ })
+      await expect(strip).toContainText(layout === 'compact' ? '진행 중' : '오늘')
+      expect(requests).toBe(1)
+      await strip.click()
+      await expect(page).toHaveURL(/\/activities#act-upcoming$/)
+      const upcoming = page.locator('#act-upcoming')
+      await expect(upcoming).toContainText('정기 세미나')
+      await expect(upcoming).toBeInViewport()
+    })
+  }
+
+  test('a failed fetch stays quiet and does not retry', async ({ page }) => {
+    await mockOptionalApis(page)
+    let requests = 0
+    await page.route('**/api/club-activities/timeline', (route) => {
+      requests += 1
+      return route.fulfill({ status: 503, body: '' })
+    })
+    const response = page.waitForResponse('**/api/club-activities/timeline')
+    await page.goto('/')
+    await response
+    await expect(page.getByRole('link', { name: /다음 일정/ })).toHaveCount(0)
+    await expect(page.getByText('활동 일정을 불러오지 못했습니다', { exact: false })).toHaveCount(0)
+    expect(requests).toBe(1)
+  })
+})
+
 test.describe('a visitor on the home page', () => {
   test.beforeEach(async ({ page }) => {
     await mockOptionalApis(page)

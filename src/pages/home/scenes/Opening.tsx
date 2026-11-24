@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { AppWindow, ArrowRight, BookOpen, DraftingCompass, FileText, FolderOpen, Megaphone, Terminal } from 'lucide-react'
 import { experiencePills } from '../../../data/homeContent'
 import { SCREEN_ON_EVENT } from '../../../utils/screenOn'
@@ -12,12 +12,13 @@ type Props = {
   copy: string | null
   semester: string | null
   noticeTitle: string
+  nextActivity: ReactNode
   onMore: () => void
   onApply: () => void
   onNotice: () => void
 }
 
-export default function Opening({ title, copy, semester, noticeTitle, onMore, onApply, onNotice }: Props) {
+export default function Opening({ title, copy, semester, noticeTitle, nextActivity, onMore, onApply, onNotice }: Props) {
   const wordmarkRef = useRef<HTMLHeadingElement | null>(null)
 
   useEffect(() => {
@@ -89,6 +90,7 @@ export default function Opening({ title, copy, semester, noticeTitle, onMore, on
             <span className="scene-notice__title">{noticeTitle}</span>
             <ArrowRight size={14} aria-hidden="true" />
           </button>
+          {nextActivity}
           <div className="scene-actions">
             <button type="button" onClick={onMore} className="apple-action-primary scene-btn">
               <span className="home-mode-prompt" aria-hidden="true">$</span>

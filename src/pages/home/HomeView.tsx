@@ -1,7 +1,10 @@
 import { Fragment, type ReactNode } from 'react'
-import { useNavigate, useLocation, type NavigateOptions, type To } from 'react-router-dom'
+import { Link, useNavigate, useLocation, type NavigateOptions, type To } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { ArrowRight, CalendarDays } from 'lucide-react'
 import { listNotices } from '../../services/noticeApi'
+import { listClubActivityTimeline } from '../../services/clubActivityApi'
+import { nextActivity } from '../../data/nextActivity'
 import { defaultSiteSettings, getPublicSiteSettings } from '../../services/siteSettingsApi'
 import { scrollToTopInstant } from '../../utils/themeColors'
 import { isFullPageLink } from '../../utils/fullPageLink'
@@ -57,6 +60,28 @@ export default function HomeView() {
     queryFn: getPublicSiteSettings,
   })
   const siteSettings = siteSettingsQuery.data ?? defaultSiteSettings
+  const activityQuery = useQuery({
+    queryKey: ['home', 'activity-timeline'],
+    queryFn: async () => {
+      const items = await listClubActivityTimeline()
+      return Array.isArray(items) ? nextActivity(items, Date.now()) ?? null : null
+    },
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+  const activity = activityQuery.isSuccess ? activityQuery.data : null
+  const nextActivityStrip = activity && (
+    <div className="home-next-activity">
+      <Link to="/activities#act-upcoming" className="scene-notice">
+        <CalendarDays size={15} aria-hidden="true" />
+        <span className="scene-notice__tag">다음 일정</span>
+        <span className="scene-notice__title">{activity.title}</span>
+        <span className="scene-notice__tag">{activity.live ? '진행 중' : activity.days === 0 ? '오늘' : `D-${activity.days}`}</span>
+        <ArrowRight size={14} aria-hidden="true" />
+      </Link>
+    </div>
+  )
 
   const openPanel = (id: string) => {
     const el = document.getElementById(id)
@@ -134,6 +159,7 @@ export default function HomeView() {
         copy={siteSettings.homeHeroCopy === defaultSiteSettings.homeHeroCopy ? null : siteSettings.homeHeroCopy}
         semester={siteSettings.semesterLabel === defaultSiteSettings.semesterLabel ? null : siteSettings.semesterLabel}
         noticeTitle={member ? latestNotice?.title || '동아리 공지사항 보기' : '모집 일정 및 지원 안내'}
+        nextActivity={nextActivityStrip}
         onMore={() => openPanel('about')}
         onApply={() => goPageTop('/recruit')}
         onNotice={openNotice}
@@ -147,7 +173,7 @@ export default function HomeView() {
   }
 
   if (homeLayout === 'compact') return (
-    <CompactHome member={member} latestNotice={latestNotice} settings={siteSettings} />
+    <CompactHome member={member} latestNotice={latestNotice} settings={siteSettings} nextActivity={nextActivityStrip} />
   )
 
   return (
