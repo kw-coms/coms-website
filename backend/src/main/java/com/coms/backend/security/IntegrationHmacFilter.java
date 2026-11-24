@@ -26,10 +26,12 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Authenticates inbound server-to-server calls under /api/integrations/** using
- * HMAC-SHA256(secret, timestamp + "." + rawBody). Replay window is 5 minutes.
+ * HMAC-SHA256(secret, timestamp + "." + requestId + "." + rawBody). Replay window is 5 minutes.
  * Skips Spring Security's JWT filter — callers do not have user tokens.
  */
 @Component
@@ -39,10 +41,14 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
     private static final String PATH_PREFIX = "/api/integrations/";
     private static final String SIGNATURE_HEADER = "X-Integration-Signature";
     private static final String TIMESTAMP_HEADER = "X-Integration-Timestamp";
+    private static final String REQUEST_ID_HEADER = "X-Integration-Request-Id";
     private static final int MAX_REQUEST_BODY_BYTES = 1024 * 1024;
 
     private final byte[] secretBytes;
     private final Clock clock;
+    // shortcut: replay state is local to one JVM; use shared storage before running multiple instances.
+    private final ConcurrentHashMap<String, Long> usedRequestIds = new ConcurrentHashMap<>();
+    private final AtomicInteger requestsSinceEviction = new AtomicInteger();
 
     public IntegrationHmacFilter(@Value("${integration.hmac-secret:}") String secret, Clock clock) {
         this.secretBytes = secret == null ? new byte[0] : secret.getBytes(StandardCharsets.UTF_8);
@@ -67,7 +73,9 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
 
         String signatureHeader = request.getHeader(SIGNATURE_HEADER);
         String timestampHeader = request.getHeader(TIMESTAMP_HEADER);
-        if (signatureHeader == null || signatureHeader.isBlank() || timestampHeader == null || timestampHeader.isBlank()) {
+        String requestId = request.getHeader(REQUEST_ID_HEADER);
+        if (signatureHeader == null || signatureHeader.isBlank() || timestampHeader == null || timestampHeader.isBlank()
+                || requestId == null || !requestId.matches("[A-Za-z0-9_-]{16,128}")) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Missing integration auth headers");
             return;
         }
@@ -97,10 +105,26 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
             response.sendError(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE, "Integration request body too large");
             return;
         }
-        String expected = hmacHex(timestampHeader.trim() + "." + new String(body, StandardCharsets.UTF_8));
+        String expected = hmacHex(timestampHeader.trim() + "." + requestId + "." + new String(body, StandardCharsets.UTF_8));
         if (!constantTimeEquals(expected, signatureHeader.trim())) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Bad signature");
             return;
+        }
+        boolean[] fresh = {false};
+        usedRequestIds.compute(requestId, (ignored, expiresAt) -> {
+            if (expiresAt != null && expiresAt >= now) return expiresAt;
+            fresh[0] = true;
+            return timestamp + REPLAY_WINDOW_SECONDS;
+        });
+        if (!fresh[0]) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Replayed request");
+            return;
+        }
+        if (requestsSinceEviction.incrementAndGet() >= 64) {
+            requestsSinceEviction.set(0);
+            usedRequestIds.forEach((id, expiresAt) -> {
+                if (expiresAt < now) usedRequestIds.remove(id, expiresAt);
+            });
         }
 
         var auth = new UsernamePasswordAuthenticationToken(
