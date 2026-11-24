@@ -25,7 +25,7 @@ class ClubActivityTimelineMigrationTest {
             try (var statement = connection.createStatement()) {
                 try (var rows = statement.executeQuery("SELECT COUNT(*) FROM club_activities WHERE show_on_timeline = TRUE AND event_date IS NULL")) {
                     rows.next();
-                    assertThat(rows.getInt(1)).isEqualTo(6);
+                    assertThat(rows.getInt(1)).isEqualTo(5);
                 }
                 try (var rows = statement.executeQuery("SELECT timeline_status, timeline_term, date_label FROM club_activities WHERE title = '해커톤 결과 · 시상 공지'")) {
                     rows.next();

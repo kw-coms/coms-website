@@ -10,8 +10,6 @@ ALTER TABLE club_activities ADD COLUMN member_facts TEXT;
 INSERT INTO club_activities (kind, category, title, description, event_date, end_date,
     timeline_status, show_on_timeline, timeline_term, date_label, timeline_kind_label, created_by)
 VALUES
-('ACTIVITY', 'EVENT', 'MT', '2학기 친목 활동으로 다녀온 MT입니다.', NULL, NULL,
- 'DONE', TRUE, '2026 2학기', '2026 2학기', '행사', 'SYSTEM'),
 ('ACTIVITY', 'STUDY', '고급 C 프로그래밍 스터디', '고급 C 프로그래밍을 공부하는 2학기 스터디입니다.', NULL, NULL,
  'CONFIRMED', TRUE, '2026 2학기', '2026 2학기', '스터디', 'SYSTEM'),
 ('ACTIVITY', 'ACHIEVEMENT', '해커톤 결과 · 시상 공지', '평가가 끝나면 결과와 시상을 공지합니다.', NULL, NULL,

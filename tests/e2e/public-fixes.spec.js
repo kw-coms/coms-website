@@ -7,7 +7,6 @@ import { asMember, mockOptionalApis, trackRequests } from './visualSupport.js'
 const skipIntro = (page) => page.addInitScript(() => window.sessionStorage.setItem('coms.intro.played:v1', '1'))
 const setTheme = (page, theme) => page.addInitScript((mode) => { try { localStorage.setItem('kwcoms-theme-mode:v2', mode) } catch { /* storage blocked */ } }, theme)
 const timelineItems = [
-  ['MT', 'DONE', '행사'],
   ['고급 C 프로그래밍 스터디', 'CONFIRMED', '스터디'],
   ['해커톤 결과 · 시상 공지', 'DONE', '해커톤'],
   ['아두이노 · 알고리즘 스터디', 'PLANNED', '스터디'],
