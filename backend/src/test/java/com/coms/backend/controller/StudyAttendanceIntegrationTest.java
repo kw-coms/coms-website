@@ -163,6 +163,22 @@ class StudyAttendanceIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test void demotedApprovedMemberCannotCheckInOrReadRound() throws Exception {
+        long id = createRound(LEADER);
+        String code = open(id);
+        Member account = members.findByStudentId(APPROVED).orElseThrow();
+        account.setRole(Member.Role.ASSOCIATE);
+        members.saveAndFlush(account);
+        checkIn(APPROVED, code).andExpect(status().isNotFound());
+        mvc.perform(get(path()).cookie(cookie(APPROVED))).andExpect(status().isForbidden());
+        mvc.perform(get(path() + "/" + id + "/attendance/roster").cookie(cookie(APPROVED)))
+                .andExpect(status().isForbidden());
+        assertThat(memberships.findByGroupIdAndStudentId(groupId, APPROVED).orElseThrow().getStatus())
+                .isEqualTo(StudyGroupMember.Status.APPROVED);
+        assertThat(attendanceRecords.findBySessionIdAndStudentId(
+                attendanceSessions.findByStudySessionId(id).orElseThrow().getId(), APPROVED)).isEmpty();
+    }
+
     @Test void longGroupNameKeepsRoundSuffixWithinAttendanceTitleLimit() throws Exception {
         StudyGroup group = groups.findById(groupId).orElseThrow();
         group.setName("가".repeat(120));

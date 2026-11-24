@@ -224,6 +224,39 @@ class StudyGroupIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PENDING"));
     }
 
+    @Test void pendingApplicantCannotBeApprovedAfterDemotionAndApprovedMemberLosesRosterAccess() throws Exception {
+        long id = propose();
+        mvc.perform(post("/api/study-groups/{id}/approve", id).cookie(cookie(MANAGER)).header("Origin", ORIGIN))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/study-groups/{id}/join", id).cookie(cookie(MEMBER)).header("Origin", ORIGIN))
+                .andExpect(status().isOk());
+        Member account = members.findByStudentId(MEMBER).orElseThrow();
+        account.setRole(Member.Role.ASSOCIATE);
+        members.saveAndFlush(account);
+        mvc.perform(put("/api/study-groups/{id}/members/{studentId}", id, MEMBER).cookie(cookie(LEADER))
+                        .header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"approved\":true}"))
+                .andExpect(status().isForbidden());
+        assertThat(memberships.findByGroupIdAndStudentId(id, MEMBER).orElseThrow().getStatus())
+                .isEqualTo(StudyGroupMember.Status.PENDING);
+        account.setRole(Member.Role.USER);
+        members.saveAndFlush(account);
+        mvc.perform(put("/api/study-groups/{id}/members/{studentId}", id, MEMBER).cookie(cookie(LEADER))
+                        .header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"approved\":true}"))
+                .andExpect(status().isOk());
+        account.setRole(Member.Role.ASSOCIATE);
+        members.saveAndFlush(account);
+        mvc.perform(get("/api/study-groups/{id}/members", id).cookie(cookie(MEMBER)))
+                .andExpect(status().isForbidden());
+        overrides.saveAndFlush(new MemberPermissionOverride(MEMBER, Permission.ACTIVITY_WRITE,
+                MemberPermissionOverride.Effect.GRANT, MANAGER));
+        mvc.perform(get("/api/study-groups/{id}/members", id).cookie(cookie(MEMBER)))
+                .andExpect(status().isForbidden());
+        assertThat(memberships.findByGroupIdAndStudentId(id, MEMBER).orElseThrow().getStatus())
+                .isEqualTo(StudyGroupMember.Status.APPROVED);
+    }
+
     @Test void deletedLeaderLosesMembershipAndGroupIsEnded() throws Exception {
         long id = propose();
         save("removed", Member.Role.USER);

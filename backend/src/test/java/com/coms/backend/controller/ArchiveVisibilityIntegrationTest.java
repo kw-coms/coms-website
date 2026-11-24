@@ -3,6 +3,7 @@ package com.coms.backend.controller;
 import com.coms.backend.domain.ArchiveFile;
 import com.coms.backend.domain.Member;
 import com.coms.backend.domain.MemberPermissionOverride;
+import com.coms.backend.domain.MemberPermissionOverrideId;
 import com.coms.backend.domain.StudyGroup;
 import com.coms.backend.domain.StudyGroupMember;
 import com.coms.backend.domain.StudySession;
@@ -229,6 +230,25 @@ class ArchiveVisibilityIntegrationTest {
                 assertThat(status(get(path.formatted(id)), allowed)).as("%s %s", allowed, path).isEqualTo(200);
             }
         }
+        Member demoted = members.findByStudentId(uploaderId).orElseThrow();
+        demoted.setRole(Member.Role.ASSOCIATE);
+        members.saveAndFlush(demoted);
+        assertThat(body(get("/api/files"), uploaderId).toString()).doesNotContain("\"id\":" + id + ",");
+        assertThat(body(get("/api/mobile/v1/home"), uploaderId).path("quickFiles").toString())
+                .doesNotContain("\"id\":" + id + ",");
+        assertThat(status(get("/api/files?studyGroupId=" + group.getId()), uploaderId)).isEqualTo(403);
+        for (String path : List.of("/api/files/%d", "/api/files/%d/download", "/api/files/%d/inline",
+                "/api/files/%d/attachments/" + attachment + "/download")) {
+            assertThat(status(get(path.formatted(id)), uploaderId)).isEqualTo(404);
+        }
+        overrides.saveAndFlush(new MemberPermissionOverride(uploaderId, Permission.ACTIVITY_WRITE,
+                MemberPermissionOverride.Effect.GRANT, ids.get(Member.Role.ADMIN)));
+        assertThat(body(get("/api/files"), uploaderId).toString()).doesNotContain("\"id\":" + id + ",");
+        assertThat(status(get("/api/files/" + id + "/download"), uploaderId)).isEqualTo(404);
+        demoted.setRole(Member.Role.USER);
+        members.saveAndFlush(demoted);
+        overrides.deleteById(new MemberPermissionOverrideId(uploaderId, Permission.ACTIVITY_WRITE.key()));
+        overrides.flush();
         for (String denied : java.util.Arrays.asList(null, ids.get(Member.Role.ASSOCIATE), ids.get(Member.Role.USER))) {
             assertThat(body(get("/api/files"), denied).toString()).doesNotContain("\"id\":" + id + ",");
             if (denied != null) assertThat(body(get("/api/mobile/v1/home"), denied).path("quickFiles").toString())

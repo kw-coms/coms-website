@@ -45,7 +45,8 @@ public class StudyAccessService {
     private boolean isManager(StudyGroup group, String studentId) {
         if (studentId == null) return false;
         Member actor = requireMember(studentId);
-        boolean leader = studentId.equals(group.getLeaderStudentId()) && actor.getRole().isAtLeast(Member.Role.USER);
+        if (!actor.getRole().isAtLeast(Member.Role.USER)) return false;
+        boolean leader = studentId.equals(group.getLeaderStudentId());
         return leader || permissions.has(actor, Permission.ACTIVITY_WRITE);
     }
 
@@ -56,7 +57,9 @@ public class StudyAccessService {
     }
 
     public boolean isApprovedMember(Long groupId, String studentId) {
-        return studentId != null && members.findByGroupIdAndStudentId(groupId, studentId)
+        return studentId != null && accounts.findByStudentId(studentId)
+                .map(account -> account.getRole().isAtLeast(Member.Role.USER)).orElse(false)
+                && members.findByGroupIdAndStudentId(groupId, studentId)
                 .map(row -> row.getStatus() == StudyGroupMember.Status.APPROVED).orElse(false);
     }
 

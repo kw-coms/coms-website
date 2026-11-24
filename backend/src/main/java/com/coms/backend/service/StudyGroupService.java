@@ -207,6 +207,7 @@ public class StudyGroupService {
             notifications.notifyStudy(studentId, actorId, id, "스터디 가입 신청 결과를 확인해 주세요.");
             return null;
         }
+        requireFullMember(access.requireMember(studentId));
         checkCapacity(group);
         row.setStatus(StudyGroupMember.Status.APPROVED);
         row.setJoinedAt(LocalDateTime.now(clock));

@@ -28,7 +28,10 @@ public interface ArchiveFileRepository extends JpaRepository<ArchiveFile, Long> 
                 (a.visibility = com.coms.backend.domain.ArchiveFile.Visibility.SELECTED and
                   :studentId member of a.selectedStudentIds))))
               or (a.studyGroupId is not null and a.visibility = com.coms.backend.domain.ArchiveFile.Visibility.GROUP
-                and :studentId is not null and (:activityWriter = true or
+                and :studentId is not null
+                and exists (select account.id from Member account where account.studentId = :studentId
+                  and account.role <> com.coms.backend.domain.Member.Role.ASSOCIATE)
+                and (:activityWriter = true or
                   exists (select g.id from StudyGroup g where g.id = a.studyGroupId and g.leaderStudentId = :studentId) or
                   exists (select m.id from StudyGroupMember m where m.groupId = a.studyGroupId
                     and m.studentId = :studentId and m.status = com.coms.backend.domain.StudyGroupMember.Status.APPROVED)))
