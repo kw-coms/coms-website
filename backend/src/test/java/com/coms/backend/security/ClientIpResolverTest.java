@@ -35,4 +35,15 @@ class ClientIpResolverTest {
         assertThatThrownBy(() -> new ClientIpResolver("attacker.example"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void bucketCollapsesIpv6To64AndUnmapsIpv4() {
+        assertThat(ClientIpResolver.bucket("2001:db8:abcd:1::1"))
+                .isEqualTo(ClientIpResolver.bucket("2001:0db8:abcd:0001:ffff::2"))
+                .endsWith("/64");
+        assertThat(ClientIpResolver.bucket("2001:db8:abcd:2::1")).isNotEqualTo(ClientIpResolver.bucket("2001:db8:abcd:1::1"));
+        assertThat(ClientIpResolver.bucket("::ffff:203.0.113.9")).isEqualTo("203.0.113.9");
+        assertThat(ClientIpResolver.bucket("203.0.113.9")).isEqualTo("203.0.113.9");
+        assertThat(ClientIpResolver.bucket(null)).isNull();
+    }
 }

@@ -1,5 +1,6 @@
 package com.coms.backend.service;
 
+import com.coms.backend.security.ClientIpResolver;
 import com.coms.backend.domain.HackathonReview;
 import com.coms.backend.domain.HackathonEvent;
 import com.coms.backend.dto.HackathonEventReviewResponse;
@@ -59,7 +60,8 @@ public class HackathonService {
         return submit(1L, request, clientIp, reviewerStudentId);
     }
 
-    public String submit(Long eventId, HackathonReviewRequest request, String clientIp, String reviewerStudentId) {
+    public String submit(Long eventId, HackathonReviewRequest request, String rawClientIp, String reviewerStudentId) {
+        String clientIp = ClientIpResolver.bucket(rawClientIp);
         if (request == null || request.projectId() == null) throw invalid();
         HackathonEvent visible = events.findById(eventId).orElseThrow(HackathonService::notFound);
         if (!visible.isPublished()) throw notFound();

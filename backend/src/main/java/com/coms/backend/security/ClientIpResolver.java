@@ -20,6 +20,23 @@ public class ClientIpResolver {
     private final java.util.concurrent.atomic.AtomicBoolean misconfigurationReported =
             new java.util.concurrent.atomic.AtomicBoolean();
 
+    /**
+     * Rate-limit/duplicate key for a client address: IPv6 collapses to its /64 (one subscriber can
+     * rotate the rest freely) and IPv4-mapped IPv6 (::ffff:a.b.c.d) becomes plain IPv4.
+     */
+    public static String bucket(String clientIp) {
+        if (clientIp == null || !clientIp.contains(":")) return clientIp;
+        try {
+            InetAddress address = InetAddress.getByName(clientIp);
+            if (address instanceof Inet6Address) {
+                return java.util.HexFormat.of().formatHex(address.getAddress(), 0, 8) + "/64";
+            }
+            return address.getHostAddress();
+        } catch (UnknownHostException ignored) {
+            return clientIp;
+        }
+    }
+
     public ClientIpResolver(@Value("${auth.trusted-proxy-ips:127.0.0.1,::1,0:0:0:0:0:0:0:1}") String trustedProxyIps) {
         trustedProxies = Arrays.stream(trustedProxyIps.split(","))
                 .map(String::trim)

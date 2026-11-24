@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.AskRequest;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.security.ClientIpResolver;
 import com.coms.backend.security.SlidingWindowRateLimiter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
@@ -16,11 +17,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.coms.backend.security.ClientIpResolver;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneId;
@@ -95,7 +94,7 @@ public class AskService {
         if (reply.isEmpty() && member != null) reply = member.getEmail();
         if (!AskEmailAddress.isValid(reply)) throw invalid();
 
-        String ipKey = (member == null ? "guest-ip:" : "member-ip:") + ipBucket(clientIp);
+        String ipKey = (member == null ? "guest-ip:" : "member-ip:") + ClientIpResolver.bucket(clientIp);
         String memberKey = member == null ? null : "member:" + member.getId();
         String siteKey = member == null ? "guest" : "member";
         synchronized (this) {
@@ -153,19 +152,6 @@ public class AskService {
         } catch (URISyntaxException ex) {
             throw invalid();
         }
-    }
-
-    private static String ipBucket(String clientIp) {
-        if (clientIp == null || !clientIp.contains(":")) return clientIp;
-        try {
-            InetAddress address = InetAddress.getByName(clientIp);
-            if (address instanceof Inet6Address) {
-                return HexFormat.of().formatHex(address.getAddress(), 0, 8) + "/64";
-            }
-        } catch (UnknownHostException ignored) {
-            // ClientIpResolver already validates proxy addresses; retain the original key otherwise.
-        }
-        return clientIp;
     }
 
     private static String trimmed(String value) {

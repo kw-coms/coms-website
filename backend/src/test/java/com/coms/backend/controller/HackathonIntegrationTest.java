@@ -129,6 +129,24 @@ class HackathonIntegrationTest {
     }
 
     @Test
+    void guestIpDuplicateKeyUsesIpv6Slash64AndNormalizesMappedIpv4() throws Exception {
+        String suffix = String.valueOf(NEXT_IP.incrementAndGet() % 60000);
+        submitFrom("2001:db8:" + suffix + ":1::1", "wargether", 42, "First Alum").andExpect(status().isCreated());
+        submitFrom("2001:db8:" + suffix + ":1:abcd::9", "wargether", 43, "Another Alum").andExpect(status().isConflict());
+        submitFrom("2001:db8:" + suffix + ":2::1", "wargether", 44, "Third Alum").andExpect(status().isCreated());
+
+        String v4 = "198.51.100." + (NEXT_IP.incrementAndGet() % 250);
+        submitFrom("::ffff:" + v4, "still", 42, "Mapped Alum").andExpect(status().isCreated());
+        submitFrom(v4, "still", 43, "Plain Alum").andExpect(status().isConflict());
+    }
+
+    private ResultActions submitFrom(String ip, String projectId, int generation, String name) throws Exception {
+        return mvc.perform(post("/api/hackathon/reviews").header("Origin", ORIGIN)
+                .with(request -> { request.setRemoteAddr(ip); return request; })
+                .contentType(MediaType.APPLICATION_JSON).content(body(projectId, generation, name)));
+    }
+
+    @Test
     void membersHaveSeparateProjectQuotaWhenGuestReviewsAreOff() throws Exception {
         new JdbcTemplate(dataSource).update("UPDATE hackathon_events SET allow_guest_reviews=FALSE WHERE id=1");
         Cookie first = account(Member.Role.USER, "first");
