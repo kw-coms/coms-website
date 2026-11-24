@@ -1,6 +1,11 @@
 import PageHeading from '../../components/PageHeading'
 import { lazy, Suspense, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { useAuth } from '../../contexts/useAuth'
+import { listStudyGroups } from '../../services/studyGroupApi'
+import { groupCounts, GROUPS_KEY } from './groups/studyGroupHelpers'
+import { GroupCards } from './groups/StudyGroupCards'
 import { ArrowRight, CircuitBoard, Code2, Coffee } from 'lucide-react'
 import { STUDIES } from './studies'
 import { readProgress } from './exercises/progress'
@@ -43,6 +48,8 @@ function studiesWithResume() {
 
 export default function StudyHubPage() {
   // Decided before the lazy summaries arrive, so each card reserves its "이어서 풀기" row only when it will be shown.
+  const { user } = useAuth()
+  const groups = useQuery({ queryKey: [...GROUPS_KEY, user?.studentId], queryFn: () => listStudyGroups() })
   const resumable = studiesWithResume()
   const hasProgress = resumable.size > 0
   return (
@@ -60,6 +67,13 @@ export default function StudyHubPage() {
           <span><b>알고리즘 문제</b> 오늘의 문제 · 주간 문제</span>
           <ArrowRight size={16} aria-hidden="true" />
         </Link>
+        <section className="study-hub-groups" aria-labelledby="study-groups-title">
+          <div className="study-hub-groups-head"><div><h2 id="study-groups-title">스터디 모임</h2><p>함께 배우고 출석과 자료를 한곳에서 확인하세요.</p></div><Link className="apple-action-secondary" to="/study/groups">모임 전체 보기</Link></div>
+          {groups.isPending && <p role="status">모임을 불러오는 중…</p>}
+          {groups.isError && <p role="alert">모임을 불러오지 못했습니다. <button type="button" className="study-group-link-button" onClick={() => void groups.refetch()}>다시 시도</button></p>}
+          {groups.data && <><div className="study-group-counts"><span>진행 중 {groupCounts(groups.data).ACTIVE}</span><span>모집 중 {groupCounts(groups.data).RECRUITING}</span>{user && <span>제안 {groupCounts(groups.data).PROPOSED}</span>}</div><GroupCards groups={groups.data.slice(0, 3)} /></>}
+          {user && user.role !== 'ASSOCIATE' && <Link className="apple-action-primary study-hub-propose" to="/study/groups?propose=1">스터디 제안하기</Link>}
+        </section>
         <ul className="study-hub-grid">
           {STUDIES.map((study) => {
             const done = savedDone(study.progressKey)
