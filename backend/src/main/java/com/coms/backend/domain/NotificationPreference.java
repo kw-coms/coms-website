@@ -53,6 +53,7 @@ public class NotificationPreference {
             case COMMENT_ON_POST -> commentOnPost;
             case REPLY_ON_COMMENT -> replyOnComment;
             case NOTICE_CREATED -> noticeCreated;
+            case STUDY_ACTIVITY -> noticeCreated;
             case EXTERNAL_INVITE -> externalInvite;
             case COMMUNITY_POST_RESTORED -> communityPostRestored;
             case COMMUNITY_POST_DELETED -> communityPostDeleted;

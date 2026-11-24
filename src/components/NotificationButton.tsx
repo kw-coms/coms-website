@@ -72,6 +72,8 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
       window.open(item.acceptUrl, '_blank', 'noopener,noreferrer')
       // This page stays where it is, so focus goes back to the bell (the other branches navigate).
       btnRef.current?.focus()
+    } else if (item.type === 'STUDY_ACTIVITY' && /^\/study\/groups\/[1-9]\d*$/.test(item.acceptUrl || '')) {
+      navigate(item.acceptUrl)
     } else if (item.type === 'COMMUNITY_POST_DELETED') {
       navigate('/community?view=deleted')
     } else if (item.type === 'COMMUNITY_REPORT') {

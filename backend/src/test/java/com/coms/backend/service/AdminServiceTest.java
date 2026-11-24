@@ -58,6 +58,7 @@ class AdminServiceTest {
     private final ClubActivityVoteRepository clubActivityVoteRepository = mock(ClubActivityVoteRepository.class);
     private final RecruitApplicationRepository recruitApplicationRepository = mock(RecruitApplicationRepository.class);
     private final LoginFailureRepository loginFailureRepository = mock(LoginFailureRepository.class);
+    private final StudyGroupService studyGroupService = mock(StudyGroupService.class);
     private final AdminService adminService = new AdminService(
             memberRepository,
             eligibleMemberService,
@@ -79,7 +80,8 @@ class AdminServiceTest {
             mock(MeetingPollService.class),
             mock(AttendanceService.class),
             mock(GatheringService.class),
-            mock(ClubProjectSocialService.class)
+            mock(ClubProjectSocialService.class),
+            studyGroupService
     );
 
     @Autowired

@@ -76,6 +76,23 @@ class NotificationServicePreferencesTest {
     }
 
     @Test
+    void studyNotificationsLinkToTheGroupAndFollowNoticePreferences() {
+        notificationService.notifyStudy(author.getStudentId(), commenter.getStudentId(), 42L, "가입 요청이 있습니다.");
+        List<Notification> notifications = notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(author.getStudentId());
+        assertThat(notifications).hasSize(1);
+        assertThat(notifications.getFirst().getType()).isEqualTo(Notification.Type.STUDY_ACTIVITY);
+        assertThat(notifications.getFirst().getAcceptUrl()).isEqualTo("/study/groups/42");
+        verify(pushNotificationSender, timeout(2000)).sendToMember(eq(author.getStudentId()), eq("스터디 알림"),
+                eq("가입 요청이 있습니다."), eq(java.util.Map.of("type", "STUDY_ACTIVITY", "url", "/study/groups/42")));
+
+        notificationService.notifyStudy(author.getStudentId(), author.getStudentId(), 42L, "내 요청");
+        notificationService.updatePreferences(author.getStudentId(),
+                new NotificationPreferencesRequest(true, true, false, true, true, true, true));
+        notificationService.notifyStudy(author.getStudentId(), commenter.getStudentId(), 42L, "다른 요청");
+        assertThat(notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(author.getStudentId())).hasSize(1);
+    }
+
+    @Test
     void preferencesDefaultToAllEnabledWhenNeverSaved() {
         NotificationPreferencesResponse prefs = notificationService.getPreferences(author.getStudentId());
 

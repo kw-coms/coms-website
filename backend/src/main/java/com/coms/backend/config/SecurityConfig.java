@@ -100,6 +100,7 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.POST, "/api/recruit/apply", "/api/recruit/status").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/site-settings").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/opportunities").permitAll();
+                auth.requestMatchers(HttpMethod.GET, "/api/study-groups").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/api/ask").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/hackathon").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/api/hackathon/reviews").permitAll();
