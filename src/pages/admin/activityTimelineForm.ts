@@ -22,3 +22,8 @@ export function termForDate(date: string): string {
 export function selectedTerm(fields: TimelineFields): string {
   return fields.timelineTerm || termForDate(fields.eventDate)
 }
+
+/** Date edits re-derive the 학기 so it never goes stale; a cleared date keeps the current term. */
+export function eventDatePatch(date: string, current: string): { eventDate: string; timelineTerm: string } {
+  return { eventDate: date, timelineTerm: date ? termForDate(date) : current }
+}
