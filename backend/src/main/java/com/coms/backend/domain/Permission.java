@@ -2,6 +2,8 @@ package com.coms.backend.domain;
 
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Arrays;
@@ -131,6 +133,8 @@ public enum Permission {
 
     @Converter(autoApply = false)
     public static class KeyConverter implements AttributeConverter<Permission, String> {
+        private static final Logger log = LoggerFactory.getLogger(KeyConverter.class);
+
         @Override
         public String convertToDatabaseColumn(Permission permission) {
             return permission == null ? null : permission.key();
@@ -138,7 +142,12 @@ public enum Permission {
 
         @Override
         public Permission convertToEntityAttribute(String key) {
-            return key == null ? null : Permission.fromKey(key);
+            if (key == null) return null;
+            for (Permission permission : Permission.values()) {
+                if (permission.key().equals(key)) return permission;
+            }
+            log.warn("Ignoring unknown stored role permission key: {}", key);
+            return null;
         }
     }
 }

@@ -314,6 +314,7 @@ public class PermissionService {
 
     private LocalDateTime maxUpdatedAt(List<RolePermission> rows) {
         return rows.stream()
+                .filter(Objects::nonNull)
                 .map(RolePermission::getUpdatedAt)
                 .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
@@ -332,6 +333,7 @@ public class PermissionService {
     public void selfHealMissingRows() {
         Set<RolePermissionId> existing = new HashSet<>();
         for (RolePermission row : repository.findAll()) {
+            if (row == null || row.getId().getPermission() == null) continue;
             existing.add(row.getId());
         }
 
@@ -382,7 +384,7 @@ public class PermissionService {
         List<RolePermission> safeRows = rows == null ? List.of() : rows;
         Map<RolePermissionId, RolePermission> byId = new LinkedHashMap<>();
         for (RolePermission row : safeRows) {
-            if (row.getId().getRole() != Member.Role.ADMIN) {
+            if (row != null && row.getId().getPermission() != null && row.getId().getRole() != Member.Role.ADMIN) {
                 byId.put(row.getId(), row);
             }
         }
@@ -397,7 +399,7 @@ public class PermissionService {
         }
 
         RolePermission latest = safeRows.stream()
-                .filter(row -> row.getUpdatedAt() != null)
+                .filter(row -> row != null && row.getId().getPermission() != null && row.getUpdatedAt() != null)
                 .max(Comparator.comparing(RolePermission::getUpdatedAt))
                 .orElse(null);
 
@@ -424,6 +426,7 @@ public class PermissionService {
         Map<RolePermissionId, RolePermission> byId = new LinkedHashMap<>();
         if (rows != null) {
             for (RolePermission row : rows) {
+                if (row == null || row.getId().getPermission() == null) continue;
                 byId.put(row.getId(), row);
             }
         }
