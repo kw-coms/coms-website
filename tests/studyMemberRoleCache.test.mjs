@@ -30,6 +30,12 @@ globalThis.fetch = async url => {
   throw new Error(`Unexpected request: ${url}`)
 }
 
+const waitFor = async (ready, turns = 100) => {
+  for (let turn = 0; turn < turns && !ready(); turn += 1) {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })
+  }
+}
+
 const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60_000 } } })
 const host = document.createElement('div')
 document.body.append(host)
@@ -38,21 +44,19 @@ await act(async () => root.render(h(MemoryRouter, { initialEntries: ['/study/gro
   h(QueryClientProvider, { client }, h(AuthContext.Provider,
     { value: { user: { studentId: 'leader', role: 'USER' }, permissions: [], permissionsSettled: true } },
     h(Routes, null, h(Route, { path: '/study/groups/:groupId', element: h(StudyGroupPage) })))))))
-await act(async () => { await new Promise(setImmediate) })
-await act(async () => [...host.querySelectorAll('[role="tab"]')].find(tab => tab.textContent === '멤버').click())
-for (let turn = 0; turn < 20 && !host.textContent.includes('비공개 신청자'); turn += 1) {
-  await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })
-}
+const memberTab = () => [...host.querySelectorAll('[role="tab"]')].find(tab => tab.textContent === '멤버')
+await waitFor(() => Boolean(memberTab()))
+await act(async () => memberTab().click())
+await waitFor(() => host.textContent.includes('비공개 신청자'))
 assert.match(host.textContent, /비공개 신청자/, 'leader initially sees pending applicant')
 
 await act(async () => client.setQueryData(['study', 1, 'leader'], {
   ...group, manager: false, leaderStudentId: 'new-leader', leaderName: '새 리더', myMembership: approved,
 }))
-for (let turn = 0; turn < 20 && host.textContent.includes('비공개 신청자'); turn += 1) {
-  await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })
-}
+await waitFor(() => !host.textContent.includes('비공개 신청자'))
 assert.doesNotMatch(host.textContent, /비공개 신청자/, 'former leader cannot see cached pending applicant')
-await act(async () => { await new Promise(setImmediate) })
+// The role change keys a fresh roster query; on a slow runner it can still be loading after one tick.
+await waitFor(() => memberRequests === 2 && !host.textContent.includes('멤버를 불러오는 중'))
 assert.equal(memberRequests, 2, 'manager role change uses a separate roster cache')
 assert.match(host.textContent, /이전 리더/, 'approved members remain visible')
 
