@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, ChevronLeft, ChevronRight, Maximize2, X } from 'lucide-react'
 import {
   foundingExtraPhotoIds,
@@ -15,7 +16,8 @@ import {
 import type { TimelineEvent, TimelinePhoto, TimelineStatus } from '../../data/activityTimeline'
 import { mergeActivityTimeline } from '../../data/activityTimelineMerge'
 import type { PublicTimelineActivity } from '../../data/activityTimelineMerge'
-import { RECRUIT_FACTS, recruitSummary } from '../../data/recruitFacts'
+import { recruitSummary } from '../../data/recruitFacts'
+import { defaultSiteSettings, getPublicSiteSettings } from '../../services/siteSettingsApi'
 import { useAuth } from '../../contexts/useAuth'
 import { listClubActivityTimeline } from '../../services/clubActivityApi'
 import './activities.css'
@@ -275,6 +277,7 @@ function Lightbox({ dialogRef, openId, setOpenId }: { dialogRef: React.RefObject
 }
 
 export default function ActivityTimeline() {
+  const { data: siteSettings = defaultSiteSettings } = useQuery({ queryKey: ['site-settings', 'public'], queryFn: getPublicSiteSettings })
   const { user, loading } = useAuth()
   const location = useLocation()
   const now = useNow(HACKATHON_TICK_MS)
@@ -384,8 +387,8 @@ export default function ActivityTimeline() {
 
         <aside className="act-recruit" aria-labelledby="act-recruit-title">
             <div>
-              <h4 id="act-recruit-title" className="act-recruit-title">{RECRUIT_FACTS.headline}</h4>
-              <p className="act-card-text">{recruitSummary}</p>
+              <h4 id="act-recruit-title" className="act-recruit-title">{siteSettings.recruitHeadline}</h4>
+              <p className="act-card-text">{recruitSummary(siteSettings)}</p>
             </div>
             <Link to="/recruit" className="act-recruit-link">지원 안내 보기 <ArrowRight size={16} aria-hidden="true" /></Link>
         </aside>

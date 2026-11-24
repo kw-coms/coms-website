@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { mockOptionalApis, signInHint } from './visualSupport.js'
-import { RECRUIT_FACTS } from '../../src/data/recruitFacts'
+import { defaultSiteSettings } from '../../src/services/siteSettingsApi'
 
 test.use({ serviceWorkers: 'block' })
 
@@ -28,7 +28,7 @@ for (const enabled of [true, false]) {
     await expect(faqs).toHaveText(['어떻게 가입하나요?', '코딩을 처음 해도 괜찮나요?', '회비와 동아리방이 궁금해요'])
     const groupWidth = (await dialog.getByRole('group', { name: '자주 묻는 질문' }).boundingBox()).width
     for (const width of await faqs.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().width))) expect(width).toBeGreaterThanOrEqual(groupWidth - 1)
-    for (const [index, expected] of [[0, '로그인 없이'], [1, '코딩이 처음이어도 괜찮'], [2, `${RECRUIT_FACTS.fee}, 동아리방은 ${RECRUIT_FACTS.room}`]]) {
+    for (const [index, expected] of [[0, '로그인 없이'], [1, '코딩이 처음이어도 괜찮'], [2, `${defaultSiteSettings.recruitFee}, 동아리방은 ${defaultSiteSettings.recruitRoom}`]]) {
       await faqs.nth(index).click()
       await expect(dialog.locator('.coms-ask-bubble--club').last()).toContainText(expected)
       await expect(dialog.locator('.coms-ask-bubble--club').last()).toBeFocused()

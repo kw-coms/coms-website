@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockAdminApis } from './visualSupport.js'
+import { mockActivityTimeline, mockAdminApis, mockOptionalApis } from './visualSupport.js'
 
 const application = (overrides = {}) => ({
   id: 7, name: '김지원', studentId: '2026123000', department: '컴퓨터정보공학부',
@@ -7,6 +7,28 @@ const application = (overrides = {}) => ({
   interests: '웹', motive: '함께 만들고 싶습니다.', expectation: '스터디',
   status: 'RECEIVED', adminNote: '', submittedAt: '2026-06-15T09:00:00',
   ...overrides,
+})
+
+test('recruit pages, activities and FAQ use the public recruit settings', async ({ page }) => {
+  await mockOptionalApis(page)
+  await mockActivityTimeline(page)
+  await page.addInitScript(() => sessionStorage.setItem('coms.intro.played:v1', '1'))
+  await page.route('**/api/site-settings', (route) => route.fulfill({ json: {
+    recruitCohort: '61기', recruitFee: '3만원', recruitRoom: '복지관 405호', recruitHeadline: '61기 모집 안내',
+  } }))
+
+  for (const path of ['/recruit', '/recruit-notice']) {
+    await page.goto(path)
+    const facts = page.getByTestId('recruit-facts')
+    await expect(facts.getByRole('heading')).toHaveText('61기 모집 안내')
+    await expect(facts.locator('dd')).toContainText(['61기 상시 모집', '코딩이 처음', '3만원', '복지관 405호'])
+  }
+  await page.goto('/activities')
+  const aside = page.getByRole('complementary', { name: '61기 모집 안내' })
+  await expect(aside).toContainText('회비는 3만원, 동아리방은 복지관 405호')
+  await page.getByRole('button', { name: '질문하기' }).click()
+  await page.getByRole('button', { name: '회비와 동아리방이 궁금해요' }).click()
+  await expect(page.getByRole('dialog')).toContainText('회비는 3만원, 동아리방은 복지관 405호')
 })
 
 for (const succeeds of [true, false]) {

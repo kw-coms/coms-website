@@ -21,6 +21,10 @@ export type SiteSettings = {
   semesterLabel: string
   recruitmentStatus: string
   recruitmentPeriod: string
+  recruitCohort: string
+  recruitFee: string
+  recruitRoom: string
+  recruitHeadline: string
   homeHeroTitle: string
   homeHeroCopy: string
   contactLinks: SiteSettingsContactLink[]
@@ -33,6 +37,10 @@ export const defaultSiteSettings: SiteSettings = {
   semesterLabel: '2026 Semester Ready',
   recruitmentStatus: '모집 안내',
   recruitmentPeriod: '상세 일정은 COM\'s 공식 채널과 학내 공지를 통해 안내됩니다.',
+  recruitCohort: '60기',
+  recruitFee: '2만원',
+  recruitRoom: '복지관 403호',
+  recruitHeadline: '지금 60기 상시 모집 중',
   homeHeroTitle: 'COM\'s',
   homeHeroCopy: '배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.',
   contactLinks: [{ label: 'Mail', href: 'mailto:kwcoms69@gmail.com' }],
@@ -61,6 +69,10 @@ export function normalizeSiteSettings(value: Partial<SiteSettings> | null | unde
     semesterLabel: clean(value?.semesterLabel) || defaultSiteSettings.semesterLabel,
     recruitmentStatus: clean(value?.recruitmentStatus) || defaultSiteSettings.recruitmentStatus,
     recruitmentPeriod: clean(value?.recruitmentPeriod) || defaultSiteSettings.recruitmentPeriod,
+    recruitCohort: clean(value?.recruitCohort) || defaultSiteSettings.recruitCohort,
+    recruitFee: clean(value?.recruitFee) || defaultSiteSettings.recruitFee,
+    recruitRoom: clean(value?.recruitRoom) || defaultSiteSettings.recruitRoom,
+    recruitHeadline: clean(value?.recruitHeadline) || defaultSiteSettings.recruitHeadline,
     homeHeroTitle: clean(value?.homeHeroTitle) || defaultSiteSettings.homeHeroTitle,
     homeHeroCopy: clean(value?.homeHeroCopy) || defaultSiteSettings.homeHeroCopy,
     contactLinks: cleanLinks(value?.contactLinks),

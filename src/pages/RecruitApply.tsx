@@ -377,7 +377,7 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
         </div>
 
         <div className="bg-[var(--app-surface)] px-6 pt-6 sm:px-8">
-          <RecruitFacts extra={settingRows} />
+          <RecruitFacts settings={settings} extra={settingRows} />
         </div>
 
         <div className="grid gap-0 lg:grid-cols-[1fr_320px]">

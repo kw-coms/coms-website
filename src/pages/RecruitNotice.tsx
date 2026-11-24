@@ -2,8 +2,7 @@ import PageHeading from '../components/PageHeading'
 import { ArrowLeft, CalendarDays, CheckCircle2, Mail, PenLine, Rocket, Users } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import RecruitFacts from '../components/RecruitFacts'
-import { RECRUIT_FACTS } from '../data/recruitFacts'
-import { getPublicSiteSettings } from '../services/siteSettingsApi'
+import { defaultSiteSettings, getPublicSiteSettings } from '../services/siteSettingsApi'
 
 const recruitDetails = [
   {
@@ -52,7 +51,7 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
         <div className="apple-board-hero px-6 py-8 sm:px-8 sm:py-10">
           <PageHeading className="apple-display text-4xl sm:text-6xl">COM&apos;s 신입 부원 모집 공지</PageHeading>
           <p className="apple-copy mt-4 max-w-3xl text-base sm:text-lg">
-            {siteSettings?.recruitmentStatus || RECRUIT_FACTS.headline}
+            {siteSettings?.recruitmentStatus || defaultSiteSettings.recruitHeadline}
           </p>
           <button
             type="button"
@@ -82,7 +81,7 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
               </p>
             </div>
 
-            <RecruitFacts />
+            <RecruitFacts settings={siteSettings} />
 
             <div className="grid gap-3 md:grid-cols-3">
               {recruitDetails.map(({ title, icon: Icon, body }) => (
