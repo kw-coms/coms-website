@@ -53,6 +53,7 @@ class RichBodyMediaControllerIntegrationTest {
         members.save(member("2026000101", Member.Role.USER));
         members.save(member("2026000102", Member.Role.OFFICER));
         members.save(member("2026000103", Member.Role.ADMIN));
+        members.save(member("2026000114", Member.Role.USER));
         member = cookie("2026000101");
         officer = cookie("2026000102");
         admin = cookie("2026000103");
@@ -134,19 +135,19 @@ class RichBodyMediaControllerIntegrationTest {
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.EnumSource(com.coms.backend.domain.ArchiveFile.Visibility.class)
     void archiveBodyMediaUsesParentVisibilityForInlineAndDownload(com.coms.backend.domain.ArchiveFile.Visibility visibility) throws Exception {
-        String[] readers = {null, "2026000110", "2026000111", "2026000102", "2026000112", "2026000113", "2026000101", "2026000103"};
+        String[] readers = {null, "2026000110", "2026000111", "2026000102", "2026000112", "2026000113", "2026000114", "2026000103", "2026000101"};
         members.save(member("2026000110", Member.Role.ASSOCIATE));
         members.save(member("2026000111", Member.Role.USER));
         members.save(member("2026000112", Member.Role.VICE_PRESIDENT));
         members.save(member("2026000113", Member.Role.USER));
         var archive = archive(visibility);
-        archive.setSelectedStudentIds(java.util.Set.of("2026000113"));
+        archive.setSelectedStudentIds(java.util.Set.of("2026000113", "2026000114"));
         archives.saveAndFlush(archive);
         long id = uploadId("archive", member);
         media.findById(id).orElseThrow().attach(archive.getId(), java.time.LocalDateTime.now());
 
         for (int i = 0; i < readers.length; i++) {
-            boolean allowed = i == 7 || switch (visibility) {
+            boolean allowed = i == 7 || i == 8 || switch (visibility) {
                 case PUBLIC -> true;
                 case MEMBERS -> i > 0;
                 case OFFICERS -> i == 3 || i == 4;
@@ -169,7 +170,11 @@ class RichBodyMediaControllerIntegrationTest {
         mvc.perform(get("/api/rich-media/{id}", id)).andExpect(status().isOk());
         archive.setVisibility(com.coms.backend.domain.ArchiveFile.Visibility.OFFICERS);
         archives.saveAndFlush(archive);
-        mvc.perform(get("/api/rich-media/{id}", id).cookie(member)).andExpect(status().isNotFound());
+        for (String suffix : new String[]{"", "/download"}) {
+            mvc.perform(get("/api/rich-media/" + id + suffix).cookie(cookie("2026000114")))
+                    .andExpect(status().isNotFound());
+            mvc.perform(get("/api/rich-media/" + id + suffix).cookie(member)).andExpect(status().isOk());
+        }
         row.attach(Long.MAX_VALUE, java.time.LocalDateTime.now());
         mvc.perform(get("/api/rich-media/{id}", id).cookie(admin)).andExpect(status().isNotFound());
     }

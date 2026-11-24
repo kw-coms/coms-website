@@ -23,9 +23,9 @@ class ArchiveVisibilityMigrationTest {
             sql.execute("CREATE TABLE archive_files (id BIGINT PRIMARY KEY)");
             sql.execute("INSERT INTO archive_files VALUES (1)");
             sql.execute("INSERT INTO members VALUES ('2026000001')");
-            try (var source = getClass().getResourceAsStream("/db/migration/V125__archive_visibility.sql")) {
+            try (var source = getClass().getResourceAsStream("/db/migration/V126__archive_visibility.sql")) {
                 assertThat(source).isNotNull();
-                Files.write(migrations.resolve("V125__archive_visibility.sql"), source.readAllBytes());
+                Files.write(migrations.resolve("V126__archive_visibility.sql"), source.readAllBytes());
             }
             assertThat(Flyway.configure().dataSource(url, "sa", "").locations("filesystem:" + migrations)
                     .baselineOnMigrate(true).load().migrate().success).isTrue();

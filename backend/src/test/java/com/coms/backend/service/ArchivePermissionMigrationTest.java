@@ -22,9 +22,9 @@ class ArchivePermissionMigrationTest {
                 statement.execute("CREATE TABLE role_permissions (role VARCHAR(20), permission VARCHAR(60), allowed BOOLEAN, updated_at TIMESTAMP, updated_by VARCHAR(30), PRIMARY KEY (role, permission))");
                 statement.execute("INSERT INTO role_permissions VALUES ('USER', 'archive.manage', true, TIMESTAMP '2026-01-02 03:04:05', '2026000001')");
                 statement.execute("INSERT INTO role_permissions VALUES ('OFFICER', 'archive.manage', false, TIMESTAMP '2026-01-03 03:04:05', '2026000002')");
-                try (var source = getClass().getResourceAsStream("/db/migration/V124__archive_permissions_and_member_overrides.sql")) {
+                try (var source = getClass().getResourceAsStream("/db/migration/V125__archive_permissions_and_member_overrides.sql")) {
                     assertThat(source).isNotNull();
-                    Files.write(migrationDirectory.resolve("V124__archive_permissions_and_member_overrides.sql"), source.readAllBytes());
+                    Files.write(migrationDirectory.resolve("V125__archive_permissions_and_member_overrides.sql"), source.readAllBytes());
                 }
                 assertThat(Flyway.configure().dataSource(url, "sa", "")
                         .locations("filesystem:" + migrationDirectory).baselineOnMigrate(true).load().migrate().success).isTrue();
