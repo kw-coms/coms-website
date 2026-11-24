@@ -12,15 +12,12 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class IntegrationHmacFilterTest {
     private static final String SECRET = "unit-test-secret-1234567890-abcdef";
     private static final long FIXED_EPOCH = 1_700_000_000L;
-    private static final String REQUEST_ID = "b2b-request-000001";
     private static final int MAX_BODY_BYTES = 1024 * 1024;
     private static final Clock FIXED_CLOCK = Clock.fixed(Instant.ofEpochSecond(FIXED_EPOCH), ZoneOffset.UTC);
 
@@ -30,13 +27,12 @@ class IntegrationHmacFilterTest {
     void allowsValidSignature() throws Exception {
         String body = "{\"recipientStudentId\":\"2026000001\"}";
         String timestamp = String.valueOf(FIXED_EPOCH);
-        String signature = sign(SECRET, timestamp + "." + REQUEST_ID + "." + body);
+        String signature = sign(SECRET, timestamp + "." + body);
 
         MockFilterChain chain = new MockFilterChain();
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/integrations/notifications");
         request.addHeader("X-Integration-Signature", signature);
         request.addHeader("X-Integration-Timestamp", timestamp);
-        request.addHeader("X-Integration-Request-Id", REQUEST_ID);
         request.setContent(body.getBytes(StandardCharsets.UTF_8));
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -46,83 +42,13 @@ class IntegrationHmacFilterTest {
     }
 
     @Test
-    void rejectsReplayedRequestAndChangedRequestId() throws Exception {
-        String body = "{}";
-        String timestamp = String.valueOf(FIXED_EPOCH);
-        String signature = sign(SECRET, timestamp + "." + REQUEST_ID + "." + body);
-
-        MockHttpServletRequest first = signedRequest(timestamp, REQUEST_ID, signature, body);
-        MockHttpServletResponse accepted = new MockHttpServletResponse();
-        filter.doFilter(first, accepted, new MockFilterChain());
-        assertThat(accepted.getStatus()).isEqualTo(200);
-
-        MockHttpServletResponse replayed = new MockHttpServletResponse();
-        filter.doFilter(signedRequest(timestamp, REQUEST_ID, signature, body), replayed, new MockFilterChain());
-        assertThat(replayed.getStatus()).isEqualTo(401);
-
-        MockHttpServletResponse changedId = new MockHttpServletResponse();
-        filter.doFilter(signedRequest(timestamp, "b2b-request-000002", signature, body), changedId, new MockFilterChain());
-        assertThat(changedId.getStatus()).isEqualTo(401);
-    }
-
-    @Test
-    void acceptsOnlyOneOfTwoConcurrentCopies() throws Exception {
-        String body = "{}";
-        String timestamp = String.valueOf(FIXED_EPOCH);
-        String signature = sign(SECRET, timestamp + "." + REQUEST_ID + "." + body);
-        CountDownLatch start = new CountDownLatch(1);
-        try (var pool = Executors.newFixedThreadPool(2)) {
-            var first = pool.submit(() -> {
-                start.await();
-                MockHttpServletResponse response = new MockHttpServletResponse();
-                filter.doFilter(signedRequest(timestamp, REQUEST_ID, signature, body), response, new MockFilterChain());
-                return response.getStatus();
-            });
-            var second = pool.submit(() -> {
-                start.await();
-                MockHttpServletResponse response = new MockHttpServletResponse();
-                filter.doFilter(signedRequest(timestamp, REQUEST_ID, signature, body), response, new MockFilterChain());
-                return response.getStatus();
-            });
-            start.countDown();
-            assertThat(first.get() + second.get()).isEqualTo(200 + 401);
-        }
-    }
-
-    @Test
-    void acceptsRequestIdAgainAfterItsWindowExpires() throws Exception {
-        class MutableClock extends Clock {
-            long epoch = FIXED_EPOCH;
-            @Override public Instant instant() { return Instant.ofEpochSecond(epoch); }
-            @Override public java.time.ZoneId getZone() { return ZoneOffset.UTC; }
-            @Override public Clock withZone(java.time.ZoneId zone) { return this; }
-        }
-        MutableClock clock = new MutableClock();
-        IntegrationHmacFilter movingFilter = new IntegrationHmacFilter(SECRET, clock);
-        String body = "{}";
-        String firstTime = String.valueOf(FIXED_EPOCH);
-        MockHttpServletResponse first = new MockHttpServletResponse();
-        movingFilter.doFilter(signedRequest(firstTime, REQUEST_ID,
-                sign(SECRET, firstTime + "." + REQUEST_ID + "." + body), body), first, new MockFilterChain());
-        assertThat(first.getStatus()).isEqualTo(200);
-
-        clock.epoch += 301;
-        String nextTime = String.valueOf(clock.epoch);
-        MockHttpServletResponse next = new MockHttpServletResponse();
-        movingFilter.doFilter(signedRequest(nextTime, REQUEST_ID,
-                sign(SECRET, nextTime + "." + REQUEST_ID + "." + body), body), next, new MockFilterChain());
-        assertThat(next.getStatus()).isEqualTo(200);
-    }
-
-    @Test
     void rejectsBadSignature() throws Exception {
         String body = "{\"recipientStudentId\":\"2026000001\"}";
         String timestamp = String.valueOf(FIXED_EPOCH);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/integrations/notifications");
-        request.addHeader("X-Integration-Signature", sign("wrong-secret-1234567890-abcdef-extra-padding", timestamp + "." + REQUEST_ID + "." + body));
+        request.addHeader("X-Integration-Signature", sign("wrong-secret-1234567890-abcdef-extra-padding", timestamp + "." + body));
         request.addHeader("X-Integration-Timestamp", timestamp);
-        request.addHeader("X-Integration-Request-Id", REQUEST_ID);
         request.setContent(body.getBytes(StandardCharsets.UTF_8));
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -135,12 +61,11 @@ class IntegrationHmacFilterTest {
     void rejectsStaleTimestamp() throws Exception {
         String body = "{}";
         String timestamp = String.valueOf(FIXED_EPOCH - 1000);
-        String signature = sign(SECRET, timestamp + "." + REQUEST_ID + "." + body);
+        String signature = sign(SECRET, timestamp + "." + body);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/integrations/notifications");
         request.addHeader("X-Integration-Signature", signature);
         request.addHeader("X-Integration-Timestamp", timestamp);
-        request.addHeader("X-Integration-Request-Id", REQUEST_ID);
         request.setContent(body.getBytes(StandardCharsets.UTF_8));
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -161,31 +86,15 @@ class IntegrationHmacFilterTest {
     }
 
     @Test
-    void rejectsMissingRequestIdWithOtherwiseValidLegacySignature() throws Exception {
-        String body = "{}";
-        String timestamp = String.valueOf(FIXED_EPOCH);
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/integrations/notifications");
-        request.addHeader("X-Integration-Signature", sign(SECRET, timestamp + "." + body));
-        request.addHeader("X-Integration-Timestamp", timestamp);
-        request.setContent(body.getBytes(StandardCharsets.UTF_8));
-        MockHttpServletResponse response = new MockHttpServletResponse();
-
-        filter.doFilter(request, response, new MockFilterChain());
-
-        assertThat(response.getStatus()).isEqualTo(401);
-    }
-
-    @Test
     void allowsBodyAtConfiguredSizeLimit() throws Exception {
         String body = "a".repeat(MAX_BODY_BYTES);
         String timestamp = String.valueOf(FIXED_EPOCH);
-        String signature = sign(SECRET, timestamp + "." + REQUEST_ID + "." + body);
+        String signature = sign(SECRET, timestamp + "." + body);
 
         MockFilterChain chain = new MockFilterChain();
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/integrations/notifications");
         request.addHeader("X-Integration-Signature", signature);
         request.addHeader("X-Integration-Timestamp", timestamp);
-        request.addHeader("X-Integration-Request-Id", REQUEST_ID);
         request.setContent(body.getBytes(StandardCharsets.UTF_8));
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -205,7 +114,6 @@ class IntegrationHmacFilterTest {
         };
         request.addHeader("X-Integration-Signature", "unused");
         request.addHeader("X-Integration-Timestamp", timestamp);
-        request.addHeader("X-Integration-Request-Id", REQUEST_ID);
         request.setContent("{}".getBytes(StandardCharsets.UTF_8));
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -218,7 +126,7 @@ class IntegrationHmacFilterTest {
     void rejectsOversizedChunkedBodyWhileReading() throws Exception {
         String body = "a".repeat(MAX_BODY_BYTES + 1);
         String timestamp = String.valueOf(FIXED_EPOCH);
-        String signature = sign(SECRET, timestamp + "." + REQUEST_ID + "." + body);
+        String signature = sign(SECRET, timestamp + "." + body);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/integrations/notifications") {
             @Override
@@ -228,7 +136,6 @@ class IntegrationHmacFilterTest {
         };
         request.addHeader("X-Integration-Signature", signature);
         request.addHeader("X-Integration-Timestamp", timestamp);
-        request.addHeader("X-Integration-Request-Id", REQUEST_ID);
         request.setContent(body.getBytes(StandardCharsets.UTF_8));
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -261,6 +168,53 @@ class IntegrationHmacFilterTest {
         assertThat(response.getStatus()).isEqualTo(503);
     }
 
+    private static final class MutableClock extends Clock {
+        long epoch = FIXED_EPOCH;
+        @Override public Instant instant() { return Instant.ofEpochSecond(epoch); }
+        @Override public java.time.ZoneId getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(java.time.ZoneId zone) { return this; }
+    }
+
+    private static int send(IntegrationHmacFilter f, long epoch, String body) throws Exception {
+        String timestamp = String.valueOf(epoch);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/integrations/notifications");
+        request.addHeader("X-Integration-Signature", sign(SECRET, timestamp + "." + body));
+        request.addHeader("X-Integration-Timestamp", timestamp);
+        request.setContent(body.getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        f.doFilter(request, response, new MockFilterChain());
+        return response.getStatus();
+    }
+
+    @Test
+    void rejectsExactReplayButAcceptsSameBodyWithNewTimestamp() throws Exception {
+        MutableClock clock = new MutableClock();
+        IntegrationHmacFilter f = new IntegrationHmacFilter(SECRET, clock);
+        assertThat(send(f, FIXED_EPOCH, "{}")).isEqualTo(200);
+        assertThat(send(f, FIXED_EPOCH, "{}")).isEqualTo(401);
+        clock.epoch += 1;
+        assertThat(send(f, clock.epoch, "{}")).isEqualTo(200);
+    }
+
+    @Test
+    void rejectsRequestsOutsideTheWindowBothWays() throws Exception {
+        IntegrationHmacFilter f = new IntegrationHmacFilter(SECRET, new MutableClock());
+        assertThat(send(f, FIXED_EPOCH - 301, "{}")).isEqualTo(401);
+        assertThat(send(f, FIXED_EPOCH + 301, "{}")).isEqualTo(401);
+    }
+
+    @Test
+    void replayMemoryStaysBoundedAndRecoversWhenEntriesExpire() throws Exception {
+        MutableClock clock = new MutableClock();
+        IntegrationHmacFilter f = new IntegrationHmacFilter(SECRET, clock);
+        for (int i = 0; i < 50_000; i++) {
+            assertThat(send(f, FIXED_EPOCH, "{\"n\":" + i + "}")).isEqualTo(200);
+        }
+        assertThat(send(f, FIXED_EPOCH, "{\"n\":-1}")).isEqualTo(503);
+        clock.epoch += 301;
+        assertThat(send(f, clock.epoch, "{\"n\":-1}")).isEqualTo(200);
+    }
+
     private static String sign(String secret, String payload) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
@@ -270,14 +224,5 @@ class IntegrationHmacFilterTest {
             sb.append(String.format("%02x", b));
         }
         return sb.toString();
-    }
-
-    private static MockHttpServletRequest signedRequest(String timestamp, String requestId, String signature, String body) {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/integrations/notifications");
-        request.addHeader("X-Integration-Signature", signature);
-        request.addHeader("X-Integration-Timestamp", timestamp);
-        request.addHeader("X-Integration-Request-Id", requestId);
-        request.setContent(body.getBytes(StandardCharsets.UTF_8));
-        return request;
     }
 }
