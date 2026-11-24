@@ -142,7 +142,7 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
   const [formData, setFormData] = useState({
     title: restored?.title ?? (initialNotice?.title || ''),
     category: restored?.category || savedCategory,
-    publicVisible: initialNotice ? initialPublicVisible : restored?.publicVisible ?? false,
+    publicVisible: restored?.publicVisible ?? initialPublicVisible,
   })
   const [editorKey, setEditorKey] = useState(0)
   const [saving, setSaving] = useState(false)

@@ -175,7 +175,7 @@ test('notice write permission does not expose another authors edit action', asyn
 test('notice editor sends its loaded version and only changes visibility explicitly', async ({ page }) => {
   await mockAdminApis(page)
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'ADMIN', permissions: ['notice.write'] } }))
-  let notice = { id: 915, version: 3, publicVisible: true, title: '공개 공지', content: '기존 공지 본문', category: 'GENERAL', author: '관리자', pinned: false }
+  let notice = { id: 915, version: 3, updatedAt: '2026-11-24T10:00:00', publicVisible: true, title: '공개 공지', content: '기존 공지 본문', category: 'GENERAL', author: '관리자', pinned: false }
   const saves = []
   await page.route('**/api/notices', route => route.fulfill({ json: [notice] }))
   await page.route('**/api/notices/915', async route => {
@@ -192,21 +192,58 @@ test('notice editor sends its loaded version and only changes visibility explici
   const visibility = page.getByRole('checkbox', { name: '비회원에게도 공개' })
   await expect(visibility).toBeChecked()
   await expect(page.locator('[contenteditable="true"]').first()).toContainText('기존 공지 본문')
-  notice = { ...notice, version: 4, publicVisible: false }
+  notice = { ...notice, version: 4, updatedAt: '2026-11-24T10:01:00', publicVisible: false }
   await page.getByPlaceholder('제목', { exact: true }).fill('편집 중인 제목')
   await page.getByRole('button', { name: '저장', exact: true }).click()
   await expect.poll(() => saves[0]).toMatchObject({ version: 3, title: '편집 중인 제목' })
   expect(saves[0]).not.toHaveProperty('publicVisible')
   await expect(page.getByText(/새로고침.*다시 시도/)).toBeVisible()
   await expect(page.getByPlaceholder('제목', { exact: true })).toHaveValue('편집 중인 제목')
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('kwcoms-draft:v1:2020123456:notice:915') || 'null')?.title,
+  )).toBe('편집 중인 제목')
 
   await page.reload()
   await page.getByRole('button', { name: '수정', exact: true }).click()
+  await page.getByRole('button', { name: '임시 저장본 불러오기', exact: true }).click()
+  await expect(page.getByPlaceholder('제목', { exact: true })).toHaveValue('편집 중인 제목')
   await expect(page.locator('[contenteditable="true"]').first()).toContainText('기존 공지 본문')
   await expect(visibility).not.toBeChecked()
   await visibility.check()
   await page.getByRole('button', { name: '저장', exact: true }).click()
   await expect.poll(() => saves[1]).toMatchObject({ version: 4, publicVisible: true })
+})
+
+test('notice editor restores a saved visibility change at the same version', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'ADMIN', permissions: ['notice.write'] } }))
+  const notice = { id: 916, version: 3, updatedAt: '2026-11-24T10:00:00', publicVisible: true, title: '공개 공지', content: '기존 공지 본문', category: 'GENERAL', author: '관리자', pinned: false }
+  let saved
+  await page.route('**/api/notices', route => route.fulfill({ json: [notice] }))
+  await page.route('**/api/notices/916', route => {
+    if (route.request().method() === 'PUT') saved = route.request().postDataJSON()
+    return route.fulfill({ json: notice })
+  })
+
+  await page.goto('/notices/916')
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  const visibility = page.getByRole('checkbox', { name: '비회원에게도 공개' })
+  await expect(visibility).toBeChecked()
+  await expect(page.locator('[contenteditable="true"]').first()).toContainText('기존 공지 본문')
+  await visibility.uncheck()
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('kwcoms-draft:v1:2020123456:notice:916') || 'null')?.publicVisible,
+  )).toBe(false)
+  expect(await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('kwcoms-draft:v1:2020123456:notice:916'))?.baseRevision,
+  )).toBe(notice.updatedAt)
+
+  await page.reload()
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  await expect(visibility).not.toBeChecked()
+  await expect(page.locator('[contenteditable="true"]').first()).toContainText('기존 공지 본문')
+  await page.getByRole('button', { name: '저장', exact: true }).click()
+  await expect.poll(() => saved).toMatchObject({ version: 3, publicVisible: false })
 })
 
 function multipartField(body, name) {
