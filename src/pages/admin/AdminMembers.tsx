@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listEligibleMembers } from '../../services/adminApi'
 import { useAdminMembers } from './useAdminMembers'
@@ -60,6 +60,8 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
   const [roleFilter, setRoleFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const { members, total, loading, fetching, error, refetch, addMember, updateRole, updateGeneration, removeMember, resetPassword } = useAdminMembers({ page, size: PAGE_SIZE, search: query, role: roleFilter, status: statusFilter })
+  const fetchingRef = useRef(fetching)
+  useEffect(() => { fetchingRef.current = fetching }, [fetching])
   const [expanded, setExpanded] = useState(null)
   // The roster (명부), to show who is on it. The same list the 명부 인증 tab loads; if it cannot
   // be loaded the mark is simply left out.
@@ -151,7 +153,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
   }
 
   const handleRoleUpdate = async (member, newRole) => {
-    if (!newRole || newRole === member.role) return
+    if (fetchingRef.current || !newRole || newRole === member.role) return
     try {
       await updateRole({ id: member.id, role: newRole })
     } catch (err) {
@@ -160,11 +162,12 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
   }
 
   const handleGenerationEdit = async (member) => {
+    if (fetchingRef.current) return
     const generation = await promptDialog({
       message: `${member.name} 회원의 기수를 입력하세요. (숫자만, 예: 60)`,
       defaultValue: member.generation || '',
     })
-    if (generation === null) return
+    if (generation === null || fetchingRef.current) return
     if (!/^\d{1,3}$/.test(generation.trim())) {
       showToast({ message: '기수는 숫자(1~3자리)로 입력해주세요.', tone: 'error' })
       return
@@ -178,7 +181,9 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
   }
 
   const handleDelete = async (member) => {
+    if (fetchingRef.current) return
     if (!(await confirmDialog({ message: `${member.name} 회원을 삭제하시겠습니까?`, tone: 'danger' }))) return
+    if (fetchingRef.current) return
     try {
       await removeMember(member.id)
       if (members.length === 1 && page > 0) setPage(page - 1)
@@ -188,8 +193,9 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
   }
 
   const handlePasswordReset = async (member) => {
+    if (fetchingRef.current) return
     const newPassword = await promptDialog({ message: `${member.name} (${member.studentId}) 회원의 새 임시 비밀번호를 입력하세요.\n(관리자 초기화는 공백만 입력할 수 없습니다.)` })
-    if (!newPassword) return
+    if (!newPassword || fetchingRef.current) return
     try {
       await resetPassword({ id: member.id, password: newPassword })
       showToast({ message: '비밀번호가 초기화되었습니다.', tone: 'success' })
@@ -201,11 +207,11 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
   // The list as it is on screen (narrowed and ordered) as a spreadsheet file. It is personal
   // data leaving the site, so the president confirms first.
   const handleExport = async () => {
-    if (visibleMembers.length === 0) return
+    if (fetchingRef.current || visibleMembers.length === 0) return
     const ok = await confirmDialog({
       message: `현재 페이지의 회원 ${visibleMembers.length}명의 이름, 학번, 이메일, 전화번호를 CSV 파일로 내려받습니다.\n개인정보이니 필요한 곳에만 쓰고, 쓴 뒤에는 지워 주세요.`,
     })
-    if (!ok) return
+    if (!ok || fetchingRef.current) return
     downloadMembersCsv(visibleMembers)
     showToast({ message: `현재 페이지 회원 ${visibleMembers.length}명을 CSV로 내려받았습니다.`, tone: 'success' })
   }
@@ -325,7 +331,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
           <button
             type="button"
             onClick={handleExport}
-            disabled={visibleMembers.length === 0}
+            disabled={fetching || visibleMembers.length === 0}
             className="apple-action-secondary inline-flex min-h-10 items-center gap-1.5 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Download size={13} aria-hidden="true" />
@@ -380,6 +386,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
                   <>
                     <select
                       value={member.role || 'USER'}
+                      disabled={fetching}
                       onChange={(event) => handleRoleUpdate(member, event.target.value)}
                       aria-label={`${member.name} 역할 변경`}
                       className="rounded border border-[var(--app-hairline)] bg-[var(--app-surface)] px-1.5 py-0.5 text-xs font-semibold text-[var(--app-text)]"
@@ -390,6 +397,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
                     </select>
                     <button
                       type="button"
+                      disabled={fetching}
                       onClick={() => handleGenerationEdit(member)}
                       className="text-xs font-semibold text-blue-500 transition hover:underline"
                     >
@@ -397,6 +405,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
                     </button>
                     <button
                       type="button"
+                      disabled={fetching}
                       onClick={() => handlePasswordReset(member)}
                       className="text-xs font-semibold text-amber-600 transition hover:underline"
                     >
@@ -404,6 +413,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
                     </button>
                     <button
                       type="button"
+                      disabled={fetching}
                       onClick={() => handleDelete(member)}
                       className="text-xs font-semibold text-red-500 transition hover:underline"
                     >
