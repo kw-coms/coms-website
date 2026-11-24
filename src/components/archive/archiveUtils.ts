@@ -7,6 +7,7 @@ export const ARCHIVE_VISIBILITY_LABELS: Record<ArchiveVisibility, string> = {
   MEMBERS: '동아리원',
   OFFICERS: '임원',
   SELECTED: '지정 회원',
+  GROUP: '스터디 멤버',
 }
 
 export function archiveAttachments(file) {

@@ -15,6 +15,8 @@ public record ArchiveFileResponse(
         String category,
         String visibility,
         List<String> selectedStudentIds,
+        Long studyGroupId,
+        Long studySessionId,
         long viewCount,
         long upvotes,
         int myVote,

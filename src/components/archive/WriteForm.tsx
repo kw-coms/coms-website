@@ -34,8 +34,8 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
   const { user } = useAuth()
   const { can } = usePermissions()
   const canSetRestricted = can(PERMISSIONS.archiveVisibility)
-  const canChangeVisibility = !initialFile || canSetRestricted ||
-    ownsArchive(user, initialFile) && ['PUBLIC', 'MEMBERS'].includes(initialFile.visibility || 'MEMBERS')
+  const canChangeVisibility = initialFile?.visibility !== 'GROUP' && (!initialFile || canSetRestricted ||
+    ownsArchive(user, initialFile) && ['PUBLIC', 'MEMBERS'].includes(initialFile.visibility || 'MEMBERS'))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)
@@ -122,7 +122,7 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
       <fieldset className="space-y-3">
         <legend className="mb-2 text-xs font-bold text-[var(--app-subtle)]">공개 범위</legend>
         <div className="flex flex-wrap gap-2">
-          {(Object.keys(ARCHIVE_VISIBILITY_LABELS) as ArchiveVisibility[]).map((value) => (
+          {(Object.keys(ARCHIVE_VISIBILITY_LABELS) as ArchiveVisibility[]).filter(value => value !== 'GROUP' || initialFile?.visibility === 'GROUP').map((value) => (
             <label key={value} className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold ${visibility === value ? 'border-[var(--app-accent)] bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-muted)]'} ${!canChangeVisibility || !canSetRestricted && (value === 'OFFICERS' || value === 'SELECTED') ? 'opacity-50' : 'cursor-pointer'}`}>
               <input type="radio" name={`archive-visibility-${initialFile?.id ?? 'new'}`} value={value} checked={visibility === value} disabled={saving || !canChangeVisibility || !canSetRestricted && (value === 'OFFICERS' || value === 'SELECTED')} onChange={() => setVisibility(value)} />
               {ARCHIVE_VISIBILITY_LABELS[value]}

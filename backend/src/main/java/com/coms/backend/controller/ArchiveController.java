@@ -62,25 +62,29 @@ public class ArchiveController {
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
             @RequestParam(value = "visibility", required = false) String visibility,
             @RequestParam(value = "selectedStudentIds", required = false) List<String> selectedStudentIds,
+            @RequestParam(value = "studyGroupId", required = false) Long studyGroupId,
+            @RequestParam(value = "studySessionId", required = false) Long studySessionId,
             Authentication authentication) throws IOException {
         if (file != null && files != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "file과 files를 함께 보낼 수 없습니다.");
         }
         if (files != null) {
-            return ResponseEntity.ok(archiveService.uploadGroup(title, description, category, files, authentication.getName(), visibility, selectedStudentIds));
+            return ResponseEntity.ok(archiveService.uploadGroup(title, description, category, files, authentication.getName(), visibility, selectedStudentIds, studyGroupId, studySessionId));
         }
         if (file == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일을 선택해주세요.");
         }
-        return ResponseEntity.ok(archiveService.uploadGroup(title, description, category, List.of(file), authentication.getName(), visibility, selectedStudentIds));
+        return ResponseEntity.ok(archiveService.uploadGroup(title, description, category, List.of(file), authentication.getName(), visibility, selectedStudentIds, studyGroupId, studySessionId));
     }
 
     @GetMapping
     public ResponseEntity<List<ArchiveFileResponse>> list(Authentication authentication,
                                                           @RequestParam(required = false) Integer page,
-                                                          @RequestParam(required = false) Integer size) {
+                                                          @RequestParam(required = false) Integer size,
+                                                          @RequestParam(required = false) Long studyGroupId,
+                                                          @RequestParam(required = false) Long studySessionId) {
         return ListPagination.paginate(
-                archiveService.list(authentication == null ? null : authentication.getName()), page, size);
+                archiveService.list(authentication == null ? null : authentication.getName(), studyGroupId, studySessionId), page, size);
     }
 
     @GetMapping("/{id}")

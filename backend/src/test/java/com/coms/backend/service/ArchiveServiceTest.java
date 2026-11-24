@@ -154,7 +154,8 @@ class ArchiveServiceTest {
                 .thenThrow(new IOException("second write failed"));
         ArchiveService failingService = new ArchiveService(files, attachments, failingStorage, members,
                 mock(ArchiveFileVoteRepository.class), mock(RichContentSanitizer.class), mock(AuditLogService.class),
-                mock(RichBodyMediaService.class), mock(PermissionService.class));
+                mock(RichBodyMediaService.class), mock(PermissionService.class), mock(StudyAccessService.class),
+                mock(com.coms.backend.repository.StudySessionRepository.class));
 
         assertThatThrownBy(() -> failingService.uploadGroup("자료", null, "GENERAL",
                 List.of(pdf("first.pdf", "%PDF-1.4 first"), pdf("second.pdf", "%PDF-1.4 second")), "2026123456"))
@@ -324,7 +325,8 @@ class ArchiveServiceTest {
         ArchiveService service = new ArchiveService(files, mock(ArchiveAttachmentRepository.class),
                 mock(StorageService.class), members, mock(ArchiveFileVoteRepository.class),
                 mock(RichContentSanitizer.class), mock(AuditLogService.class),
-                mock(RichBodyMediaService.class), mock(PermissionService.class));
+                mock(RichBodyMediaService.class), mock(PermissionService.class), mock(StudyAccessService.class),
+                mock(com.coms.backend.repository.StudySessionRepository.class));
 
         assertThatThrownBy(() -> service.getAndIncrementView(88L, viewer.getStudentId()))
                 .isInstanceOfSatisfying(ResponseStatusException.class,

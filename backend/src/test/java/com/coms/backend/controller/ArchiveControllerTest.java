@@ -91,6 +91,7 @@ class ArchiveControllerTest {
                 org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq("GENERAL"),
                 org.mockito.ArgumentMatchers.argThat(files -> files.size() == 2),
                 org.mockito.ArgumentMatchers.eq("2026123456"),
+                org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull());
     }
 

@@ -3,10 +3,16 @@ package com.coms.backend.controller;
 import com.coms.backend.domain.ArchiveFile;
 import com.coms.backend.domain.Member;
 import com.coms.backend.domain.MemberPermissionOverride;
+import com.coms.backend.domain.StudyGroup;
+import com.coms.backend.domain.StudyGroupMember;
+import com.coms.backend.domain.StudySession;
 import com.coms.backend.domain.Permission;
 import com.coms.backend.repository.ArchiveFileRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.MemberPermissionOverrideRepository;
+import com.coms.backend.repository.StudyGroupRepository;
+import com.coms.backend.repository.StudyGroupMemberRepository;
+import com.coms.backend.repository.StudySessionRepository;
 import com.coms.backend.security.JwtTokenProvider;
 import com.coms.backend.service.ArchiveService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -50,6 +56,9 @@ class ArchiveVisibilityIntegrationTest {
     @Autowired MemberPermissionOverrideRepository overrides;
     @Autowired JwtTokenProvider tokens;
     @Autowired JdbcTemplate jdbc;
+    @Autowired StudyGroupRepository studyGroups;
+    @Autowired StudyGroupMemberRepository studyMembers;
+    @Autowired StudySessionRepository studySessions;
     private final ObjectMapper json = new ObjectMapper();
 
     private final Map<Member.Role, String> ids = new EnumMap<>(Member.Role.class);
@@ -169,6 +178,115 @@ class ArchiveVisibilityIntegrationTest {
     }
 
     @Test
+    void studyMaterialReadsFollowCurrentMembershipOnEveryArchivePath() throws Exception {
+        StudyGroup group = new StudyGroup();
+        group.setName("알고리즘 모임");
+        group.setLeaderStudentId(chosenId);
+        group.setCreatedBy(chosenId);
+        group.setTerm("2026 2학기");
+        group.setStatus(StudyGroup.Status.ACTIVE);
+        group = studyGroups.saveAndFlush(group);
+        StudyGroupMember member = new StudyGroupMember();
+        member.setGroupId(group.getId());
+        member.setStudentId(uploaderId);
+        member.setRole(StudyGroupMember.Role.MEMBER);
+        member.setStatus(StudyGroupMember.Status.APPROVED);
+        studyMembers.saveAndFlush(member);
+        StudyGroupMember pending = new StudyGroupMember();
+        pending.setGroupId(group.getId());
+        pending.setStudentId(ids.get(Member.Role.USER));
+        pending.setStatus(StudyGroupMember.Status.PENDING);
+        studyMembers.saveAndFlush(pending);
+        StudySession round = new StudySession();
+        round.setGroupId(group.getId());
+        round.setRoundNo(1);
+        round.setDate(java.time.LocalDate.now());
+        round.setTopic("정렬");
+        round = studySessions.saveAndFlush(round);
+
+        var upload = multipart("/api/files")
+                .file(new MockMultipartFile("files", "notes.pdf", "application/pdf", "%PDF-1.4".getBytes()))
+                .param("title", "회차 자료").param("studyGroupId", group.getId().toString())
+                .param("studySessionId", round.getId().toString());
+        assertThat(status(upload, uploaderId)).isEqualTo(200);
+        var material = archiveService.list(uploaderId, group.getId(), null).get(0);
+        Long id = material.id();
+        Long attachment = material.attachments().get(0).id();
+        ArchiveFile stored = files.findById(id).orElseThrow();
+        stored.setUploadedAt(java.time.LocalDateTime.now().plusMinutes(1));
+        files.saveAndFlush(stored);
+        assertThat(material.studySessionId()).isEqualTo(round.getId());
+        assertThat(files.findById(id).orElseThrow().getVisibility()).isEqualTo(ArchiveFile.Visibility.GROUP);
+
+        for (String allowed : List.of(chosenId, uploaderId, ids.get(Member.Role.ADMIN))) {
+            assertThat(body(get("/api/files?studyGroupId=" + group.getId()), allowed).size()).isEqualTo(1);
+            assertThat(body(get("/api/files?studyGroupId=" + group.getId() + "&studySessionId=" + round.getId()), allowed).size()).isEqualTo(1);
+            assertThat(body(get("/api/files"), allowed).toString()).contains("\"id\":" + id + ",");
+            assertThat(body(get("/api/mobile/v1/home"), allowed).path("quickFiles").toString())
+                    .contains("\"id\":" + id + ",");
+            for (String path : List.of("/api/files/%d", "/api/files/%d/download", "/api/files/%d/inline",
+                    "/api/files/%d/attachments/" + attachment + "/download")) {
+                assertThat(status(get(path.formatted(id)), allowed)).as("%s %s", allowed, path).isEqualTo(200);
+            }
+        }
+        for (String denied : java.util.Arrays.asList(null, ids.get(Member.Role.ASSOCIATE), ids.get(Member.Role.USER))) {
+            assertThat(body(get("/api/files"), denied).toString()).doesNotContain("\"id\":" + id + ",");
+            if (denied != null) assertThat(body(get("/api/mobile/v1/home"), denied).path("quickFiles").toString())
+                    .doesNotContain("\"id\":" + id + ",");
+            for (String path : List.of("/api/files/%d", "/api/files/%d/download", "/api/files/%d/inline",
+                    "/api/files/%d/attachments/" + attachment + "/download")) {
+                assertThat(status(get(path.formatted(id)), denied)).as("%s %s", denied, path).isEqualTo(404);
+            }
+        }
+        String activityWriter = ids.get(Member.Role.USER);
+        overrides.saveAndFlush(new MemberPermissionOverride(activityWriter, Permission.ACTIVITY_WRITE,
+                MemberPermissionOverride.Effect.GRANT, ids.get(Member.Role.ADMIN)));
+        assertThat(body(get("/api/files"), activityWriter).toString()).contains("\"id\":" + id + ",");
+        assertThat(status(get("/api/files/" + id + "/download"), activityWriter)).isEqualTo(200);
+        overrides.saveAndFlush(new MemberPermissionOverride(activityWriter, Permission.ACTIVITY_WRITE,
+                MemberPermissionOverride.Effect.REVOKE, ids.get(Member.Role.ADMIN)));
+        assertThat(body(get("/api/files"), activityWriter).toString()).doesNotContain("\"id\":" + id + ",");
+        assertThat(status(patch("/api/files/" + id + "/visibility").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"visibility\":\"PUBLIC\"}"), uploaderId)).isEqualTo(400);
+        assertThat(changeVisibility(id, ArchiveFile.Visibility.PUBLIC, uploaderId, true)).isEqualTo(400);
+        assertThat(changeVisibility(id, ArchiveFile.Visibility.GROUP, uploaderId, true)).isEqualTo(200);
+        assertThat(files.findById(id).orElseThrow().getVisibility()).isEqualTo(ArchiveFile.Visibility.GROUP);
+        assertThat(status(multipart("/api/files")
+                .file(new MockMultipartFile("files", "leak.pdf", "application/pdf", "%PDF-1.4".getBytes()))
+                .param("title", "공개 시도").param("studyGroupId", group.getId().toString())
+                .param("visibility", "PUBLIC"), uploaderId)).isEqualTo(400);
+        StudyGroup otherGroup = new StudyGroup();
+        otherGroup.setName("다른 모임");
+        otherGroup.setLeaderStudentId(chosenId);
+        otherGroup.setCreatedBy(chosenId);
+        otherGroup.setTerm("2026 2학기");
+        otherGroup.setStatus(StudyGroup.Status.ACTIVE);
+        otherGroup = studyGroups.saveAndFlush(otherGroup);
+        StudySession otherRound = new StudySession();
+        otherRound.setGroupId(otherGroup.getId());
+        otherRound.setRoundNo(1);
+        otherRound.setDate(java.time.LocalDate.now());
+        otherRound.setTopic("다른 회차");
+        otherRound = studySessions.saveAndFlush(otherRound);
+        assertThat(status(multipart("/api/files")
+                .file(new MockMultipartFile("files", "wrong.pdf", "application/pdf", "%PDF-1.4".getBytes()))
+                .param("title", "다른 회차 자료").param("studyGroupId", group.getId().toString())
+                .param("studySessionId", otherRound.getId().toString()), uploaderId)).isEqualTo(400);
+        assertThat(status(multipart("/api/files")
+                .file(new MockMultipartFile("files", "orphan.pdf", "application/pdf", "%PDF-1.4".getBytes()))
+                .param("title", "범위 없는 모임 공개").param("visibility", "GROUP"), uploaderId)).isEqualTo(400);
+
+        studyMembers.delete(member);
+        studyMembers.flush();
+        assertThat(body(get("/api/files"), uploaderId).toString()).doesNotContain("\"id\":" + id + ",");
+        assertThat(status(get("/api/files/" + id + "/download"), uploaderId)).isEqualTo(404);
+        assertThat(status(get("/api/files/" + id), uploaderId)).isEqualTo(404);
+        assertThat(status(multipart("/api/files")
+                .file(new MockMultipartFile("files", "again.pdf", "application/pdf", "%PDF-1.4".getBytes()))
+                .param("title", "탈퇴 후 업로드").param("studyGroupId", group.getId().toString()), uploaderId)).isEqualTo(403);
+    }
+
+    @Test
     void uploaderCanSelectBasicVisibilityButRestrictedSelectionNeedsGrant() throws Exception {
         assertThat(body(get("/api/files/" + selectedId), chosenId).path("selectedStudentIds").size()).isZero();
         assertThat(body(get("/api/files/" + selectedId), ids.get(Member.Role.ADMIN))
@@ -187,8 +305,10 @@ class ArchiveVisibilityIntegrationTest {
     @Test
     void uploaderWithoutGrantCanOnlySwitchBetweenPublicAndMembers() throws Exception {
         for (boolean put : List.of(false, true)) {
-            for (ArchiveFile.Visibility from : ArchiveFile.Visibility.values()) {
-                for (ArchiveFile.Visibility to : ArchiveFile.Visibility.values()) {
+            for (ArchiveFile.Visibility from : List.of(ArchiveFile.Visibility.PUBLIC, ArchiveFile.Visibility.MEMBERS,
+                    ArchiveFile.Visibility.OFFICERS, ArchiveFile.Visibility.SELECTED)) {
+                for (ArchiveFile.Visibility to : List.of(ArchiveFile.Visibility.PUBLIC, ArchiveFile.Visibility.MEMBERS,
+                        ArchiveFile.Visibility.OFFICERS, ArchiveFile.Visibility.SELECTED)) {
                     Long id = upload("transition", from, uploaderId,
                             from == ArchiveFile.Visibility.SELECTED ? Set.of(chosenId) : Set.of());
                     boolean basic = (from == ArchiveFile.Visibility.PUBLIC || from == ArchiveFile.Visibility.MEMBERS)

@@ -11,7 +11,7 @@ export async function listFiles() {
   return request('/api/files')
 }
 
-export type ArchiveVisibility = 'PUBLIC' | 'MEMBERS' | 'OFFICERS' | 'SELECTED'
+export type ArchiveVisibility = 'PUBLIC' | 'MEMBERS' | 'OFFICERS' | 'SELECTED' | 'GROUP'
 export type ArchiveVisibilityInput = { visibility: ArchiveVisibility; selectedStudentIds?: string[] }
 
 export function updateArchiveVisibility(id: number, input: ArchiveVisibilityInput) {
