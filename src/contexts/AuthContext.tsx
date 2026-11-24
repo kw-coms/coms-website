@@ -31,8 +31,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [])
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState(null)
-  // 회장이 조정한 직급별 권한. null = 아직 못 받음 → 직급 기본값으로 대체(usePermissions).
-  const [permissions, setPermissions] = useState<string[] | null>(null)
+  // Bind permissions to the request's member/role so an account switch cannot reuse old grants.
+  const [permissionSnapshot, setPermissionSnapshot] = useState<{ request: string; values: string[] } | null>(null)
 
   // Keep Sentry's user context in sync with the session (no-op when Sentry is disabled).
   useEffect(() => {
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       forgetDrawStorage(userRef.current.id)
       userRef.current = null
       setUser(null)
-      setPermissions(null)
+        setPermissionSnapshot(null)
       queryClient.clear()
       showToast({ message: '로그인이 만료되었습니다. 다시 로그인해주세요.' })
     })
@@ -106,6 +106,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   // cannot tell "still on its way" from "failed", and a route guard has to: it waits for the
   // first and must not wait for the second.
   const permissionsRequest = studentId ? `${studentId}|${role}|${permissionsNonce}` : ''
+  const permissions = permissionSnapshot?.request === permissionsRequest ? permissionSnapshot.values : null
   const [settledPermissionsRequest, setSettledPermissionsRequest] = useState('')
   const permissionsSettled = Boolean(permissionsRequest) && settledPermissionsRequest === permissionsRequest
 
@@ -116,11 +117,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let mounted = true
     getMyPermissions()
       .then((data) => {
-        if (mounted) setPermissions(Array.isArray(data?.permissions) ? data.permissions : null)
+        if (mounted) setPermissionSnapshot(Array.isArray(data?.permissions)
+          ? { request: permissionsRequest, values: data.permissions } : null)
       })
       .catch(() => {
-        // 실패해도 로그인 상태를 흔들지 않는다 — 직급 기본값으로 화면을 그린다.
-        if (mounted) setPermissions(null)
+        // Keep the login, but never replace an unknown/revoked grant with a role default.
+        if (mounted) setPermissionSnapshot(null)
       })
       .finally(() => {
         if (mounted) setSettledPermissionsRequest(permissionsRequest)
@@ -156,7 +158,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     userRef.current = null
     setUser(null)
     setAuthError(null)
-    setPermissions(null)
+    setPermissionSnapshot(null)
     // Drop every cached query so the next account on a shared device can't see the previous
     // user's community list, bookmarks, or vote state (query keys aren't scoped per user).
     queryClient.clear()
