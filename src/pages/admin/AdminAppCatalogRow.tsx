@@ -14,6 +14,7 @@ const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-[var(--app-hairline)] bg-w
 type MediaInfo = { id: string | number; url?: string; originalName?: string }
 type ProjectItem = {
   id: string | number
+  version: number
   category?: string
   categoryName?: string
   title?: string
@@ -126,8 +127,16 @@ export default function AdminAppCatalogRow({ item, categories, linkState = null,
     setBusy(true)
     setRowError('')
     try {
-      onUpdated(await reviewClubProject(item.id, status))
+      onUpdated(await reviewClubProject(item.id, status, item.version))
     } catch (err) {
+      if (err.status === 409) {
+        try {
+          await refreshFromServer()
+        } catch {
+          setRowError('최신 작품을 불러오지 못했습니다. 새로고침 후 다시 검토해주세요.')
+          return
+        }
+      }
       setRowError(err.message || '작품 검토에 실패했습니다.')
     } finally {
       setBusy(false)

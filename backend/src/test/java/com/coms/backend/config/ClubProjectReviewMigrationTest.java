@@ -22,13 +22,17 @@ class ClubProjectReviewMigrationTest {
                     if (!command.isBlank()) statement.execute(command.trim());
                 }
                 statement.execute("INSERT INTO club_projects(id) VALUES (2)");
-                try (var rows = statement.executeQuery("SELECT id, review_status FROM club_projects ORDER BY id")) {
+                try (var rows = statement.executeQuery("SELECT id, review_status, version FROM club_projects ORDER BY id")) {
                     assertThat(rows.next()).isTrue();
                     assertThat(rows.getLong(1)).isEqualTo(1);
                     assertThat(rows.getString(2)).isEqualTo("APPROVED");
+                    assertThat(rows.getLong(3)).isZero();
+                    assertThat(rows.wasNull()).isFalse();
                     assertThat(rows.next()).isTrue();
                     assertThat(rows.getLong(1)).isEqualTo(2);
                     assertThat(rows.getString(2)).isEqualTo("APPROVED");
+                    assertThat(rows.getLong(3)).isZero();
+                    assertThat(rows.wasNull()).isFalse();
                     assertThat(rows.next()).isFalse();
                 }
             }

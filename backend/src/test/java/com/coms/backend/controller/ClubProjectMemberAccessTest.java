@@ -31,6 +31,7 @@ class ClubProjectMemberAccessTest {
     @Autowired MockMvc mvc;
     @Autowired MemberRepository members;
     @Autowired JwtTokenProvider tokens;
+    @Autowired com.coms.backend.repository.ClubProjectRepository projects;
 
     private Cookie member(String id) {
         return member(id, Member.Role.USER);
@@ -71,7 +72,8 @@ class ClubProjectMemberAccessTest {
         mvc.perform(get("/api/club-projects/{id}", id)).andExpect(status().isNotFound());
         mvc.perform(get("/api/club-projects/{id}/comments", id)).andExpect(status().isNotFound());
         mvc.perform(patch("/api/club-projects/{id}/review", id).cookie(owner)
-                .header("Origin", ORIGIN).param("status", "APPROVED"))
+                .header("Origin", ORIGIN).param("status", "APPROVED")
+                .param("version", String.valueOf(projects.findById(id).orElseThrow().getVersion())))
                 .andExpect(status().isForbidden());
         byte[] png = Base64.getDecoder().decode(
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lWQAAAAASUVORK5CYII=");
@@ -84,7 +86,8 @@ class ClubProjectMemberAccessTest {
         mvc.perform(get("/api/club-projects/{id}/images/{imageId}", id, pendingImageId).cookie(owner))
                 .andExpect(status().isOk());
         mvc.perform(patch("/api/club-projects/{id}/review", id).cookie(manager)
-                .header("Origin", ORIGIN).param("status", "APPROVED"))
+                .header("Origin", ORIGIN).param("status", "APPROVED")
+                .param("version", String.valueOf(projects.findById(id).orElseThrow().getVersion())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.reviewStatus").value("APPROVED"));
         mvc.perform(get("/api/club-projects/{id}/images/{imageId}", id, pendingImageId))
                 .andExpect(status().isOk());
@@ -110,7 +113,8 @@ class ClubProjectMemberAccessTest {
         mvc.perform(get("/api/club-projects/{id}", id).cookie(owner))
                 .andExpect(jsonPath("$.reviewStatus").value("PENDING"));
         mvc.perform(patch("/api/club-projects/{id}/review", id).cookie(manager)
-                .header("Origin", ORIGIN).param("status", "APPROVED"))
+                .header("Origin", ORIGIN).param("status", "APPROVED")
+                .param("version", String.valueOf(projects.findById(id).orElseThrow().getVersion())))
                 .andExpect(status().isOk());
         mvc.perform(get("/api/club-projects/{id}/images/{imageId}", id, imageId))
                 .andExpect(status().isOk()).andExpect(header().string("X-Content-Type-Options", "nosniff"));
@@ -126,7 +130,8 @@ class ClubProjectMemberAccessTest {
         mvc.perform(get("/api/club-projects/{id}", id).cookie(owner))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.reviewStatus").value("PENDING"));
         mvc.perform(patch("/api/club-projects/{id}/review", id).cookie(manager)
-                .header("Origin", ORIGIN).param("status", "REJECTED"))
+                .header("Origin", ORIGIN).param("status", "REJECTED")
+                .param("version", String.valueOf(projects.findById(id).orElseThrow().getVersion())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.reviewStatus").value("REJECTED"));
         mvc.perform(get("/api/club-projects/{id}", id)).andExpect(status().isNotFound());
         mvc.perform(patch("/api/club-projects/{id}", id).cookie(owner).header("Origin", ORIGIN)
@@ -141,6 +146,9 @@ class ClubProjectMemberAccessTest {
         long id = ((Number) JsonPath.read(mvc.perform(post("/api/club-projects")
                 .cookie(owner).header("Origin", ORIGIN).param("category", "APP").param("title", "검토 작품"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id")).longValue();
+        mvc.perform(patch("/api/club-projects/{id}/review", id).cookie(manager)
+                .header("Origin", ORIGIN).param("status", "APPROVED"))
+                .andExpect(status().isBadRequest());
         review(id, manager, "APPROVED", 200);
         mvc.perform(get("/api/club-projects/{id}", id)).andExpect(status().isOk());
         review(id, manager, "APPROVED", 409);
@@ -154,8 +162,30 @@ class ClubProjectMemberAccessTest {
         mvc.perform(get("/api/club-projects/{id}", id)).andExpect(status().isNotFound());
     }
 
+    @Test
+    void adminCannotApproveContentChangedAfterPreview() throws Exception {
+        Cookie owner = member("2099000041");
+        Cookie manager = member("2099000042", Member.Role.ADMIN);
+        long id = ((Number) JsonPath.read(mvc.perform(post("/api/club-projects")
+                .cookie(owner).header("Origin", ORIGIN).param("category", "APP").param("title", "검토 작품"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id")).longValue();
+        long previewVersion = ((Number) JsonPath.read(mvc.perform(get("/api/club-projects/{id}", id)
+                .cookie(manager)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.version")).longValue();
+
+        mvc.perform(patch("/api/club-projects/{id}", id).cookie(owner).header("Origin", ORIGIN)
+                .param("linkUrl", "https://changed.example.com"))
+                .andExpect(status().isOk());
+        mvc.perform(patch("/api/club-projects/{id}/review", id).cookie(manager)
+                .header("Origin", ORIGIN).param("status", "APPROVED")
+                .param("version", String.valueOf(previewVersion)))
+                .andExpect(status().isConflict());
+        mvc.perform(get("/api/club-projects/{id}", id)).andExpect(status().isNotFound());
+    }
+
     private void review(long id, Cookie manager, String status, int expected) throws Exception {
         mvc.perform(patch("/api/club-projects/{id}/review", id).cookie(manager)
-                .header("Origin", ORIGIN).param("status", status)).andExpect(status().is(expected));
+                .header("Origin", ORIGIN).param("status", status)
+                .param("version", String.valueOf(projects.findById(id).orElseThrow().getVersion())))
+                .andExpect(status().is(expected));
     }
 }

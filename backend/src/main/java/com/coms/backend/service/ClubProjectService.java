@@ -124,7 +124,7 @@ public class ClubProjectService {
         ClubProject project = get(response.id());
         project.setOwnerStudentId(studentId);
         project.setReviewStatus(ClubProject.ReviewStatus.PENDING);
-        return toResponse(repository.save(project), studentId, false);
+        return toResponse(repository.saveAndFlush(project), studentId, false);
     }
 
     @Transactional(readOnly = true)
@@ -139,16 +139,19 @@ public class ClubProjectService {
                 || (viewerStudentId != null && viewerStudentId.equals(project.getOwnerStudentId()));
     }
 
-    public ClubProjectResponse review(Long id, ClubProject.ReviewStatus status) {
+    public ClubProjectResponse review(Long id, ClubProject.ReviewStatus status, long expectedVersion) {
         ClubProject project = repository.findWithLockById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (project.getVersion() != expectedVersion) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "작품이 변경됐습니다. 새로고침 후 다시 검토해주세요.");
+        }
         ClubProject.ReviewStatus current = project.getReviewStatus();
         // PENDING -> APPROVED/REJECTED, APPROVED -> PENDING/REJECTED (unpublish), REJECTED -> APPROVED.
         if (status == current || (status == ClubProject.ReviewStatus.PENDING && current == ClubProject.ReviewStatus.REJECTED)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "처리할 수 없는 검토 상태 변경입니다.");
         }
         project.setReviewStatus(status);
-        return toResponse(repository.save(project), null, true);
+        return toResponse(repository.saveAndFlush(project), null, true);
     }
 
     /** Owner changed the project's media after review: it must be reviewed again before staying public. */
@@ -156,7 +159,7 @@ public class ClubProjectService {
         ClubProject project = get(id);
         if (project.getReviewStatus() != ClubProject.ReviewStatus.PENDING) {
             project.setReviewStatus(ClubProject.ReviewStatus.PENDING);
-            repository.save(project);
+            repository.saveAndFlush(project);
         }
     }
 
@@ -177,7 +180,7 @@ public class ClubProjectService {
                 || (linkUrl != null && !Objects.equals(previousLink, project.getLinkUrl()))) {
             project.setReviewStatus(ClubProject.ReviewStatus.PENDING);
         }
-        return toResponse(get(id), studentId, false);
+        return toResponse(repository.saveAndFlush(project), studentId, false);
     }
 
     public ClubProjectResponse update(Long id, String category, String title, String description, String eyebrow,
@@ -211,7 +214,7 @@ public class ClubProjectService {
             project.setPosition(position);
         }
         project.setUpdatedAt(LocalDateTime.now());
-        ClubProject saved = repository.save(project);
+        ClubProject saved = repository.saveAndFlush(project);
         return toResponse(saved);
     }
 
@@ -249,6 +252,8 @@ public class ClubProjectService {
             String contentType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
             ClubProjectFile saved = fileRepository.save(new ClubProjectFile(
                     project.getId(), stored, cleanOriginalFilename(file), contentType, file.getSize(), existing.size()));
+            project.setUpdatedAt(LocalDateTime.now());
+            repository.saveAndFlush(project);
             return saved.getId();
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패했습니다.");
@@ -261,8 +266,11 @@ public class ClubProjectService {
         if (!file.getClubProjectId().equals(id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
+        ClubProject project = get(id);
         storageService.delete(file.getStoredName());
         fileRepository.delete(file);
+        project.setUpdatedAt(LocalDateTime.now());
+        repository.saveAndFlush(project);
     }
 
     @Transactional(readOnly = true)
@@ -521,6 +529,7 @@ public class ClubProjectService {
 
         return new ClubProjectResponse(
                 project.getId(),
+                project.getVersion(),
                 project.getCategory(),
                 categoryNames.getOrDefault(project.getCategory(), project.getCategory()),
                 project.getTitle(),

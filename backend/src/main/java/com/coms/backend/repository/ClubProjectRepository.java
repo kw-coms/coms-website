@@ -19,12 +19,13 @@ public interface ClubProjectRepository extends JpaRepository<ClubProject, Long> 
     @Query("select p from ClubProject p where p.id = :id")
     Optional<ClubProject> findWithLockById(@Param("id") Long id);
 
+    // Views update atomically and are excluded from project content writes.
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update ClubProject p set p.viewCount = p.viewCount + 1 where p.id = :id")
     int incrementViewCount(@Param("id") Long id);
 
     @Modifying(flushAutomatically = true)
-    @Query("update ClubProject p set p.ownerStudentId = null where p.ownerStudentId = :studentId")
+    @Query("update ClubProject p set p.ownerStudentId = null, p.version = p.version + 1 where p.ownerStudentId = :studentId")
     void detachOwnedWorks(@Param("studentId") String studentId);
 
     long countByCategory(String category);

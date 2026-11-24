@@ -5,6 +5,7 @@ import java.util.List;
 
 public record ClubProjectResponse(
         Long id,
+        long version,
         String category,
         String categoryName,
         String title,

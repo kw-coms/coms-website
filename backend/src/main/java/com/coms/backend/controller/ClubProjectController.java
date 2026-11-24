@@ -170,8 +170,9 @@ public class ClubProjectController {
     @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")
     @PatchMapping("/{id}/review")
     public ResponseEntity<ClubProjectResponse> review(@PathVariable Long id,
-            @RequestParam ClubProject.ReviewStatus status, Authentication authentication) {
-        ClubProjectResponse response = projectService.review(id, status);
+            @RequestParam ClubProject.ReviewStatus status, @RequestParam long version,
+            Authentication authentication) {
+        ClubProjectResponse response = projectService.review(id, status, version);
         auditProject(authentication, "ADMIN_CLUB_PROJECT_" + status.name(), response);
         return ResponseEntity.ok(response);
     }

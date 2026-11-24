@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.time.LocalDateTime;
 
@@ -20,6 +21,10 @@ public class ClubProject {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     @Column(nullable = false, length = 40)
     private String category;
@@ -67,6 +72,7 @@ public class ClubProject {
     }
 
     public Long getId() { return id; }
+    public long getVersion() { return version; }
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
     public String getTitle() { return title; }

@@ -87,7 +87,8 @@ class ClubProjectServiceTest {
                 .isEqualTo(publicCount);
         assertThat(clubProjectService.list("2099000001", false)).filteredOn(p -> p.id().equals(created.id()))
                 .singleElement().satisfies(p -> assertThat(p.canEdit()).isTrue());
-        clubProjectService.review(created.id(), com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED);
+        clubProjectService.review(created.id(), com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED,
+                clubProjectRepository.findById(created.id()).orElseThrow().getVersion());
         assertThat(clubProjectCategoryService.list().stream()
                 .filter(category -> category.key().equals("APP")).findFirst().orElseThrow().projectCount())
                 .isEqualTo(publicCount + 1);
