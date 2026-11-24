@@ -24,7 +24,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +46,7 @@ public class AttendanceService {
     static final int MAX_CHECK_IN_ATTEMPTS = 10;
     static final Duration CHECK_IN_ATTEMPT_WINDOW = Duration.ofMinutes(5);
     private static final String REMOVED_MEMBER_ID = "removed";
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final String REMOVED_MEMBER_NAME = "탈퇴한 회원";
 
     private final AttendanceSessionRepository sessionRepository;
@@ -216,12 +219,15 @@ public class AttendanceService {
         boolean scoped = request.studyGroupId() != null || request.studySessionId() != null;
         if (scoped && (request.studyGroupId() == null || request.studySessionId() == null
                 || !request.studySessionId().equals(match.getStudySessionId()))) throw invalidCode(key);
-        if (match.getStudySessionId() != null) {
-            Long groupId = studySessions.findById(match.getStudySessionId()).orElseThrow(() -> invalidCode(key)).getGroupId();
+        Long studySessionId = match.getStudySessionId();
+        if (studySessionId != null) {
+            Long groupId = studySessions.findGroupIdById(studySessionId).orElseThrow(() -> invalidCode(key));
             if (scoped && !groupId.equals(request.studyGroupId())) throw invalidCode(key);
             // Serialize with manual marks, closing attendance and membership changes in this study.
             StudyGroup group = studyAccess.lockGroup(groupId);
             if (group.getStatus() == StudyGroup.Status.ENDED) throw invalidCode(key);
+            var round = studySessions.findByIdAndGroupId(studySessionId, groupId).orElseThrow(() -> invalidCode(key));
+            if (round.getDate().isAfter(LocalDate.now(clock.withZone(SEOUL)))) throw invalidCode(key);
             if (!studyAccess.isApprovedMember(groupId, studentId)) throw invalidCode(key);
             now = LocalDateTime.now(clock);
         }

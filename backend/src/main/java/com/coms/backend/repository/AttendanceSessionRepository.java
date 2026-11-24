@@ -13,6 +13,8 @@ public interface AttendanceSessionRepository extends JpaRepository<AttendanceSes
 
     Optional<AttendanceSession> findByStudySessionId(Long studySessionId);
 
+    boolean existsByStudySessionId(Long studySessionId);
+
     List<AttendanceSession> findByStudySessionIdIn(Collection<Long> studySessionIds);
 
     Optional<OpenCodeMatch> findFirstByCodeAndClosedAtIsNullAndClosesAtAfterOrderById(String code, LocalDateTime now);
