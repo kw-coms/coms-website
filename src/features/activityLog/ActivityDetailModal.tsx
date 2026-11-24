@@ -47,7 +47,7 @@ function ActivityDetailModal({
 
   const saveActivityEdit = async (event) => {
     event.preventDefault()
-    if (!activity || !activityEditor?.title.trim() || !activityEditor.eventDate) return
+    if (!activity || !activityEditor?.title.trim() || (!activityEditor.eventDate && activity.eventDate)) return
     setSavingEdit(true)
     setSubmitError('')
     try {
@@ -56,7 +56,8 @@ function ActivityDetailModal({
         category: selectedEditorCategory,
         title: activityEditor.title.trim(),
         description: normalizeRichTextForSubmit(activityEditor.description),
-        eventDate: activityEditor.eventDate,
+        eventDate: activityEditor.eventDate || undefined,
+        endDate: activityEditor.eventDate === activity.eventDate ? activity.endDate : activityEditor.eventDate || undefined,
       })
       mergeActivity(updated)
       if (editImages.length > 0) {
@@ -171,7 +172,7 @@ function ActivityDetailModal({
               <button type="button" className="activity-detail-secondary" onClick={() => setActivityEditor(null)} disabled={savingEdit}>
                 취소
               </button>
-              <button type="submit" disabled={savingEdit || !activityEditor.title.trim() || !activityEditor.eventDate}>
+              <button type="submit" disabled={savingEdit || !activityEditor.title.trim() || (!activityEditor.eventDate && Boolean(activity.eventDate))}>
                 {savingEdit ? '저장 중...' : '수정 저장'}
               </button>
             </div>

@@ -52,7 +52,7 @@ function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
   const [exceptionSaving, setExceptionSaving] = useState(false)
 
   const occurrences = useScheduleOccurrences(selectedYear, selectedMonth)
-  const scheduleItems = (user ? records || [] : []).filter((item) => item.kind === 'SCHEDULE')
+  const scheduleItems = (user ? records || [] : []).filter((item) => item.kind === 'SCHEDULE' && item.eventDate)
   const calendarMonth = buildCalendarMonth(new Date(selectedYear, selectedMonth, 1))
   const eventsByDay = buildCalendarDayEvents({
     calendarMonth,
