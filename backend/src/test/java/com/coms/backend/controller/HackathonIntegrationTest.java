@@ -31,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -51,6 +52,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class HackathonIntegrationTest {
     private static final String ORIGIN = "https://coms.kw.ac.kr";
     private static final String SCORES = "\"themeFit\":18,\"creativity\":17,\"technology\":16,\"completeness\":15,\"practicality\":14,\"feedback\":\"좋은 작품\"";
+    private static final AtomicInteger NEXT_IP = new AtomicInteger();
+    private String testIp;
 
     @Autowired MockMvc mvc;
     @Autowired HackathonReviewRepository reviews;
@@ -65,6 +68,7 @@ class HackathonIntegrationTest {
 
     @BeforeEach
     void reset() {
+        testIp = "192.0.2." + NEXT_IP.incrementAndGet();
         reviews.deleteAll();
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         for (String stored : jdbc.queryForList("SELECT stored_name FROM hackathon_materials WHERE stored_name IS NOT NULL", String.class)) storage.delete(stored);
@@ -73,7 +77,7 @@ class HackathonIntegrationTest {
         jdbc.update("DELETE FROM hackathon_events WHERE id <> 1");
         settings.deleteAll();
         settings.saveAndFlush(new HackathonSettings());
-        jdbc.update("MERGE INTO hackathon_events (id,title,event_year,semester,theme,introduction,rules,published,open,starts_at,ends_at,results_published) KEY(id) VALUES (1,'COM’s 해커톤 2026',2026,2,'전쟁','','',TRUE,TRUE,NULL,NULL,FALSE)");
+        jdbc.update("MERGE INTO hackathon_events (id,title,event_year,semester,theme,introduction,rules,published,open,allow_guest_reviews,starts_at,ends_at,results_published) KEY(id) VALUES (1,'COM’s 해커톤 2026',2026,2,'전쟁','','',TRUE,TRUE,TRUE,NULL,NULL,FALSE)");
         for (String projectId : new String[]{"wargether", "underground-route", "still"}) {
             jdbc.update("MERGE INTO hackathon_projects (id,event_id,title,author,description,position) KEY(id) VALUES (?,1,?,'기존 팀','기존 작품',0)", projectId, projectId);
         }
@@ -100,6 +104,91 @@ class HackathonIntegrationTest {
         submit("still", 42, "Ann").andExpect(status().isCreated());
         assertThat(reviews.count()).isEqualTo(2);
         assertThat(reviews.findAll().stream().allMatch(row -> !row.isChair())).isTrue();
+    }
+
+    @Test
+    void guestReviewDefaultsOffAndAdminCanEnableItPerEvent() throws Exception {
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        jdbc.update("UPDATE hackathon_events SET allow_guest_reviews=FALSE WHERE id=1");
+        submit("wargether", 42, "Alum").andExpect(status().isUnauthorized());
+        Cookie admin = account(Member.Role.ADMIN, "chair");
+        mvc.perform(put("/api/admin/hackathon/events/1/guest-reviews").cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"allowGuestReviews\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.allowGuestReviews").value(true));
+        mvc.perform(get("/api/hackathon/events/1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.allowGuestReviews").value(true));
+        submit("wargether", 42, "Alum").andExpect(status().isCreated());
+    }
+
+    @Test
+    void changingGuestNameCannotReviewTheSameProjectTwiceFromOneIp() throws Exception {
+        submit("wargether", 42, "First Alum").andExpect(status().isCreated());
+        submit("wargether", 43, "Another Alum").andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("이 접속 주소에서 이 팀의 평가를 이미 제출했습니다."));
+        submit("still", 43, "Another Alum").andExpect(status().isCreated());
+    }
+
+    @Test
+    void guestIpDuplicateKeyUsesIpv6Slash64AndNormalizesMappedIpv4() throws Exception {
+        String suffix = String.valueOf(NEXT_IP.incrementAndGet() % 60000);
+        submitFrom("2001:db8:" + suffix + ":1::1", "wargether", 42, "First Alum").andExpect(status().isCreated());
+        submitFrom("2001:db8:" + suffix + ":1:abcd::9", "wargether", 43, "Another Alum").andExpect(status().isConflict());
+        submitFrom("2001:db8:" + suffix + ":2::1", "wargether", 44, "Third Alum").andExpect(status().isCreated());
+
+        String v4 = "198.51.100." + (NEXT_IP.incrementAndGet() % 250);
+        submitFrom("::ffff:" + v4, "still", 42, "Mapped Alum").andExpect(status().isCreated());
+        submitFrom(v4, "still", 43, "Plain Alum").andExpect(status().isConflict());
+    }
+
+    private ResultActions submitFrom(String ip, String projectId, int generation, String name) throws Exception {
+        return mvc.perform(post("/api/hackathon/reviews").header("Origin", ORIGIN)
+                .with(request -> { request.setRemoteAddr(ip); return request; })
+                .contentType(MediaType.APPLICATION_JSON).content(body(projectId, generation, name)));
+    }
+
+    @Test
+    void membersHaveSeparateProjectQuotaWhenGuestReviewsAreOff() throws Exception {
+        new JdbcTemplate(dataSource).update("UPDATE hackathon_events SET allow_guest_reviews=FALSE WHERE id=1");
+        Cookie first = account(Member.Role.USER, "first");
+        Cookie second = account(Member.Role.USER, "second");
+        mvc.perform(post("/api/hackathon/reviews").cookie(first).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(body("wargether", 42, "First Alum")))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/hackathon/reviews").cookie(first).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(body("wargether", 43, "Changed Name")))
+                .andExpect(status().isConflict());
+        mvc.perform(post("/api/hackathon/reviews").cookie(second).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(body("wargether", 44, "Second Alum")))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void membersWithTheSameNameAndCohortCanBothReviewOneProject() throws Exception {
+        Cookie first = account(Member.Role.USER, "namesake-one");
+        Cookie second = account(Member.Role.USER, "namesake-two");
+        String sameReview = body("wargether", 42, "Same Name");
+
+        mvc.perform(post("/api/hackathon/reviews").cookie(first).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(sameReview))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/hackathon/reviews").cookie(second).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(sameReview))
+                .andExpect(status().isCreated());
+        assertThat(reviews.count()).isEqualTo(2);
+    }
+
+    @Test
+    void exhaustedGuestIpBudgetDoesNotBlockSignedInMembers() throws Exception {
+        submit("wargether", 42, "Guest Alum").andExpect(status().isCreated());
+        for (int attempt = 0; attempt < 9; attempt++) {
+            submit("wargether", 42, "Guest Alum").andExpect(status().isConflict());
+        }
+        submit("wargether", 42, "Guest Alum").andExpect(status().isTooManyRequests());
+        Cookie member = account(Member.Role.USER, "member");
+        mvc.perform(post("/api/hackathon/reviews").cookie(member).header("Origin", ORIGIN)
+                .with(request -> { request.setRemoteAddr(testIp); return request; })
+                .contentType(MediaType.APPLICATION_JSON).content(body("wargether", 43, "Member Alum")))
+                .andExpect(status().isCreated());
     }
 
     @Test
@@ -321,6 +410,12 @@ class HackathonIntegrationTest {
                 .andExpect(status().isOk());
         mvc.perform(post("/api/hackathon/events/{id}/reviews", eventId).header("Origin", ORIGIN)
                 .contentType(MediaType.APPLICATION_JSON).content(body(projectId, 42, "Same Member")))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(put("/api/admin/hackathon/events/{id}/guest-reviews", eventId).cookie(admin).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"allowGuestReviews\":true}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/hackathon/events/{id}/reviews", eventId).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(body(projectId, 42, "Same Member")))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.projectId").value(projectId));
         mvc.perform(post("/api/hackathon/events/{id}/reviews", eventId).header("Origin", ORIGIN)
                 .contentType(MediaType.APPLICATION_JSON).content(body(projectId, 42, "Same Member")))
@@ -507,6 +602,7 @@ class HackathonIntegrationTest {
 
     private ResultActions submitBody(String body) throws Exception {
         return mvc.perform(post("/api/hackathon/reviews").header("Origin", ORIGIN)
+                .with(request -> { request.setRemoteAddr(testIp); return request; })
                 .contentType(MediaType.APPLICATION_JSON).content(body));
     }
 

@@ -1,3 +1,4 @@
+import { seoulDateStamp } from '../../utils/seoulDate'
 import { csvCell } from './auditLogCsv'
 import { ROLE_LABELS, displayStudentId } from '../../utils/roleAccess'
 
@@ -54,7 +55,7 @@ export function downloadMembersCsv(members: MemberRow[], now = new Date()) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `coms-members-${now.toISOString().slice(0, 10)}.csv`
+  anchor.download = `coms-members-${seoulDateStamp(now)}.csv`
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()

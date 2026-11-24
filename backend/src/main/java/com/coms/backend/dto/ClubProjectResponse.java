@@ -5,6 +5,7 @@ import java.util.List;
 
 public record ClubProjectResponse(
         Long id,
+        long version,
         String category,
         String categoryName,
         String title,
@@ -22,7 +23,8 @@ public record ClubProjectResponse(
         long viewCount,
         long likeCount,
         long commentCount,
-        boolean likedByMe
+        boolean likedByMe,
+        String reviewStatus
 ) {
     public record ImageInfo(Long id, String url) {}
     public record FileInfo(Long id, String url, String originalName, long size) {}

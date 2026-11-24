@@ -12,7 +12,7 @@ public class MemberExternalInviteRequest {
     private List<@NotBlank @Size(max = 50) String> recipientStudentIds;
 
     @Size(max = 100)
-    private String actorLabel;
+    private String actorLabel; // Legacy input only; the server always uses the authenticated sender name.
 
     @NotBlank
     @Size(max = 300)

@@ -87,7 +87,10 @@ class ClubWorkflowsIntegrationTest {
         JsonNode saved = response(mvc.perform(body(put(work + "/" + projectId), author, draftWrite)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.published").value(false)).andReturn().getResponse().getContentAsByteArray());
         mvc.perform(body(put(work + "/" + projectId), author, draftWrite)).andExpect(status().isConflict());
-        mvc.perform(body(post(event + "/reviews"), null, "{\"projectId\":\"" + projectId + "\"}")).andExpect(status().isNotFound());
+        // Guest judging is off by default for an event, so a guest is turned away before the project is looked up;
+        // a signed-in member still cannot review a draft.
+        mvc.perform(body(post(event + "/reviews"), null, "{\"projectId\":\"" + projectId + "\"}")).andExpect(status().isUnauthorized());
+        mvc.perform(body(post(event + "/reviews"), outsider, "{\"projectId\":\"" + projectId + "\"}")).andExpect(status().isNotFound());
 
         mvc.perform(body(put(adminEvent + "/projects/" + projectId), admin, """
                 {"teamName":"회로팀","title":"회로 작품","author":"팀 대표","description":"작품 설명","published":true,"version":%d}

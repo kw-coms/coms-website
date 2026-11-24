@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { asMember, expectMembersGate, mockAdminApis, mockOptionalApis } from './visualSupport.js'
+import { asMember, expectMembersGate, mockAdminApis, mockOptionalApis, signInHint } from './visualSupport.js'
 
 const day = (offset) => {
   const date = new Date(Date.now() + offset * 86400000)
@@ -111,6 +111,7 @@ const noticeRows = [
 
 async function noticesAsMember(page, { role = 'USER', studentId = '2023000002', permissions = [] } = {}) {
   await signedInMember(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 5, studentId, name: '홍길동', role, emailVerified: true } }))
   await page.route('**/api/permissions/me', (route) => route.fulfill({ json: { role, permissions } }))
   await page.route('**/api/notices', (route) => route.fulfill({ json: noticeRows }))
@@ -838,6 +839,7 @@ test.describe('review fixes', () => {
   test('phone: an unverified e-mail opens its section and shows 미인증 in the summary', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await mockAdminApis(page)
+    await signInHint(page)
     await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 1, name: '관리자', studentId: '2020123456', role: 'ADMIN', emailVerified: false, email: 'a@b.c' } }))
     await page.goto('/settings')
     await expect(page.locator('details#settings-email')).toHaveAttribute('open', '')
@@ -900,6 +902,7 @@ test.describe('review fixes', () => {
   test('an editor ignores shared anon drafts until a member id is known', async ({ page }) => {
     await mockAdminApis(page)
     let authLoads = 0
+    await signInHint(page)
     await page.route('**/api/auth/me', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 500))
       authLoads += 1
@@ -985,6 +988,7 @@ test.describe('review regressions', () => {
       })
       expect(await memberKeys(page, '2020123456')).toEqual([])
       // /me still returns A in this fixture: reloading alone must not re-arm the ended tab.
+      await signInHint(page)
       await page.reload()
       await page.getByRole('button', { name: editor === 'post' ? '글쓰기' : '공지 작성' }).click()
       await expect(page.getByRole('alert').filter({ hasText: '다른 탭에서 로그인 상태가 변경되었습니다' })).toBeVisible()
@@ -1003,6 +1007,7 @@ test.describe('review regressions', () => {
     await expect.poll(() => memberKeys(page, '2020123456')).toContain('kwcoms-draft:v1:2020123456:post:new')
     const otherTab = await context.newPage()
     await mockAdminApis(otherTab)
+    await signInHint(otherTab)
     await otherTab.route('**/api/auth/me', (route) => route.fulfill({ json: {
       id: 2, studentId: '2023000002', name: '다른 회원', role: 'USER', emailVerified: true,
     } }))

@@ -249,6 +249,7 @@ public class RecruitApplicationService {
         RecruitApplication.Status status = parseStatus(request.status());
         application.setStatus(status);
         application.setAdminNote(trimToNull(request.adminNote()));
+        application.setUpdatedAt(LocalDateTime.now(clock));
         RecruitApplicationAdminResponse response = RecruitApplicationAdminResponse.from(application);
         if (status == RecruitApplication.Status.ACCEPTED) {
             promote(application, adminStudentId);
@@ -340,8 +341,11 @@ public class RecruitApplicationService {
         }
     }
 
-    private static RecruitApplication toEntity(RecruitApplicationRequest request, String clientIp) {
+    private RecruitApplication toEntity(RecruitApplicationRequest request, String clientIp) {
         RecruitApplication application = new RecruitApplication();
+        LocalDateTime now = LocalDateTime.now(clock);
+        application.setSubmittedAt(now);
+        application.setUpdatedAt(now);
         application.setName(trim(request.name()));
         application.setStudentId(trim(request.studentId()));
         application.setDepartment(trim(request.department()));
@@ -359,7 +363,7 @@ public class RecruitApplicationService {
     private void enforceRateLimit(Map<String, Deque<LocalDateTime>> attemptsByClient, String clientIp,
                                   int maxPerWindow, Duration window, String message) {
         String key = clientIp == null || clientIp.isBlank() ? "unknown" : clientIp;
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime cutoff = now.minus(window);
         Deque<LocalDateTime> attempts = attemptsByClient.computeIfAbsent(key, ignored -> new ArrayDeque<>());
 

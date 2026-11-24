@@ -8,6 +8,7 @@ import { ListSearch } from '../common/ListTools'
 import { matchesQuery } from '../../utils/listTools'
 import { workViewerKey } from '../../utils/workViewerKey'
 import WorkEditor from './WorkEditor'
+import { showToast } from '../common/Toast'
 import '../../styles/site-pages.css'
 
 function groupByCategory(projects, categories) {
@@ -86,7 +87,7 @@ function ViewerProjects({ user }) {
     let mounted = true
     listClubProjectLinkStatuses()
       .then((statuses) => { if (mounted) setLinkStatuses(statuses) })
-      .catch(() => {})
+      .catch((err) => { if (mounted) showToast({ message: err.message || '작품 링크 상태를 불러오지 못했습니다.', tone: 'error' }) })
     return () => { mounted = false }
   }, [user])
 

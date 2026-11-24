@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { Buffer } from 'node:buffer'
-import { asMember, mockAdminApis, mockOptionalApis, autoDriveModals, expectMembersGate, trackRequests } from './visualSupport.js'
+import { asMember, mockAdminApis, mockAdminMembers, mockOptionalApis, autoDriveModals, expectMembersGate, trackRequests, signInHint } from './visualSupport.js'
 
 const routeExpectations = [
   ['/', /KW COM's/],
@@ -22,6 +22,7 @@ const fontFamilies = [
 
 test('archive edit preserves its file and offers explicit author reassignment', async ({ page }) => {
   await mockAdminApis(page)
+  const memberRequests = trackRequests(page, /\/api\/admin\/members(?:\?|$)/)
   let file = { id: 910, title: '기존 자료', description: '기존 설명', originalName: 'original.pdf', uploadedBy: 'owner', uploaderName: '원작성자', category: 'GENERAL', fileSize: 42, viewCount: 7, upvotes: 2, uploadedAt: '2026-09-01T00:00:00', contentVersion: 'original' }
   const edits = []
   const authors = []
@@ -33,7 +34,10 @@ test('archive edit preserves its file and offers explicit author reassignment', 
     file = { ...file, title: multipartField(body, 'title'), description: multipartField(body, 'description') }
     await route.fulfill({ json: file })
   })
-  await page.route('**/api/admin/members', route => route.fulfill({ json: [{ studentId: '2026123456', name: '박채현' }] }))
+  await mockAdminMembers(page, [
+    { id: 1, studentId: '2026123456', name: '박채현' },
+    { id: 2, studentId: '2026123457', name: '김민서' },
+  ])
   await page.route('**/api/files/910/author', async route => {
     const body = route.request().postDataJSON()
     authors.push(body)
@@ -60,11 +64,16 @@ test('archive edit preserves its file and offers explicit author reassignment', 
   await page.getByRole('button', { name: '작성자 변경', exact: true }).click()
   dialog = page.getByRole('dialog', { name: '작성자 변경' })
   await dialog.getByRole('radio', { name: '회원 선택' }).check()
+  const memberSelect = dialog.getByRole('combobox', { name: '회원 선택' })
+  const otherMember = memberSelect.getByRole('option', { name: /김민서/ })
+  await expect(otherMember).toHaveCount(1)
   await dialog.getByLabel('회원 검색').fill('박채현')
-  await dialog.getByRole('combobox', { name: '회원 선택' }).selectOption('2026123456')
+  await expect(otherMember).toHaveCount(0)
+  await memberSelect.selectOption('2026123456')
   await dialog.getByRole('button', { name: '소유권 변경 확인' }).click()
   await expect(dialog).not.toBeVisible()
   expect(authors[1]).toEqual({ studentId: '2026123456' })
+  expect(memberRequests.map((url) => new URL(url).search)).toEqual(['', ''])
 })
 
 test('archive replacement sends only the explicitly chosen file', async ({ page }) => {
@@ -110,6 +119,7 @@ test('archive refuses saving while its rich editor is still loading', async ({ p
 
 test('archive non-owner vice president cannot see the content edit action', async ({ page }) => {
   await mockAdminApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { studentId: 'vp', name: '부회장', role: 'VICE_PRESIDENT', emailVerified: true } }))
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'VICE_PRESIDENT', permissions: ['archive.author_change'] } }))
   await page.route('**/api/files', route => route.fulfill({ json: [{ id: 912, title: '타인 자료', uploadedBy: 'owner', originalName: 'old.txt', uploadedAt: '2026-09-01T00:00:00' }] }))
@@ -122,6 +132,7 @@ test('notice author can edit after reassignment but cannot pin or delete', async
   await mockAdminApis(page)
   const notice = { id: 913, title: '이관된 공지', content: '기존 본문', category: 'GENERAL', author: '회원', authorStudentId: 'owner', pinned: true, createdAt: '2026-09-01T00:00:00' }
   let edited = null
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { studentId: 'owner', name: '회원', role: 'USER', emailVerified: true } }))
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
   await page.route('**/api/notices', route => route.fulfill({ json: [notice] }))
@@ -148,6 +159,7 @@ test('notice author can edit after reassignment but cannot pin or delete', async
 test('notice write permission does not expose another authors edit action', async ({ page }) => {
   await mockAdminApis(page)
   const notice = { id: 914, title: '다른 회원의 공지', content: '본문', category: 'GENERAL', author: '다른 회원', authorStudentId: 'owner', pinned: false, createdAt: '2026-09-01T00:00:00' }
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { studentId: 'vp', name: '부회장', role: 'VICE_PRESIDENT', emailVerified: true } }))
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'VICE_PRESIDENT', permissions: ['notice.write'] } }))
   await page.route('**/api/notices', route => route.fulfill({ json: [notice] }))
@@ -333,12 +345,13 @@ test('home section cards lead where they say', async ({ page }) => {
 // here are made up.
 test('admin member list and roster can be searched and ordered', async ({ page }) => {
   await mockAdminApis(page)
-  await page.route('**/api/admin/members', route => route.fulfill({ json: [
+  const memberRequests = trackRequests(page, /\/api\/admin\/members(?:\?|$)/)
+  await mockAdminMembers(page, [
     { id: 1, studentId: '2020123456', name: '관리자', email: 'admin@example.com', emailVerified: true, department: '컴퓨터정보공학부', generation: '58', phone: '01000000001', role: 'ADMIN' },
     { id: 2, studentId: '2023000002', name: '홍길동', email: 'hong@example.com', emailVerified: true, department: '소프트웨어학부', generation: '61', phone: '01000000002', role: 'USER' },
     { id: 3, studentId: '2022000003', name: '김철수', email: 'kim@example.com', emailVerified: false, department: '전자공학과', generation: '60', phone: '01000000003', role: 'OFFICER' },
     { id: 4, studentId: '2023000006', name: '최가람', email: 'choi@example.com', emailVerified: true, department: '소프트웨어학부', generation: '', phone: '01000000006', role: 'USER' },
-  ] }))
+  ])
   await page.route('**/api/admin/eligible-members', route => route.fulfill({ json: [
     { id: 11, studentId: '2023000002', name: '홍길동', generation: '61', phone: '01000000002' },
     { id: 12, studentId: '', name: '졸업선배', generation: '41', phone: '01000000013' },
@@ -352,8 +365,8 @@ test('admin member list and roster can be searched and ordered', async ({ page }
   const tools = page.getByRole('search', { name: '회원 목록 찾기' })
   await expect(tools.getByRole('status')).toHaveText('4명')
 
-  // Ordered by 기수, newest first; the member without one stays last either way.
-  await tools.getByLabel('정렬 기준').selectOption('generation')
+  // Sort this page by 기수 in both directions, keeping the member without one last.
+  await tools.getByLabel('현재 페이지 정렬 기준', { exact: true }).selectOption('generation')
   await expect(memberNames).toHaveText(['관리자', '김철수', '홍길동', '최가람'])
   await tools.getByRole('button', { name: /오름차순 정렬 중/ }).click()
   await expect(memberNames).toHaveText(['홍길동', '김철수', '관리자', '최가람'])
@@ -363,9 +376,19 @@ test('admin member list and roster can be searched and ordered', async ({ page }
   await expect(memberNames).toHaveText(['홍길동', '최가람'])
   await tools.getByLabel('회원 검색').fill('010-0000-0006')
   await expect(memberNames).toHaveText(['최가람'])
-  await expect(tools.getByRole('status')).toHaveText('4명 중 1명')
+  await expect(tools.getByRole('status')).toHaveText('1명')
   await tools.getByLabel('회원 검색').fill('없는사람')
-  await expect(page.getByText('조건에 맞는 회원이 없습니다.')).toBeVisible()
+  const emptyState = page.getByText('조건에 맞는 회원이 없습니다.')
+  await expect(emptyState).toBeVisible()
+
+  await tools.getByLabel('역할로 거르기').selectOption('ALL')
+  await expect(page.getByText('회원 목록을 갱신하는 중...')).toBeHidden()
+  await tools.getByLabel('회원 검색').fill('60기')
+  await expect(memberNames).toHaveText(['김철수'])
+  await tools.getByLabel('인증 상태로 거르기').selectOption('VERIFIED')
+  await expect(emptyState).toBeVisible()
+  await tools.getByLabel('인증 상태로 거르기').selectOption('UNVERIFIED')
+  await expect(memberNames).toHaveText(['김철수'])
 
   await page.goto('/admin?tab=roster')
   // Matched from the start of the cell: a name may be followed by a chip (가입함, 준회원).
@@ -383,17 +406,39 @@ test('admin member list and roster can be searched and ordered', async ({ page }
   await expect(rosterNames).toHaveText([/^홍길동/, /^졸업선배/, /^김철수/])
   await page.getByLabel('명부 검색').fill('졸업')
   await expect(rosterNames).toHaveText([/^졸업선배/])
+
+  const firstPage = { page: '0', size: '30' }
+  expect(memberRequests.map((url) => Object.fromEntries(new URL(url).searchParams))).toEqual([
+    firstPage,
+    { ...firstPage, role: 'USER' },
+    { ...firstPage, role: 'USER', search: '010-0000-0006' },
+    { ...firstPage, role: 'USER', search: '없는사람' },
+    { ...firstPage, search: '없는사람' },
+    { ...firstPage, search: '60기' },
+    { ...firstPage, search: '60기', status: 'VERIFIED' },
+    { ...firstPage, search: '60기', status: 'UNVERIFIED' },
+    {}, // The roster loads the legacy full array and sorts and searches locally.
+  ])
 })
 
 // The roster shows which rows already have an account, and the member list can be saved as a
 // spreadsheet file after a confirmation. The people here are made up.
 test('admin roster marks who has signed up and the member list exports as CSV', async ({ page }) => {
   await mockAdminApis(page)
-  await page.route('**/api/admin/members', route => route.fulfill({ json: [
+  const memberRequests = trackRequests(page, /\/api\/admin\/members(?:\?|$)/)
+  await mockAdminMembers(page, [
     { id: 1, studentId: '2020123456', name: '관리자', email: 'admin@example.com', emailVerified: true, department: '컴퓨터정보공학부', generation: '58', phone: '01000000001', role: 'ADMIN' },
     { id: 2, studentId: '2023000002', name: '홍길동', email: 'hong@example.com', emailVerified: true, department: '소프트웨어학부', generation: '61', phone: '01000000002', role: 'USER' },
     { id: 3, studentId: 'G2019-12', name: '졸업선배', email: 'old@example.com', emailVerified: true, department: '', generation: '41', phone: '', role: 'USER' },
-  ] }))
+    ...Array.from({ length: 30 }, (_, index) => ({
+      id: index + 4,
+      studentId: String(2025000000 + index),
+      name: `추가 회원 ${index + 1}`,
+      email: `member${index + 1}@example.org`,
+      emailVerified: true,
+      role: 'USER',
+    })),
+  ])
   await page.route('**/api/admin/eligible-members', route => route.fulfill({ json: [
     { id: 11, studentId: '2023000002', name: '홍길동', generation: '61', phone: '01000000002' },
     { id: 12, studentId: '', name: '졸업선배', generation: '41', phone: '01000000013' },
@@ -414,9 +459,14 @@ test('admin roster marks who has signed up and the member list exports as CSV', 
 
   await page.goto('/admin?tab=members')
   const tools = page.getByRole('search', { name: '회원 목록 찾기' })
+  await expect(tools.getByRole('status')).toHaveText('33명 중 30명')
+  await page.getByRole('button', { name: '다음', exact: true }).click()
+  await expect(tools.getByRole('status')).toHaveText('33명 중 3명')
+  await expect(page.getByText('추가 회원 30', { exact: true })).toBeVisible()
   await tools.getByLabel('회원 검색').fill('example.com')
-  await tools.getByLabel('정렬 기준').selectOption('name')
-  const exportButton = tools.getByRole('button', { name: 'CSV 내보내기' })
+  await expect(page.getByText('1 / 1 페이지', { exact: true })).toBeVisible()
+  await tools.getByLabel('현재 페이지 정렬 기준', { exact: true }).selectOption('name')
+  const exportButton = tools.getByRole('button', { name: '현재 페이지 CSV 내보내기' })
 
   // Declining the confirmation downloads nothing.
   await exportButton.click()
@@ -440,6 +490,12 @@ test('admin roster marks who has signed up and the member list exports as CSV', 
   expect(lines.slice(1).map((line) => line.split(',')[0])).toEqual(['"관리자"', '"졸업선배"', '"홍길동"'])
   expect(lines[3]).toContain('"010-0000-0002"')
   expect(lines[2]).toContain('"2019 (졸업생)"')
+  expect(memberRequests.map((url) => Object.fromEntries(new URL(url).searchParams))).toEqual([
+    {},
+    { page: '0', size: '30' },
+    { page: '1', size: '30' },
+    { page: '0', size: '30', search: 'example.com' },
+  ])
 })
 
 test('roster suggestion stays separate until an operator applies it', async ({ page }) => {
@@ -682,6 +738,7 @@ test('members can recommend, comment, reply and remove a thread without losing a
 // that did not answer, so a visitor does not find out from an error page.
 test('apps page marks an app whose link did not answer', async ({ page }) => {
   // The link check is for members; guests are not asked.
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   const project = (id, title, linkUrl) => ({ id, category: 'WEBSITE', categoryName: '웹사이트', title, eyebrow: '', description: `${title} 설명`, madeBy: '', linkUrl, displayUrl: '', position: id, files: [] })
   await page.route('**/api/club-projects/categories', route => route.fulfill({ json: [{ key: 'WEBSITE', name: '웹사이트', position: 0 }] }))
@@ -710,6 +767,7 @@ test('apps page marks an app whose link did not answer', async ({ page }) => {
 })
 
 test('apps page does without the link check when it cannot be read', async ({ page }) => {
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   await page.route('**/api/club-projects/categories', route => route.fulfill({ json: [{ key: 'WEBSITE', name: '웹사이트', position: 0 }] }))
   await page.route('**/api/club-projects', route => route.fulfill({
@@ -742,6 +800,7 @@ test('apps page does not ask guests for link status, members get it', async ({ p
   await expect(page.getByText('응답 없음')).toHaveCount(0)
 
   // Member: the call is made and the dot shows.
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   await page.goto('/apps')
   await expect(page.locator('.app-card').filter({ hasText: '죽은 앱' })).toContainText('지금 응답 없음')
@@ -794,6 +853,7 @@ test('appearance panel directs signed-in users to account-saved font settings', 
 test('signed-in account built-in font applies across the site', async ({ page }) => {
   await mockAdminApis(page)
   await page.unroute('**/api/auth/me')
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({
     status: 200,
     json: {
@@ -940,7 +1000,7 @@ test('president adds a verified member from member management', async ({ page })
   let postedMember = null
   let postCount = 0
 
-  await page.route('**/api/admin/members', async (route) => {
+  await page.route((url) => url.pathname === '/api/admin/members', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({ status: 200, json: members })
       return
@@ -1063,7 +1123,7 @@ test('admin password reset accepts simple temporary passwords without complexity
   let promptMessage
   let resetPayload = null
 
-  await page.route('**/api/admin/members', (route) => route.fulfill({
+  await page.route((url) => url.pathname === '/api/admin/members', (route) => route.fulfill({
     status: 200,
     json: [
       {
@@ -2037,6 +2097,7 @@ test('admin deleted community posts tab preserves deletion evidence', async ({ p
 
 test('community exposes my deleted posts and restore appeal for members', async ({ page }) => {
   let appealPayload = null
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({
     status: 200,
     json: {
@@ -2588,6 +2649,7 @@ for (const siteFont of ['arriving', 'blocked']) {
   test(`header with a 20-character Korean name stays inside the bar at 1280 and 1366, site font ${siteFont}`, async ({ page }) => {
     await page.addInitScript(() => { try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ } })
     await mockAdminApis(page)
+    await signInHint(page)
     await page.route('**/api/auth/me', (route) => route.fulfill({ status: 200, json: { id: 1, name: '가나다라마바사아자차카타파하거너더러머버', studentId: '2020123456', role: 'ADMIN', emailVerified: true } }))
     if (siteFont === 'blocked') await page.route(/pretendard/i, (route) => route.abort())
     else await holdSiteFont(page)
@@ -4600,6 +4662,7 @@ test('sponsors page renders tiers, anonymises, and hides the amount note from gu
 test.describe('gatherings', () => {
   const asMember = async (page) => {
     await mockAdminApis(page)
+    await signInHint(page)
     await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
     await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
   }
@@ -4802,6 +4865,7 @@ test.describe('gatherings', () => {
 // check opens it, shows the code, sees who came and closes it. The people are made up.
 test('a member checks in to attendance with the code', async ({ page }) => {
   await mockAdminApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
   let sessions = [{ id: 3, title: '웹 세미나 3주차', openedByName: '운영진', openedAt: '2026-10-12T19:00:00', closesAt: '2026-10-12T19:30:00', open: true, remainingSeconds: 1500, attendeeCount: 4, attended: false, code: null }]
@@ -4848,6 +4912,7 @@ test('a member checks in to attendance with the code', async ({ page }) => {
 
 test('a member is told when no attendance is being taken', async ({ page }) => {
   await mockAdminApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
   await page.route('**/api/attendance/sessions', route => route.fulfill({ json: [] }))
@@ -5159,6 +5224,7 @@ test('a best time of a meeting poll can be put on the club calendar by whoever m
 
 test('a member without calendar rights is not offered the calendar button', async ({ page }) => {
   await mockAdminApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
   await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
   const poll = { id: 7, title: '웹 스터디 첫 모임', description: '', creatorName: '김철수', mine: false, canDelete: false, dates: ['2026-10-14'], startMinute: 600, endMinute: 720, slotMinutes: 30, participantCount: 1, answered: false }

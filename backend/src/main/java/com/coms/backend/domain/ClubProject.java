@@ -2,21 +2,32 @@ package com.coms.backend.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "club_projects")
 public class ClubProject {
+    public enum ReviewStatus { PENDING, APPROVED, REJECTED }
+
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     @Column(nullable = false, length = 40)
     private String category;
@@ -42,6 +53,10 @@ public class ClubProject {
     @Column(name = "owner_student_id", length = 30)
     private String ownerStudentId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "review_status", nullable = false, length = 20)
+    private ReviewStatus reviewStatus = ReviewStatus.APPROVED;
+
     @Column(name = "view_count", nullable = false, updatable = false)
     private long viewCount = 0;
 
@@ -49,17 +64,18 @@ public class ClubProject {
     private int position = 0;
 
     @Column(nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(SEOUL);
 
     @Column(nullable = false)
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    private LocalDateTime updatedAt = createdAt;
 
     @PreUpdate
-    void touch() {
-        updatedAt = LocalDateTime.now();
+    public void touch() {
+        updatedAt = LocalDateTime.now(SEOUL);
     }
 
     public Long getId() { return id; }
+    public long getVersion() { return version; }
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
     public String getTitle() { return title; }
@@ -76,6 +92,8 @@ public class ClubProject {
     public void setDisplayUrl(String displayUrl) { this.displayUrl = displayUrl; }
     public String getOwnerStudentId() { return ownerStudentId; }
     public void setOwnerStudentId(String ownerStudentId) { this.ownerStudentId = ownerStudentId; }
+    public ReviewStatus getReviewStatus() { return reviewStatus; }
+    public void setReviewStatus(ReviewStatus reviewStatus) { this.reviewStatus = reviewStatus; }
     public long getViewCount() { return viewCount; }
     public int getPosition() { return position; }
     public void setPosition(int position) { this.position = position; }

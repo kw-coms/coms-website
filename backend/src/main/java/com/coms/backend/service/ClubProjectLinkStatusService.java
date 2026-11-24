@@ -77,7 +77,11 @@ public class ClubProjectLinkStatusService {
 
     /** What the last look found, one entry per catalogue item that has a link. */
     public List<ClubProjectLinkStatusResponse> list() {
+        Set<Long> publicIds = repository.findAll().stream()
+                .filter(project -> project.getReviewStatus() == ClubProject.ReviewStatus.APPROVED)
+                .map(ClubProject::getId).collect(java.util.stream.Collectors.toSet());
         return statuses.values().stream()
+                .filter(status -> publicIds.contains(status.projectId()))
                 .sorted(Comparator.comparing(ClubProjectLinkStatusResponse::projectId))
                 .toList();
     }
@@ -87,6 +91,7 @@ public class ClubProjectLinkStatusService {
         Set<Long> withLink = new HashSet<>();
         int down = 0;
         for (ClubProject project : repository.findAll()) {
+            if (project.getReviewStatus() != ClubProject.ReviewStatus.APPROVED) continue;
             String link = project.getLinkUrl() == null ? "" : project.getLinkUrl().trim();
             if (link.isEmpty()) continue;
             withLink.add(project.getId());

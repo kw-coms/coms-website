@@ -24,6 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -54,6 +55,7 @@ public class ClubEventService {
     private final ClubEventRsvpRepository rsvpRepository;
     private final MemberRepository memberRepository;
     private final StorageService storageService;
+    private final Clock clock;
 
     public ClubEventService(ClubEventRepository eventRepository,
                             ClubEventEntryRepository entryRepository,
@@ -61,7 +63,8 @@ public class ClubEventService {
                             ClubEventVoteRepository voteRepository,
                             ClubEventRsvpRepository rsvpRepository,
                             MemberRepository memberRepository,
-                            StorageService storageService) {
+                            StorageService storageService,
+                            Clock clock) {
         this.eventRepository = eventRepository;
         this.entryRepository = entryRepository;
         this.entryFileRepository = entryFileRepository;
@@ -69,6 +72,7 @@ public class ClubEventService {
         this.rsvpRepository = rsvpRepository;
         this.memberRepository = memberRepository;
         this.storageService = storageService;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -119,8 +123,8 @@ public class ClubEventService {
         event.setEndsAt(endsAt);
         event.setCreatedBy(member.getStudentId());
         event.setCreatedByName(member.getName());
-        event.setCreatedAt(LocalDateTime.now());
-        event.setUpdatedAt(LocalDateTime.now());
+        event.setCreatedAt(LocalDateTime.now(clock));
+        event.setUpdatedAt(LocalDateTime.now(clock));
         return toResponse(eventRepository.save(event), List.of(), Map.of(), List.of(), List.of(), creatorStudentId);
     }
 
@@ -147,7 +151,7 @@ public class ClubEventService {
         validateWindow(nextStart, nextEnd);
         event.setStartsAt(nextStart);
         event.setEndsAt(nextEnd);
-        event.setUpdatedAt(LocalDateTime.now());
+        event.setUpdatedAt(LocalDateTime.now(clock));
         return get(eventRepository.save(event).getId(), editorStudentId);
     }
 
@@ -198,7 +202,7 @@ public class ClubEventService {
             entry.setMimeType(contentType(primaryFile));
             entry.setFileSize(primaryFile.getSize());
             entry.setPosition((int) entryRepository.countByClubEventId(event.getId()));
-            entry.setCreatedAt(LocalDateTime.now());
+            entry.setCreatedAt(LocalDateTime.now(clock));
             ClubEventEntry saved = entryRepository.save(entry);
             List<ClubEventEntryFile> savedFiles = new ArrayList<>();
             savedFiles.add(entryFileRepository.save(new ClubEventEntryFile(
@@ -220,7 +224,7 @@ public class ClubEventService {
                         file.getSize(),
                         i)));
             }
-            event.setUpdatedAt(LocalDateTime.now());
+            event.setUpdatedAt(LocalDateTime.now(clock));
             eventRepository.save(event);
             return toEntryResponse(event.getId(), saved, savedFiles, 0, false, 0);
         } catch (IOException e) {
@@ -235,7 +239,7 @@ public class ClubEventService {
     public ClubEventResponse vote(Long eventId, Long entryId, String studentId) {
         requireMember(studentId);
         ClubEvent event = getEvent(eventId);
-        if (!isVotingOpen(event, LocalDateTime.now())) {
+        if (!isVotingOpen(event, LocalDateTime.now(clock))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "현재 투표할 수 없는 이벤트입니다.");
         }
         ClubEventEntry entry = entryRepository.findById(entryId)
@@ -252,8 +256,8 @@ public class ClubEventService {
             vote.setClubEventId(event.getId());
             vote.setEntryId(entry.getId());
             vote.setStudentId(studentId);
-            vote.setCreatedAt(LocalDateTime.now());
-            vote.setUpdatedAt(LocalDateTime.now());
+            vote.setCreatedAt(LocalDateTime.now(clock));
+            vote.setUpdatedAt(LocalDateTime.now(clock));
             try {
                 voteRepository.saveAndFlush(vote);
             } catch (DataIntegrityViolationException e) {
@@ -269,7 +273,7 @@ public class ClubEventService {
     private void applyVote(ClubEventVote vote, ClubEventEntry entry) {
         if (!vote.getEntryId().equals(entry.getId())) {
             vote.setEntryId(entry.getId());
-            vote.setUpdatedAt(LocalDateTime.now());
+            vote.setUpdatedAt(LocalDateTime.now(clock));
             voteRepository.save(vote);
         }
     }
@@ -287,8 +291,8 @@ public class ClubEventService {
             rsvp.setClubEventId(event.getId());
             rsvp.setStudentId(studentId);
             rsvp.setStatus(parsedStatus);
-            rsvp.setCreatedAt(LocalDateTime.now());
-            rsvp.setUpdatedAt(LocalDateTime.now());
+            rsvp.setCreatedAt(LocalDateTime.now(clock));
+            rsvp.setUpdatedAt(LocalDateTime.now(clock));
             try {
                 rsvpRepository.saveAndFlush(rsvp);
             } catch (DataIntegrityViolationException e) {
@@ -304,7 +308,7 @@ public class ClubEventService {
     private void applyRsvp(ClubEventRsvp rsvp, ClubEventRsvp.Status parsedStatus) {
         if (rsvp.getStatus() != parsedStatus) {
             rsvp.setStatus(parsedStatus);
-            rsvp.setUpdatedAt(LocalDateTime.now());
+            rsvp.setUpdatedAt(LocalDateTime.now(clock));
             rsvpRepository.save(rsvp);
         }
     }
@@ -508,7 +512,7 @@ public class ClubEventService {
                 event.getDescription(),
                 event.getStartsAt(),
                 event.getEndsAt(),
-                isVotingOpen(event, LocalDateTime.now()),
+                isVotingOpen(event, LocalDateTime.now(clock)),
                 votes.size(),
                 myEntryId,
                 entries.size(),

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
+import { mockAdminApis, mockOptionalApis, signInHint } from './visualSupport.js'
 
 // The PWA service worker precaches the TourOverlay chunk. Once it controls the page, the chunk is
 // served from its cache and page.route never sees the request, so the chunk-failure tests would
@@ -24,6 +24,7 @@ const forceAuto = (page) => page.addInitScript((key) => window.localStorage.setI
 
 const asMember = async (page) => {
   await mockAdminApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
 }
 
@@ -184,6 +185,7 @@ test.describe('starting', () => {
   test('a start asked for while auth is still loading opens the member tour', async ({ page }) => {
     await asMember(page)
     await skipIntro(page)
+    await signInHint(page)
     await page.route('**/api/auth/me', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 1500))
       await route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } })

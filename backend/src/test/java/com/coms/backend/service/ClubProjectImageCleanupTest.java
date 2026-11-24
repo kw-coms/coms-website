@@ -43,7 +43,7 @@ class ClubProjectImageCleanupTest {
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lWQAAAAASUVORK5CYII=");
         var upload = new MockMultipartFile("images", "image.png", "image/png", png);
 
-        assertThatThrownBy(() -> service.addImages(10L, List.of(upload, upload)))
+        assertThatThrownBy(() -> service.addImages(10L, List.of(upload, upload), null, true))
                 .isInstanceOf(ResponseStatusException.class);
         verify(storage).delete("first-blob");
     }

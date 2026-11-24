@@ -1,5 +1,6 @@
 package com.coms.backend.service;
 
+import com.coms.backend.security.ClientIpResolver;
 import com.coms.backend.domain.HackathonReview;
 import com.coms.backend.domain.HackathonEvent;
 import com.coms.backend.dto.HackathonEventReviewResponse;
@@ -37,7 +38,8 @@ public class HackathonService {
     private final HackathonProjectRepository projects;
     private final Clock clock;
     private final TransactionTemplate transactions;
-    private final SlidingWindowRateLimiter submissionsByIp;
+    private final SlidingWindowRateLimiter guestSubmissionsByIp;
+    private final SlidingWindowRateLimiter memberSubmissionsById;
 
     public HackathonService(HackathonReviewRepository reviews, HackathonEventRepository events,
                             HackathonProjectRepository projects, Clock clock, PlatformTransactionManager transactionManager) {
@@ -46,21 +48,26 @@ public class HackathonService {
         this.projects = projects;
         this.clock = clock;
         transactions = new TransactionTemplate(transactionManager);
-        submissionsByIp = new SlidingWindowRateLimiter(120, Duration.ofMinutes(1), clock);
+        guestSubmissionsByIp = new SlidingWindowRateLimiter(10, Duration.ofMinutes(1), clock);
+        memberSubmissionsById = new SlidingWindowRateLimiter(120, Duration.ofMinutes(1), clock);
     }
 
     public boolean isOpen() {
         return events.findById(1L).map(HackathonEvent::isOpen).orElse(false);
     }
 
-    public String submit(HackathonReviewRequest request, String clientIp) {
-        return submit(1L, request, clientIp);
+    public String submit(HackathonReviewRequest request, String clientIp, String reviewerStudentId) {
+        return submit(1L, request, clientIp, reviewerStudentId);
     }
 
-    public String submit(Long eventId, HackathonReviewRequest request, String clientIp) {
+    public String submit(Long eventId, HackathonReviewRequest request, String rawClientIp, String reviewerStudentId) {
+        String clientIp = ClientIpResolver.bucket(rawClientIp);
         if (request == null || request.projectId() == null) throw invalid();
         HackathonEvent visible = events.findById(eventId).orElseThrow(HackathonService::notFound);
         if (!visible.isPublished()) throw notFound();
+        if (reviewerStudentId == null && !visible.isAllowGuestReviews()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "비회원 평가는 허용되지 않습니다.");
+        }
         if (!projects.existsByEventIdAndIdAndPublishedTrue(eventId, request.projectId())) {
             if (eventId == 1L) throw invalid();
             throw notFound();
@@ -74,7 +81,8 @@ public class HackathonService {
         String feedback = checkedFeedback(request.feedback());
         int[] scores = checkedScores(request.themeFit(), request.creativity(), request.technology(),
                 request.completeness(), request.practicality());
-        if (!submissionsByIp.tryAcquire(clientIp)) {
+        if (!(reviewerStudentId == null ? guestSubmissionsByIp.tryAcquire(clientIp)
+                : memberSubmissionsById.tryAcquire(reviewerStudentId))) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "요청이 많습니다. 잠시 후 다시 시도해주세요.");
         }
         try {
@@ -83,25 +91,34 @@ public class HackathonService {
                 if (state == null || !state.isOpen()) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "해커톤 평가가 마감되었습니다.");
                 }
+                if (reviewerStudentId == null && !state.isAllowGuestReviews()) {
+                    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "비회원 평가는 허용되지 않습니다.");
+                }
                 if (!projects.existsByEventIdAndIdAndPublishedTrue(eventId, request.projectId())) throw notFound();
-                if (reviews.existsByEventIdAndProjectIdAndGenerationAndNameKey(eventId, request.projectId(), generation, nameKey)) {
+                if (reviewerStudentId == null && reviews.existsByEventIdAndProjectIdAndGenerationAndNameKeyAndReviewerStudentIdIsNull(eventId, request.projectId(), generation, nameKey)) {
                     throw duplicate();
                 }
+                if (reviewerStudentId == null && reviews.existsByEventIdAndProjectIdAndIpKey(eventId, request.projectId(), clientIp)) throw duplicateIp();
+                if (reviewerStudentId != null && reviews.existsByEventIdAndProjectIdAndReviewerStudentId(eventId, request.projectId(), reviewerStudentId)) throw duplicateMember();
                 HackathonReview row = new HackathonReview();
                 row.setEventId(eventId);
                 row.setProjectId(request.projectId());
                 row.setGeneration(generation);
                 row.setName(name);
                 row.setNameKey(nameKey);
+                row.setIpKey(reviewerStudentId == null ? clientIp : null);
+                row.setReviewerStudentId(reviewerStudentId);
                 copyScores(row, scores, feedback);
                 row.setCreatedAt(LocalDateTime.now(clock));
                 reviews.saveAndFlush(row);
             });
         } catch (DataIntegrityViolationException ex) {
             // The unique key decides when two requests pass the preliminary duplicate check together.
-            if (reviews.existsByEventIdAndProjectIdAndGenerationAndNameKey(eventId, request.projectId(), generation, nameKey)) {
+            if (reviewerStudentId == null && reviews.existsByEventIdAndProjectIdAndGenerationAndNameKeyAndReviewerStudentIdIsNull(eventId, request.projectId(), generation, nameKey)) {
                 throw duplicate();
             }
+            if (reviewerStudentId == null && reviews.existsByEventIdAndProjectIdAndIpKey(eventId, request.projectId(), clientIp)) throw duplicateIp();
+            if (reviewerStudentId != null && reviews.existsByEventIdAndProjectIdAndReviewerStudentId(eventId, request.projectId(), reviewerStudentId)) throw duplicateMember();
             throw ex;
         }
         return request.projectId();
@@ -187,6 +204,23 @@ public class HackathonService {
 
     private static ResponseStatusException notFound() {
         return new ResponseStatusException(HttpStatus.NOT_FOUND, "행사를 찾을 수 없습니다.");
+    }
+
+    private static ResponseStatusException duplicateIp() {
+        return new ResponseStatusException(HttpStatus.CONFLICT, "이 접속 주소에서 이 팀의 평가를 이미 제출했습니다.");
+    }
+
+    private static ResponseStatusException duplicateMember() {
+        return new ResponseStatusException(HttpStatus.CONFLICT, "이 계정으로 이 팀의 평가를 이미 제출했습니다.");
+    }
+
+    @Transactional
+    public boolean setAllowGuestReviews(Long eventId, Boolean allowed) {
+        if (allowed == null) throw invalid();
+        HackathonEvent event = events.lockById(eventId).orElseThrow(HackathonService::notFound);
+        event.setAllowGuestReviews(allowed);
+        events.saveAndFlush(event);
+        return allowed;
     }
 
     private static String checkedFeedback(String feedback) {

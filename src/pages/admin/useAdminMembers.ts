@@ -3,6 +3,7 @@ import {
   createMember,
   deleteMember,
   listMembers,
+  listMembersPage,
   resetMemberPassword,
   updateMemberGeneration,
   updateMemberRole,
@@ -22,22 +23,22 @@ type CreateMemberPayload = {
   phone: string
 }
 
-export function useAdminMembers() {
+export function useAdminMembers(pageOptions?: { page: number; size: number; search: string; role: string; status: string }) {
   const queryClient = useQueryClient()
   const membersQuery = useQuery({
-    queryKey: adminMembersQueryKey,
+    queryKey: pageOptions ? [...adminMembersQueryKey, 'page', pageOptions] : adminMembersQueryKey,
     queryFn: async () => {
+      if (pageOptions) return listMembersPage(pageOptions.page, pageOptions.size, pageOptions.search, pageOptions.role, pageOptions.status)
       const data = await listMembers()
       return Array.isArray(data) ? data : []
     },
+    select: (data) => Array.isArray(data) ? { members: data, total: data.length } : data,
+    placeholderData: (previousData) => previousData,
   })
 
   const roleMutation = useMutation({
     mutationFn: ({ id, role }: { id: string | number; role: string }) => updateMemberRole(id, role),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(adminMembersQueryKey, (prev) => (
-        (Array.isArray(prev) ? prev : []).map((member) => (member.id === updated.id ? updated : member))
-      ))
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminMembersQueryKey })
     },
   })
@@ -51,20 +52,14 @@ export function useAdminMembers() {
 
   const generationMutation = useMutation({
     mutationFn: ({ id, generation }: { id: string | number; generation: string }) => updateMemberGeneration(id, generation),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(adminMembersQueryKey, (prev) => (
-        (Array.isArray(prev) ? prev : []).map((member) => (member.id === updated.id ? updated : member))
-      ))
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminMembersQueryKey })
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id) => deleteMember(id),
-    onSuccess: (_result, id) => {
-      queryClient.setQueryData(adminMembersQueryKey, (prev) => (
-        (Array.isArray(prev) ? prev : []).filter((member) => member.id !== id)
-      ))
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminMembersQueryKey })
     },
   })
@@ -74,8 +69,10 @@ export function useAdminMembers() {
   })
 
   return {
-    members: membersQuery.data ?? [],
+    members: membersQuery.data?.members ?? [],
+    total: membersQuery.data?.total ?? 0,
     loading: membersQuery.isPending,
+    fetching: membersQuery.isFetching,
     error: membersQuery.error ? (membersQuery.error.message || '회원 목록을 불러오지 못했습니다.') : '',
     refetch: membersQuery.refetch,
     addMember: createMutation.mutateAsync,

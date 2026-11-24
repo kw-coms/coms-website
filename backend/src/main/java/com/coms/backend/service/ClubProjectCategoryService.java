@@ -1,6 +1,7 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.ClubProjectCategory;
+import com.coms.backend.domain.ClubProject;
 import com.coms.backend.dto.ClubProjectCategoryRequest;
 import com.coms.backend.dto.ClubProjectCategoryResponse;
 import com.coms.backend.repository.ClubProjectCategoryRepository;
@@ -31,7 +32,7 @@ public class ClubProjectCategoryService {
 
     @Transactional(readOnly = true)
     public List<ClubProjectCategoryResponse> list() {
-        Map<String, Long> counts = projectRepository.countByCategory().stream()
+        Map<String, Long> counts = projectRepository.countByCategory(ClubProject.ReviewStatus.APPROVED).stream()
                 .collect(Collectors.toMap(
                         row -> (String) row[0],
                         row -> (Long) row[1],

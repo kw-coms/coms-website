@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.EligibleMember;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.AdminMemberCreateRequest;
+import com.coms.backend.dto.LoginAuditResponse;
 import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.repository.ArchiveFileVoteRepository;
 import com.coms.backend.repository.ClubActivityVoteRepository;
@@ -29,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.Optional;
 
@@ -96,6 +98,91 @@ class AdminServiceTest {
     void setUp() {
         realMemberRepository.deleteAll();
         realEligibleMemberRepository.deleteAll();
+    }
+
+    @Test
+    void memberSearchFiltersBeforePagingAndKeepsLegacyFullList() {
+        realMemberRepository.save(existingMember("2026000001", "김가람", "a@example.com"));
+        realMemberRepository.save(existingMember("2026000002", "김나래", "b@example.com"));
+        Member unverified = existingMember("2026000003", "김다솜", "c@example.com");
+        unverified.setEmailVerified(false);
+        realMemberRepository.save(unverified);
+        realMemberRepository.save(existingMember("2026000004", "박가람", "d@example.com"));
+
+        assertThat(realAdminService.listMembers()).hasSize(4);
+        var first = realAdminService.listMembers(0, 1, "김", "USER", "VERIFIED");
+        var second = realAdminService.listMembers(1, 1, "김", "USER", "VERIFIED");
+        assertThat(first.getTotalElements()).isEqualTo(2);
+        assertThat(first.getContent()).extracting(MemberResponse::studentId).containsExactly("2026000001");
+        assertThat(second.getContent()).extracting(MemberResponse::studentId).containsExactly("2026000002");
+        assertThat(realAdminService.listMembers(0, 20, "2026000003", null, "UNVERIFIED")
+                .getContent()).extracting(MemberResponse::studentId).containsExactly("2026000003");
+        assertThat(realAdminService.listMembers(0, 20, "b@example.com", null, null)
+                .getContent()).extracting(MemberResponse::studentId).containsExactly("2026000002");
+    }
+
+    @Test
+    void memberSearchMatchesGenerationSuffixAndTreatsWildcardsLiterally() {
+        Member gen12 = existingMember("2026000001", "김가람", "a@example.com");
+        gen12.setGeneration("12");
+        realMemberRepository.save(gen12);
+        realMemberRepository.save(existingMember("2026000002", "김나래", "b@example.com"));
+        Member underscore = existingMember("2026000003", "박_다솜", "c@example.com");
+        realMemberRepository.save(underscore);
+
+        assertThat(realAdminService.listMembers(0, 20, "12기", null, null).getContent())
+                .extracting(MemberResponse::studentId).containsExactly("2026000001");
+        assertThat(realAdminService.listMembers(0, 20, "%", null, null).getContent()).isEmpty();
+        assertThat(realAdminService.listMembers(0, 20, "_", null, null).getContent())
+                .extracting(MemberResponse::studentId).containsExactly("2026000003");
+        assertThat(realAdminService.listMembers(0, 20, "박_다", null, null).getContent()).hasSize(1);
+    }
+
+    @Test
+    void memberSearchKeepsTextEndingInGiAndMatchesPhoneDigits() {
+        Member nameEndingInGi = existingMember("2026000001", "김기", "a@example.com");
+        realMemberRepository.save(nameEndingInGi);
+        Member phone = existingMember("2026000002", "김나래", "b@example.com");
+        phone.setPhone("010 (1234) 5678");
+        realMemberRepository.save(phone);
+
+        assertThat(realAdminService.listMembers(0, 20, "김기", null, null).getContent())
+                .extracting(MemberResponse::studentId).containsExactly("2026000001");
+        assertThat(realAdminService.listMembers(0, 20, "01012345678", null, null).getContent())
+                .extracting(MemberResponse::studentId).containsExactly("2026000002");
+        assertThat(realAdminService.listMembers(0, 20, "010-1234-5678", null, null).getContent())
+                .extracting(MemberResponse::studentId).containsExactly("2026000002");
+    }
+
+    @Test
+    void loginAuditUnpagedSizeReturnsEveryLoggedInMember() {
+        Member a = existingMember("2026000001", "김가람", "a@example.com");
+        a.setLastLoginAt(LocalDateTime.of(2026, 1, 1, 9, 0));
+        realMemberRepository.save(a);
+        Member b = existingMember("2026000002", "김나래", "b@example.com");
+        b.setLastLoginAt(LocalDateTime.of(2026, 1, 2, 9, 0));
+        realMemberRepository.save(b);
+
+        assertThat(realAdminService.listLoginAudit(0, Integer.MAX_VALUE).getContent())
+                .extracting(LoginAuditResponse::studentId).containsExactly("2026000002", "2026000001");
+    }
+
+    @Test
+    void loginAuditReadsOnlyOneDatabasePage() {
+        Member older = existingMember("2026000001", "김가람", "a@example.com");
+        older.setLastLoginAt(LocalDateTime.of(2026, 1, 1, 9, 0));
+        realMemberRepository.save(older);
+        Member newer = existingMember("2026000002", "김나래", "b@example.com");
+        newer.setLastLoginAt(LocalDateTime.of(2026, 1, 2, 9, 0));
+        realMemberRepository.save(newer);
+        realMemberRepository.save(existingMember("2026000003", "김다솜", "c@example.com"));
+
+        var audit = realAdminService.listLoginAudit(0, 1);
+        assertThat(audit.getTotalElements()).isEqualTo(2);
+        assertThat(audit.getContent()).singleElement()
+                .satisfies(row -> assertThat(row.studentId()).isEqualTo("2026000002"));
+        assertThat(realAdminService.listLoginAudit(1, 1).getContent()).singleElement()
+                .satisfies(row -> assertThat(row.studentId()).isEqualTo("2026000001"));
     }
 
     @Test

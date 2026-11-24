@@ -82,8 +82,16 @@ public class AdminController {
 
     @GetMapping("/members")
     public ResponseEntity<List<MemberResponse>> members(@RequestParam(required = false) Integer page,
-                                                        @RequestParam(required = false) Integer size) {
-        return ListPagination.paginate(adminService.listMembers(), page, size);
+                                                        @RequestParam(required = false) Integer size,
+                                                        @RequestParam(required = false) String search,
+                                                        @RequestParam(required = false) String role,
+                                                        @RequestParam(required = false) String status) {
+        if (page == null && size == null && search == null && role == null && status == null) {
+            return ResponseEntity.ok(adminService.listMembers());
+        }
+        ListPagination.Resolved resolved = ListPagination.resolve(page, size);
+        var result = adminService.listMembers(resolved.page(), resolved.size(), search, role, status);
+        return ListPagination.paginated(result.getContent(), result.getTotalElements());
     }
 
     @PostMapping("/members")
@@ -216,8 +224,15 @@ public class AdminController {
     }
 
     @GetMapping("/login-audit")
-    public ResponseEntity<List<LoginAuditResponse>> loginAudit() {
-        return ResponseEntity.ok(adminService.listLoginAudit());
+    public ResponseEntity<List<LoginAuditResponse>> loginAudit(@RequestParam(required = false) Integer page,
+                                                               @RequestParam(required = false) Integer size) {
+        if (page == null && size == null) {
+            // Legacy contract: no paging params returns the full list as a bare array.
+            return ResponseEntity.ok(adminService.listLoginAudit(0, Integer.MAX_VALUE).getContent());
+        }
+        ListPagination.Resolved resolved = ListPagination.resolve(page, size);
+        var result = adminService.listLoginAudit(resolved.page(), resolved.size());
+        return ListPagination.paginated(result.getContent(), result.getTotalElements());
     }
 
     @GetMapping("/recruit-applications")

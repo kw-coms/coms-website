@@ -75,6 +75,7 @@ public class AuthService implements UserDetailsService {
     private final AuditLogService auditLogService;
     private final RefreshSessionService refreshSessionService;
     private final PendingSignupService pendingSignupService;
+    private final Clock clock;
     private final SlidingWindowRateLimiter passwordResetRequestsByIp;
     private final SlidingWindowRateLimiter passwordResetCodesByAccount;
     private final SlidingWindowRateLimiter passwordResetConfirmsByIp;
@@ -104,6 +105,7 @@ public class AuthService implements UserDetailsService {
         this.auditLogService = auditLogService;
         this.refreshSessionService = refreshSessionService;
         this.pendingSignupService = pendingSignupService;
+        this.clock = clock;
         this.passwordResetRequestsByIp = new SlidingWindowRateLimiter(
                 MAX_PASSWORD_RESET_REQUESTS_PER_IP, PASSWORD_RESET_REQUEST_IP_WINDOW, clock);
         this.passwordResetCodesByAccount = new SlidingWindowRateLimiter(
@@ -152,7 +154,7 @@ public class AuthService implements UserDetailsService {
         }
 
         try {
-            member.setLastLoginAt(LocalDateTime.now());
+            member.setLastLoginAt(LocalDateTime.now(clock));
             member.setLastLoginIp(clientIp);
             memberRepository.save(member);
         } catch (Exception ignored) {
@@ -172,7 +174,7 @@ public class AuthService implements UserDetailsService {
     }
 
     private void checkLoginLockout(String identifier, String clientIp) {
-        LocalDateTime windowStart = LocalDateTime.now().minusMinutes(LOCKOUT_WINDOW_MINUTES);
+        LocalDateTime windowStart = LocalDateTime.now(clock).minusMinutes(LOCKOUT_WINDOW_MINUTES);
         boolean hasIp = normalizeNullable(clientIp) != null;
         long pairFailures = identifier == null || !hasIp ? 0
                 : loginFailureRepository.countByStudentIdAndIpAndAttemptedAtAfter(identifier, clientIp, windowStart);
@@ -199,7 +201,7 @@ public class AuthService implements UserDetailsService {
     }
 
     private void recordLoginFailure(String identifier, String clientIp) {
-        loginFailureRepository.save(new LoginFailure(identifier, clientIp));
+        loginFailureRepository.save(new LoginFailure(identifier, clientIp, LocalDateTime.now(clock)));
     }
 
     private java.util.Optional<Member> findMemberByIdentifier(String identifier) {
@@ -301,7 +303,7 @@ public class AuthService implements UserDetailsService {
                     }
                     String code = newSixDigitCode();
                     member.setPasswordResetCodeHash(passwordEncoder.encode(code));
-                    member.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(PASSWORD_RESET_EXPIRES_MINUTES));
+                    member.setPasswordResetExpiresAt(LocalDateTime.now(clock).plusMinutes(PASSWORD_RESET_EXPIRES_MINUTES));
                     member.resetPasswordResetAttempts();
                     memberRepository.save(member);
                     emailVerificationSender.sendPasswordResetCode(member.getEmail(), code);
@@ -333,7 +335,7 @@ public class AuthService implements UserDetailsService {
         if (member.getPasswordResetCodeHash() == null || member.getPasswordResetExpiresAt() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "먼저 비밀번호 재설정 인증코드를 요청해주세요.");
         }
-        if (member.getPasswordResetExpiresAt().isBefore(LocalDateTime.now())) {
+        if (member.getPasswordResetExpiresAt().isBefore(LocalDateTime.now(clock))) {
             clearPasswordResetCode(member);
             memberRepository.save(member);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호 재설정 인증코드가 만료되었습니다.");
@@ -419,7 +421,7 @@ public class AuthService implements UserDetailsService {
         enforceEmailVerificationResendCooldown(member);
         String code = newSixDigitCode();
         member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
-        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
+        member.setEmailVerificationExpiresAt(LocalDateTime.now(clock).plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
         member.resetEmailVerificationAttempts();
         memberRepository.save(member);
         emailVerificationSender.sendVerificationCode(member.getEmail(), code);
@@ -440,7 +442,7 @@ public class AuthService implements UserDetailsService {
         if (member.getEmailVerificationCodeHash() == null || member.getEmailVerificationExpiresAt() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "먼저 이메일 인증코드를 요청해주세요.");
         }
-        if (member.getEmailVerificationExpiresAt().isBefore(LocalDateTime.now())) {
+        if (member.getEmailVerificationExpiresAt().isBefore(LocalDateTime.now(clock))) {
             clearEmailVerificationCode(member);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이메일 인증코드가 만료되었습니다.");
         }
@@ -508,7 +510,7 @@ public class AuthService implements UserDetailsService {
             return;
         }
 
-        LocalDateTime cooldownBoundary = LocalDateTime.now()
+        LocalDateTime cooldownBoundary = LocalDateTime.now(clock)
                 .plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES - EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES);
         if (expiresAt.isAfter(cooldownBoundary)) {
             log.warn("Rate limit rejected: limiter=email-verification-cooldown key={}",
@@ -523,7 +525,7 @@ public class AuthService implements UserDetailsService {
             return false;
         }
 
-        LocalDateTime cooldownBoundary = LocalDateTime.now()
+        LocalDateTime cooldownBoundary = LocalDateTime.now(clock)
                 .plusMinutes(PASSWORD_RESET_EXPIRES_MINUTES - PASSWORD_RESET_RESEND_COOLDOWN_MINUTES);
         return expiresAt.isAfter(cooldownBoundary);
     }

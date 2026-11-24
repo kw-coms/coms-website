@@ -27,6 +27,12 @@ public class LoginFailure {
         this.ip = ip;
     }
 
+    public LoginFailure(String studentId, String ip, LocalDateTime attemptedAt) {
+        this.studentId = studentId;
+        this.ip = ip;
+        this.attemptedAt = attemptedAt;
+    }
+
     public Long getId() { return id; }
     public String getStudentId() { return studentId; }
     public String getIp() { return ip; }

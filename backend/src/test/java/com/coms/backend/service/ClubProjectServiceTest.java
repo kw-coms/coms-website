@@ -33,6 +33,12 @@ class ClubProjectServiceTest {
     private ClubProjectRepository clubProjectRepository;
 
     @Autowired
+    private com.coms.backend.repository.ClubProjectImageRepository imageRepository;
+
+    @Autowired
+    private com.coms.backend.repository.ClubProjectFileRepository fileRepository;
+
+    @Autowired
     private com.coms.backend.repository.MemberRepository memberRepository;
 
     @Test
@@ -75,11 +81,23 @@ class ClubProjectServiceTest {
         member.setPassword("unused");
         memberRepository.save(member);
 
+        long publicCount = clubProjectCategoryService.list().stream()
+                .filter(category -> category.key().equals("APP")).findFirst().orElseThrow().projectCount();
         var created = clubProjectService.createForMember("2099000001", "APP", "회원 작품", "소개", null, "https://example.com");
         assertThat(created.madeBy()).isEqualTo("작품 회원");
         assertThat(created.canEdit()).isTrue();
+        assertThat(created.reviewStatus()).isEqualTo("PENDING");
+        assertThat(clubProjectService.list()).noneMatch(p -> p.id().equals(created.id()));
+        assertThat(clubProjectCategoryService.list().stream()
+                .filter(category -> category.key().equals("APP")).findFirst().orElseThrow().projectCount())
+                .isEqualTo(publicCount);
         assertThat(clubProjectService.list("2099000001", false)).filteredOn(p -> p.id().equals(created.id()))
                 .singleElement().satisfies(p -> assertThat(p.canEdit()).isTrue());
+        clubProjectService.review(created.id(), com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED,
+                clubProjectRepository.findById(created.id()).orElseThrow().getVersion());
+        assertThat(clubProjectCategoryService.list().stream()
+                .filter(category -> category.key().equals("APP")).findFirst().orElseThrow().projectCount())
+                .isEqualTo(publicCount + 1);
         assertThat(clubProjectService.list("2099000002", false)).filteredOn(p -> p.id().equals(created.id()))
                 .singleElement().satisfies(p -> assertThat(p.canEdit()).isFalse());
         assertThatThrownBy(() -> clubProjectService.requireEditor(created.id(), "2099000002", false))
@@ -99,20 +117,92 @@ class ClubProjectServiceTest {
     void imageUploadChecksActualBytesAndCountsCoverFirst() {
         var project = clubProjectService.create("APP", "사진 작품", null, null, "제작자", null, null, null);
         var fake = new MockMultipartFile("images", "fake.png", "image/png", "not an image".getBytes());
-        assertThatThrownBy(() -> clubProjectService.addImages(project.id(), java.util.List.of(fake)))
+        assertThatThrownBy(() -> clubProjectService.addImages(project.id(), java.util.List.of(fake), null, true))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value()).isEqualTo(400));
         byte[] png = java.util.Base64.getDecoder().decode(
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lWQAAAAASUVORK5CYII=");
         var image = new MockMultipartFile("images", "cover.png", "image/png", png);
-        Long imageId = clubProjectService.addImages(project.id(), java.util.List.of(image)).getFirst();
-        assertThat(clubProjectService.list().stream().filter(p -> p.id().equals(project.id())).findFirst().orElseThrow().images())
+        Long imageId = clubProjectService.addImages(project.id(), java.util.List.of(image), null, true).getFirst();
+        assertThat(clubProjectService.list(null, true).stream().filter(p -> p.id().equals(project.id())).findFirst().orElseThrow().images())
                 .singleElement().satisfies(info -> assertThat(info.url()).endsWith("/images/" + imageId));
         assertThat(clubProjectService.loadImageResource(project.id(), imageId).exists()).isTrue();
-        assertThatThrownBy(() -> clubProjectService.addImages(project.id(), java.util.Collections.nCopies(6, image)))
+        assertThatThrownBy(() -> clubProjectService.addImages(project.id(), java.util.Collections.nCopies(6, image), null, true))
                 .isInstanceOf(ResponseStatusException.class);
-        clubProjectService.deleteImage(project.id(), imageId);
-        assertThat(clubProjectService.list().stream().filter(p -> p.id().equals(project.id())).findFirst().orElseThrow().images()).isEmpty();
+        clubProjectService.deleteImage(project.id(), imageId, null, true);
+        assertThat(clubProjectService.list(null, true).stream().filter(p -> p.id().equals(project.id())).findFirst().orElseThrow().images()).isEmpty();
+    }
+
+    private static final byte[] PNG = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lWQAAAAASUVORK5CYII=");
+
+    private void saveMember(String studentId) {
+        var member = new com.coms.backend.domain.Member();
+        member.setStudentId(studentId);
+        member.setName("회원 " + studentId);
+        member.setEmail(studentId + "@example.invalid");
+        member.setPassword("unused");
+        memberRepository.save(member);
+    }
+
+    @Test
+    void ownerImageUploadRequeuesAnApprovedProjectBeforeReturning() {
+        saveMember("2099000011");
+        var project = clubProjectService.createForMember("2099000011", "APP", "새 이미지 작품", "소개", null, null);
+        var fileId = clubProjectService.addFile(project.id(),
+                new MockMultipartFile("file", "release.zip", "application/zip", ZIP_BYTES));
+        clubProjectService.review(project.id(), com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED,
+                clubProjectRepository.findById(project.id()).orElseThrow().getVersion());
+        long versionBefore = clubProjectRepository.findById(project.id()).orElseThrow().getVersion();
+        var image = new MockMultipartFile("images", "new.png", "image/png", PNG);
+
+        Long imageId = clubProjectService.addImages(project.id(), java.util.List.of(image), "2099000011", false).getFirst();
+
+        assertThat(clubProjectRepository.findById(project.id()).orElseThrow().getReviewStatus())
+                .isEqualTo(com.coms.backend.domain.ClubProject.ReviewStatus.PENDING);
+        assertThat(clubProjectRepository.findById(project.id()).orElseThrow().getVersion()).isGreaterThan(versionBefore);
+        assertThatThrownBy(() -> clubProjectService.loadVisibleImageMeta(project.id(), imageId, null, false))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> clubProjectService.loadVisibleFileMeta(project.id(), fileId, null, false))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(imageRepository.findVisibleByProjectIds(java.util.List.of(project.id()),
+                com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED, false, null)).isEmpty();
+        assertThat(fileRepository.findVisibleByProjectIds(java.util.List.of(project.id()),
+                com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED, false, null)).isEmpty();
+        assertThat(imageRepository.findVisibleByProjectIds(java.util.List.of(project.id()),
+                com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED, true, null)).hasSize(1);
+    }
+
+    @Test
+    void managerImageUploadKeepsApprovedProjectVisibleToGuests() {
+        var project = clubProjectService.create("APP", "관리자 이미지 작품", null, null, "제작자", null, null, null);
+        assertThat(clubProjectRepository.findById(project.id()).orElseThrow().getReviewStatus())
+                .isEqualTo(com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED);
+        var image = new MockMultipartFile("images", "new.png", "image/png", PNG);
+
+        Long imageId = clubProjectService.addImages(project.id(), java.util.List.of(image), null, true).getFirst();
+
+        assertThat(clubProjectRepository.findById(project.id()).orElseThrow().getReviewStatus())
+                .isEqualTo(com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED);
+        assertThat(clubProjectService.loadVisibleImageMeta(project.id(), imageId, null, false)).isNotNull();
+        assertThat(imageRepository.findVisibleByProjectIds(java.util.List.of(project.id()),
+                com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED, false, null)).hasSize(1);
+    }
+
+    @Test
+    void imageDeleteChecksPermissionBeforeLookingUpTheImage() {
+        saveMember("2099000012");
+        saveMember("2099000013");
+        var project = clubProjectService.createForMember("2099000012", "APP", "삭제 작품", "소개", null, null);
+        var image = new MockMultipartFile("images", "new.png", "image/png", PNG);
+        Long imageId = clubProjectService.addImages(project.id(), java.util.List.of(image), "2099000012", false).getFirst();
+
+        // Existing and missing image ids must be indistinguishable to a non-editor.
+        for (Long probe : new Long[]{imageId, imageId + 9999}) {
+            assertThatThrownBy(() -> clubProjectService.deleteImage(project.id(), probe, "2099000013", false))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value()).isEqualTo(403));
+        }
     }
 
     @Test

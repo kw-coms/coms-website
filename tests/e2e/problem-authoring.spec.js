@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { asMember, mockOptionalApis } from './visualSupport.js'
+import { asMember, mockOptionalApis, signInHint } from './visualSupport.js'
 
 test.use({ reducedMotion: 'reduce' })
 
@@ -79,6 +79,7 @@ test('member writes examples and five private cases, verifies, and requests revi
 
 test('president verifies a pending proposal and publishes its number', async ({ page }, info) => {
   await mockOptionalApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 1, studentId: '2026000001', name: '회장', role: 'ADMIN', emailVerified: true } }))
   let current = { ...proposal('pending'), owned: false }
   await page.route('**/study/api/club', (route) => {

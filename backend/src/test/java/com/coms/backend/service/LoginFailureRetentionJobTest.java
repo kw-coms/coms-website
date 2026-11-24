@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,6 +27,9 @@ class LoginFailureRetentionJobTest {
     private LoginFailureRetentionJob job;
 
     @Autowired
+    private Clock clock;
+
+    @Autowired
     private LoginFailureRepository loginFailureRepository;
 
     @Autowired
@@ -41,7 +45,7 @@ class LoginFailureRetentionJobTest {
 
     @Test
     void deletesOnlyRowsOlderThanTheRetentionWindow() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         insert("2026123456", "203.0.113.1", now.minusDays(31));
         insert("2026123457", "203.0.113.2", now.minusDays(400));
         insert("2026123458", "203.0.113.3", now.minusDays(29));
@@ -54,12 +58,12 @@ class LoginFailureRetentionJobTest {
 
     @Test
     void keepsEverythingWhenRetentionIsDisabled() {
-        insert("2026123456", "203.0.113.1", LocalDateTime.now().minusDays(400));
+        insert("2026123456", "203.0.113.1", LocalDateTime.now(clock).minusDays(400));
 
         LoginFailureRetentionJob disabled =
                 new LoginFailureRetentionJob(loginFailureRepository, refreshSessionRepository,
                         org.mockito.Mockito.mock(PendingSignupService.class),
-                        java.time.Clock.systemDefaultZone(), false);
+                        clock, false);
         disabled.purgeOldLoginFailures();
 
         assertThat(loginFailureRepository.count()).isEqualTo(1);
@@ -68,7 +72,7 @@ class LoginFailureRetentionJobTest {
     @Test
     void deletesRefreshSessionsThatExpiredOrWereRevokedOverAWeekAgo() {
         refreshSessionRepository.deleteAll();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         insertSession("expired-long-ago", now.minusDays(30), null);
         insertSession("revoked-long-ago", now.plusDays(20), now.minusDays(8));
         insertSession("revoked-yesterday", now.plusDays(20), now.minusDays(1));
@@ -86,7 +90,7 @@ class LoginFailureRetentionJobTest {
                         + "VALUES (?, ?, ?, FALSE, ?, ?, ?)",
                 jti, jti, "2026123456", Timestamp.valueOf(expiresAt),
                 revokedAt == null ? null : Timestamp.valueOf(revokedAt),
-                Timestamp.valueOf(LocalDateTime.now()));
+                Timestamp.valueOf(LocalDateTime.now(clock)));
     }
 
     private void insert(String studentId, String ip, LocalDateTime attemptedAt) {

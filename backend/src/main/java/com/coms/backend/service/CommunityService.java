@@ -36,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -86,6 +87,7 @@ public class CommunityService {
     private final CommunityMediaService mediaService;
     private final CommunityCommentService commentService;
     private final YouTubeSearchService youTubeSearchService;
+    private final Clock clock;
 
     public CommunityService(CommunityPostRepository communityPostRepository,
                             CommunityPostVoteRepository voteRepository,
@@ -103,7 +105,8 @@ public class CommunityService {
                             CommunityReputationService reputationService,
                             CommunityMediaService mediaService,
                             CommunityCommentService commentService,
-                            YouTubeSearchService youTubeSearchService) {
+                            YouTubeSearchService youTubeSearchService,
+                            Clock clock) {
         this.communityPostRepository = communityPostRepository;
         this.voteRepository = voteRepository;
         this.bookmarkRepository = bookmarkRepository;
@@ -121,6 +124,7 @@ public class CommunityService {
         this.mediaService = mediaService;
         this.commentService = commentService;
         this.youTubeSearchService = youTubeSearchService;
+        this.clock = clock;
     }
 
     // ---- Post listing --------------------------------------------------------------------------
@@ -282,6 +286,9 @@ public class CommunityService {
         SanitizedPost sanitized = validateRequest(request);
         access.requireCategoryAllowed(member, sanitized.category());
         CommunityPost post = new CommunityPost();
+        LocalDateTime now = LocalDateTime.now(clock);
+        post.setCreatedAt(now);
+        post.setUpdatedAt(now);
         post.setTitle(sanitized.title());
         post.setContent(sanitized.content());
         post.setCategory(sanitized.category());
@@ -329,7 +336,7 @@ public class CommunityService {
         }
         mediaService.attachImage(post, image);
         if (titleChanged || !isInitialFinalization) {
-            post.markEdited();
+            post.markEdited(LocalDateTime.now(clock));
         }
         CommunityPost saved = communityPostRepository.save(post);
         auditLogService.record(member.getStudentId(), "COMMUNITY_POST_UPDATE", "COMMUNITY_POST", String.valueOf(saved.getId()), textService.safeTitle(saved.getTitle()), null);
@@ -493,7 +500,7 @@ public class CommunityService {
         if (optionIndex < 0 || optionIndex >= poll.optionCount()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "투표 선택지가 올바르지 않습니다.");
         }
-        if (poll.isClosed()) {
+        if (poll.isClosed(LocalDateTime.now(clock))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "종료된 투표입니다.");
         }
         Optional<CommunityPollVote> existing = pollVoteRepository.findByPostIdAndPollIdAndStudentId(post.getId(), poll.pollId(), member.getStudentId());
@@ -737,7 +744,7 @@ public class CommunityService {
     }
 
     private void enforcePostRateLimit(String studentId) {
-        LocalDateTime windowStart = LocalDateTime.now().minusMinutes(1);
+        LocalDateTime windowStart = LocalDateTime.now(clock).minusMinutes(1);
         long recentPostCount = communityPostRepository.countByAuthorStudentIdAndCreatedAtAfter(studentId, windowStart);
         if (recentPostCount >= MAX_POSTS_PER_MINUTE) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
@@ -747,7 +754,7 @@ public class CommunityService {
 
     private boolean isInitialFinalization(CommunityPost post, String nextContent) {
         return !post.isEdited()
-                && java.time.Duration.between(post.getCreatedAt(), java.time.LocalDateTime.now()).toMinutes() < 5
+                && java.time.Duration.between(post.getCreatedAt(), LocalDateTime.now(clock)).toMinutes() < 5
                 && isUploadFinalizationContent(post.getContent(), nextContent);
     }
 
@@ -943,7 +950,7 @@ public class CommunityService {
             for (JsonNode block : root) {
                 if (block.isObject() && "poll".equals(block.path("type").asText()) && pollId.equals(block.path("pollId").asText())) {
                     ObjectNode copy = ((ObjectNode) block).deepCopy();
-                    copy.put("closedAt", LocalDateTime.now().toString());
+                    copy.put("closedAt", LocalDateTime.now(clock).toString());
                     next.add(copy);
                     found = true;
                 } else {
@@ -1030,7 +1037,7 @@ public class CommunityService {
                 myOption = index;
             }
         }
-        return new CommunityPostResponse.PollResult(definition.pollId(), counts, myOption, definition.closesAt(), definition.closedAt(), definition.isClosed());
+        return new CommunityPostResponse.PollResult(definition.pollId(), counts, myOption, definition.closesAt(), definition.closedAt(), definition.isClosed(LocalDateTime.now(clock)));
     }
 
     private CommunityPostResponse toResponse(CommunityPost post,
@@ -1198,8 +1205,8 @@ public class CommunityService {
     }
 
     private record PollDefinition(String pollId, int optionCount, LocalDateTime closesAt, LocalDateTime closedAt) {
-        boolean isClosed() {
-            return closedAt != null || (closesAt != null && !LocalDateTime.now().isBefore(closesAt));
+        boolean isClosed(LocalDateTime now) {
+            return closedAt != null || (closesAt != null && !now.isBefore(closesAt));
         }
     }
 

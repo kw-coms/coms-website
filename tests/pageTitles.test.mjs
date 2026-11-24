@@ -16,6 +16,13 @@ assert.equal(documentTitleFor('/community/members/2026123456'), "회원 프로�
 assert.equal(documentTitleFor('/resources/12'), "자료실 | KW COM's")
 assert.equal(documentTitleFor('/login'), "로그인 | KW COM's")
 assert.equal(documentTitleFor('/apps/7', '두 사람이 만든 앱'), "두 사람이 만든 앱 | 작품 | KW COM's")
+assert.equal(documentTitleFor('/hackathon', '해커톤 아카이브'), "해커톤 아카이브 | KW COM's")
+for (const path of ['/notices', '/apps/7', '/hackathon', '/study/web']) {
+  const base = documentTitleFor(path)
+  assert.equal(documentTitleFor(path, base), base, 'an already formatted title has one suffix')
+  const titled = documentTitleFor(path, '세부 제목')
+  assert.equal(documentTitleFor(path, titled), titled, 'formatting an item title is idempotent')
+}
 
 // An opened item's own title leads, so the tab says what is being read.
 assert.equal(documentTitleFor('/notices/3', '  정기 총회   안내 '), "정기 총회 안내 | 공지사항 | KW COM's")

@@ -12,7 +12,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "hackathon_reviews", uniqueConstraints =
-        @UniqueConstraint(name = "uq_hackathon_review_identity", columnNames = {"event_id", "project_id", "generation", "name_key"}))
+        {@UniqueConstraint(name = "uq_hackathon_review_ip", columnNames = {"event_id", "project_id", "ip_key"}),
+         @UniqueConstraint(name = "uq_hackathon_review_member", columnNames = {"event_id", "project_id", "reviewer_student_id"})})
 public class HackathonReview {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -26,6 +27,10 @@ public class HackathonReview {
     private String name;
     @Column(name = "name_key", nullable = false, length = 80)
     private String nameKey;
+    @Column(name = "ip_key", length = 45)
+    private String ipKey;
+    @Column(name = "reviewer_student_id", length = 20)
+    private String reviewerStudentId;
     @Column(nullable = false)
     private boolean chair;
     @Column(name = "theme_fit", nullable = false)
@@ -54,6 +59,10 @@ public class HackathonReview {
     public void setName(String value) { name = value; }
     public String getNameKey() { return nameKey; }
     public void setNameKey(String value) { nameKey = value; }
+    public String getIpKey() { return ipKey; }
+    public void setIpKey(String value) { ipKey = value; }
+    public String getReviewerStudentId() { return reviewerStudentId; }
+    public void setReviewerStudentId(String value) { reviewerStudentId = value; }
     public boolean isChair() { return chair; }
     public void setChair(boolean value) { chair = value; }
     public Integer getThemeFit() { return themeFit; }

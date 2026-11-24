@@ -53,6 +53,7 @@ class AuthControllerCookieTest {
         List<String> cookies = response.getHeaders(HttpHeaders.SET_COOKIE);
         assertThat(cookies).allSatisfy(cookie -> assertThat(cookie).doesNotContain("Max-Age"));
         assertThat(cookies).allSatisfy(cookie -> assertThat(cookie).contains("SameSite=Lax"));
+        assertThat(cookies).anySatisfy(cookie -> assertThat(cookie).contains("comsSession=1", "Path=/").doesNotContain("HttpOnly"));
     }
 
     @Test
@@ -66,6 +67,7 @@ class AuthControllerCookieTest {
         List<String> cookies = response.getHeaders(HttpHeaders.SET_COOKIE);
         assertThat(cookies).anySatisfy(cookie -> assertThat(cookie).contains("refreshToken=refresh", "Max-Age=2592000"));
         assertThat(cookies).anySatisfy(cookie -> assertThat(cookie).contains("token=access").doesNotContain("Max-Age"));
+        assertThat(cookies).anySatisfy(cookie -> assertThat(cookie).contains("comsSession=1", "Max-Age=2592000").doesNotContain("HttpOnly"));
     }
 
     @Test
@@ -105,5 +107,15 @@ class AuthControllerCookieTest {
 
         List<String> cookies = response.getHeaders(HttpHeaders.SET_COOKIE);
         assertThat(cookies).allSatisfy(cookie -> assertThat(cookie).contains("SameSite=Lax"));
+    }
+
+    @Test
+    void logoutClearsSessionHintAlongsideCredentials() {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        controller.logout(new MockHttpServletRequest(), response);
+
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE))
+                .anySatisfy(cookie -> assertThat(cookie).contains("comsSession=", "Max-Age=0", "Path=/"));
     }
 }

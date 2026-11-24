@@ -16,6 +16,7 @@ import com.coms.backend.repository.RecruitApplicationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -49,6 +50,7 @@ public class AdminAnalyticsService {
     private final ClubActivityRepository clubActivityRepository;
     private final ClubEventRepository clubEventRepository;
     private final ArchiveFileRepository archiveFileRepository;
+    private final Clock clock;
 
     public AdminAnalyticsService(MemberRepository memberRepository,
                                  NoticeRepository noticeRepository,
@@ -58,7 +60,8 @@ public class AdminAnalyticsService {
                                  RecruitApplicationRepository recruitApplicationRepository,
                                  ClubActivityRepository clubActivityRepository,
                                  ClubEventRepository clubEventRepository,
-                                 ArchiveFileRepository archiveFileRepository) {
+                                 ArchiveFileRepository archiveFileRepository,
+                                 Clock clock) {
         this.memberRepository = memberRepository;
         this.noticeRepository = noticeRepository;
         this.communityPostRepository = communityPostRepository;
@@ -68,6 +71,7 @@ public class AdminAnalyticsService {
         this.clubActivityRepository = clubActivityRepository;
         this.clubEventRepository = clubEventRepository;
         this.archiveFileRepository = archiveFileRepository;
+        this.clock = clock;
     }
 
     public AdminAnalyticsResponse buildAnalytics() {
@@ -103,7 +107,7 @@ public class AdminAnalyticsService {
     }
 
     private List<AdminAnalyticsResponse.MonthlyCount> recruitApplicationsByMonth() {
-        YearMonth currentMonth = YearMonth.from(LocalDate.now());
+        YearMonth currentMonth = YearMonth.from(LocalDate.now(clock));
         YearMonth firstMonth = currentMonth.minusMonths(TIME_SERIES_MONTHS - 1L);
         LocalDateTime since = firstMonth.atDay(1).atStartOfDay();
 

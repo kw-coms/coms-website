@@ -4,7 +4,7 @@ const project = (projectId, title, author, description, github, live, presentati
   materials: [file(start, projectId, 'proposal', `/hackathon-2026/${projectId}/proposal.pdf`, '계획서 PDF'), file(start + 1, projectId, 'presentation', `/hackathon-2026/${projectId}/${presentation}`, `발표 자료 ${presentation.endsWith('.pptx') ? 'PPTX' : 'PDF'}`), file(start + 2, projectId, 'video', `/hackathon-2026/${projectId}/demo.mp4`, '시연 영상'), file(start + 3, projectId, 'poster', `/hackathon-2026/${projectId}/poster.jpg`, '포스터')],
 })
 export const legacyEvent = {
-  id: 1, title: 'COM’s 해커톤 2026', year: 2026, semester: 2, open: true, published: true,
+  id: 1, title: 'COM’s 해커톤 2026', year: 2026, semester: 2, open: true, allowGuestReviews: true, published: true,
   startsAt: '2026-11-08T18:00:00', endsAt: '2026-11-15T04:00:00', status: 'REVIEWING', resultsPublished: false, results: [],
   theme: '전쟁', introduction: '전쟁이 일어났을 때, 사람들에게 무엇이 필요할까요?\n그 문제를 해결하는 서비스를 만드는 해커톤입니다. 개발 기간은 11월 8일 18:00부터 11월 15일 04:00까지입니다.',
   rules: '5개 항목을 각 20점, 총 100점으로 평가합니다. 최종 점수는 졸업생 평균 50% + 회장 평가 50%이며, 동점이면 완성도 → 주제 적합성 순으로 결정합니다.',
@@ -15,8 +15,8 @@ export const legacyEvent = {
     project('still', 'Still', '정한아 · 한아님', '떨어진 가족이 짧은 영상과 음성으로 일상을 나눕니다.', 'https://github.com/JeongHanAh/2026COM-s-Hackathon', 'https://example.com/still', 'presentation.pptx', 9),
   ],
 }
-export const futureEvent = { id: 2, title: '2027년 1학기 해커톤', year: 2027, semester: 1, open: true, published: true, startsAt: null, endsAt: null, status: 'REVIEWING', resultsPublished: false, results: [], theme: '캠퍼스', introduction: '새 행사 소개', rules: '각 항목 20점', materials: [], projects: [{ projectId: 'future-team', title: '새 팀', author: '테스트 팀', description: '새 행사 작품입니다.', github: null, live: null, position: 0, materials: [] }] }
-export const summary = (event) => ({ id: event.id, title: event.title, year: event.year, semester: event.semester, open: event.open, theme: event.theme, startsAt: event.startsAt, endsAt: event.endsAt, status: event.status, resultsPublished: event.resultsPublished, projectCount: event.projects.length })
+export const futureEvent = { id: 2, title: '2027년 1학기 해커톤', year: 2027, semester: 1, open: true, allowGuestReviews: true, published: true, startsAt: null, endsAt: null, status: 'REVIEWING', resultsPublished: false, results: [], theme: '캠퍼스', introduction: '새 행사 소개', rules: '각 항목 20점', materials: [], projects: [{ projectId: 'future-team', title: '새 팀', author: '테스트 팀', description: '새 행사 작품입니다.', github: null, live: null, position: 0, materials: [] }] }
+export const summary = (event) => ({ id: event.id, title: event.title, year: event.year, semester: event.semester, open: event.open, allowGuestReviews: event.allowGuestReviews, theme: event.theme, startsAt: event.startsAt, endsAt: event.endsAt, status: event.status, resultsPublished: event.resultsPublished, projectCount: event.projects.length })
 export const adminSummary = (event) => ({ id: event.id, title: event.title, year: event.year, semester: event.semester, open: event.open, published: event.published, startsAt: event.startsAt, endsAt: event.endsAt, status: event.status, resultsPublished: event.resultsPublished })
 // 지난 행사: 평가가 닫히고 결과가 공개된 기록. 작품 자료는 그대로 남아 있다.
 export const doneEvent = {

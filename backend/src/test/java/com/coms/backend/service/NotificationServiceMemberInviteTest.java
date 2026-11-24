@@ -56,6 +56,8 @@ class NotificationServiceMemberInviteTest {
             fresh.setPassword("hashed-password");
             return memberRepository.save(fresh);
         });
+        sender.setName("Sender Member");
+        memberRepository.save(sender);
         recipient = memberRepository.findByStudentId("2026100002").orElseGet(() -> {
             Member fresh = new Member();
             fresh.setStudentId("2026100002");
@@ -93,12 +95,11 @@ class NotificationServiceMemberInviteTest {
         NotificationService.ExternalInviteBatchResult result = notificationService.notifyExternalInviteFromMember(sender.getStudentId(), req);
 
         assertThat(result.accepted()).isEqualTo(2);
-        assertThat(result.unknown()).isEmpty();
-        assertThat(result.rejected()).isZero();
+        assertThat(result.undelivered()).isZero();
         List<Notification> saved = notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(recipient.getStudentId());
         assertThat(saved).hasSize(1);
         assertThat(saved.get(0).getType()).isEqualTo(Notification.Type.EXTERNAL_INVITE);
-        assertThat(saved.get(0).getActorLabel()).isEqualTo("팀메이트");
+        assertThat(saved.get(0).getActorLabel()).isEqualTo(sender.getName());
         assertThat(saved.get(0).getActorStudentId()).isEqualTo(sender.getStudentId());
         assertThat(saved.get(0).getAcceptUrl()).contains("invite=abc");
     }
@@ -124,6 +125,8 @@ class NotificationServiceMemberInviteTest {
     @Test
     void truncatesActorLabelToOneHundredCharacters() {
         String longLabel = "ㄱ".repeat(150);
+        sender.setName(longLabel);
+        memberRepository.save(sender);
         MemberExternalInviteRequest req = request(
                 List.of(recipient.getStudentId()),
                 longLabel,
@@ -197,6 +200,19 @@ class NotificationServiceMemberInviteTest {
     }
 
     @Test
+    void unknownRecipientRequestsReachTheSamePerMinuteRateLimit() {
+        for (int i = 0; i < 10; i++) {
+            notificationService.notifyExternalInviteFromMember(sender.getStudentId(),
+                    request(List.of("9999999999"), "팀메이트", "팀플 " + i, null));
+        }
+
+        assertThatThrownBy(() -> notificationService.notifyExternalInviteFromMember(sender.getStudentId(),
+                request(List.of("9999999999"), "팀메이트", "한 건 더", null)))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+    }
+
+    @Test
     void defaultsActorLabelToSenderName() {
         MemberExternalInviteRequest req = request(
                 List.of(recipient.getStudentId()),
@@ -213,7 +229,7 @@ class NotificationServiceMemberInviteTest {
     }
 
     @Test
-    void reportsUnknownStudentIdsWithoutFailingBatch() {
+    void reportsUndeliveredCountWithoutDisclosingStudentIds() {
         MemberExternalInviteRequest req = request(
                 List.of(recipient.getStudentId(), "9999999999"),
                 "팀메이트",
@@ -224,8 +240,7 @@ class NotificationServiceMemberInviteTest {
         NotificationService.ExternalInviteBatchResult result = notificationService.notifyExternalInviteFromMember(sender.getStudentId(), req);
 
         assertThat(result.accepted()).isEqualTo(1);
-        assertThat(result.unknown()).containsExactly("9999999999");
-        assertThat(result.rejected()).isZero();
+        assertThat(result.undelivered()).isEqualTo(1);
     }
 
     @Test
@@ -240,7 +255,17 @@ class NotificationServiceMemberInviteTest {
         NotificationService.ExternalInviteBatchResult result = notificationService.notifyExternalInviteFromMember(sender.getStudentId(), req);
 
         assertThat(result.accepted()).isEqualTo(1);
-        assertThat(result.rejected()).isEqualTo(1);
+        assertThat(result.undelivered()).isEqualTo(1);
+    }
+
+    @Test
+    void ignoresImpersonatedActorLabel() {
+        var result = notificationService.notifyExternalInviteFromMember(sender.getStudentId(),
+                request(List.of(recipient.getStudentId()), "회장", "초대", null));
+        assertThat(result.accepted()).isEqualTo(1);
+        Notification saved = notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(recipient.getStudentId()).get(0);
+        assertThat(saved.getActorLabel()).isEqualTo("Sender Member");
+        assertThat(saved.getActorStudentId()).isEqualTo(sender.getStudentId());
     }
 
     @Test

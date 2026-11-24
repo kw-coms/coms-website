@@ -5,6 +5,10 @@ import org.junit.jupiter.api.Test;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -16,6 +20,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * JVM loopback resolver from the string form, and the request/response helpers work on bytes.
  */
 class LinkPreviewServiceTest {
+
+    private static final Clock SEOUL_CLOCK = Clock.system(ZoneId.of("Asia/Seoul"));
 
     private static InetAddress ip(String literal) throws UnknownHostException {
         return InetAddress.getByName(literal);
@@ -188,14 +194,14 @@ class LinkPreviewServiceTest {
      */
     @Test
     void resolveAndGuardRejectsLocalhostHost() {
-        LinkPreviewService svc = new LinkPreviewService();
+        LinkPreviewService svc = new LinkPreviewService(SEOUL_CLOCK);
         assertThatThrownBy(() -> svc.resolveAndGuard("localhost"))
                 .hasMessageContaining("허용되지 않는 링크 주소입니다.");
     }
 
     @Test
     void resolveAndGuardRejectsNonResolvingHost() {
-        LinkPreviewService svc = new LinkPreviewService();
+        LinkPreviewService svc = new LinkPreviewService(SEOUL_CLOCK);
         assertThatThrownBy(() -> svc.resolveAndGuard("this-host-does-not-exist.invalid"))
                 .hasMessageContaining("링크 호스트를 확인할 수 없습니다.");
     }
@@ -220,7 +226,7 @@ class LinkPreviewServiceTest {
 
     @Test
     void rejectsNonStandardPorts() {
-        LinkPreviewService svc = new LinkPreviewService();
+        LinkPreviewService svc = new LinkPreviewService(SEOUL_CLOCK);
         // A preview against an arbitrary port is a port scan with the server as the scanner.
         assertThatThrownBy(() -> svc.preview("https://example.com:8080/", "2026123456"))
                 .hasMessageContaining("기본 웹 포트");
@@ -230,7 +236,7 @@ class LinkPreviewServiceTest {
 
     @Test
     void limitsPreviewsPerMember() {
-        LinkPreviewService svc = new LinkPreviewService();
+        LinkPreviewService svc = new LinkPreviewService(SEOUL_CLOCK);
         // 포트 검증에서 막히더라도 제한기는 그 앞에서 이미 요청을 셌다.
         for (int i = 0; i < 20; i++) {
             assertThatThrownBy(() -> svc.preview("https://example.com:8080/", "2026123456"))
@@ -241,6 +247,27 @@ class LinkPreviewServiceTest {
 
         // 다른 회원은 자기 창을 가진다.
         assertThatThrownBy(() -> svc.preview("https://example.com:8080/", "2026123457"))
+                .hasMessageContaining("기본 웹 포트");
+    }
+
+    @Test
+    void previewLimitExpiresOnInjectedSeoulClock() {
+        AtomicReference<Instant> instant = new AtomicReference<>(Instant.parse("2026-11-30T15:30:00Z"));
+        Clock clock = new Clock() {
+            @Override public ZoneId getZone() { return ZoneId.of("Asia/Seoul"); }
+            @Override public Clock withZone(ZoneId zone) { return Clock.fixed(instant.get(), zone); }
+            @Override public Instant instant() { return instant.get(); }
+        };
+        LinkPreviewService svc = new LinkPreviewService(clock);
+        for (int i = 0; i < 20; i++) {
+            assertThatThrownBy(() -> svc.preview("https://example.com:8080/", "2026123456"))
+                    .hasMessageContaining("기본 웹 포트");
+        }
+        assertThatThrownBy(() -> svc.preview("https://example.com:8080/", "2026123456"))
+                .hasMessageContaining("링크 미리보기 요청이 많습니다");
+
+        instant.updateAndGet(value -> value.plusSeconds(61));
+        assertThatThrownBy(() -> svc.preview("https://example.com:8080/", "2026123456"))
                 .hasMessageContaining("기본 웹 포트");
     }
 
@@ -273,7 +300,7 @@ class LinkPreviewServiceTest {
             trickle.setDaemon(true);
             trickle.start();
 
-            LinkPreviewService service = new LinkPreviewService();
+            LinkPreviewService service = new LinkPreviewService(SEOUL_CLOCK);
             java.net.URI uri = java.net.URI.create("https://preview.example:" + server.getLocalPort() + "/");
             long start = System.nanoTime();
             long deadline = start + java.time.Duration.ofMillis(700).toNanos();
@@ -291,7 +318,7 @@ class LinkPreviewServiceTest {
     /** A service whose fetches return canned pages and whose hosts all resolve to one public address. */
     private static LinkPreviewService canned(java.util.List<URI> asked, LinkPreviewService.FetchedPage... pages) {
         java.util.ArrayDeque<LinkPreviewService.FetchedPage> queue = new java.util.ArrayDeque<>(java.util.List.of(pages));
-        return new LinkPreviewService() {
+        return new LinkPreviewService(SEOUL_CLOCK) {
             @Override
             InetAddress resolveAndGuard(String host) {
                 try {
@@ -356,13 +383,13 @@ class LinkPreviewServiceTest {
                 .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
         assertThat(asked).containsExactly(URI.create("https://app.example/"));
         // And the real guard still refuses a private address.
-        assertThatThrownBy(() -> new LinkPreviewService().finalStatus("https://localhost/"))
+        assertThatThrownBy(() -> new LinkPreviewService(SEOUL_CLOCK).finalStatus("https://localhost/"))
                 .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
     }
 
     @Test
     void requireResolvableOnlyAsksWhetherTheNameExists() throws Exception {
-        LinkPreviewService service = new LinkPreviewService();
+        LinkPreviewService service = new LinkPreviewService(SEOUL_CLOCK);
         // A private address resolves: judging it is the fetch's job, not this method's.
         service.requireResolvable("127.0.0.1");
         assertThatThrownBy(() -> service.requireResolvable("no-such-host.invalid"))

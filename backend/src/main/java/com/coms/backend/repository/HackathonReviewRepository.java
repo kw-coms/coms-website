@@ -10,7 +10,9 @@ public interface HackathonReviewRepository extends JpaRepository<HackathonReview
     boolean existsByProjectIdAndGenerationAndNameKey(String projectId, Integer generation, String nameKey);
     Optional<HackathonReview> findByProjectIdAndGenerationAndNameKey(String projectId, Integer generation, String nameKey);
     List<HackathonReview> findAllByOrderByCreatedAtAscIdAsc();
-    boolean existsByEventIdAndProjectIdAndGenerationAndNameKey(Long eventId, String projectId, Integer generation, String nameKey);
+    boolean existsByEventIdAndProjectIdAndGenerationAndNameKeyAndReviewerStudentIdIsNull(Long eventId, String projectId, Integer generation, String nameKey);
+    boolean existsByEventIdAndProjectIdAndIpKey(Long eventId, String projectId, String ipKey);
+    boolean existsByEventIdAndProjectIdAndReviewerStudentId(Long eventId, String projectId, String reviewerStudentId);
     Optional<HackathonReview> findByEventIdAndProjectIdAndGenerationAndNameKey(Long eventId, String projectId, Integer generation, String nameKey);
     List<HackathonReview> findByEventIdOrderByCreatedAtAscIdAsc(Long eventId);
     boolean existsByEventId(Long eventId);

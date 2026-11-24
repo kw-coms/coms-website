@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockAdminApis } from './visualSupport.js'
+import { mockAdminApis, mockAdminMembers, signInHint, trackRequests } from './visualSupport.js'
 
 test.use({ serviceWorkers: 'block' })
 
@@ -47,8 +47,9 @@ async function installFakeApi(page) {
   const field = (body, name) => new RegExp(`name="${name}"\\r\\n\\r\\n([\\s\\S]*?)\\r\\n--`).exec(body)?.[1] ?? ''
   const all = (body, name) => [...body.matchAll(new RegExp(`name="${name}"\\r\\n\\r\\n([\\s\\S]*?)\\r\\n--`, 'g'))].map(match => match[1])
 
+  await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: USERS[db.me] }))
-  await page.route('**/api/admin/members', route => route.fulfill({ json: PEOPLE }))
+  await mockAdminMembers(page, PEOPLE)
   await page.route(/\/api\/(admin\/)?team-projects(\/.*)?(\?.*)?$/, async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname.replace('/api/admin/team-projects', '/api/team-projects').replace(/^\/api\/team-projects/, '')
@@ -211,11 +212,13 @@ test('admin builds a program with every kind of schedule item, a member submits,
   await teamForm.getByRole('button', { name: '팀 만들기' }).click()
   await expect(teamForm.getByRole('alert')).toContainText('같은 이름의 팀이 이미 있습니다')
   const team = page.getByRole('article', { name: 'A팀 팀' })
+  const memberRequests = trackRequests(page, /\/api\/admin\/members(?:\?|$)/)
   await team.getByLabel('A팀 팀원 검색').fill('55')
   await team.getByRole('button', { name: '김하나 A팀에 추가' }).click()
   await expect(team.getByText('김하나 55기 · 2020000001')).toBeVisible()
   await team.getByLabel('A팀 팀원 검색').fill('김하나')
   await expect(team.getByText('A팀 소속')).toBeVisible()   // already on a team: no second add
+  expect(memberRequests.map((url) => new URL(url).search)).toEqual([''])
 
   // ---- 회원: 메뉴로 들어가기, 일정·D-day, 제출 전/미제출
   db.me = 'hana'

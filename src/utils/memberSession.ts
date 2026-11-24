@@ -10,6 +10,12 @@ const OWNER_KEY = 'kwcoms-member-owner:v1'
 const TAB_KEY = 'kwcoms-member-tab:v1'
 const logoutKey = (id: string) => `kwcoms-member-logout:v1:${id}`
 const listeners = new Set<() => void>()
+export function hasLegacySessionOwnerHint() {
+  try { return Boolean(storage()?.getItem(OWNER_KEY)) } catch { return false }
+}
+export function clearLegacySessionOwnerHint() {
+  try { storage()?.removeItem(OWNER_KEY) } catch { /* Storage may be blocked. */ }
+}
 type TabSession = { owner: string; logoutGeneration: string; ownerGeneration: string; ended: boolean }
 let tabSession: TabSession | null = null
 try {

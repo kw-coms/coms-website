@@ -49,6 +49,9 @@ class AuthServiceTest {
     private AuthService authService;
 
     @Autowired
+    private Clock clock;
+
+    @Autowired
     private MemberRepository memberRepository;
 
     @Autowired
@@ -152,7 +155,7 @@ class AuthServiceTest {
         Member saved = memberRepository.findByStudentId("2026123457").orElseThrow();
         assertThat(alreadyVerified).isFalse();
         assertThat(saved.getEmailVerificationCodeHash()).isNotBlank();
-        assertThat(saved.getEmailVerificationExpiresAt()).isAfter(LocalDateTime.now());
+        assertThat(saved.getEmailVerificationExpiresAt()).isAfter(LocalDateTime.now(clock));
         assertThat(saved.isEmailVerified()).isFalse();
     }
 
@@ -160,7 +163,7 @@ class AuthServiceTest {
     void requestEmailVerificationRejectsImmediateResend() {
         Member member = saveMember("2026123463", false);
         member.setEmailVerificationCodeHash(passwordEncoder.encode("123456"));
-        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
+        member.setEmailVerificationExpiresAt(LocalDateTime.now(clock).plusMinutes(10));
         memberRepository.save(member);
 
         assertThatThrownBy(() -> authService.requestEmailVerification("2026123463"))
@@ -174,21 +177,21 @@ class AuthServiceTest {
     void requestEmailVerificationAllowsResendAfterCooldown() {
         Member member = saveMember("2026123464", false);
         member.setEmailVerificationCodeHash(passwordEncoder.encode("123456"));
-        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(8));
+        member.setEmailVerificationExpiresAt(LocalDateTime.now(clock).plusMinutes(8));
         memberRepository.save(member);
 
         boolean alreadyVerified = authService.requestEmailVerification("2026123464");
 
         Member saved = memberRepository.findByStudentId("2026123464").orElseThrow();
         assertThat(alreadyVerified).isFalse();
-        assertThat(saved.getEmailVerificationExpiresAt()).isAfter(LocalDateTime.now().plusMinutes(9));
+        assertThat(saved.getEmailVerificationExpiresAt()).isAfter(LocalDateTime.now(clock).plusMinutes(9));
     }
 
     @Test
     void confirmEmailVerificationRejectsWrongCode() {
         Member member = saveMember("2026123458", false);
         member.setEmailVerificationCodeHash(passwordEncoder.encode("123456"));
-        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
+        member.setEmailVerificationExpiresAt(LocalDateTime.now(clock).plusMinutes(10));
         memberRepository.save(member);
 
         assertThatThrownBy(() -> authService.confirmEmailVerification("2026123458", "654321"))
@@ -201,7 +204,7 @@ class AuthServiceTest {
     void confirmEmailVerificationMarksEmailVerifiedAndClearsCode() {
         Member member = saveMember("2026123459", false);
         member.setEmailVerificationCodeHash(passwordEncoder.encode("123456"));
-        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
+        member.setEmailVerificationExpiresAt(LocalDateTime.now(clock).plusMinutes(10));
         memberRepository.save(member);
 
         boolean verified = authService.confirmEmailVerification("2026123459", "123456");
@@ -221,7 +224,7 @@ class AuthServiceTest {
 
         Member saved = memberRepository.findByStudentId("2026123472").orElseThrow();
         assertThat(saved.getPasswordResetCodeHash()).isNotBlank();
-        assertThat(saved.getPasswordResetExpiresAt()).isAfter(LocalDateTime.now());
+        assertThat(saved.getPasswordResetExpiresAt()).isAfter(LocalDateTime.now(clock));
         verify(emailVerificationSender).sendPasswordResetCode(eq(member.getEmail()), anyString());
     }
 
@@ -236,7 +239,7 @@ class AuthServiceTest {
     void confirmPasswordResetChangesPasswordAndClearsCode() {
         Member member = saveMember("2026123474", true);
         member.setPasswordResetCodeHash(passwordEncoder.encode("123456"));
-        member.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(10));
+        member.setPasswordResetExpiresAt(LocalDateTime.now(clock).plusMinutes(10));
         memberRepository.save(member);
 
         authService.confirmPasswordReset(null, member.getEmail(), "123456", "NewPassword1!", "198.51.100.7");
@@ -686,7 +689,7 @@ class AuthServiceTest {
     /** Moves the stored expiry out of the one-minute resend cooldown without waiting. */
     private void endPasswordResetCooldown(String studentId) {
         Member member = memberRepository.findByStudentId(studentId).orElseThrow();
-        member.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(5));
+        member.setPasswordResetExpiresAt(LocalDateTime.now(clock).plusMinutes(5));
         memberRepository.save(member);
     }
 

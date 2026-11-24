@@ -233,6 +233,8 @@ class ClubProjectSocialEndpointTest {
         Cookie owner = member("2099000109");
         Cookie other = member("2099000110");
         long id = projects.createForMember("2099000109", "APP", "계정 작품", "소개", null, null).id();
+        projects.review(id, com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED,
+                projects.get(id).getVersion());
         postComment(id, owner, "삭제할 댓글", null);
         long parent = postComment(id, owner, "삭제할 부모", null);
         postComment(id, other, "함께 지워질 답글", parent);

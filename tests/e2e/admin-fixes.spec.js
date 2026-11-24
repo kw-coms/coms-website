@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { asMember, mockAdminApis } from './visualSupport.js'
+import { asMember, mockAdminApis, signInHint } from './visualSupport.js'
 
 // Operator panel and participation tools. Every person, title and number below is made up.
 
@@ -10,6 +10,7 @@ const recruitApplication = (over = {}) => ({
 })
 
 async function mockOfficer(page, permissions) {
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 2, name: '임원', studentId: '2022000001', role: 'OFFICER', emailVerified: true } }))
   await page.route('**/api/permissions/me', (route) => route.fulfill({ json: { role: 'OFFICER', permissions } }))
 }
@@ -181,7 +182,7 @@ test.describe('operator panel', () => {
 
   test('the member list marks who is on the roster and links to the roster tab and back', async ({ page }) => {
     await mockAdminApis(page)
-    await page.route('**/api/admin/members', (route) => route.fulfill({
+    await page.route((url) => url.pathname === '/api/admin/members', (route) => route.fulfill({
       json: [
         { id: 1, studentId: '2020123456', name: '관리자', email: 'a@example.com', emailVerified: true, role: 'ADMIN' },
         { id: 2, studentId: '2023000002', name: '홍길동', email: 'h@example.com', emailVerified: true, role: 'USER' },

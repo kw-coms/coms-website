@@ -19,12 +19,14 @@ import com.coms.backend.repository.NotificationRepository;
 import com.coms.backend.repository.RecruitApplicationRepository;
 import com.coms.backend.repository.TeamRandomizerRoomRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -106,6 +108,42 @@ public class AdminService {
     @Transactional(readOnly = true)
     public List<MemberResponse> listMembers() {
         return memberRepository.findAll().stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MemberResponse> listMembers(int page, int size, String search, String role, String status) {
+        Member.Role selectedRole = null;
+        if (role != null && !role.isBlank()) {
+            try {
+                selectedRole = Member.Role.valueOf(role);
+            } catch (IllegalArgumentException ex) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바른 역할을 선택해주세요.");
+            }
+        }
+        Boolean verified = switch (status == null ? "" : status) {
+            case "", "ALL" -> null;
+            case "VERIFIED" -> true;
+            case "UNVERIFIED" -> false;
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바른 인증 상태를 선택해주세요.");
+        };
+        String normalizedSearch = likePattern(search);
+        String phoneSearch = phonePattern(search);
+        return memberRepository.searchAdminMembers(normalizedSearch, phoneSearch, selectedRole, verified,
+                PageRequest.of(page, size, Sort.by("id"))).map(this::toResponse);
+    }
+
+    /** "12기" matches generation 12; %, _ and the escape char match literally (query uses escape '!'). */
+    private static String likePattern(String search) {
+        if (search == null || search.isBlank()) return null;
+        String term = search.trim().toLowerCase(Locale.ROOT);
+        if (term.matches("[0-9]+기")) term = term.substring(0, term.length() - 1);
+        return "%" + term.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+    }
+
+    private static String phonePattern(String search) {
+        if (search == null || !search.trim().matches("[+()0-9.\\s-]+")) return null;
+        String digits = search.replaceAll("[^0-9]", "");
+        return digits.isEmpty() ? null : "%" + digits + "%";
     }
 
     public MemberResponse createMember(AdminMemberCreateRequest request) {
@@ -283,10 +321,9 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
-    public List<LoginAuditResponse> listLoginAudit() {
-        return memberRepository.findAll().stream()
-                .filter(m -> m.getLastLoginAt() != null)
-                .sorted(Comparator.comparing(Member::getLastLoginAt).reversed())
+    public Page<LoginAuditResponse> listLoginAudit(int page, int size) {
+        return memberRepository.findByLastLoginAtNotNull(PageRequest.of(page, size,
+                        Sort.by(Sort.Direction.DESC, "lastLoginAt").and(Sort.by("id"))))
                 .map(m -> new LoginAuditResponse(
                         m.getId(),
                         m.getStudentId(),
@@ -294,8 +331,7 @@ public class AdminService {
                         m.getRole().name(),
                         m.getLastLoginAt(),
                         m.getLastLoginIp()
-                ))
-                .toList();
+                ));
     }
 
     private MemberResponse toResponse(Member member) {

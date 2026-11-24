@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.AskRequest;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.security.ClientIpResolver;
 import com.coms.backend.security.SlidingWindowRateLimiter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
@@ -16,12 +17,14 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.coms.backend.security.ClientIpResolver;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.HexFormat;
 
 @Service
 public class AskService {
@@ -91,20 +94,21 @@ public class AskService {
         if (reply.isEmpty() && member != null) reply = member.getEmail();
         if (!AskEmailAddress.isValid(reply)) throw invalid();
 
-        String ipKey = "ip:" + clientIp;
+        String ipKey = (member == null ? "guest-ip:" : "member-ip:") + ClientIpResolver.bucket(clientIp);
         String memberKey = member == null ? null : "member:" + member.getId();
+        String siteKey = member == null ? "guest" : "member";
         synchronized (this) {
             if (shortLimit.isExhausted(ipKey) || dailyLimit.isExhausted(ipKey)
                     || (memberKey != null && (shortLimit.isExhausted(memberKey) || dailyLimit.isExhausted(memberKey)))
-                    || globalLimit.isExhausted("site") || globalDailyLimit.isExhausted("site")) throw tooMany();
+                    || globalLimit.isExhausted(siteKey) || globalDailyLimit.isExhausted(siteKey)) throw tooMany();
             shortLimit.record(ipKey);
             dailyLimit.record(ipKey);
             if (memberKey != null) {
                 shortLimit.record(memberKey);
                 dailyLimit.record(memberKey);
             }
-            globalLimit.record("site");
-            globalDailyLimit.record("site");
+            globalLimit.record(siteKey);
+            globalDailyLimit.record(siteKey);
         }
 
         String topic = request.topic() == AskRequest.Topic.COLLABORATION ? "협업 제안" : "질문";

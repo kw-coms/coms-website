@@ -13,7 +13,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 
 import java.lang.reflect.Field;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -40,7 +43,8 @@ class PermissionServiceTest {
     private final MemberRepository memberRepository = mock(MemberRepository.class);
     private final MemberPermissionOverrideRepository overrideRepository = mock(MemberPermissionOverrideRepository.class);
     private final AuditLogService auditLogService = mock(AuditLogService.class);
-    private final PermissionService service = new PermissionService(repository, memberRepository, overrideRepository, auditLogService);
+    private final Clock clock = Clock.system(ZoneId.of("Asia/Seoul"));
+    private final PermissionService service = new PermissionService(repository, memberRepository, overrideRepository, auditLogService, clock);
 
     @Test
     void forgedAdminAuthorityWithoutMemberFailsClosed() {
@@ -217,6 +221,19 @@ class PermissionServiceTest {
     }
 
     @Test
+    void replacementVersionUsesSeoulClockAndMicrosecondPrecision() {
+        Clock boundary = Clock.fixed(Instant.parse("2026-11-30T15:30:00.123456789Z"), ZoneId.of("Asia/Seoul"));
+        PermissionService fixedService = new PermissionService(repository, memberRepository, overrideRepository, auditLogService, boundary);
+        when(repository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PermissionMatrixResponse response = fixedService.replace(Map.of(
+                Member.Role.ASSOCIATE, Set.of(), Member.Role.USER, Set.of(),
+                Member.Role.OFFICER, Set.of(), Member.Role.VICE_PRESIDENT, Set.of()), "2026000001", null);
+
+        assertThat(response.updatedAt()).isEqualTo(LocalDateTime.of(2026, 12, 1, 0, 30, 0, 123456000));
+    }
+
+    @Test
     void matrixOutputsOnlyFourEditableRolesWithDottedPermissionKeysAndMetadata() {
         LocalDateTime updatedAt = LocalDateTime.of(2026, 9, 4, 12, 30);
         when(repository.findAll()).thenReturn(java.util.List.of(
@@ -279,7 +296,7 @@ class PermissionServiceTest {
     }
 
     private RolePermission row(Member.Role role, Permission permission, boolean allowed, String updatedBy) {
-        return row(role, permission, allowed, LocalDateTime.now(), updatedBy);
+        return row(role, permission, allowed, LocalDateTime.now(clock), updatedBy);
     }
 
     private RolePermission row(Member.Role role, Permission permission, boolean allowed, LocalDateTime updatedAt, String updatedBy) {

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockOptionalApis } from './visualSupport.js'
+import { mockOptionalApis, signInHint } from './visualSupport.js'
 import { RECRUIT_FACTS } from '../../src/data/recruitFacts'
 
 test.use({ serviceWorkers: 'block' })
@@ -101,6 +101,7 @@ test('member email is prefilled and can be changed', async ({ page }) => {
     await route.fulfill({ status: 204 })
   })
   await mockOptionalApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 7, studentId: '2026000000', name: 'Test Member', email: 'test@example.com', role: 'USER', emailVerified: true } }))
   await page.route('**/api/site-settings', (route) => route.fulfill({ json: { askEnabled: true } }))
   await page.goto('/about')
@@ -391,6 +392,7 @@ for (const width of [1440, 390]) for (const theme of ['light', 'dark']) {
       await page.route('**/api/site-settings', (route) => route.fulfill({ json: { askEnabled: true } }))
       for (const path of ['/', '/activities', '/community', '/admin']) {
         const role = path === '/admin' ? 'ADMIN' : 'USER'
+        await signInHint(page)
         await page.route('**/api/auth/me', (route) => route.fulfill({ json: { id: 71, studentId: '2026000071', name: 'Test Account', role, emailVerified: true } }))
         await page.route('**/api/permissions/me', (route) => route.fulfill({ json: { role, permissions: role === 'ADMIN' ? ['operations.panel'] : [] } }))
         await page.goto(path)

@@ -221,6 +221,43 @@ class AskServiceTest {
     }
 
     @Test
+    void rotatingIpv6AddressesWithinOne64ShareTheIpLimit() {
+        AskService service = service(true);
+        service.send(request(), null, "2001:db8:abcd:1::1");
+        service.send(request(), null, "2001:0db8:abcd:0001:ffff::2");
+        service.send(request(), null, "2001:db8:abcd:1::3");
+        assertStatus(HttpStatus.TOO_MANY_REQUESTS,
+                () -> service.send(request(), null, "2001:db8:abcd:1::4"));
+        service.send(request(), null, "2001:db8:abcd:2::1");
+        verify(sender, times(4)).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    void guestDailyQuotaCannotExhaustMemberQuota() {
+        member();
+        when(settings.askInboxEmail()).thenReturn("inbox@example.com");
+        AskService service = new AskService(settings, members, sender, clock, true, "sender@example.com", 1);
+        service.send(request(), null, "198.51.100.1");
+        assertStatus(HttpStatus.TOO_MANY_REQUESTS,
+                () -> service.send(request(), null, "198.51.100.2"));
+        service.send(request(), memberAuth(), "198.51.100.3");
+        assertStatus(HttpStatus.TOO_MANY_REQUESTS,
+                () -> service.send(request(), memberAuth(), "198.51.100.4"));
+        verify(sender, times(2)).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    void guestIpQuotaCannotExhaustMemberIpQuota() {
+        member();
+        AskService service = service(true);
+        for (int i = 0; i < 3; i++) service.send(request(), null, "198.51.100.1");
+        assertStatus(HttpStatus.TOO_MANY_REQUESTS,
+                () -> service.send(request(), null, "198.51.100.1"));
+        service.send(request(), memberAuth(), "198.51.100.1");
+        verify(sender, times(4)).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
     void failedMemberLimitDoesNotSpendIpTokens() {
         member();
         AskService service = service(true);

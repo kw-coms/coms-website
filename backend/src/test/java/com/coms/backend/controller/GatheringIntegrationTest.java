@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,6 +54,8 @@ class GatheringIntegrationTest {
     private static final String MEMBER = "2026000053";
     private static final String OTHER = "2026000054";
 
+    @Autowired
+    private Clock clock;
     @Autowired
     private MockMvc mockMvc;
     @Autowired
@@ -198,12 +201,12 @@ class GatheringIntegrationTest {
 
     @Test
     void aGatheringClosesByItselfAtItsTime() throws Exception {
-        String inAnHour = LocalDateTime.now().plusHours(1).withNano(0).toString();
+        String inAnHour = LocalDateTime.now(clock).plusHours(1).withNano(0).toString();
         long id = createAndGetId(hostCookie, "{\"title\":\"MT\",\"closesAt\":\"" + inAnHour + "\"}");
         join(memberCookie, id, null).andExpect(status().isOk());
 
         Gathering gathering = gatheringRepository.findById(id).orElseThrow();
-        gathering.setClosesAt(LocalDateTime.now().minusMinutes(1));
+        gathering.setClosesAt(LocalDateTime.now(clock).minusMinutes(1));
         gatheringRepository.saveAndFlush(gathering);
 
         join(otherCookie, id, null).andExpect(status().isConflict());
@@ -259,9 +262,9 @@ class GatheringIntegrationTest {
         create(hostCookie, "{\"title\":\"스터디\",\"capacity\":0}").andExpect(status().isBadRequest());
         create(hostCookie, "{\"title\":\"스터디\",\"capacity\":501}").andExpect(status().isBadRequest());
         create(hostCookie, "{\"title\":\"스터디\",\"noteLabel\":\"" + "가".repeat(41) + "\"}").andExpect(status().isBadRequest());
-        create(hostCookie, "{\"title\":\"스터디\",\"closesAt\":\"" + LocalDateTime.now().minusMinutes(5).withNano(0) + "\"}")
+        create(hostCookie, "{\"title\":\"스터디\",\"closesAt\":\"" + LocalDateTime.now(clock).minusMinutes(5).withNano(0) + "\"}")
                 .andExpect(status().isBadRequest());
-        create(hostCookie, "{\"title\":\"스터디\",\"closesAt\":\"" + LocalDateTime.now().plusDays(400).withNano(0) + "\"}")
+        create(hostCookie, "{\"title\":\"스터디\",\"closesAt\":\"" + LocalDateTime.now(clock).plusDays(400).withNano(0) + "\"}")
                 .andExpect(status().isBadRequest());
         assertThat(gatheringRepository.count()).isZero();
 

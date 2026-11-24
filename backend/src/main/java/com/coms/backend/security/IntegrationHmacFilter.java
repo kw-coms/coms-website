@@ -26,10 +26,12 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Authenticates inbound server-to-server calls under /api/integrations/** using
- * HMAC-SHA256(secret, timestamp + "." + rawBody). Replay window is 5 minutes.
+ * HMAC-SHA256(secret, timestamp + "." + rawBody). Replay window is 5 minutes; an accepted
+ * signature is remembered until its timestamp leaves the window and a repeat is rejected.
  * Skips Spring Security's JWT filter — callers do not have user tokens.
  */
 @Component
@@ -39,10 +41,13 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
     private static final String PATH_PREFIX = "/api/integrations/";
     private static final String SIGNATURE_HEADER = "X-Integration-Signature";
     private static final String TIMESTAMP_HEADER = "X-Integration-Timestamp";
+    private static final int MAX_TRACKED_SIGNATURES = 50_000;
     private static final int MAX_REQUEST_BODY_BYTES = 1024 * 1024;
 
     private final byte[] secretBytes;
     private final Clock clock;
+    // ponytail: replay memory is per JVM and forgotten on restart; use shared durable storage before scaling out.
+    private final ConcurrentHashMap<String, Long> usedSignatures = new ConcurrentHashMap<>();
 
     public IntegrationHmacFilter(@Value("${integration.hmac-secret:}") String secret, Clock clock) {
         this.secretBytes = secret == null ? new byte[0] : secret.getBytes(StandardCharsets.UTF_8);
@@ -102,6 +107,21 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Bad signature");
             return;
         }
+        String signature = signatureHeader.trim();
+        synchronized (usedSignatures) {
+            if (usedSignatures.size() >= MAX_TRACKED_SIGNATURES) {
+                usedSignatures.values().removeIf(expiresAt -> expiresAt < now);
+                if (usedSignatures.size() >= MAX_TRACKED_SIGNATURES) {
+                    response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "Integration busy");
+                    return;
+                }
+            }
+            // The signature binds the timestamp, so an entry can only be hit again while its timestamp is still in the window.
+            if (usedSignatures.putIfAbsent(signature, timestamp + REPLAY_WINDOW_SECONDS) != null) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Replayed request");
+                return;
+            }
+        }
 
         var auth = new UsernamePasswordAuthenticationToken(
                 "integration",
@@ -109,9 +129,17 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
                 List.of(new SimpleGrantedAuthority("ROLE_INTEGRATION"))
         );
         SecurityContextHolder.getContext().setAuthentication(auth);
+        // ponytail: known ceiling - a failure after the DB commit (e.g. response write) releases the signature below,
+        // so a partner retry can duplicate a notification; history is also in-memory and lost on restart.
+        // Upgrade path: idempotency key table keyed by signature with the stored result.
+        boolean processed = false;
         try {
             filterChain.doFilter(new CachedBodyRequest(request, body), response);
+            processed = response.getStatus() < HttpServletResponse.SC_BAD_REQUEST;
         } finally {
+            if (!processed) {
+                usedSignatures.remove(signature);
+            }
             SecurityContextHolder.clearContext();
         }
     }

@@ -15,8 +15,11 @@ import com.coms.backend.repository.NoticeRepository;
 import com.coms.backend.repository.RecruitApplicationRepository;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -26,6 +29,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class AdminAnalyticsServiceTest {
+
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+    private final Clock clock = Clock.system(SEOUL);
 
     private final MemberRepository memberRepository = mock(MemberRepository.class);
     private final NoticeRepository noticeRepository = mock(NoticeRepository.class);
@@ -40,7 +46,7 @@ class AdminAnalyticsServiceTest {
     private final AdminAnalyticsService service = new AdminAnalyticsService(
             memberRepository, noticeRepository, communityPostRepository, communityCommentRepository,
             communityPostReportRepository, recruitApplicationRepository, clubActivityRepository,
-            clubEventRepository, archiveFileRepository);
+            clubEventRepository, archiveFileRepository, clock);
 
     @Test
     void buildAnalyticsReturnsTotalsAndGroupedCounts() {
@@ -98,7 +104,7 @@ class AdminAnalyticsServiceTest {
     @Test
     void recruitApplicationsByMonthBucketsTimestampsIntoSixMonths() {
         DateTimeFormatter monthFormat = DateTimeFormatter.ofPattern("yyyy-MM");
-        YearMonth currentMonth = YearMonth.now();
+        YearMonth currentMonth = YearMonth.now(clock);
         String currentKey = currentMonth.format(monthFormat);
         String previousKey = currentMonth.minusMonths(1).format(monthFormat);
 
@@ -122,5 +128,19 @@ class AdminAnalyticsServiceTest {
                 .get()
                 .extracting(AdminAnalyticsResponse.MonthlyCount::count)
                 .isEqualTo(1L);
+    }
+
+    @Test
+    void monthlySeriesUsesSeoulDateAtUtcMonthBoundary() {
+        Clock boundaryClock = Clock.fixed(Instant.parse("2026-11-30T15:30:00Z"), SEOUL);
+        AdminAnalyticsService boundaryService = new AdminAnalyticsService(
+                memberRepository, noticeRepository, communityPostRepository, communityCommentRepository,
+                communityPostReportRepository, recruitApplicationRepository, clubActivityRepository,
+                clubEventRepository, archiveFileRepository, boundaryClock);
+
+        when(recruitApplicationRepository.findSubmittedAtSince(any())).thenReturn(List.of());
+
+        var series = boundaryService.buildAnalytics().recruitApplicationsByMonth();
+        assertThat(series.getLast().month()).isEqualTo("2026-12");
     }
 }

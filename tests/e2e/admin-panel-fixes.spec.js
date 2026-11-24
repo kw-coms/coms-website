@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockAdminApis } from './visualSupport.js'
+import { mockAdminApis, signInHint } from './visualSupport.js'
 
 test('overview announces loading without an empty claim before its sources settle', async ({ page }) => {
   await mockAdminApis(page)
@@ -22,7 +22,7 @@ for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 })
     await mockAdminApis(page)
     let member = { id: 7, studentId: '2026000007', name: '가입 회원', email: 'member@example.com', emailVerified: true, role: 'ASSOCIATE' }
-    await page.route('**/api/admin/members', (route) => route.fulfill({ json: [member] }))
+    await page.route((url) => url.pathname === '/api/admin/members', (route) => route.fulfill({ json: [member] }))
     await page.route('**/api/admin/members/7/role', (route) => {
       expect(route.request().method()).toBe('PATCH')
       expect(route.request().postDataJSON()).toEqual({ role: 'USER' })
@@ -54,6 +54,7 @@ for (const width of [1440, 390]) {
 
 test('an operator with just one tab permission sees only that group and recovers from a forbidden URL', async ({ page }) => {
   await mockAdminApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({ json: {
     id: 2, name: '임원', studentId: '2022000001', role: 'OFFICER', emailVerified: true,
   } }))
@@ -73,7 +74,7 @@ test('an operator with just one tab permission sees only that group and recovers
 
 test('member roster marks disappear when the existing roster API cannot be read', async ({ page }) => {
   await mockAdminApis(page)
-  await page.route('**/api/admin/members', (route) => route.fulfill({ json: [{
+  await page.route((url) => url.pathname === '/api/admin/members', (route) => route.fulfill({ json: [{
     id: 7, studentId: '2023000002', name: '홍길동', email: 'member@example.com',
     emailVerified: true, role: 'USER',
   }] }))

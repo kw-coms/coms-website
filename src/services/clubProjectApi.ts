@@ -76,6 +76,10 @@ export async function updateClubProject(id, fields) {
   })
 }
 
+export async function reviewClubProject(id, status: 'PENDING' | 'APPROVED' | 'REJECTED', version: number) {
+  return request(`/api/club-projects/${id}/review?status=${status}&version=${version}`, { method: 'PATCH' })
+}
+
 export async function deleteClubProject(id) {
   return requestNoContent(`/api/club-projects/${id}`, {
     method: 'DELETE',

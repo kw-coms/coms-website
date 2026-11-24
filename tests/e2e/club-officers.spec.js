@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { expectMembersGate, mockAdminApis, mockOptionalApis } from './visualSupport.js'
+import { expectMembersGate, mockAdminApis, mockOptionalApis, signInHint } from './visualSupport.js'
 
 test.use({ serviceWorkers: 'block' })
 
@@ -25,6 +25,7 @@ const TERMS = [
 
 async function installMemberApi(page, terms = TERMS) {
   await mockOptionalApis(page)
+  await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({ json: USER }))
   await page.route('**/api/club-officers', (route) => route.fulfill({ json: terms }))
 }
