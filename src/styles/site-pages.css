@@ -37,13 +37,13 @@
 /* One surface per inner card, including hover and the lite overrides. */
 .coms-inner-page :is(.coms-card, .coms-timeline-card, .apple-product-panel, .apple-soft-panel, .apple-board-shell, .study-card, .site-stats) {
 	border: 0 !important;
-	background: var(--app-surface-soft) !important;
-	box-shadow: none !important;
+	background: var(--appearance-card-bg, var(--app-surface-soft)) !important;
+	box-shadow: var(--appearance-card-frame, none) !important;
 	backdrop-filter: none;
 	transition-property: transform, opacity;
 }
 .coms-inner-page :is(.coms-card, .apple-product-panel, .apple-soft-panel, .study-card):hover {
-	box-shadow: none !important;
+	box-shadow: var(--appearance-card-frame, none) !important;
 }
 .coms-inner-page :is(.coms-card, .coms-timeline-card, .apple-product-panel, .apple-soft-panel, .study-card):focus-visible {
 	outline: 2px solid var(--app-text);

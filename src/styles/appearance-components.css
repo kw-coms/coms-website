@@ -1,0 +1,300 @@
+/* The standard appearance stays on the original component recipes. */
+:root:is([data-appearance-theme='terminal'], [data-appearance-theme='retro'], [data-appearance-theme='blueprint']) {
+	& body {
+		background: var(--preset-pattern), var(--app-bg);
+		font-family: var(--appearance-font-body);
+	}
+
+	& :is(.coms-page-backdrop, .site-page:not(.apps-directory), .coms-sec, .study-hub, .study-page, .apple-detail-hero, .compact-home) {
+		background: var(--preset-pattern), var(--app-bg);
+	}
+
+	& .coms-sec::before,
+	& .coms-sec::after {
+		display: none;
+	}
+
+	& :is(h1, h2, h3, h4, h5, h6, [role='heading'], .scene-wordmark, .coms-footer-wordmark) {
+		font-family: var(--appearance-font-display);
+	}
+
+	& :is(button, label, [role='button'], [role='tab'], summary, .nav-item, .nav-chip, .apple-mobile-tab,
+		.coms-footer-link, .apple-action-primary, .apple-action-secondary, .study-card-link) {
+		font-family: var(--appearance-font-ui, var(--appearance-font-body));
+	}
+
+	& :is(.page-crumb, .apple-eyebrow, .site-head-eyebrow, .scene-kicker, .coms-eyebrow, .coms-card-eyebrow,
+		.act-kind, .act-subhead, .nav-col-title, .nav-m-title, .apple-table thead th, .judge-table-head,
+		.study-overview-stats dt, .coms-visual-bar, .coms-ask-eyebrow, .compact-home__eyebrow) {
+		color: var(--preset-ink);
+		font-family: var(--appearance-font-label, var(--appearance-font-display));
+		letter-spacing: var(--appearance-label-spacing, 0.04em);
+		text-transform: var(--appearance-label-case, none);
+	}
+
+	& :is(.page-crumb, .apple-eyebrow, .scene-kicker, .coms-eyebrow, .coms-card-eyebrow, .act-subhead)::before {
+		content: var(--appearance-prompt, none) / '';
+		display: inline;
+		color: var(--preset-ink);
+		background: none;
+	}
+
+	& :is(.page-heading, .act-term-head, .coms-sec .detail-head, .apple-footer-directory) {
+		background: var(--appearance-section-rule);
+		border-block-end-color: transparent;
+	}
+
+	& :is(figcaption, .app-card-foot, .act-date, .study-card-sub, .site-stats-label, .apple-footer-note) {
+		font-style: var(--appearance-caption-style, normal);
+	}
+
+	/* Paint the frame inside the existing box to keep card, dialog and list geometry. */
+	& :is(
+		.apple-product-panel, .apple-soft-panel, .apple-board-shell, .coms-card, .coms-timeline-card,
+		.coms-visual, .coms-cta, .compact-home__card, .compact-home__member,
+		.site-stats, .act-card, .act-founding, .act-live, .act-jump, .act-recruit, .study-card, .study-overview-stats,
+		.study-page nav.toc, .ex-panel, .algorithm-card, .judge-challenge, .club-tournament-card,
+		.club-tournament-panel, .club-tournament-match, .coms-gather-panel, .coms-attend-panel, .club-calendar-shell,
+		.activity-board-shell, .activity-board-card, .activity-log-card, .activity-compose-side-card,
+		.club-event-list-card, .club-event-entry-card, .club-event-status-card, .club-event-upload-panel,
+		.hackathon-card, .hackathon-intro, .hackathon-identity, .hackathon-project, .of-card, .tp-card, .coms-error-state,
+		section.shape-cut, .appearance-auth-panel,
+		:where(article, section, aside, details, form, div, li, ul).border:is(.rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl)
+	) {
+		--legacy-surface-shadow: var(--appearance-card-frame);
+		border-radius: var(--appearance-card-radius);
+		border-color: transparent;
+		box-shadow: var(--appearance-card-frame);
+		backdrop-filter: none;
+	}
+
+	& :is(.shape-cut, .shape-cut-sm, .shape-cut-top) {
+		clip-path: none;
+		border-radius: var(--appearance-card-radius);
+	}
+
+	& :is(div, li, article).shape-cut-sm.border {
+		border-color: transparent;
+		box-shadow: var(--appearance-card-frame);
+	}
+
+	& :is(.appearance-auth-panel, section.shape-cut) {
+		background-color: var(--appearance-card-bg) !important;
+	}
+
+	& :is(.appearance-auth-frame, div.shape-cut:has(> section.shape-cut)) {
+		--legacy-surface-shadow: none;
+		background-color: transparent !important;
+		box-shadow: none !important;
+	}
+
+	& :is(.apple-topbar, .apple-mobile-tabs, .nav-panel, .nav-m-top, .nav-m-section, .apple-board-minibar,
+		.apple-control-strip, .coms-visual-bar, .coms-ask-header) {
+		border-block-end-color: var(--appearance-card-stroke);
+	}
+
+	& :is(.nav-col, .nav-item, .nav-chip, .nav-m-close, .nav-m-login, .nav-search, .apple-mobile-tab > span) {
+		border-radius: var(--appearance-control-radius);
+	}
+
+	& :is(.nav-panel, .nav-m-overlay, dialog, [role='dialog'], [role='alertdialog'], .coms-toast) {
+		border-radius: var(--appearance-card-radius);
+		box-shadow: var(--appearance-card-frame);
+		backdrop-filter: none;
+	}
+
+	& :is(.nav-panel, .appearance-popover, .coms-confirm-card, .coms-quick-panel,
+		.coms-tour-card, .coms-toast, .coms-ask-panel, .activity-detail-modal, [aria-modal='true'].apple-soft-panel) {
+		background: var(--appearance-dialog-bg);
+		border-color: transparent;
+	}
+
+	& :is(.apple-action-primary, .apple-action-secondary, .apple-detail-home-button, .apple-chip, .ex-primary,
+		.ex-secondary, .study-overview-resume, .coms-confirm-ok, .coms-confirm-cancel, .coms-tour-btn, .coms-toast-action,
+		.coms-ask-trigger, .coms-ask-close, .coms-ask-submit, .coms-to-top,
+		.club-event-rsvp-button, .appearance-actions > button, [role='tab'],
+		:is(button, a, label, [role='button']):is(.rounded-lg, .rounded-xl, .rounded-2xl, .rounded-full, .shape-cut-sm),
+		.app-card-open) {
+		border-radius: var(--appearance-control-radius);
+	}
+
+	& :is(.apple-action-primary, .apple-action-secondary, .ex-primary, .ex-secondary, .coms-confirm-ok, .coms-confirm-cancel,
+		.coms-tour-btn, .coms-ask-trigger, .coms-to-top, .appearance-actions > button, [role='tab'],
+		:is(button, a, label).border, .app-card-open) {
+		box-shadow: var(--appearance-control-shadow);
+	}
+
+	& :is(.apple-action-primary, .act-recruit-link, .ex-primary, .coms-confirm-ok:not(.is-danger), .coms-tour-btn-primary,
+		.coms-toast-action, .club-battle-primary, .club-sets-primary, .club-tournament-primary, .authoring-primary,
+		.coding-settings-save button, .judge-help form button[type='submit'], .club-vote-form button[type='submit'],
+		.activity-post-composer .activity-compose-actions button:not(.activity-compose-cancel),
+		:where(button, a, [role='button']):is([class~='bg-[var(--app-accent)]'], [class~='bg-[var(--app-brand)]'],
+		[class~='bg-[#0071e3]'], [class~='bg-[#3b4890]'])) {
+		font-family: var(--appearance-font-ui, var(--appearance-font-body));
+		border-radius: var(--appearance-control-radius);
+		background-color: var(--appearance-primary-bg, var(--app-accent)) !important;
+		color: var(--appearance-primary-color, var(--app-accent-on)) !important;
+		box-shadow: var(--appearance-control-shadow);
+
+		&:hover {
+			background-color: var(--appearance-primary-hover-bg, var(--app-accent-hover)) !important;
+			color: var(--appearance-primary-hover-color, var(--app-accent-hover-on)) !important;
+		}
+
+		&:active:not(:disabled) {
+			box-shadow: var(--appearance-pressed-shadow, inset 0 0 0 2px var(--appearance-focus));
+			transform: none;
+		}
+	}
+
+	& :is(.apple-action-primary, .apple-action-secondary, .ex-primary, .ex-secondary,
+		.coms-confirm-ok, .coms-confirm-cancel, :is(button, a).border, button[type='submit']):active:not(:disabled) {
+		box-shadow: var(--appearance-pressed-shadow, inset 0 0 0 2px var(--appearance-focus));
+		transform: none;
+	}
+
+	& :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='hidden']), textarea, select) {
+		border-radius: var(--appearance-control-radius);
+		box-shadow: inset 0 0 0 1px var(--preset-ink);
+		caret-color: var(--appearance-focus);
+	}
+
+	& :is(input:not(.coms-attend-input), select, textarea:not(.study-page textarea, .cm-editor textarea)) {
+		font-family: var(--appearance-font-ui, var(--appearance-font-body));
+	}
+
+	& :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='hidden']), select,
+		textarea:not(.study-page textarea, .cm-editor textarea)) {
+		background-color: var(--appearance-input-bg);
+	}
+
+	& input:is([type='checkbox'], [type='radio'], [type='range']) {
+		accent-color: var(--app-accent);
+	}
+
+	& :is(input, textarea)::placeholder {
+		color: var(--app-subtle);
+		opacity: 1;
+	}
+
+	& :is(button, a, input, textarea, select, summary, [role='tab'], [role='button'], [tabindex]):focus-visible {
+		outline: 2px solid var(--appearance-focus);
+		outline-offset: 2px;
+	}
+
+	/* The focus ring stays visible while the text caret blinks. */
+	& :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color']), textarea):focus-visible {
+		box-shadow: inset 0 0 0 1px var(--preset-ink);
+		animation: var(--appearance-caret, none);
+	}
+
+	& :is(.apple-table, .hackathon-results, .judge-table, .coms-roster-table) :is(th, td),
+	& :is(.judge-table-row, .activity-community-table-head) {
+		box-shadow: inset 0 -1px var(--appearance-card-stroke);
+	}
+
+	& :is(.apple-table, .hackathon-results, .coms-roster-table) thead,
+	& :is(.judge-table-head, .activity-community-table-head) {
+		background: var(--site-theme-fill);
+	}
+
+	& :is(.act-status, .hackathon-status, .judge-tier, .club-tournament-status, .authoring-chip, .of-chip, .tp-chip,
+		.coms-mini-chip, .activity-post-mini-badge, .club-event-rank-badge,
+		span.rounded-full:is([class~='bg-[var(--app-accent-soft)]'], [class~='bg-[var(--app-surface-soft)]'])) {
+		border-radius: var(--appearance-control-radius);
+		box-shadow: inset 0 0 0 1px currentColor;
+		font-family: var(--appearance-font-label, var(--appearance-font-ui));
+	}
+
+	& :is(a, button, [role='button']).text-blue-500 {
+		color: var(--app-accent-text);
+	}
+
+	& :is([class~='text-[var(--theme-body-muted)]/70'], [class~='text-[var(--theme-body-muted)]/80'],
+		[class~='text-[var(--theme-body-muted)]/85'], [class~='text-[var(--theme-body-muted)]/90']) {
+		color: var(--app-muted);
+	}
+
+	& .text-red-500 { color: var(--appearance-error-text); }
+	& :is(.judge-solved, .authoring-chip.is-published) { color: var(--appearance-success-text); }
+	& .authoring-chip.is-changes { color: var(--appearance-warning-text); }
+	& :is(.apple-chip-active, .activity-detail-actions > button.is-active, .club-event-vote-button-selected,
+		.club-event-rsvp-button-selected, .club-calendar-day-active .club-calendar-day-number, .coms-meet-day.is-selected,
+		.coms-gather-list > li.is-mine .coms-gather-order) {
+		border-radius: var(--appearance-control-radius);
+		color: var(--app-accent-on);
+		box-shadow: var(--appearance-button-shadow, none);
+	}
+
+	& .club-event-rsvp-button-selected .club-event-rsvp-button-count {
+		color: var(--app-accent-on);
+	}
+
+	& .skeleton:not(.skeleton-circle) {
+		border-radius: var(--appearance-control-radius);
+		background: var(--preset-pattern), var(--app-surface-soft);
+	}
+}
+
+/* Keep badge punctuation inline when it replaces the dot on terminal. */
+:root[data-appearance-theme='terminal'] {
+	& :is(.act-status, .hackathon-status, .judge-tier, .club-tournament-status, .authoring-chip)::before {
+		content: var(--appearance-badge-start) / '';
+	}
+
+	& :is(.act-status, .hackathon-status, .judge-tier, .club-tournament-status, .authoring-chip)::after {
+		content: var(--appearance-badge-end) / '';
+	}
+
+	& .act-status i { display: none; }
+	& .hackathon-status::before {
+		width: auto;
+		height: auto;
+		background: none;
+	}
+}
+
+:root[data-appearance-theme='retro'] {
+	/* Paint the existing heading rows so the window bars reuse their spacing. */
+	& :is(.study-card-head, .act-card-title, .act-founding-title, .apple-board-hero .page-heading,
+		.appearance-auth-panel .page-heading, section.shape-cut > .page-heading,
+		.coms-confirm-title, .coms-tour-title, .coms-visual-bar, .coms-ask-header, .nav-col-title, .apple-footer-directory h3,
+		.appearance-popover > :first-child,
+		[role='dialog'] > :is(h1, h2, h3, header)) {
+		--appearance-focus: var(--appearance-titlebar-text);
+		background: var(--appearance-titlebar);
+		color: var(--appearance-titlebar-text);
+		box-shadow: inset 0 -1px rgb(255 255 255 / 28%), -6px 0 #18285d, 6px 0 #235eab;
+	}
+
+	& :is(.study-card-head, .apple-board-hero .page-heading, .appearance-auth-panel .page-heading,
+		section.shape-cut > .page-heading, [role='dialog'] > header) :is(h1, h2, h3, .page-crumb, .study-card-sub) {
+		color: var(--appearance-titlebar-text);
+	}
+
+	& .study-card-head .study-tile {
+		color: var(--app-text);
+	}
+
+	& :is(.coms-visual-bar, .coms-ask-header) :is(.coms-visual-name, .coms-visual-sub, .coms-ask-eyebrow) {
+		color: var(--appearance-titlebar-text);
+	}
+
+	& :is(.coms-ask-header, .appearance-popover > :first-child) button {
+		color: var(--appearance-titlebar-text);
+
+		&:hover {
+			background: rgb(255 255 255 / 16%);
+		}
+	}
+}
+
+@keyframes appearance-caret {
+	50% { caret-color: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:root[data-appearance-theme='terminal'] {
+		--appearance-caret: none;
+	}
+}

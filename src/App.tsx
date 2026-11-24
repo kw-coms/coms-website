@@ -138,10 +138,14 @@ function App() {
     root.dataset.themeMode = mode
     root.dataset.appearanceTheme = appearanceTheme
     root.dataset.accentStrength = accentStrength
-    for (const [property, value] of Object.entries(getAccentTokens(accentColor, mode, accentStrength))) root.style.setProperty(property, value)
+    const palette = appearanceTheme === 'standard' ? null : getComputedStyle(root)
+    const surfaces = palette
+      ? ['--app-bg', '--app-surface', '--app-surface-soft', '--app-surface-elevated'].map((token) => palette.getPropertyValue(token).trim())
+      : []
+    for (const [property, value] of Object.entries(getAccentTokens(accentColor, mode, accentStrength, surfaces))) root.style.setProperty(property, value)
     const chromeColor = appearanceTheme === 'standard'
       ? (mode === 'dark' ? '#0f1115' : '#ffffff')
-      : getComputedStyle(root).getPropertyValue('--app-bg').trim()
+      : surfaces[0]
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', chromeColor)
 
     storeValue(THEME_MODE_KEY, mode)

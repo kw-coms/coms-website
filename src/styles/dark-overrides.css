@@ -579,7 +579,7 @@
 :root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_1px_2px_rgba(0,0,0,0.04)]"],
 :root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_1px_2px_rgba(0,0,0,0.05)]"],
 :root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_1px_2px_rgba(0,0,0,0.08)]"] {
-	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
+	box-shadow: var(--legacy-surface-shadow, 0 1px 2px rgba(0, 0, 0, 0.5)) !important;
 }
 
 :root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_8px_24px_rgba(0,0,0,0.05)]"],
@@ -592,7 +592,7 @@
 :root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_4px_16px_rgba(0,0,0,0.05)]"],
 :root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_2px_12px_rgba(0,0,0,0.08)]"],
 :root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_5px_18px_rgba(0,0,0,0.12)]"] {
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+	box-shadow: var(--legacy-surface-shadow, 0 8px 24px rgba(0, 0, 0, 0.5)) !important;
 }
 
 :root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_18px_45px_rgba(0,0,0,0.08)]"],
@@ -605,7 +605,7 @@
 :root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_18px_54px_rgba(0,0,0,0.09)]"],
 :root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_24px_70px_rgba(0,0,0,0.12)]"],
 :root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_32px_90px_rgba(0,0,0,0.12)]"] {
-	box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55) !important;
+	box-shadow: var(--legacy-surface-shadow, 0 24px 70px rgba(0, 0, 0, 0.55)) !important;
 }
 
 .theme-home .divide-black\/8 > :not([hidden]) ~ :not([hidden]),
@@ -717,6 +717,6 @@
 
 :root[data-theme-mode='dark'] .theme-home .shadow-\[0_24px_70px_rgba\(0\,0\,0\,0\.1\)\],
 :root[data-theme-mode='dark'] .apple-route .shadow-\[0_24px_70px_rgba\(0\,0\,0\,0\.1\)\] {
-	box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38) !important;
+	box-shadow: var(--legacy-surface-shadow, 0 24px 70px rgba(0, 0, 0, 0.38)) !important;
 }
 

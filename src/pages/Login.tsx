@@ -14,7 +14,7 @@ import { PASSWORD_PATTERN, PASSWORD_MESSAGE, PASSWORD_TOO_LONG_MESSAGE, isPasswo
 import { useScrollReveal } from '../hooks/useScrollReveal'
 
 const panelClass =
-  'rounded-lg border border-black/10 bg-white/86 p-5 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:p-8'
+  'appearance-auth-panel rounded-lg border border-black/10 bg-white/86 p-5 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:p-8'
 const frameClass = 'rounded-lg bg-black/10 p-px'
 const inputClass =
   'w-full rounded-lg bg-white px-4 py-3 text-[#1d1d1f] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[var(--app-accent)]/24'
@@ -275,7 +275,7 @@ export default function Login({ onCancel, onSuccess, goSignup }: {
         </button>
       </div>
 
-      <div className="rounded-lg bg-white/70 p-px shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
+      <div className="appearance-auth-frame rounded-lg bg-white/70 p-px shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
         <section className={panelClass}>
           <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left" data-reveal style={{ '--reveal-delay': '80ms' } as React.CSSProperties}>
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
