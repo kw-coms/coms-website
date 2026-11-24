@@ -82,6 +82,23 @@ for (const theme of ['light', 'dark']) {
     }
   }
 }
+for (const mode of ['light', 'dark']) {
+  for (const strength of ['standard', 'vivid']) {
+    for (const accent of ['#000000', '#ffffff', '#ffff00', '#0000ff', '#ff00ff', '#808080']) {
+      const surface = mode === 'dark' ? '#344957' : '#d6dce4'
+      const tokens = preferences.getAccentTokens(accent, mode, strength, [surface])
+      for (const background of [tokens['--app-accent-soft'], surface]) {
+        const [lighter, darker] = [luminance(tokens['--app-accent-text']), luminance(background)].sort((a, b) => b - a)
+        assert.ok((lighter + 0.05) / (darker + 0.05) >= 4.5, `${mode}/${strength}/${accent}: contrast on ${background}`)
+      }
+    }
+  }
+}
 const buildConfig = readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8')
 assert.ok(buildConfig.includes('**/LegacyIntroCanvas-*.js'), 'the optional canvas must stay out of the service worker install precache')
 console.log('appearance preference contracts passed')
+
+// An unreachable surface must terminate and fall back to the extreme with more contrast.
+assert.equal(preferences.getAccentTokens('#808080', 'dark', 'standard', ['#ffffff'])['--app-accent-text'], '#000000')
+assert.equal(preferences.getAccentTokens('#808080', 'light', 'standard', ['#000000'])['--app-accent-text'], '#ffffff')
+assert.ok(preferences.getAccentTokens('#808080', 'dark', 'standard', ['color-mix(in srgb, red 50%, blue)', 'var(--x)'])['--app-accent-text'])

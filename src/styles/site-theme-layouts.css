@@ -1,6 +1,6 @@
 /* The alternate site themes keep the same controls and organize their surfaces differently. */
 :root:is([data-appearance-theme='terminal'], [data-appearance-theme='retro'], [data-appearance-theme='blueprint']) {
-	--site-theme-mono: ui-monospace, Consolas, var(--apple-font-family);
+	--site-theme-mono: var(--appearance-font-mono);
 	--site-theme-rule: color-mix(in srgb, var(--preset-ink) 40%, var(--app-surface));
 	--site-theme-fill: color-mix(in srgb, var(--preset-ink) 10%, var(--app-surface));
 
@@ -229,10 +229,6 @@
 /* Retro: desktop windows with distinct title bars, inset frames and beveled controls. */
 :root[data-appearance-theme='retro'] {
 	--site-theme-card-areas: 'head open' 'desc desc' 'images images' 'foot foot' 'more more' 'engagement engagement';
-	--retro-highlight: color-mix(in srgb, white 55%, var(--app-surface));
-	--retro-shadow: color-mix(in srgb, black 48%, var(--app-surface));
-	--retro-titlebar: linear-gradient(95deg, #18285d, #235eab);
-	--retro-bevel: inset 1px 1px var(--retro-highlight), inset -1px -1px var(--retro-shadow), inset 2px 2px var(--app-surface);
 
 	& .apple-global-nav .apple-topbar {
 		background: var(--app-surface) !important;

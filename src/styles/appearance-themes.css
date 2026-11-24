@@ -78,8 +78,18 @@
 	--preset-ink: #17653e;
 	--preset-board: #10271b;
 	--preset-signal: #83e7aa;
-	--preset-corner: 0.55rem;
+	--preset-corner: 0px;
 	--preset-pattern: repeating-linear-gradient(0deg, var(--preset-line) 0 1px, transparent 1px 4px);
+	--appearance-font-display: var(--appearance-font-mono);
+	--appearance-font-ui: var(--appearance-font-mono);
+	--appearance-font-label: var(--appearance-font-mono);
+	--appearance-card-radius: 0px;
+	--appearance-control-radius: 0px;
+	--appearance-section-rule: linear-gradient(90deg, var(--preset-ink), transparent) bottom / 100% 1px no-repeat;
+	--appearance-prompt: '> ';
+	--appearance-badge-start: '[';
+	--appearance-badge-end: ']';
+	--appearance-caret: appearance-caret 1s step-end 5;
 }
 
 :root[data-appearance-theme='terminal'][data-theme-mode='dark'] {
@@ -109,6 +119,22 @@
 	--preset-signal: #92cefa;
 	--preset-corner: 0;
 	--preset-pattern: radial-gradient(var(--preset-line) 1px, transparent 1px) 0 0 / 7px 7px;
+	--appearance-font-display: system-ui, var(--appearance-font-body);
+	--appearance-font-ui: system-ui, var(--appearance-font-body);
+	--appearance-card-radius: 4px;
+	--appearance-control-radius: 3px;
+	--appearance-border-width: 2px;
+	--appearance-frame-ink: var(--retro-shadow);
+	--appearance-card-shadow: 3px 3px 0 var(--retro-shadow);
+	--appearance-button-shadow: inset 0 0 0 1px var(--retro-shadow), 2px 2px 0 var(--retro-shadow);
+	--appearance-pressed-shadow: inset 2px 2px 0 var(--retro-shadow);
+	--appearance-titlebar: var(--retro-titlebar);
+	--appearance-titlebar-text: #fff;
+	--appearance-section-rule: repeating-linear-gradient(90deg, var(--retro-shadow) 0 4px, transparent 4px 7px) bottom / 100% 2px no-repeat;
+	--retro-highlight: color-mix(in srgb, white 55%, var(--app-surface));
+	--retro-shadow: color-mix(in srgb, black 48%, var(--app-surface));
+	--retro-titlebar: linear-gradient(95deg, #18285d, #235eab);
+	--retro-bevel: inset 1px 1px var(--retro-highlight), inset -1px -1px var(--retro-shadow), inset 2px 2px var(--app-surface);
 }
 
 :root[data-appearance-theme='retro'][data-theme-mode='dark'] {
@@ -142,6 +168,20 @@
 		linear-gradient(90deg, var(--preset-line) 1px, transparent 1px) 0 0 / 20px 20px,
 		linear-gradient(var(--preset-line) 1px, transparent 1px) 0 0 / 80px 80px,
 		linear-gradient(90deg, var(--preset-line) 1px, transparent 1px) 0 0 / 80px 80px;
+	--appearance-font-display: 'Arial Narrow', 'Aptos Narrow', 'Roboto Condensed', var(--appearance-font-body);
+	--appearance-font-label: var(--appearance-font-display);
+	--appearance-label-case: uppercase;
+	--appearance-label-spacing: 0.1em;
+	--appearance-card-radius: 2px;
+	--appearance-control-radius: 2px;
+	--appearance-section-rule:
+		linear-gradient(var(--preset-ink), var(--preset-ink)) left bottom 2px / 100% 1px no-repeat,
+		linear-gradient(90deg, var(--preset-ink) 1px, transparent 1px calc(100% - 1px), var(--preset-ink)) bottom / 100% 5px no-repeat;
+	--appearance-primary-bg: var(--app-surface);
+	--appearance-primary-color: var(--app-accent-text);
+	--appearance-primary-hover-bg: var(--app-accent-soft);
+	--appearance-primary-hover-color: var(--app-accent-text);
+	--appearance-caption-style: italic;
 }
 
 :root[data-appearance-theme='blueprint'][data-theme-mode='dark'] {
@@ -166,6 +206,19 @@
 	--theme-surface-70: color-mix(in srgb, var(--app-surface) 70%, transparent);
 	--theme-border-soft: var(--app-hairline);
 	--preset-line: color-mix(in srgb, var(--preset-ink) 9%, transparent);
+	--appearance-font-body: var(--apple-font-family);
+	--appearance-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, var(--apple-font-family), monospace;
+	--appearance-focus: var(--preset-ink);
+	--appearance-card-bg: var(--app-surface);
+	--appearance-card-stroke: var(--appearance-frame-ink, var(--preset-ink));
+	--appearance-card-frame: inset 0 0 0 var(--appearance-border-width, 1px) var(--appearance-card-stroke),
+		var(--appearance-card-shadow, 0 0 transparent);
+	--appearance-control-shadow: var(--appearance-button-shadow, inset 0 0 0 1px var(--preset-ink));
+	--appearance-input-bg: var(--app-surface);
+	--appearance-dialog-bg: var(--app-surface-elevated);
+	--appearance-error-text: #a51d29;
+	--appearance-success-text: #16633b;
+	--appearance-warning-text: #874516;
 
 	/* Older controls use white text on fills that follow the user's accent. */
 	& .text-white:is(
@@ -184,12 +237,10 @@
 		}
 	}
 
+	/* body paints the pattern and base colour; these shells add only the top wash. */
 	& .coms-page-backdrop,
 	& .site-page {
-		background:
-			linear-gradient(180deg, transparent, var(--app-bg) 34rem),
-			radial-gradient(60rem 24rem at 80% -8rem, var(--preset-line), transparent 74%),
-			var(--preset-pattern), var(--app-bg);
+		background: radial-gradient(60rem 24rem at 80% -8rem, var(--preset-line), transparent 74%);
 	}
 
 	& .apple-board-hero {
@@ -224,6 +275,12 @@
 	& .apple-topbar {
 		box-shadow: inset 0 -1px var(--app-hairline);
 	}
+}
+
+:root[data-theme-mode='dark']:is([data-appearance-theme='terminal'], [data-appearance-theme='retro'], [data-appearance-theme='blueprint']) {
+	--appearance-error-text: #ffb6ba;
+	--appearance-success-text: #9ce7b7;
+	--appearance-warning-text: #ffc691;
 }
 
 :root[data-appearance-theme='terminal'] :is(.scene-wordmark, .coms-footer-wordmark) {

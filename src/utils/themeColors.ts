@@ -141,30 +141,53 @@ export function getStoredAccentStrength(): AccentStrength {
   return readStoredValue(ACCENT_STRENGTH_KEY) === 'vivid' ? 'vivid' : 'standard'
 }
 
-function getAccentForeground(color: string) {
+function relativeLuminance(color: string) {
   const { r, g, b } = hexToRgb(color)
   const linear = (channel: number) => {
     const value = channel / 255
     return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
   }
-  const luminance = 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+  return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+}
+
+function getAccentForeground(color: string) {
+  const luminance = relativeLuminance(color)
   const blackContrast = (luminance + 0.05) / 0.05
   const whiteContrast = 1.05 / (luminance + 0.05)
   return blackContrast > whiteContrast ? '#000000' : '#ffffff'
 }
 
-export function getAccentTokens(color: string, themeMode: string, strength: AccentStrength = 'standard'): Record<string, string> {
+export function getAccentTokens(
+  color: string, themeMode: string, strength: AccentStrength = 'standard', surfaces: readonly string[] = [],
+): Record<string, string> {
   const accent = normalizeHex(color)
   const dark = themeMode === 'dark'
   const vivid = strength === 'vivid'
   const hover = mixHex(accent, dark ? '#ffffff' : '#000000', dark ? 0.14 : 0.08)
+  const soft = mixHex(accent, dark ? '#17191f' : '#ffffff', vivid ? (dark ? 0.62 : 0.78) : (dark ? 0.8 : 0.88))
+  const readableInk = dark ? '#ffffff' : '#000000'
+  let text = mixHex(accent, readableInk, vivid ? (dark ? 0.52 : 0.62) : (dark ? 0.28 : 0.08))
+  // Only plain hex surfaces are measurable; color-mix()/var() tokens are skipped.
+  const measurable = surfaces.filter((surface) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(surface.trim()))
+  if (measurable.length) {
+    // The most demanding surface bounds contrast on the other surfaces and accent badges.
+    const luminances = [...measurable, soft].map(relativeLuminance)
+    const background = dark ? Math.max(...luminances) : Math.min(...luminances)
+    const contrast = (ink: string) => {
+      const foreground = relativeLuminance(ink)
+      return dark ? (foreground + 0.05) / (background + 0.05) : (background + 0.05) / (foreground + 0.05)
+    }
+    for (let step = 0; step < 12 && contrast(text) < 4.7; step += 1) text = mixHex(text, readableInk, 0.16)
+    // Unreachable on this surface: fall back to whichever extreme contrasts more.
+    if (contrast(text) < 4.7) text = (background + 0.05) / 0.05 > 1.05 / (background + 0.05) ? '#000000' : '#ffffff'
+  }
   return {
     '--app-accent': accent,
     '--app-accent-hover': hover,
     '--app-accent-on': getAccentForeground(accent),
     '--app-accent-hover-on': getAccentForeground(hover),
-    '--app-accent-soft': mixHex(accent, dark ? '#17191f' : '#ffffff', vivid ? (dark ? 0.62 : 0.78) : (dark ? 0.8 : 0.88)),
-    '--app-accent-text': mixHex(accent, dark ? '#ffffff' : '#000000', vivid ? (dark ? 0.52 : 0.62) : (dark ? 0.28 : 0.08)),
+    '--app-accent-soft': soft,
+    '--app-accent-text': text,
     '--app-accent-border': `color-mix(in srgb, ${accent} ${vivid ? 74 : 42}%, transparent)`,
   }
 }
