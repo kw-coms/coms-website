@@ -278,7 +278,7 @@ public class NoticeService {
                 notice.getVersion(),
                 notice.getTitle(),
                 notice.getContent(),
-                notice.getAuthor(),
+                studentId == null ? "COM's 운영진" : notice.getAuthor(),
                 studentId == null ? null : notice.getAuthorStudentId(),
                 notice.isPublicVisible(),
                 notice.isPinned(),

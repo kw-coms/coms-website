@@ -135,16 +135,26 @@ class OperationsSecurityIntegrationTest {
                         .content("{\"title\":\"공개 공지\",\"content\":\"내용\",\"publicVisible\":true}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         long publicId = objectMapper.readTree(publicBody).get("id").asLong();
+        String realAuthor = objectMapper.readTree(publicBody).get("author").asText();
+        assertThat(realAuthor).isNotEqualTo("COM's 운영진");
 
         mockMvc.perform(get("/api/notices"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(publicId))
                 .andExpect(jsonPath("$[1]").doesNotExist())
+                .andExpect(jsonPath("$[0].author").value("COM's 운영진"))
                 .andExpect(jsonPath("$[0].authorStudentId").doesNotExist());
+        mockMvc.perform(get("/api/notices").param("page", "0").param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].author").value("COM's 운영진"));
         mockMvc.perform(get("/api/notices/" + privateId)).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/notices/" + publicId))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.author").value("COM's 운영진"))
                 .andExpect(jsonPath("$.authorStudentId").doesNotExist());
+        mockMvc.perform(get("/api/notices/" + publicId).cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.author").value(realAuthor));
         mockMvc.perform(get("/api/notices").cookie(userCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[1].id").exists());
