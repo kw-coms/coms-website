@@ -26,7 +26,7 @@
 
 	& :is(.page-crumb, .apple-eyebrow, .site-head-eyebrow, .scene-kicker, .coms-eyebrow, .coms-card-eyebrow,
 		.act-kind, .act-subhead, .nav-col-title, .nav-m-title, .apple-table thead th, .judge-table-head,
-		.study-overview-stats dt, .coms-visual-bar, .coms-ask-eyebrow, .compact-home__eyebrow) {
+		.study-overview-stats dt, .coms-visual-bar, .coms-ask-eyebrow, .compact-home__group-title, .compact-home__now-title) {
 		color: var(--preset-ink);
 		font-family: var(--appearance-font-label, var(--appearance-font-display));
 		letter-spacing: var(--appearance-label-spacing, 0.04em);
@@ -45,7 +45,7 @@
 	/* Paint the frame inside the existing box to keep card, dialog and list geometry. */
 	& :is(
 		.apple-product-panel, .apple-soft-panel, .apple-board-shell, .coms-card, .coms-timeline-card,
-		.coms-visual, .coms-cta, .compact-home__card, .compact-home__member,
+		.coms-visual, .coms-cta, .compact-home__now, .compact-home__directory,
 		.site-stats, .act-card, .act-founding, .act-live, .act-jump, .act-recruit, .study-card, .study-overview-stats,
 		.study-page nav.toc, .ex-panel, .algorithm-card, .judge-challenge, .club-tournament-card,
 		.club-tournament-panel, .club-tournament-match, .coms-gather-panel, .coms-attend-panel, .club-calendar-shell,

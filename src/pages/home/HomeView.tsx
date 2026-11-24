@@ -192,7 +192,7 @@ export default function HomeView() {
   }
 
   if (homeLayout === 'compact') return (
-    <CompactHome member={member} latestNotice={latestNotice} settings={siteSettings} nextActivity={nextActivityStrip} />
+    <CompactHome member={member} latestNotice={latestNotice} settings={siteSettings} activity={activity} />
   )
 
   return (
