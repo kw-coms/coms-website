@@ -5,8 +5,9 @@
 		font-family: var(--appearance-font-body);
 	}
 
-	& :is(.coms-page-backdrop, .site-page:not(.apps-directory), .coms-sec, .study-hub, .study-page, .apple-detail-hero, .compact-home) {
-		background: var(--preset-pattern), var(--app-bg);
+	/* The pattern is painted once, on body; page shells stay transparent so it is not stacked. */
+	& :is(.coms-sec, .study-hub, .study-page, .apple-detail-hero, .compact-home) {
+		background: transparent;
 	}
 
 	& .coms-sec::before,
@@ -232,7 +233,7 @@
 
 	& .skeleton:not(.skeleton-circle) {
 		border-radius: var(--appearance-control-radius);
-		background: var(--preset-pattern), var(--app-surface-soft);
+		background: var(--app-surface-soft);
 	}
 }
 

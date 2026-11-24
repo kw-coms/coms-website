@@ -237,12 +237,10 @@
 		}
 	}
 
+	/* body paints the pattern and base colour; these shells add only the top wash. */
 	& .coms-page-backdrop,
 	& .site-page {
-		background:
-			linear-gradient(180deg, transparent, var(--app-bg) 34rem),
-			radial-gradient(60rem 24rem at 80% -8rem, var(--preset-line), transparent 74%),
-			var(--preset-pattern), var(--app-bg);
+		background: radial-gradient(60rem 24rem at 80% -8rem, var(--preset-line), transparent 74%);
 	}
 
 	& .apple-board-hero {
