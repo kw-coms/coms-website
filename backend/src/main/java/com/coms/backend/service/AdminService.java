@@ -127,7 +127,8 @@ public class AdminService {
             default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바른 인증 상태를 선택해주세요.");
         };
         String normalizedSearch = likePattern(search);
-        return memberRepository.searchAdminMembers(normalizedSearch, selectedRole, verified,
+        String phoneSearch = phonePattern(search);
+        return memberRepository.searchAdminMembers(normalizedSearch, phoneSearch, selectedRole, verified,
                 PageRequest.of(page, size, Sort.by("id"))).map(this::toResponse);
     }
 
@@ -135,8 +136,14 @@ public class AdminService {
     private static String likePattern(String search) {
         if (search == null || search.isBlank()) return null;
         String term = search.trim().toLowerCase(Locale.ROOT);
-        if (term.length() > 1 && term.endsWith("기")) term = term.substring(0, term.length() - 1).trim();
+        if (term.matches("[0-9]+기")) term = term.substring(0, term.length() - 1);
         return "%" + term.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+    }
+
+    private static String phonePattern(String search) {
+        if (search == null || !search.trim().matches("[+()0-9.\\s-]+")) return null;
+        String digits = search.replaceAll("[^0-9]", "");
+        return digits.isEmpty() ? null : "%" + digits + "%";
     }
 
     public MemberResponse createMember(AdminMemberCreateRequest request) {

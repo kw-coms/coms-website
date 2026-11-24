@@ -139,6 +139,22 @@ class AdminServiceTest {
     }
 
     @Test
+    void memberSearchKeepsTextEndingInGiAndMatchesPhoneDigits() {
+        Member nameEndingInGi = existingMember("2026000001", "김기", "a@example.com");
+        realMemberRepository.save(nameEndingInGi);
+        Member phone = existingMember("2026000002", "김나래", "b@example.com");
+        phone.setPhone("010 (1234) 5678");
+        realMemberRepository.save(phone);
+
+        assertThat(realAdminService.listMembers(0, 20, "김기", null, null).getContent())
+                .extracting(MemberResponse::studentId).containsExactly("2026000001");
+        assertThat(realAdminService.listMembers(0, 20, "01012345678", null, null).getContent())
+                .extracting(MemberResponse::studentId).containsExactly("2026000002");
+        assertThat(realAdminService.listMembers(0, 20, "010-1234-5678", null, null).getContent())
+                .extracting(MemberResponse::studentId).containsExactly("2026000002");
+    }
+
+    @Test
     void loginAuditUnpagedSizeReturnsEveryLoggedInMember() {
         Member a = existingMember("2026000001", "김가람", "a@example.com");
         a.setLastLoginAt(LocalDateTime.of(2026, 1, 1, 9, 0));
