@@ -44,31 +44,33 @@ public class StudyAttendanceService {
 
     @Transactional(readOnly = true)
     public List<StudyAttendanceDto.Session> list(Long groupId, String actor) {
-        access.requireParticipant(groupId, actor);
-        return sessions.findByGroupIdOrderByRoundNoAsc(groupId).stream().map(s -> view(s, actor)).toList();
+        StudyGroup group = access.requireGroup(groupId);
+        boolean manager = access.requireParticipantAndCheckManager(group, actor);
+        return sessions.findByGroupIdOrderByRoundNoAsc(groupId).stream().map(round -> view(round, group, manager)).toList();
     }
 
     @Transactional(readOnly = true)
     public StudyAttendanceDto.Session get(Long groupId, Long sessionId, String actor) {
-        access.requireParticipant(groupId, actor);
-        return view(require(groupId, sessionId), actor);
+        StudyGroup group = access.requireGroup(groupId);
+        boolean manager = access.requireParticipantAndCheckManager(group, actor);
+        return view(require(groupId, sessionId), group, manager);
     }
 
     public StudyAttendanceDto.Session create(Long groupId, StudyAttendanceDto.Write write, String actor) {
-        lockGroupForRoundChanges(groupId, actor);
+        StudyGroup group = lockGroupForRoundChanges(groupId, actor);
         int next = sessions.findTopByGroupIdOrderByRoundNoDesc(groupId).map(s -> s.getRoundNo() + 1).orElse(1);
         StudySession session = new StudySession();
         session.setGroupId(groupId);
         session.setRoundNo(next);
         apply(session, write);
-        return view(sessions.save(session), actor);
+        return view(sessions.save(session), group, true);
     }
 
     public StudyAttendanceDto.Session edit(Long groupId, Long sessionId, StudyAttendanceDto.Write write, String actor) {
-        lockGroupForRoundChanges(groupId, actor);
+        StudyGroup group = lockGroupForRoundChanges(groupId, actor);
         StudySession session = require(groupId, sessionId);
         apply(session, write);
-        return view(session, actor);
+        return view(session, group, true);
     }
 
     public StudyAttendanceDto.Session open(Long groupId, Long sessionId, StudyAttendanceDto.Open request, String actor) {
@@ -81,17 +83,17 @@ public class StudyAttendanceService {
                 notifications.notifyStudy(member.getStudentId(), actor, groupId, group.getName() + " " + round.getRoundNo() + "회 출석이 열렸습니다.");
             }
         }
-        return view(round, actor);
+        return view(round, group, true);
     }
 
     public StudyAttendanceDto.Session close(Long groupId, Long sessionId, String actor) {
         access.lockGroup(groupId);
-        access.requireManager(groupId, actor);
+        StudyGroup group = access.requireManager(groupId, actor);
         StudySession round = require(groupId, sessionId);
         AttendanceSession session = attendanceSessions.findByStudySessionId(round.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "열린 출석이 없습니다."));
         if (session.isOpenAt(LocalDateTime.now(clock))) session.setClosedAt(LocalDateTime.now(clock));
-        return view(round, actor);
+        return view(round, group, true);
     }
 
     public StudyAttendanceDto.Roster mark(Long groupId, Long sessionId, String studentId,
@@ -223,12 +225,12 @@ public class StudyAttendanceService {
         return name.substring(0, end) + suffix;
     }
 
-    private StudyAttendanceDto.Session view(StudySession round, String actor) {
+    private StudyAttendanceDto.Session view(StudySession round, StudyGroup group, boolean manager) {
         AttendanceSession check = attendanceSessions.findByStudySessionId(round.getId()).orElse(null);
         boolean open = check != null && check.isOpenAt(LocalDateTime.now(clock))
-                && access.requireGroup(round.getGroupId()).getStatus() != StudyGroup.Status.ENDED;
+                && group.getStatus() != StudyGroup.Status.ENDED;
         return new StudyAttendanceDto.Session(round.getId(), round.getGroupId(), round.getRoundNo(), round.getDate(), round.getTopic(),
                 round.getNotes(), check == null ? null : check.getId(), open,
-                open && access.isManager(round.getGroupId(), actor) ? check.getCode() : null);
+                open && manager ? check.getCode() : null);
     }
 }

@@ -136,6 +136,17 @@ class StudyAttendanceIntegrationTest {
         assertThat(attendanceSessions.existsById(attendanceId)).isTrue();
     }
 
+    @Test void sessionListShowsOpenCodesOnlyToManagersAcrossRounds() throws Exception {
+        String first = open(createRound(LEADER));
+        String second = open(createRound(LEADER));
+        mvc.perform(get(path()).cookie(cookie(OFFICER))).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].attendanceCode").value(first))
+                .andExpect(jsonPath("$[1].attendanceCode").value(second));
+        mvc.perform(get(path()).cookie(cookie(APPROVED))).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].attendanceOpen").value(true)).andExpect(jsonPath("$[0].attendanceCode").doesNotExist())
+                .andExpect(jsonPath("$[1].attendanceOpen").value(true)).andExpect(jsonPath("$[1].attendanceCode").doesNotExist());
+    }
+
     @Test void formerAttendeeRemainsOnHistoricRosterWithoutRetainingAccess() throws Exception {
         long id = createRound(LEADER);
         String code = open(id);

@@ -39,7 +39,11 @@ public class StudyAccessService {
 
     public boolean isManager(Long groupId, String studentId) {
         if (studentId == null) return false;
-        StudyGroup group = requireGroup(groupId);
+        return isManager(requireGroup(groupId), studentId);
+    }
+
+    private boolean isManager(StudyGroup group, String studentId) {
+        if (studentId == null) return false;
         Member actor = requireMember(studentId);
         boolean leader = studentId.equals(group.getLeaderStudentId()) && actor.getRole().isAtLeast(Member.Role.USER);
         return leader || permissions.has(actor, Permission.ACTIVITY_WRITE);
@@ -47,7 +51,7 @@ public class StudyAccessService {
 
     public StudyGroup requireManager(Long groupId, String studentId) {
         StudyGroup group = requireGroup(groupId);
-        if (!isManager(groupId, studentId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "스터디 관리 권한이 없습니다.");
+        if (!isManager(group, studentId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "스터디 관리 권한이 없습니다.");
         return group;
     }
 
@@ -63,8 +67,18 @@ public class StudyAccessService {
 
     public StudyGroup requireParticipant(Long groupId, String studentId) {
         StudyGroup group = requireGroup(groupId);
-        if (!canReadMaterials(groupId, studentId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "승인된 스터디 멤버만 볼 수 있습니다.");
+        if (!canReadMaterials(groupId, studentId)) throw participantOnly();
         return group;
+    }
+
+    boolean requireParticipantAndCheckManager(StudyGroup group, String studentId) {
+        boolean manager = isManager(group, studentId);
+        if (!manager && !isApprovedMember(group.getId(), studentId)) throw participantOnly();
+        return manager;
+    }
+
+    private static ResponseStatusException participantOnly() {
+        return new ResponseStatusException(HttpStatus.FORBIDDEN, "승인된 스터디 멤버만 볼 수 있습니다.");
     }
 
     public List<StudyGroupMember> approvedMembers(Long groupId) {
