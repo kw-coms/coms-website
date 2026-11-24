@@ -330,7 +330,8 @@ public class ClubProjectService {
                 }
             });
         }
-        project.setReviewStatus(ClubProject.ReviewStatus.PENDING);
+        // Only an owner's upload re-queues review; a manager/admin upload must not unpublish a live project.
+        if (!manager) project.setReviewStatus(ClubProject.ReviewStatus.PENDING);
         project.touch();
         repository.saveAndFlush(project);
         return ids;
