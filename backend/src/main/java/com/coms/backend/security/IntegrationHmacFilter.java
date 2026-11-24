@@ -46,7 +46,7 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
 
     private final byte[] secretBytes;
     private final Clock clock;
-    // ponytail: replay memory is per JVM (a second instance would accept a replay once); move it to shared storage before scaling out.
+    // ponytail: replay memory is per JVM and forgotten on restart; use shared durable storage before scaling out.
     private final ConcurrentHashMap<String, Long> usedSignatures = new ConcurrentHashMap<>();
 
     public IntegrationHmacFilter(@Value("${integration.hmac-secret:}") String secret, Clock clock) {
@@ -107,17 +107,20 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Bad signature");
             return;
         }
-        if (usedSignatures.size() >= MAX_TRACKED_SIGNATURES) {
-            usedSignatures.values().removeIf(expiresAt -> expiresAt < now);
+        String signature = signatureHeader.trim();
+        synchronized (usedSignatures) {
             if (usedSignatures.size() >= MAX_TRACKED_SIGNATURES) {
-                response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "Integration busy");
+                usedSignatures.values().removeIf(expiresAt -> expiresAt < now);
+                if (usedSignatures.size() >= MAX_TRACKED_SIGNATURES) {
+                    response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "Integration busy");
+                    return;
+                }
+            }
+            // The signature binds the timestamp, so an entry can only be hit again while its timestamp is still in the window.
+            if (usedSignatures.putIfAbsent(signature, timestamp + REPLAY_WINDOW_SECONDS) != null) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Replayed request");
                 return;
             }
-        }
-        // The signature binds the timestamp, so an entry can only be hit again while its timestamp is still in the window.
-        if (usedSignatures.putIfAbsent(signatureHeader.trim(), timestamp + REPLAY_WINDOW_SECONDS) != null) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Replayed request");
-            return;
         }
 
         var auth = new UsernamePasswordAuthenticationToken(
@@ -126,9 +129,14 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
                 List.of(new SimpleGrantedAuthority("ROLE_INTEGRATION"))
         );
         SecurityContextHolder.getContext().setAuthentication(auth);
+        boolean processed = false;
         try {
             filterChain.doFilter(new CachedBodyRequest(request, body), response);
+            processed = response.getStatus() < HttpServletResponse.SC_BAD_REQUEST;
         } finally {
+            if (!processed) {
+                usedSignatures.remove(signature);
+            }
             SecurityContextHolder.clearContext();
         }
     }
