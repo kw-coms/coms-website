@@ -13,6 +13,7 @@ import jakarta.persistence.ElementCollection;
 import jakarta.persistence.JoinColumn;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -67,7 +68,7 @@ public class ArchiveFile {
     private long viewCount = 0;
 
     @Column(nullable = false)
-    private LocalDateTime uploadedAt = LocalDateTime.now();
+    private LocalDateTime uploadedAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
 
     public enum Category {
         GENERAL, ACADEMIC_JOURNAL
