@@ -118,30 +118,42 @@ test.describe('guide screen', () => {
     await skipIntro(page)
     await mockOptionalApis(page)
     await page.context().addCookies([{ name: 'other_tab_session', value: 'member', url: testInfo.project.use.baseURL }])
+    await page.addInitScript(() => {
+      window.__noticeCredentials = []
+      const originalFetch = window.fetch.bind(window)
+      window.fetch = (input, init) => {
+        const { pathname } = new URL(input instanceof Request ? input.url : input, location.href)
+        if (pathname === '/api/notices' || pathname === '/api/notices/4') {
+          const request = new Request(input, init)
+          window.__noticeCredentials.push({ path: pathname, credentials: request.credentials })
+          return originalFetch(request)
+        }
+        return originalFetch(input, init)
+      }
+    })
 
-    const requests = []
     const publicNotice = { id: 4, title: '공개 공지', content: '공개 내용', category: 'GENERAL', publicVisible: true, createdAt: '2026-11-01T10:00:00' }
     const memberNotice = { id: 5, title: '회원 전용 공지', content: '회원 전용 내용', category: 'GENERAL', publicVisible: false, createdAt: '2026-11-01T11:00:00' }
-    await page.route('**/api/notices', (route) => {
-      const cookie = route.request().headers().cookie || ''
-      requests.push({ path: 'list', cookie })
-      return route.fulfill({ json: cookie ? [publicNotice, memberNotice] : [publicNotice] })
+    await page.route('**/api/notices', async (route) => {
+      const credentials = await page.evaluate(() => window.__noticeCredentials.findLast((request) => request.path === '/api/notices')?.credentials)
+      return route.fulfill({ json: credentials === 'omit' ? [publicNotice] : [publicNotice, memberNotice] })
     })
-    await page.route('**/api/notices/4', (route) => {
-      const cookie = route.request().headers().cookie || ''
-      requests.push({ path: 'detail', cookie })
-      return route.fulfill({ json: cookie ? { ...publicNotice, content: '회원에게만 보이는 본문' } : publicNotice })
+    await page.route('**/api/notices/4', async (route) => {
+      const credentials = await page.evaluate(() => window.__noticeCredentials.findLast((request) => request.path === '/api/notices/4')?.credentials)
+      return route.fulfill({ json: credentials === 'omit' ? publicNotice : { ...publicNotice, content: '회원에게만 보이는 본문' } })
     })
 
     await page.goto('/notices')
     await expect(page.getByText('공개 공지').filter({ visible: true }).first()).toBeVisible()
     await expect(page.getByText('회원 전용 공지', { exact: true })).toHaveCount(0)
+    const listRequests = await page.evaluate(() => window.__noticeCredentials)
     await page.goto('/notices/4')
     await expect(page.getByText('공개 내용').filter({ visible: true }).first()).toBeVisible()
     await expect(page.getByText('회원에게만 보이는 본문')).toHaveCount(0)
-    expect(requests.some((request) => request.path === 'list')).toBe(true)
-    expect(requests.some((request) => request.path === 'detail')).toBe(true)
-    expect(requests.every((request) => request.cookie === '')).toBe(true)
+    const detailRequests = await page.evaluate(() => window.__noticeCredentials)
+    expect(listRequests).toContainEqual({ path: '/api/notices', credentials: 'omit' })
+    expect(detailRequests).toContainEqual({ path: '/api/notices/4', credentials: 'omit' })
+    expect([...listRequests, ...detailRequests].every((request) => request.credentials === 'omit')).toBe(true)
   })
 
   test('a guest opens the unlocked resources entry and requests the public list', async ({ page }) => {
