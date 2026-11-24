@@ -29,6 +29,6 @@ public interface ClubProjectRepository extends JpaRepository<ClubProject, Long> 
 
     long countByCategory(String category);
 
-    @Query("SELECT p.category AS category, COUNT(p) AS total FROM ClubProject p GROUP BY p.category")
-    List<Object[]> countByCategory();
+    @Query("SELECT p.category AS category, COUNT(p) AS total FROM ClubProject p WHERE p.reviewStatus = :status GROUP BY p.category")
+    List<Object[]> countByCategory(@Param("status") ClubProject.ReviewStatus status);
 }

@@ -2,6 +2,8 @@ package com.coms.backend.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -13,6 +15,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "club_projects")
 public class ClubProject {
+    public enum ReviewStatus { PENDING, APPROVED, REJECTED }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,6 +44,10 @@ public class ClubProject {
 
     @Column(name = "owner_student_id", length = 30)
     private String ownerStudentId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "review_status", nullable = false, length = 20)
+    private ReviewStatus reviewStatus = ReviewStatus.APPROVED;
 
     @Column(name = "view_count", nullable = false, updatable = false)
     private long viewCount = 0;
@@ -76,6 +83,8 @@ public class ClubProject {
     public void setDisplayUrl(String displayUrl) { this.displayUrl = displayUrl; }
     public String getOwnerStudentId() { return ownerStudentId; }
     public void setOwnerStudentId(String ownerStudentId) { this.ownerStudentId = ownerStudentId; }
+    public ReviewStatus getReviewStatus() { return reviewStatus; }
+    public void setReviewStatus(ReviewStatus reviewStatus) { this.reviewStatus = reviewStatus; }
     public long getViewCount() { return viewCount; }
     public int getPosition() { return position; }
     public void setPosition(int position) { this.position = position; }

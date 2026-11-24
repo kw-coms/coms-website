@@ -4,6 +4,7 @@ import { projectFileHref } from '../../utils/appProjectUrls'
 import {
   deleteClubProjectFile,
   listClubProjects,
+  reviewClubProject,
   updateClubProject,
   uploadClubProjectFile,
 } from '../../services/clubProjectApi'
@@ -22,6 +23,7 @@ type ProjectItem = {
   linkUrl?: string
   displayUrl?: string
   files?: MediaInfo[]
+  reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED'
 }
 
 export default function AdminAppCatalogRow({ item, categories, linkState = null, onDelete, onUpdated }: {
@@ -120,6 +122,18 @@ export default function AdminAppCatalogRow({ item, categories, linkState = null,
     }
   }
 
+  const review = async (status: 'APPROVED' | 'REJECTED') => {
+    setBusy(true)
+    setRowError('')
+    try {
+      onUpdated(await reviewClubProject(item.id, status))
+    } catch (err) {
+      setRowError(err.message || '작품 검토에 실패했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const categoryName = categories.find((category) => category.key === item.category)?.name || item.categoryName || item.category
 
   return (
@@ -134,6 +148,10 @@ export default function AdminAppCatalogRow({ item, categories, linkState = null,
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
+          {item.reviewStatus === 'PENDING' && <>
+            <button type="button" disabled={busy} onClick={() => review('APPROVED')} className="text-xs font-semibold text-[var(--app-accent-text)]">승인</button>
+            <button type="button" disabled={busy} onClick={() => review('REJECTED')} className="text-xs font-semibold text-red-500">반려</button>
+          </>}
           <button
             type="button"
             onClick={() => (editing ? setEditing(false) : startEdit())}
@@ -150,6 +168,8 @@ export default function AdminAppCatalogRow({ item, categories, linkState = null,
           </button>
         </div>
       </div>
+
+      {rowError && <p role="alert" className="mt-2 text-xs font-semibold text-red-600">{rowError}</p>}
 
       <div className="mt-3" data-testid={`admin-app-preview-${item.id}`}>
         <AppProjectCard
@@ -267,7 +287,6 @@ export default function AdminAppCatalogRow({ item, categories, linkState = null,
             </button>
           </div>
 
-          {rowError && <p className="text-xs font-semibold text-red-600 md:col-span-2">{rowError}</p>}
 
           <div className="flex items-center gap-2 md:col-span-2">
             <button

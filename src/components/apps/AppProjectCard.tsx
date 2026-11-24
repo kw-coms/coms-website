@@ -37,6 +37,7 @@ type AppProject = {
   viewCount?: number
   likeCount?: number
   commentCount?: number
+  reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED'
   files?: { id?: string | number; url?: string; originalName?: string; name?: string; size?: number; fileSize?: number }[]
   images?: { id: number; url: string }[]
   [key: string]: unknown
@@ -108,6 +109,8 @@ export default function AppProjectCard({
       <div className="app-card-head">
         <p className="app-card-eyebrow">{project?.eyebrow}</p>
         <h3 className="app-card-title" title={title}>{detailTo ? <Link to={detailTo}>{title}</Link> : title}</h3>
+        {project.reviewStatus === 'PENDING' && <span className="text-xs font-bold text-[var(--app-muted)]">검토 중</span>}
+        {project.reviewStatus === 'REJECTED' && <span className="text-xs font-bold text-[var(--app-muted)]">반려됨</span>}
       </div>
       {open}
       {/* Fixed-size slots: every card is the same size however much text it carries. */}

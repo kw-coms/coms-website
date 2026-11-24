@@ -81,7 +81,8 @@ public class ClubProjectService {
 
     @Transactional(readOnly = true)
     public List<ClubProjectResponse> list(String viewerStudentId, boolean manager) {
-        List<ClubProject> projects = repository.findAllByOrderByPositionAscIdAsc();
+        List<ClubProject> projects = repository.findAllByOrderByPositionAscIdAsc().stream()
+                .filter(project -> canView(project, viewerStudentId, manager)).toList();
         Map<String, String> categoryNames = categoryService.keyToNameMap();
         Map<Long, List<ClubProjectFile>> files = filesByProject(projects);
         Map<Long, List<ClubProjectImage>> images = imagesByProject(projects);
@@ -92,10 +93,15 @@ public class ClubProjectService {
     }
 
     public ClubProjectResponse detail(Long id, String viewerStudentId, boolean manager) {
+        requireVisible(id, viewerStudentId, manager);
         if (repository.incrementViewCount(id) == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        return toResponse(get(id), viewerStudentId, manager);
+        ClubProject project = get(id);
+        if (!canView(project, viewerStudentId, manager)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return toResponse(project, viewerStudentId, manager);
     }
 
     public ClubProjectResponse create(String category, String title, String description, String eyebrow,
@@ -117,7 +123,33 @@ public class ClubProjectService {
                 madeBy == null ? name : madeBy, linkUrl, null, null);
         ClubProject project = get(response.id());
         project.setOwnerStudentId(studentId);
+        project.setReviewStatus(ClubProject.ReviewStatus.PENDING);
         return toResponse(repository.save(project), studentId, false);
+    }
+
+    @Transactional(readOnly = true)
+    public void requireVisible(Long id, String viewerStudentId, boolean manager) {
+        if (!canView(get(id), viewerStudentId, manager)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    private boolean canView(ClubProject project, String viewerStudentId, boolean manager) {
+        return project.getReviewStatus() == ClubProject.ReviewStatus.APPROVED || manager
+                || (viewerStudentId != null && viewerStudentId.equals(project.getOwnerStudentId()));
+    }
+
+    public ClubProjectResponse review(Long id, ClubProject.ReviewStatus status) {
+        if (status == ClubProject.ReviewStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        ClubProject project = repository.findWithLockById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (project.getReviewStatus() != ClubProject.ReviewStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "검토 대기 중인 작품만 처리할 수 있습니다.");
+        }
+        project.setReviewStatus(status);
+        return toResponse(repository.save(project), null, true);
     }
 
     public void requireEditor(Long id, String studentId, boolean manager) {
@@ -130,7 +162,13 @@ public class ClubProjectService {
     public ClubProjectResponse updateForMember(Long id, String studentId, String category,
                                                String title, String description, String madeBy, String linkUrl) {
         requireEditor(id, studentId, false);
+        ClubProject project = get(id);
+        String previousLink = project.getLinkUrl();
         update(id, category, title, description, null, madeBy, linkUrl, null, null);
+        if (project.getReviewStatus() == ClubProject.ReviewStatus.REJECTED
+                || (linkUrl != null && !Objects.equals(previousLink, project.getLinkUrl()))) {
+            project.setReviewStatus(ClubProject.ReviewStatus.PENDING);
+        }
         return toResponse(get(id), studentId, false);
     }
 
@@ -495,7 +533,8 @@ public class ClubProjectService {
                 project.getViewCount(),
                 engagement.likes().getOrDefault(project.getId(), 0L),
                 engagement.comments().getOrDefault(project.getId(), 0L),
-                engagement.likedByViewer().contains(project.getId())
+                engagement.likedByViewer().contains(project.getId()),
+                project.getReviewStatus().name()
         );
     }
 }

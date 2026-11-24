@@ -2,6 +2,7 @@ package com.coms.backend.controller;
 
 import com.coms.backend.domain.ClubProjectFile;
 import com.coms.backend.domain.ClubProjectImage;
+import com.coms.backend.domain.ClubProject;
 import com.coms.backend.dto.ClubProjectLinkStatusResponse;
 import com.coms.backend.dto.ClubProjectResponse;
 import com.coms.backend.dto.ClubProjectCommentRequest;
@@ -78,12 +79,14 @@ public class ClubProjectController {
     @PutMapping("/{id}/like")
     public ResponseEntity<ClubProjectEngagementResponse> setLike(@PathVariable Long id,
             @Valid @RequestBody ClubProjectLikeRequest request, Authentication authentication) {
+        requireVisible(id, authentication);
         return ResponseEntity.ok(socialService.setLike(id, authentication.getName(), request.liked()));
     }
 
     @GetMapping("/{id}/comments")
     public ResponseEntity<List<ClubProjectCommentResponse>> listComments(@PathVariable Long id,
             Authentication authentication) {
+        requireVisible(id, authentication);
         String viewer = authentication == null ? null : authentication.getName();
         return ResponseEntity.ok(socialService.listComments(id, viewer,
                 authentication != null && canManageAll(authentication)));
@@ -93,6 +96,7 @@ public class ClubProjectController {
     @PostMapping("/{id}/comments")
     public ResponseEntity<ClubProjectCommentResponse> addComment(@PathVariable Long id,
             @Valid @RequestBody ClubProjectCommentRequest request, Authentication authentication) {
+        requireVisible(id, authentication);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(socialService.addComment(id, authentication.getName(), request));
     }
@@ -102,6 +106,7 @@ public class ClubProjectController {
     public ResponseEntity<ClubProjectCommentResponse> updateComment(@PathVariable Long id,
             @PathVariable Long commentId, @Valid @RequestBody ClubProjectCommentUpdateRequest request,
             Authentication authentication) {
+        requireVisible(id, authentication);
         return ResponseEntity.ok(socialService.updateComment(id, commentId, authentication.getName(), request));
     }
 
@@ -109,6 +114,7 @@ public class ClubProjectController {
     @DeleteMapping("/{id}/comments/{commentId}")
     public ResponseEntity<Void> deleteComment(@PathVariable Long id, @PathVariable Long commentId,
             Authentication authentication) {
+        requireVisible(id, authentication);
         socialService.deleteComment(id, commentId, authentication.getName(), canManageAll(authentication));
         return ResponseEntity.noContent().build();
     }
@@ -161,6 +167,15 @@ public class ClubProjectController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")
+    @PatchMapping("/{id}/review")
+    public ResponseEntity<ClubProjectResponse> review(@PathVariable Long id,
+            @RequestParam ClubProject.ReviewStatus status, Authentication authentication) {
+        ClubProjectResponse response = projectService.review(id, status);
+        auditProject(authentication, "ADMIN_CLUB_PROJECT_" + status.name(), response);
+        return ResponseEntity.ok(response);
+    }
+
     @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
@@ -185,7 +200,9 @@ public class ClubProjectController {
 
     // Public download of distributables (apk/zip).
     @GetMapping("/{id}/files/{fileId}/download")
-    public ResponseEntity<Resource> downloadFile(@PathVariable Long id, @PathVariable Long fileId) {
+    public ResponseEntity<Resource> downloadFile(@PathVariable Long id, @PathVariable Long fileId,
+                                                 Authentication authentication) {
+        requireVisible(id, authentication);
         ClubProjectFile meta = projectService.loadFileMeta(id, fileId);
         Resource resource = projectService.loadFileResource(id, fileId);
         String filename = meta.getOriginalName() == null || meta.getOriginalName().isBlank() ? "download" : meta.getOriginalName();
@@ -217,7 +234,9 @@ public class ClubProjectController {
     }
 
     @GetMapping("/{id}/images/{imageId}")
-    public ResponseEntity<Resource> image(@PathVariable Long id, @PathVariable Long imageId) {
+    public ResponseEntity<Resource> image(@PathVariable Long id, @PathVariable Long imageId,
+                                          Authentication authentication) {
+        requireVisible(id, authentication);
         ClubProjectImage meta = projectService.loadImageMeta(id, imageId);
         return ResponseEntity.ok()
                 .contentType("image/png".equals(meta.getMimeType()) ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG)
@@ -236,6 +255,11 @@ public class ClubProjectController {
 
     private boolean canManageAll(Authentication authentication) {
         return permissionService.has(authentication, "PROJECT_WRITE");
+    }
+
+    private void requireVisible(Long id, Authentication authentication) {
+        projectService.requireVisible(id, authentication == null ? null : authentication.getName(),
+                authentication != null && canManageAll(authentication));
     }
 
     private void auditProject(Authentication authentication, String verb, ClubProjectResponse response) {

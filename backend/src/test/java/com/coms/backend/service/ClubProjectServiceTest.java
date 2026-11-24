@@ -75,11 +75,22 @@ class ClubProjectServiceTest {
         member.setPassword("unused");
         memberRepository.save(member);
 
+        long publicCount = clubProjectCategoryService.list().stream()
+                .filter(category -> category.key().equals("APP")).findFirst().orElseThrow().projectCount();
         var created = clubProjectService.createForMember("2099000001", "APP", "회원 작품", "소개", null, "https://example.com");
         assertThat(created.madeBy()).isEqualTo("작품 회원");
         assertThat(created.canEdit()).isTrue();
+        assertThat(created.reviewStatus()).isEqualTo("PENDING");
+        assertThat(clubProjectService.list()).noneMatch(p -> p.id().equals(created.id()));
+        assertThat(clubProjectCategoryService.list().stream()
+                .filter(category -> category.key().equals("APP")).findFirst().orElseThrow().projectCount())
+                .isEqualTo(publicCount);
         assertThat(clubProjectService.list("2099000001", false)).filteredOn(p -> p.id().equals(created.id()))
                 .singleElement().satisfies(p -> assertThat(p.canEdit()).isTrue());
+        clubProjectService.review(created.id(), com.coms.backend.domain.ClubProject.ReviewStatus.APPROVED);
+        assertThat(clubProjectCategoryService.list().stream()
+                .filter(category -> category.key().equals("APP")).findFirst().orElseThrow().projectCount())
+                .isEqualTo(publicCount + 1);
         assertThat(clubProjectService.list("2099000002", false)).filteredOn(p -> p.id().equals(created.id()))
                 .singleElement().satisfies(p -> assertThat(p.canEdit()).isFalse());
         assertThatThrownBy(() -> clubProjectService.requireEditor(created.id(), "2099000002", false))

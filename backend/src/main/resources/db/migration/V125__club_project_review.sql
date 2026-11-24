@@ -1,0 +1,1 @@
+ALTER TABLE club_projects ADD COLUMN review_status VARCHAR(20) NOT NULL DEFAULT 'APPROVED';

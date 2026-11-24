@@ -174,7 +174,7 @@ class ClubProjectAuditLogControllerTest {
     private ClubProjectResponse projectResponse(Long id, String category, String title, String linkUrl) {
         return new ClubProjectResponse(id, category, category, title, "설명", "Web", "홍길동",
                 linkUrl, linkUrl == null ? null : "example.com/app", 0, List.of(), false, List.of(),
-                LocalDateTime.now(), LocalDateTime.now(), 0, 0, 0, false);
+                LocalDateTime.now(), LocalDateTime.now(), 0, 0, 0, false, "APPROVED");
     }
 
     private com.coms.backend.domain.ClubProject projectResponseEntity(String title, String category, String linkUrl) {
