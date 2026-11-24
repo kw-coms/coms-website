@@ -106,6 +106,16 @@ class OperationsSecurityIntegrationTest {
     }
 
     @Test
+    void associateCanWriteCommunityAndUseArchiveUploadRoute() throws Exception {
+        mockMvc.perform(post("/api/community/posts").cookie(associateCookie).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"준회원 글\",\"content\":\"본문 내용\",\"category\":\"GENERAL\"}"))
+                .andExpect(status().isCreated());
+        assertThat(uploadArchive(associateCookie, "준회원 자료", "associate.pdf", "%PDF-1.4 associate")
+                .path("title").asText()).isEqualTo("준회원 자료");
+    }
+
+    @Test
     void publicSettingsStayPublicWhileNoticesRequireMembership() throws Exception {
         mockMvc.perform(get("/api/site-settings"))
                 .andExpect(status().isOk());
