@@ -177,9 +177,9 @@ public class ClubFormService {
         return responses(id, page, false);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Responses responses(Long id, int page, boolean studyOnly) {
-        Form form = require(id, false);
+        Form form = require(id, studyOnly);
         if (studyOnly && form.category() != Category.STUDY) throw studyForbidden();
         if (page < 0 || page > 100_000) throw invalid("페이지 번호를 확인해 주세요.");
         List<ResponseRow> rows = jdbc.sql("""
@@ -198,9 +198,9 @@ public class ClubFormService {
         return aggregates(id, false);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Aggregates aggregates(Long id, boolean studyOnly) {
-        Form form = require(id, false);
+        Form form = require(id, studyOnly);
         if (studyOnly && form.category() != Category.STUDY) throw studyForbidden();
         List<ResponseRow> rows = jdbc.sql("""
                 SELECT m.name, m.student_id, r.answers_json, r.submitted_at
