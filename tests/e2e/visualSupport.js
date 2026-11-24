@@ -49,6 +49,38 @@ export async function signInHint(pageOrContext) {
   await (pageOrContext.context ? pageOrContext.context() : pageOrContext).addCookies([{ name: 'comsSession', value: '1', url }])
 }
 
+export async function mockAdminMembers(page, members) {
+  await page.route((url) => url.pathname === '/api/admin/members', (route) => {
+    const request = route.request()
+    if (request.method() !== 'GET') return route.fallback()
+    const params = new URL(request.url()).searchParams
+    if (!['page', 'size', 'search', 'role', 'status'].some((key) => params.has(key))) {
+      return route.fulfill({ json: members })
+    }
+
+    const rawSearch = (params.get('search') ?? '').trim()
+    const search = rawSearch.toLowerCase().replace(/^([0-9]+)기$/, '$1')
+    const phoneSearch = /^[+()0-9.\s-]+$/.test(rawSearch) ? rawSearch.replace(/[^0-9]/g, '') : ''
+    const role = params.get('role')
+    const status = params.get('status')
+    const matches = members.filter((member) => {
+      if (role?.trim() && member.role !== role) return false
+      if (status && status !== 'ALL' && member.emailVerified !== (status === 'VERIFIED')) return false
+      return !search
+        || [member.name, member.email, member.department].some((field) => field?.toLowerCase().includes(search))
+        || [member.studentId, member.phone, member.generation].some((field) => String(field ?? '').includes(search))
+        || Boolean(phoneSearch && member.phone?.replace(/[^0-9]/g, '').includes(phoneSearch))
+    }).sort((a, b) => a.id - b.id)
+
+    const size = Math.min(Number(params.get('size') ?? 20), 200)
+    const offset = Number(params.get('page') ?? 0) * size
+    return route.fulfill({
+      json: matches.slice(offset, offset + size),
+      headers: { 'X-Total-Count': String(matches.length) },
+    })
+  })
+}
+
 export async function mockAdminApis(page) {
   await signInHint(page)
   await page.route('**/api/auth/me', (route) => route.fulfill({
@@ -63,7 +95,7 @@ export async function mockAdminApis(page) {
   }))
   await page.route('**/api/auth/refresh', (route) => route.fulfill({ status: 204 }))
   await page.route('**/api/fonts', (route) => route.fulfill({ status: 200, json: [] }))
-  await page.route((url) => url.pathname === '/api/admin/members', (route) => route.fulfill({ status: 200, json: [] }))
+  await mockAdminMembers(page, [])
   await page.route('**/api/admin/recruit-applications', (route) => route.fulfill({ status: 200, json: [] }))
   await page.route('**/api/admin/community/deleted-posts**', (route) => route.fulfill({ status: 200, json: [] }))
   await page.route('**/api/notifications', (route) => route.fulfill({ status: 200, json: [] }))
