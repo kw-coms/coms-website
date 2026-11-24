@@ -5,6 +5,7 @@ import com.coms.backend.dto.HackathonProjectResponse;
 import com.coms.backend.dto.HackathonTeamWork;
 import com.coms.backend.service.AuditLogService;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.web.bind.annotation.PutMapping;
 import com.coms.backend.dto.HackathonEventResponse;
 import com.coms.backend.dto.HackathonEventSummary;
@@ -47,8 +48,8 @@ public class HackathonController {
 
     @PostMapping("/reviews")
     public ResponseEntity<Map<String, String>> submit(@RequestBody HackathonReviewRequest request,
-                                                       HttpServletRequest servletRequest) {
-        String projectId = service.submit(request, clientIpResolver.resolve(servletRequest));
+                                                       HttpServletRequest servletRequest, Authentication authentication) {
+        String projectId = service.submit(request, clientIpResolver.resolve(servletRequest), memberId(authentication));
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("projectId", projectId));
     }
 
@@ -60,9 +61,14 @@ public class HackathonController {
 
     @PostMapping("/events/{eventId}/reviews")
     public ResponseEntity<Map<String, String>> submitEvent(@PathVariable Long eventId,
-            @RequestBody HackathonReviewRequest request, HttpServletRequest servletRequest) {
-        String projectId = service.submit(eventId, request, clientIpResolver.resolve(servletRequest));
+            @RequestBody HackathonReviewRequest request, HttpServletRequest servletRequest, Authentication authentication) {
+        String projectId = service.submit(eventId, request, clientIpResolver.resolve(servletRequest), memberId(authentication));
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("projectId", projectId));
+    }
+
+    private static String memberId(Authentication authentication) {
+        return authentication != null && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken) ? authentication.getName() : null;
     }
 
     @GetMapping("/team-work/{eventId}")

@@ -119,6 +119,14 @@ public class AdminHackathonController {
         return Map.of("open", open);
     }
 
+    @PutMapping("/events/{eventId}/guest-reviews")
+    public Map<String, Boolean> guestReviews(@PathVariable Long eventId, @RequestBody Map<String, Boolean> request,
+                                             Authentication authentication) {
+        boolean allowed = service.setAllowGuestReviews(eventId, request == null ? null : request.get("allowGuestReviews"));
+        audit(authentication, "ADMIN_HACKATHON_GUEST_REVIEWS", "HACKATHON_EVENT", eventId);
+        return Map.of("allowGuestReviews", allowed);
+    }
+
     @PostMapping("/events/{eventId}/projects")
     public ResponseEntity<HackathonProjectResponse> createProject(@PathVariable Long eventId, @RequestBody HackathonProjectWrite request,
                                                                    Authentication authentication) {

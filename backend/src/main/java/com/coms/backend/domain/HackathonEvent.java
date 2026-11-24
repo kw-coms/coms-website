@@ -29,6 +29,8 @@ public class HackathonEvent {
     private boolean published;
     @Column(nullable = false)
     private boolean open;
+    @Column(name = "allow_guest_reviews", nullable = false)
+    private boolean allowGuestReviews;
     @Column(name = "starts_at")
     private LocalDateTime startsAt;
     @Column(name = "ends_at")
@@ -53,6 +55,8 @@ public class HackathonEvent {
     public void setPublished(boolean value) { published = value; }
     public boolean isOpen() { return open; }
     public void setOpen(boolean value) { open = value; }
+    public boolean isAllowGuestReviews() { return allowGuestReviews; }
+    public void setAllowGuestReviews(boolean value) { allowGuestReviews = value; }
     public LocalDateTime getStartsAt() { return startsAt; }
     public void setStartsAt(LocalDateTime value) { startsAt = value; }
     public LocalDateTime getEndsAt() { return endsAt; }

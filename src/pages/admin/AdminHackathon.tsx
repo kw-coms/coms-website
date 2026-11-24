@@ -9,7 +9,7 @@ import HackathonStatusBadge from '../../features/hackathon/HackathonStatusBadge'
 import {
   createHackathonEvent, createHackathonProject, deleteEventReview, deleteHackathonMaterial, deleteHackathonProject,
   getAdminHackathonEvent, listAdminHackathonEvents, listEventReviews, publishHackathonEvent,
-  saveEventChairReview, setEventOpen, setEventResultsPublished, updateHackathonEvent, updateHackathonProject, uploadHackathonMaterial,
+  saveEventChairReview, setEventOpen, setEventGuestReviews, setEventResultsPublished, updateHackathonEvent, updateHackathonProject, uploadHackathonMaterial,
   type AdminHackathonEvent, type HackathonEventWrite, type HackathonMaterial, type HackathonProject,
   type HackathonReview,
 } from '../../services/hackathonApi'
@@ -127,6 +127,7 @@ export default function AdminHackathon() {
       <div className="flex flex-wrap items-center gap-3"><strong>{event.published ? '공개 중' : '초안'} · {event.open ? '평가 접수 중' : '평가 마감'}</strong>
         <button type="button" disabled={pending || (event.published && (event.open || reviews.isPending || reviews.isError || Boolean(reviews.data?.length)))} className={actionClass} onClick={() => act(() => publishHackathonEvent(eventId, !event.published), event.published ? '공개를 중단했습니다.' : '해커톤 글을 공개했습니다.')}>{event.published ? '공개 중단' : '글 공개'}</button>
         <button type="button" disabled={pending || (!event.open && (!event.published || !event.projects.some(project => project.published !== false)))} className={actionClass} onClick={() => act(() => setEventOpen(eventId, !event.open), event.open ? '평가를 마감했습니다.' : '평가를 열었습니다.')}>{event.open ? '평가 마감하기' : '평가 다시 열기'}</button>
+        <button type="button" aria-pressed={event.allowGuestReviews} disabled={pending} className={actionClass} onClick={() => act(() => setEventGuestReviews(eventId, !event.allowGuestReviews), event.allowGuestReviews ? '비회원 평가를 닫았습니다.' : '비회원 평가를 허용했습니다.')}>{event.allowGuestReviews ? '비회원 평가 허용 중 · 끄기' : '비회원 평가 허용'}</button>
         <button type="button" className={actionClass} onClick={() => refresh()}>집계 새로고침</button>
         <HackathonStatusBadge status={event.status} />
         <button type="button" aria-pressed={event.resultsPublished} disabled={pending || Boolean(resultsBlocked)} aria-describedby={resultsBlocked ? 'hackathon-results-reason' : undefined} className={actionClass} onClick={() => act(() => setEventResultsPublished(eventId, !event.resultsPublished), event.resultsPublished ? '결과 공개를 중단했습니다.' : '결과를 공개했습니다.')}>{event.resultsPublished ? '결과 공개 중 · 비공개로 전환' : '결과 공개'}</button>

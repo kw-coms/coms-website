@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public record HackathonEventResponse(Long id, String title, Integer year, Integer semester, boolean open,
+                                     boolean allowGuestReviews,
                                      String theme, String introduction, String rules,
                                      List<HackathonProjectResponse> projects,
                                      List<HackathonMaterialResponse> materials,
@@ -17,7 +18,7 @@ public record HackathonEventResponse(Long id, String title, Integer year, Intege
                                               List<HackathonMaterial> materials, HackathonEventStatus status,
                                               List<HackathonResultResponse> results) {
         return new HackathonEventResponse(event.getId(), event.getTitle(), event.getYear(), event.getSemester(),
-                event.isOpen(), event.getTheme(), event.getIntroduction(), event.getRules(),
+                event.isOpen(), event.isAllowGuestReviews(), event.getTheme(), event.getIntroduction(), event.getRules(),
                 projects.stream().map(project -> HackathonProjectResponse.from(project, materials)).toList(),
                 materials.stream().filter(material -> material.getProjectId() == null)
                         .map(HackathonMaterialResponse::from).toList(),

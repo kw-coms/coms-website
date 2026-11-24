@@ -107,7 +107,7 @@ export default function Hackathon() {
         <HackathonStatusBadge status={event.status} />
         <p className="text-sm text-[var(--app-muted)]">개발 기간 {formatPeriod(event.startsAt, event.endsAt) ?? '미정'} (한국 시간)</p>
       </div>
-      {event.open ? <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--app-muted)]">선배님들의 경험으로 후배들의 작품을 살펴봐 주세요.<br />로그인 없이 기수와 이름만 입력하면 평가에 참여하실 수 있습니다.</p>
+      {event.open ? <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--app-muted)]">선배님들의 경험으로 후배들의 작품을 살펴봐 주세요.<br />{event.allowGuestReviews ? '로그인 없이 기수와 이름만 입력하면 평가에 참여하실 수 있습니다.' : '평가에 참여하려면 로그인해 주세요.'}</p>
         : <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--app-muted)]">{STATUS_META[event.status].hint} 작품과 자료는 기록으로 계속 볼 수 있습니다.</p>}
       <div className="mt-5 flex flex-wrap gap-3">
         <Link to={'/forms?category=HACKATHON&event=' + eventId} className="apple-action-secondary inline-flex min-h-11 items-center px-4 text-sm">팀 신청·수요조사</Link>
@@ -119,6 +119,7 @@ export default function Hackathon() {
       </div>
       {user && <TeamWorkPanel key={eventId + ":" + user.studentId} eventId={eventId} studentId={user.studentId} />}
       {copyError && <p role="alert" className="mt-3 break-all text-sm">자동 복사가 지원되지 않습니다. 주소를 길게 눌러 복사해 주세요: <a href={link} className="select-all text-[var(--app-accent-text)] underline">{window.location.origin}{link}</a></p>}
+      {event.open && !event.allowGuestReviews && !user && !loading && <p role="status" className="mt-4 text-sm">비회원 평가는 현재 허용되지 않습니다. <Link to="/login" state={{ from: location }} className="underline">로그인</Link> 후 참여할 수 있습니다.</p>}
       <section className="hackathon-intro mt-8" aria-labelledby="hackathon-theme">
         <p className="text-sm font-semibold text-[var(--app-accent-text)]">이번 주제</p>
         <h2 id="hackathon-theme" className="mt-2 text-3xl font-bold">{event.theme || event.title}</h2>
@@ -127,7 +128,7 @@ export default function Hackathon() {
         <Materials materials={event.materials} title={event.title} />
       </section>
       {event.resultsPublished && (event.results.length > 0 ? <Results results={event.results} /> : <p role="status" className="hackathon-intro mt-6 text-sm font-semibold">집계 중입니다. 결과가 정리되면 이곳에 순위가 표시됩니다.</p>)}
-      {event.open && event.projects.length > 0 && <section className="hackathon-identity mt-6" aria-labelledby="hackathon-identity-title">
+      {event.open && (user || event.allowGuestReviews) && event.projects.length > 0 && <section className="hackathon-identity mt-6" aria-labelledby="hackathon-identity-title">
         <h2 id="hackathon-identity-title" className="text-lg font-bold">평가자 정보</h2>
         <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">기수와 이름으로 팀별 중복 평가를 확인합니다. 각 팀을 한 번씩 평가해 주세요. 입력 정보와 피드백은 운영진만 확인합니다.</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-[140px_1fr]">
@@ -139,7 +140,7 @@ export default function Hackathon() {
       {!event.open && <p role="status" className="mt-6 rounded-xl bg-[var(--app-surface-soft)] p-5 font-semibold">{event.status === 'DONE' ? '평가가 마감되었습니다. 작품 자료는 계속 보실 수 있습니다.' : event.status === 'UPCOMING' ? '아직 시작 전인 행사입니다. 평가는 개발이 끝난 뒤에 열립니다.' : '팀들이 작품을 만들고 있습니다. 평가는 개발이 끝난 뒤에 열립니다.'}</p>}
       {event.projects.length === 0 && <p className="mt-6 rounded-xl bg-[var(--app-surface-soft)] p-5">{event.status === 'DONE' ? '등록된 작품이 없습니다.' : '참가 작품은 추후 공개됩니다.'}</p>}
       <nav aria-label="작품 바로가기" className="my-6 flex flex-wrap gap-3">{event.projects.map(project => <a key={project.projectId} href={`#${project.projectId}`} className="inline-flex min-h-11 items-center rounded-full border border-[var(--app-hairline)] px-4 text-sm font-semibold">{project.title}</a>)}</nav>
-      <div className="space-y-6">{event.projects.map(project => <ProjectEvaluation key={`${eventId}:${project.projectId}`} eventId={eventId} project={project} identity={identity} open={event.open} />)}</div>
+      <div className="space-y-6">{event.projects.map(project => <ProjectEvaluation key={`${eventId}:${project.projectId}`} eventId={eventId} project={project} identity={identity} open={event.open && Boolean(user || event.allowGuestReviews)} />)}</div>
       <p className="mt-8 text-sm leading-7 text-[var(--app-muted)]">{event.open ? '작품을 살펴봐 주셔서 감사합니다.' : '이 페이지는 행사 기록으로 보관됩니다.'}</p>
     </>}
   </main></div>

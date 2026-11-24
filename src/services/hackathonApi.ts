@@ -9,7 +9,7 @@ export type HackathonMaterial = { id: number; projectId: string | null; kind: 'p
 export type HackathonProject = { projectId: string; title: string; author: string; description: string; github: string | null; live: string | null; position: number; materials: HackathonMaterial[]; teamName?: string | null; published?: boolean; version?: number }
 export type HackathonStatus = 'UPCOMING' | 'IN_PROGRESS' | 'REVIEWING' | 'DONE'
 export type HackathonEventBase = {
-  id: number; title: string; year: number; semester: 1 | 2; open: boolean
+  id: number; title: string; year: number; semester: 1 | 2; open: boolean; allowGuestReviews: boolean
   startsAt: string | null; endsAt: string | null; status: HackathonStatus; resultsPublished: boolean
 }
 export type HackathonEventSummary = HackathonEventBase & { theme: string; projectCount: number }
@@ -47,6 +47,8 @@ export const publishHackathonEvent = (id: number, published: boolean): Promise<{
   request(`${adminEventPath(id)}/published`, { method: 'PUT', body: JSON.stringify({ published }) })
 export const setEventOpen = (id: number, open: boolean): Promise<{ open: boolean }> =>
   request(`${adminEventPath(id)}/settings`, { method: 'PUT', body: JSON.stringify({ open }) })
+export const setEventGuestReviews = (id: number, allowGuestReviews: boolean): Promise<{ allowGuestReviews: boolean }> =>
+  request(`${adminEventPath(id)}/guest-reviews`, { method: 'PUT', body: JSON.stringify({ allowGuestReviews }) })
 export const setEventResultsPublished = (id: number, resultsPublished: boolean): Promise<{ resultsPublished: boolean }> =>
   request(`${adminEventPath(id)}/results-published`, { method: 'PUT', body: JSON.stringify({ resultsPublished }) })
 export const createHackathonProject = (id: number, payload: HackathonProjectWrite): Promise<HackathonProject> =>

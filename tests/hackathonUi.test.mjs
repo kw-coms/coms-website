@@ -16,6 +16,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0)
 globalThis.cancelAnimationFrame = clearTimeout
 let open = true
+let guestReviewsAllowed = true
 let responseStatus = 201
 const submitted = []
 const adminReviews = []
@@ -31,16 +32,18 @@ globalThis.fetch = async (url, options = {}) => {
     return new Response(null, { status: 204 })
   }
   if (String(url).endsWith('/api/admin/hackathon/events')) return Response.json([adminSummary(legacyEvent)])
-  if (String(url).endsWith('/api/admin/hackathon/events/1')) return Response.json({ ...legacyEvent, open, status: open ? 'REVIEWING' : 'DONE' })
+  if (String(url).endsWith('/api/admin/hackathon/events/1')) return Response.json({ ...legacyEvent, open, allowGuestReviews: guestReviewsAllowed, status: open ? 'REVIEWING' : 'DONE' })
   if (String(url).endsWith('/api/admin/hackathon/events/1/reviews')) return Response.json(adminReviews)
   if (String(url).endsWith('/api/admin/hackathon/events/1/settings')) { open = JSON.parse(options.body).open; return Response.json({ open }) }
+  if (String(url).endsWith('/api/admin/hackathon/events/1/guest-reviews')) { guestReviewsAllowed = JSON.parse(options.body).allowGuestReviews; return Response.json({ allowGuestReviews: guestReviewsAllowed }) }
+  if (String(url).endsWith('/api/hackathon/team-work/1')) return Response.json({ editable: false, projects: [] })
   if (String(url).includes('/api/admin/hackathon/events/1/chair-reviews/')) {
     const review = { ...JSON.parse(options.body), id: 2, projectId: 'wargether', chair: true, generation: null, name: '회장' }
     adminReviews.push(review)
     return Response.json(review)
   }
   if (String(url).endsWith('/api/hackathon/events')) return Response.json([summary(legacyEvent)])
-  if (String(url).endsWith('/api/hackathon/events/1')) return Response.json({ ...legacyEvent, open, status: open ? 'REVIEWING' : 'DONE' })
+  if (String(url).endsWith('/api/hackathon/events/1')) return Response.json({ ...legacyEvent, open, allowGuestReviews: guestReviewsAllowed, status: open ? 'REVIEWING' : 'DONE' })
   assert.ok(String(url).endsWith('/api/hackathon/events/1/reviews'), 'guest flow only asks for public API')
   submitted.push(JSON.parse(options.body))
   return Response.json(responseStatus === 201 ? { projectId: 'wargether' } : { message: '이미 평가를 제출했습니다.' }, { status: responseStatus })
@@ -49,11 +52,11 @@ const host = document.createElement('div')
 document.body.append(host)
 const root = createRoot(host)
 let queryClient
-async function render(key) {
+async function render(key, user = null) {
   const previousClient = queryClient
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   await act(async () => {
-    root.render(h(MemoryRouter, { initialEntries: ['/hackathon/1'] }, h(QueryClientProvider, { client: queryClient }, h(AuthContext.Provider, { value: { user: null } }, h(Routes, null, h(Route, { path: '/hackathon/:eventId', element: h(Hackathon, { key }) }))))))
+    root.render(h(MemoryRouter, { initialEntries: ['/hackathon/1'] }, h(QueryClientProvider, { client: queryClient }, h(AuthContext.Provider, { value: { user, loading: false } }, h(Routes, null, h(Route, { path: '/hackathon/:eventId', element: h(Hackathon, { key }) }))))))
     await new Promise(setImmediate)
   })
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
@@ -108,6 +111,17 @@ assert.match(host.textContent, /평가가 마감되었습니다/)
 assert.equal(host.querySelectorAll('form').length, 0, 'closing evaluation removes the review form but keeps the projects')
 assert.equal(host.querySelectorAll('article.hackathon-project').length, 3)
 
+open = true
+guestReviewsAllowed = false
+await render('guest-off')
+assert.match(host.textContent, /비회원 평가는 현재 허용되지 않습니다/)
+assert.equal(host.querySelectorAll('form').length, 0, 'guests cannot see a review form while the toggle is off')
+await render('member-review', { studentId: 'member', role: 'USER' })
+assert.ok(host.querySelector('form[aria-label="wargether 채점"]'), 'signed-in members can still review while guest judging is off')
+assert.doesNotMatch(host.textContent, /비회원 평가는 현재 허용되지 않습니다/)
+guestReviewsAllowed = true
+open = false
+
 adminReviews.push({ ...submitted[0], id: 1, chair: false })
 Object.defineProperty(globalThis.navigator, 'clipboard', { configurable: true, value: { writeText: async (text) => { clipboardText = text } } })
 const previousClient = queryClient
@@ -133,6 +147,7 @@ assert.doesNotMatch(clipboardText, /홍길동|42기/, 'forwarded feedback exclud
 await act(async () => { [...host.querySelectorAll('button')].find((button) => button.textContent === '평가 다시 열기').click(); await new Promise((resolve) => setTimeout(resolve, 10)) })
 assert.equal(open, true)
 assert.match(host.textContent, /평가 접수 중/)
+assert.equal(host.querySelector('button[aria-pressed="true"]')?.textContent.includes('비회원 평가'), true)
 const deleteAlumni = () => host.querySelector('button[aria-label="42기 홍길동 평가 삭제"]')
 assert.ok(deleteAlumni(), 'chair can delete an individual alumni evaluation')
 await act(async () => deleteAlumni().click())

@@ -110,6 +110,7 @@ test('isolates chair-authored events, materials and alumni evaluations on the re
 
     expect((await write('put', `${adminPath}/${second.id}/published`, { published: true })).status()).toBe(200)
     for (const event of [first, second]) expect((await write('put', `${adminPath}/${event.id}/settings`, { open: true })).status()).toBe(200)
+    for (const event of [first, second]) expect((await write('put', `${adminPath}/${event.id}/guest-reviews`, { allowGuestReviews: true })).status()).toBe(200)
     const pdfResponse = await guest.get(`${BACKEND}/api/hackathon/events/${first.id}/materials/${pdfMaterial.id}/inline.pdf`)
     expect(pdfResponse.status()).toBe(200)
     expect(pdfResponse.headers()['content-type']).toContain('application/pdf')
