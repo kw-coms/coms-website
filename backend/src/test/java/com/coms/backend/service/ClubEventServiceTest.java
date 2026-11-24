@@ -19,6 +19,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +41,9 @@ class ClubEventServiceTest {
 
     @Autowired
     private ClubEventService clubEventService;
+
+    @Autowired
+    private Clock clock;
 
     @Autowired
     private ClubEventRepository clubEventRepository;
@@ -69,7 +73,7 @@ class ClubEventServiceTest {
 
     @Test
     void adminCreatesEventAddsEntriesAndMemberVoteProducesRanking() throws Exception {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         var event = clubEventService.createEvent(
                 "회지 인기투표",
                 "가장 좋았던 회지를 골라주세요.",
@@ -105,7 +109,7 @@ class ClubEventServiceTest {
 
     @Test
     void memberCanChangeExactlyOneVoteInsideEvent() throws Exception {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         var event = clubEventService.createEvent("회지 인기투표", null,
                 now.minusHours(1), now.plusDays(1), "2026123456");
         var first = clubEventService.addEntry(event.id(), "1호", "A팀", null,
@@ -134,7 +138,7 @@ class ClubEventServiceTest {
 
     @Test
     void rejectsVoteOutsideVotingWindowAndCrossEventEntry() throws Exception {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         var closed = clubEventService.createEvent("종료된 이벤트", null,
                 now.minusDays(2), now.minusDays(1), "2026123456");
         var closedEntry = clubEventService.addEntry(closed.id(), "지난 회지", "편집팀", null,
@@ -151,7 +155,7 @@ class ClubEventServiceTest {
 
     @Test
     void memberRsvpUpsertsExactlyOneRowAndAggregatesCounts() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         var event = clubEventService.createEvent("정기 모임", "참석 응답을 남겨주세요.",
                 now.minusHours(1), now.plusDays(1), "2026123456");
 
@@ -171,7 +175,7 @@ class ClubEventServiceTest {
 
     @Test
     void rsvpRejectsUnknownStatus() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         var event = clubEventService.createEvent("정기 모임", null,
                 now.minusHours(1), now.plusDays(1), "2026123456");
 
@@ -181,7 +185,7 @@ class ClubEventServiceTest {
 
     @Test
     void voteRecoversFromConcurrentInsertConstraintViolation() throws Exception {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         var event = clubEventService.createEvent("회지 인기투표", null,
                 now.minusHours(1), now.plusDays(1), "2026123456");
         var first = clubEventService.addEntry(event.id(), "1호", "A팀", null,
@@ -209,7 +213,7 @@ class ClubEventServiceTest {
 
     @Test
     void rsvpRecoversFromConcurrentInsertConstraintViolation() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         var event = clubEventService.createEvent("정기 모임", null,
                 now.minusHours(1), now.plusDays(1), "2026123456");
 

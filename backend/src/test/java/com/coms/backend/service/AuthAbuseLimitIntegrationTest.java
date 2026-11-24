@@ -14,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,6 +35,7 @@ class AuthAbuseLimitIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private AuthService authService;
+    @Autowired private Clock clock;
     @Autowired private MemberRepository memberRepository;
     @Autowired private LoginFailureRepository loginFailureRepository;
     @Autowired private PasswordEncoder passwordEncoder;
@@ -93,7 +95,7 @@ class AuthAbuseLimitIntegrationTest {
     void wrongPasswordResetCodePersistsAttempt() {
         Member member = memberRepository.findByStudentId(STUDENT_ID).orElseThrow();
         member.setPasswordResetCodeHash(passwordEncoder.encode("123456"));
-        member.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(10));
+        member.setPasswordResetExpiresAt(LocalDateTime.now(clock).plusMinutes(10));
         memberRepository.save(member);
 
         for (int attempt = 1; attempt <= 5; attempt++) {
@@ -109,7 +111,7 @@ class AuthAbuseLimitIntegrationTest {
         Member member = memberRepository.findByStudentId(STUDENT_ID).orElseThrow();
         member.setEmailVerified(false);
         member.setEmailVerificationCodeHash(passwordEncoder.encode("123456"));
-        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
+        member.setEmailVerificationExpiresAt(LocalDateTime.now(clock).plusMinutes(10));
         memberRepository.save(member);
 
         for (int attempt = 1; attempt <= 5; attempt++) {

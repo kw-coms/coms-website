@@ -13,7 +13,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,6 +28,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AuthServiceLoginThrottleTest {
+
+    private static final Clock SEOUL_BOUNDARY = Clock.fixed(
+            Instant.parse("2026-11-30T15:30:00Z"), ZoneId.of("Asia/Seoul"));
 
     private final MemberRepository memberRepository = mock(MemberRepository.class);
     private final LoginFailureRepository loginFailureRepository = mock(LoginFailureRepository.class);
@@ -44,7 +49,7 @@ class AuthServiceLoginThrottleTest {
             auditLogService,
             mock(RefreshSessionService.class),
             mock(PendingSignupService.class),
-            Clock.systemUTC()
+            SEOUL_BOUNDARY
     );
 
     @Test
@@ -141,6 +146,7 @@ class AuthServiceLoginThrottleTest {
         verify(loginFailureRepository).save(failure.capture());
         assertThat(failure.getValue().getStudentId()).isEqualTo("member@example.com");
         assertThat(failure.getValue().getIp()).isEqualTo("203.0.113.11");
+        assertThat(failure.getValue().getAttemptedAt()).isEqualTo(LocalDateTime.of(2026, 12, 1, 0, 30));
     }
 
     private static Member member(String studentId, String email) {

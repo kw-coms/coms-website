@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.Year;
 import java.util.regex.Pattern;
 
@@ -24,10 +25,12 @@ class CommunityAccess {
 
     private final MemberRepository memberRepository;
     private final PermissionService permissionService;
+    private final Clock clock;
 
-    CommunityAccess(MemberRepository memberRepository, PermissionService permissionService) {
+    CommunityAccess(MemberRepository memberRepository, PermissionService permissionService, Clock clock) {
         this.memberRepository = memberRepository;
         this.permissionService = permissionService;
+        this.clock = clock;
     }
 
     Member requireMember(String studentId) {
@@ -90,7 +93,7 @@ class CommunityAccess {
             return true;
         }
         int admissionYear = Integer.parseInt(studentId.substring(0, 4));
-        return admissionYear <= Year.now().getValue() - GRADUATE_AFTER_YEARS;
+        return admissionYear <= Year.now(clock).getValue() - GRADUATE_AFTER_YEARS;
     }
 
     /**

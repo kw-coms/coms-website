@@ -25,6 +25,7 @@ import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.concurrent.Executors;
@@ -64,6 +65,12 @@ import java.util.regex.Pattern;
  */
 @Service
 public class LinkPreviewService {
+
+    private final Clock clock;
+
+    public LinkPreviewService(Clock clock) {
+        this.clock = clock;
+    }
 
     private static final int MAX_URL_LENGTH = 2048;
     private static final int MAX_BODY_BYTES = 256 * 1024;
@@ -424,7 +431,7 @@ public class LinkPreviewService {
 
     private void enforcePreviewRateLimit(String memberStudentId) {
         String key = memberStudentId == null || memberStudentId.isBlank() ? "unknown" : memberStudentId;
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now(clock);
         java.time.LocalDateTime cutoff = now.minus(PREVIEW_WINDOW);
         java.util.Deque<java.time.LocalDateTime> attempts =
                 previewsByMember.computeIfAbsent(key, ignored -> new java.util.ArrayDeque<>());

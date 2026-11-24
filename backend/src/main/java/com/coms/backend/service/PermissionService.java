@@ -22,6 +22,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -57,6 +58,7 @@ public class PermissionService {
     private final MemberRepository memberRepository;
     private final MemberPermissionOverrideRepository overrideRepository;
     private final AuditLogService auditLogService;
+    private final Clock clock;
 
     /**
      * Immutable snapshot, swapped in one {@link AtomicReference#set}. A reader always sees either
@@ -69,11 +71,13 @@ public class PermissionService {
     public PermissionService(RolePermissionRepository repository,
                              MemberRepository memberRepository,
                              MemberPermissionOverrideRepository overrideRepository,
-                             AuditLogService auditLogService) {
+                             AuditLogService auditLogService,
+                             Clock clock) {
         this.repository = repository;
         this.memberRepository = memberRepository;
         this.overrideRepository = overrideRepository;
         this.auditLogService = auditLogService;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -258,7 +262,7 @@ public class PermissionService {
         // Truncated to microseconds: PostgreSQL/H2 TIMESTAMP columns round-trip at microsecond
         // precision, so a nanosecond-precision LocalDateTime.now() would never compare equal to the
         // value a later expectedUpdatedAt reads back from the database.
-        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
+        LocalDateTime now = LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
         List<RolePermission> rows = new ArrayList<>();
         Map<RolePermissionId, Boolean> refreshed = new HashMap<>();
 
@@ -337,7 +341,7 @@ public class PermissionService {
             existing.add(row.getId());
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         List<RolePermission> missingRows = new ArrayList<>();
         List<String> missingKeys = new ArrayList<>();
         for (Member.Role role : EDITABLE_ROLES) {

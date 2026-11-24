@@ -28,6 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
@@ -67,6 +68,7 @@ public class NotificationService {
     private final PushNotificationSender pushNotificationSender;
     private final org.springframework.core.task.TaskExecutor pushExecutor;
     private final PermissionService permissionService;
+    private final Clock clock;
     private final Set<String> acceptUrlAllowedHosts;
     private final Map<String, Deque<LocalDateTime>> inviteAttemptsBySender = new ConcurrentHashMap<>();
 
@@ -78,7 +80,7 @@ public class NotificationService {
                                PushNotificationSender pushNotificationSender,
                                @Value("${notification.external-invite.allowed-hosts:coms.kw.ac.kr}") String allowedHosts,
                                @org.springframework.beans.factory.annotation.Qualifier("pushExecutor") org.springframework.core.task.TaskExecutor pushExecutor,
-                               PermissionService permissionService) {
+                               PermissionService permissionService, Clock clock) {
         this.notificationRepository = notificationRepository;
         this.notificationPreferenceRepository = notificationPreferenceRepository;
         this.memberRepository = memberRepository;
@@ -88,6 +90,7 @@ public class NotificationService {
         this.acceptUrlAllowedHosts = parseAllowedHosts(allowedHosts);
         this.pushExecutor = pushExecutor;
         this.permissionService = permissionService;
+        this.clock = clock;
     }
 
     /**
@@ -354,7 +357,7 @@ public class NotificationService {
     }
 
     private void enforceExternalInviteRateLimit(String senderStudentId) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         long perMinute = notificationRepository.countByActorStudentIdAndTypeAndCreatedAtAfter(
                 senderStudentId, Notification.Type.EXTERNAL_INVITE, now.minusMinutes(1));
         if (perMinute >= MAX_EXTERNAL_INVITES_PER_MINUTE) {
@@ -374,7 +377,7 @@ public class NotificationService {
     // so the in-memory map cannot leak memory.
     private void enforceInviteBatchRateLimit(String senderStudentId) {
         String key = senderStudentId == null || senderStudentId.isBlank() ? "unknown" : senderStudentId;
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime cutoff = now.minus(INVITE_RATE_LIMIT_WINDOW);
         Deque<LocalDateTime> attempts = inviteAttemptsBySender.computeIfAbsent(key, ignored -> new ArrayDeque<>());
 
@@ -645,6 +648,7 @@ public class NotificationService {
                                Long noticeId,
                                String message) {
         Notification notification = new Notification();
+        notification.setCreatedAt(LocalDateTime.now(clock));
         notification.setRecipientStudentId(recipientStudentId);
         notification.setActorStudentId(actorStudentId);
         notification.setType(type);

@@ -14,6 +14,10 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,6 +33,23 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RecruitApplicationServiceTest {
+
+    @Test
+    void receivedApplicationUsesSeoulClockAtUtcDateBoundary() {
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.save(any(RecruitApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Clock clock = Clock.fixed(Instant.parse("2026-11-30T15:30:00Z"), ZoneId.of("Asia/Seoul"));
+        RecruitApplicationService service = new RecruitApplicationService(
+                mock(JavaMailSender.class), repository, mock(NotificationService.class),
+                mock(EligibleMemberService.class), mock(RecruitPromotionLogRepository.class),
+                clock, false, "no-reply@coms.kw.ac.kr", "recruit@coms.kw.ac.kr");
+
+        service.sendApplication(sampleRequest(), "203.0.113.9");
+
+        ArgumentCaptor<RecruitApplication> captor = ArgumentCaptor.forClass(RecruitApplication.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getSubmittedAt()).isEqualTo(LocalDateTime.of(2026, 12, 1, 0, 30));
+    }
 
     @Test
     void sendApplicationSendsMailToRecruitRecipient() {

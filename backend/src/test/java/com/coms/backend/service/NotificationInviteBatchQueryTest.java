@@ -11,6 +11,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,7 +35,8 @@ class NotificationInviteBatchQueryTest {
     @Test
     void membershipAndPreferencesAreLoadedOncePerBatch() {
         NotificationService service = new NotificationService(notifications, preferences, members, eligibleMembers,
-                mail, push, "example.test", Runnable::run, permissions);
+                mail, push, "example.test", Runnable::run, permissions,
+                Clock.fixed(Instant.parse("2026-11-30T15:30:00Z"), ZoneId.of("Asia/Seoul")));
         Member sender = new Member();
         sender.setStudentId("sender");
         sender.setName("Sender");
@@ -62,6 +67,9 @@ class NotificationInviteBatchQueryTest {
         verify(members, never()).existsByStudentId(anyString());
         verify(eligibleMembers, never()).findByStudentId(anyString());
         verify(preferences, never()).findByMemberStudentId(anyString());
-        verify(notifications, times(2)).save(any(Notification.class));
+        var saved = org.mockito.ArgumentCaptor.forClass(Notification.class);
+        verify(notifications, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues()).allSatisfy(notification ->
+                assertThat(notification.getCreatedAt()).isEqualTo(LocalDateTime.of(2026, 12, 1, 0, 30)));
     }
 }

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -17,13 +18,15 @@ import java.util.Locale;
 public class BannedStudentService {
 
     private final BannedStudentRepository bannedStudentRepository;
+    private final Clock clock;
 
-    public BannedStudentService(BannedStudentRepository bannedStudentRepository) {
+    public BannedStudentService(BannedStudentRepository bannedStudentRepository, Clock clock) {
         this.bannedStudentRepository = bannedStudentRepository;
+        this.clock = clock;
     }
 
     public void ban(String studentId, String duration) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime expiresAt = BanDuration.from(duration).expiresAt(now);
         bannedStudentRepository.findByStudentId(studentId).ifPresent(existing -> {
             if (isActive(existing, now)) {
@@ -52,7 +55,7 @@ public class BannedStudentService {
     public boolean isBanned(String studentId) {
         return bannedStudentRepository.findByStudentId(studentId)
                 .map(entry -> {
-                    if (isExpired(entry, LocalDateTime.now())) {
+                    if (isExpired(entry, LocalDateTime.now(clock))) {
                         bannedStudentRepository.delete(entry);
                         return false;
                     }
@@ -62,7 +65,7 @@ public class BannedStudentService {
     }
 
     public List<BannedStudentResponse> listBanned() {
-        bannedStudentRepository.deleteByExpiresAtLessThanEqual(LocalDateTime.now());
+        bannedStudentRepository.deleteByExpiresAtLessThanEqual(LocalDateTime.now(clock));
         return bannedStudentRepository.findAllByOrderByBannedAtDesc()
                 .stream()
                 .map(b -> new BannedStudentResponse(b.getId(), b.getStudentId(), b.getBannedAt(), b.getExpiresAt()))

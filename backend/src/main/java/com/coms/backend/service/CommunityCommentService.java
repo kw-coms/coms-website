@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +48,7 @@ class CommunityCommentService {
     private final CommunityReputationService reputationService;
     private final CommunityTextService textService;
     private final MemberRepository memberRepository;
+    private final Clock clock;
 
     CommunityCommentService(CommunityCommentRepository commentRepository,
                             CommunityPostRepository communityPostRepository,
@@ -56,7 +58,8 @@ class CommunityCommentService {
                             AnonymousIdentityService anonymousIdentity,
                             CommunityReputationService reputationService,
                             CommunityTextService textService,
-                            MemberRepository memberRepository) {
+                            MemberRepository memberRepository,
+                            Clock clock) {
         this.commentRepository = commentRepository;
         this.communityPostRepository = communityPostRepository;
         this.notificationService = notificationService;
@@ -66,6 +69,7 @@ class CommunityCommentService {
         this.reputationService = reputationService;
         this.textService = textService;
         this.memberRepository = memberRepository;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -119,13 +123,16 @@ class CommunityCommentService {
             }
         }
         // Counted in the database, the same way CommunityService limits posts.
+        LocalDateTime now = LocalDateTime.now(clock);
         long recentComments = commentRepository.countByStudentIdAndCreatedAtAfter(
-                member.getStudentId(), LocalDateTime.now().minusMinutes(1));
+                member.getStudentId(), now.minusMinutes(1));
         if (recentComments >= MAX_COMMENTS_PER_MINUTE) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "댓글은 1분에 최대 " + MAX_COMMENTS_PER_MINUTE + "개까지 작성할 수 있습니다.");
         }
         CommunityComment comment = new CommunityComment(postId, studentId, member.getName(), content, request.parentCommentId(), depth);
+        comment.setCreatedAt(now);
+        comment.setUpdatedAt(now);
         applyAnonymousCommentFields(post, comment, request.anonymousName(), clientIp);
         CommunityComment saved = commentRepository.save(comment);
         if (parent == null) {
