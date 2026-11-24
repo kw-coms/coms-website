@@ -136,6 +136,37 @@ class StudyAttendanceIntegrationTest {
         assertThat(attendanceSessions.existsById(attendanceId)).isTrue();
     }
 
+    @Test void scopedCheckInOnlyRecordsAttendanceForTheDisplayedRound() throws Exception {
+        long displayed = createRound(LEADER);
+        String displayedCode = open(displayed);
+        long other = createRound(LEADER);
+        String otherCode = open(other);
+        long otherAttendanceId = attendanceSessions.findByStudySessionId(other).orElseThrow().getId();
+        JsonNode invalid = json(checkIn(APPROVED, "xxxx").andExpect(status().isNotFound()).andReturn());
+
+        for (String body : new String[] {
+                scopedCheckInBody(groupId, displayed, otherCode),
+                scopedCheckInBody(groupId + 100, displayed, displayedCode),
+                mapper.createObjectNode().put("studySessionId", displayed).put("code", displayedCode).toString()
+        }) {
+            JsonNode rejection = json(mvc.perform(post("/api/attendance/check-in").cookie(cookie(APPROVED))
+                    .header("Origin", ORIGIN).contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isNotFound()).andReturn());
+            assertThat(rejection).isEqualTo(invalid);
+        }
+        assertThat(attendanceRecords.findBySessionIdAndStudentId(otherAttendanceId, APPROVED)).isEmpty();
+
+        long displayedAttendanceId = attendanceSessions.findByStudySessionId(displayed).orElseThrow().getId();
+        mvc.perform(post("/api/attendance/check-in").cookie(cookie(APPROVED)).header("Origin", ORIGIN)
+                .contentType(MediaType.APPLICATION_JSON).content(scopedCheckInBody(groupId, displayed, displayedCode)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.sessionId").value(displayedAttendanceId));
+    }
+
+    private String scopedCheckInBody(long studyGroupId, long studySessionId, String code) {
+        return mapper.createObjectNode().put("studyGroupId", studyGroupId)
+                .put("studySessionId", studySessionId).put("code", code).toString();
+    }
+
     @Test void sessionListShowsOpenCodesOnlyToManagersAcrossRounds() throws Exception {
         String first = open(createRound(LEADER));
         String second = open(createRound(LEADER));

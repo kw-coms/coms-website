@@ -4,6 +4,7 @@ import com.coms.backend.domain.AttendanceRecord;
 import com.coms.backend.domain.AttendanceSession;
 import com.coms.backend.domain.Member;
 import com.coms.backend.domain.StudyGroup;
+import com.coms.backend.dto.AttendanceCheckInRequest;
 import com.coms.backend.dto.AttendanceCheckInResponse;
 import com.coms.backend.dto.AttendanceDetailResponse;
 import com.coms.backend.dto.AttendanceOpenRequest;
@@ -201,19 +202,23 @@ public class AttendanceService {
      * time reports the first. A wrong code, or one whose session is over, is refused the same
      * way, and counts toward the member's limit of wrong tries.
      */
-    public AttendanceCheckInResponse checkIn(String rawCode, String studentId) {
+    public AttendanceCheckInResponse checkIn(AttendanceCheckInRequest request, String studentId) {
         Member member = requireMember(studentId);
         String key = member.getStudentId();
         if (wrongCodesByMember.isExhausted(key)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "코드를 여러 번 잘못 입력했습니다. 5분 뒤에 다시 시도해 주세요.");
         }
-        String code = rawCode == null ? "" : rawCode.replaceAll("\\s+", "");
+        String code = request.code() == null ? "" : request.code().replaceAll("\\s+", "");
         LocalDateTime now = LocalDateTime.now(clock);
         AttendanceSessionRepository.OpenCodeMatch match = sessionRepository
                 .findFirstByCodeAndClosedAtIsNullAndClosesAtAfterOrderById(code, now)
                 .orElseThrow(() -> invalidCode(key));
+        boolean scoped = request.studyGroupId() != null || request.studySessionId() != null;
+        if (scoped && (request.studyGroupId() == null || request.studySessionId() == null
+                || !request.studySessionId().equals(match.getStudySessionId()))) throw invalidCode(key);
         if (match.getStudySessionId() != null) {
             Long groupId = studySessions.findById(match.getStudySessionId()).orElseThrow(() -> invalidCode(key)).getGroupId();
+            if (scoped && !groupId.equals(request.studyGroupId())) throw invalidCode(key);
             // Serialize with manual marks, closing attendance and membership changes in this study.
             StudyGroup group = studyAccess.lockGroup(groupId);
             if (group.getStatus() == StudyGroup.Status.ENDED) throw invalidCode(key);

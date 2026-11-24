@@ -60,6 +60,9 @@ export async function deleteAttendanceSession(id: number): Promise<void> {
   await requestNoContent(`/api/attendance/sessions/${id}`, { method: 'DELETE' })
 }
 
-export async function checkInToAttendance(code: string): Promise<AttendanceCheckIn> {
-  return request('/api/attendance/check-in', { method: 'POST', body: JSON.stringify({ code }) })
+export async function checkInToAttendance(
+  code: string,
+  scope?: { studyGroupId: number; studySessionId: number },
+): Promise<AttendanceCheckIn> {
+  return request('/api/attendance/check-in', { method: 'POST', body: JSON.stringify({ code, ...scope }) })
 }
