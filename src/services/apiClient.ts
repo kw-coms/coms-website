@@ -312,15 +312,12 @@ export async function request(path, options: RequestInit = {}) {
   const headers = isFormData
     ? options.headers
     : { 'Content-Type': 'application/json', ...options.headers }
-
-  // `credentials` AFTER the spread: a caller passing its own `options.credentials`
-  // (or a spread RequestInit carrying an explicit `credentials: 'same-origin'`)
-  // silently dropped the session cookie when it came first.
-  const fetchOnce = () => fetchOrNetworkError(apiUrl(path), { ...options, headers, credentials: 'include' })
+  const anonymous = options.credentials === 'omit'
+  const fetchOnce = () => fetchOrNetworkError(apiUrl(path), { ...options, headers, credentials: anonymous ? 'omit' : 'include' })
 
   const generationBeforeRequest = sessionGeneration()
   let response = await fetchOnce()
-  response = await recoverFromAuthFailure(path, response, generationBeforeRequest, fetchOnce)
+  if (!anonymous) response = await recoverFromAuthFailure(path, response, generationBeforeRequest, fetchOnce)
 
   if (!response.ok) {
     await throwApiError(response)

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify'
 import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Pin, PinOff, Search, Sparkles, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
-import { getNotice, createNotice, updateNotice, deleteNotice, voteNotice, pinNotice, updateNoticeAuthor } from '../services/noticeApi'
+import { getNotice, getPublicNotice, createNotice, updateNotice, deleteNotice, voteNotice, pinNotice, updateNoticeAuthor } from '../services/noticeApi'
 import { showToast } from '../components/common/Toast'
 import { confirmDialog } from '../components/common/ConfirmDialog'
 import AuthorChangeDialog from '../components/common/AuthorChangeDialog'
@@ -352,7 +352,8 @@ function NoticeBoard() {
     if (loading) return
     let mounted = true
     // Fetch the full notice so the view count is registered and engagement (조회/추천) is current.
-    getNotice(numId)
+    const detailRequest = user ? getNotice(numId) : getPublicNotice(numId)
+    detailRequest
       .then((detail) => {
         if (!mounted) return
         setSelectedNotice(detail)

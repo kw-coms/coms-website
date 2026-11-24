@@ -138,4 +138,23 @@ const refreshCalls = (calls) => calls.filter((call) => call.url.endsWith('/api/a
   setSessionExpiredHandler(null)
 }
 
+// A guest notice request must not inherit another tab's cookie or renew that session.
+{
+  let expired = 0
+  setSessionExpiredHandler(() => { expired += 1 })
+  const calls = []
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), credentials: options.credentials })
+    return response(401, { error: 'Unauthorized' })
+  }
+
+  await assert.rejects(
+    () => request('/api/notices', { credentials: 'omit' }),
+    (error) => error.status === 401,
+  )
+  assert.deepEqual(calls, [{ url: '/api/notices', credentials: 'omit' }])
+  assert.equal(expired, 0)
+  setSessionExpiredHandler(null)
+}
+
 console.log('api client refresh contract passed')

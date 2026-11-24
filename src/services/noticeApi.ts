@@ -4,8 +4,16 @@ export async function listNotices() {
   return request('/api/notices')
 }
 
+export async function listPublicNotices() {
+  return request('/api/notices', { credentials: 'omit' })
+}
+
 export async function getNotice(id) {
   return request(`/api/notices/${id}`)
+}
+
+export async function getPublicNotice(id) {
+  return request(`/api/notices/${id}`, { credentials: 'omit' })
 }
 
 export async function createNotice(body) {

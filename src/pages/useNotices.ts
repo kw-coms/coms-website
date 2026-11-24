@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { listNotices } from '../services/noticeApi'
+import { listNotices, listPublicNotices } from '../services/noticeApi'
 import { queryKeys } from '../services/queryKeys'
 import { useAuth } from '../contexts/useAuth'
 
@@ -11,7 +11,7 @@ export function useNotices() {
     queryKey: noticesQueryKey,
     enabled: !authLoading && !authError,
     queryFn: async () => {
-      const data = await listNotices()
+      const data = await (user ? listNotices() : listPublicNotices())
       return Array.isArray(data) ? data : []
     },
   })

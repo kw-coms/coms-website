@@ -114,6 +114,36 @@ test.describe('guide screen', () => {
     expect(await page.evaluate(() => history.state?.usr?.from?.pathname)).toBe('/notices')
   })
 
+  test('guest notice list and detail never use another tab\'s session cookie', async ({ page }, testInfo) => {
+    await skipIntro(page)
+    await mockOptionalApis(page)
+    await page.context().addCookies([{ name: 'other_tab_session', value: 'member', url: testInfo.project.use.baseURL }])
+
+    const requests = []
+    const publicNotice = { id: 4, title: '공개 공지', content: '공개 내용', category: 'GENERAL', publicVisible: true, createdAt: '2026-11-01T10:00:00' }
+    const memberNotice = { id: 5, title: '회원 전용 공지', content: '회원 전용 내용', category: 'GENERAL', publicVisible: false, createdAt: '2026-11-01T11:00:00' }
+    await page.route('**/api/notices', (route) => {
+      const cookie = route.request().headers().cookie || ''
+      requests.push({ path: 'list', cookie })
+      return route.fulfill({ json: cookie ? [publicNotice, memberNotice] : [publicNotice] })
+    })
+    await page.route('**/api/notices/4', (route) => {
+      const cookie = route.request().headers().cookie || ''
+      requests.push({ path: 'detail', cookie })
+      return route.fulfill({ json: cookie ? { ...publicNotice, content: '회원에게만 보이는 본문' } : publicNotice })
+    })
+
+    await page.goto('/notices')
+    await expect(page.getByText('공개 공지').filter({ visible: true }).first()).toBeVisible()
+    await expect(page.getByText('회원 전용 공지', { exact: true })).toHaveCount(0)
+    await page.goto('/notices/4')
+    await expect(page.getByText('공개 내용').filter({ visible: true }).first()).toBeVisible()
+    await expect(page.getByText('회원에게만 보이는 본문')).toHaveCount(0)
+    expect(requests.some((request) => request.path === 'list')).toBe(true)
+    expect(requests.some((request) => request.path === 'detail')).toBe(true)
+    expect(requests.every((request) => request.cookie === '')).toBe(true)
+  })
+
   test('a guest opens the unlocked resources entry and requests the public list', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
     await skipIntro(page)
