@@ -158,6 +158,16 @@ class NoticeServiceTest {
     }
 
     @Test
+    void guestReadsDoNotCountAsNoticeViews() {
+        var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null, true));
+
+        assertThat(noticeService.getAndIncrementView(notice.id(), null).viewCount()).isZero();
+        assertThat(noticeService.getAndIncrementView(notice.id(), "2026123000").viewCount()).isEqualTo(1);
+        assertThat(noticeService.getAndIncrementView(notice.id(), null).viewCount()).isEqualTo(1);
+        assertThat(noticeRepository.findById(notice.id()).orElseThrow().getViewCount()).isEqualTo(1);
+    }
+
+    @Test
     void viewingANoticeDoesNotCountAsEditingIt() {
         var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, true, null));
         var stored = noticeRepository.findById(notice.id()).orElseThrow();

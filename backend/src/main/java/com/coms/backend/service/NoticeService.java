@@ -100,8 +100,7 @@ public class NoticeService {
     }
 
     public NoticeResponse getAndIncrementView(Long id, String studentId) {
-        int updated = studentId == null ? repo.incrementPublicViewCount(id) : repo.incrementViewCount(id);
-        if (updated == 0) {
+        if (studentId != null && repo.incrementViewCount(id) == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         Notice notice = getEntity(id);
