@@ -223,7 +223,7 @@ class PermissionServiceTest {
     @Test
     void replacementVersionUsesSeoulClockAndMicrosecondPrecision() {
         Clock boundary = Clock.fixed(Instant.parse("2026-11-30T15:30:00.123456789Z"), ZoneId.of("Asia/Seoul"));
-        PermissionService fixedService = new PermissionService(repository, memberRepository, auditLogService, boundary);
+        PermissionService fixedService = new PermissionService(repository, memberRepository, overrideRepository, auditLogService, boundary);
         when(repository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         PermissionMatrixResponse response = fixedService.replace(Map.of(
