@@ -9,16 +9,24 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 @Entity
+@DynamicUpdate // A concurrent atomic view increment must survive an editorial write.
 @Table(name = "notices")
 public class Notice {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     @Column(nullable = false)
     private String title;
@@ -34,6 +42,9 @@ public class Notice {
 
     @Column(nullable = false)
     private boolean pinned = false;
+
+    @Column(name = "public_visible", nullable = false)
+    private boolean publicVisible = false;
 
     @Column(name = "pinned_at")
     private LocalDateTime pinnedAt;
@@ -52,8 +63,9 @@ public class Notice {
     private LocalDateTime updatedAt = LocalDateTime.now();
 
     @PreUpdate
-    void onUpdate() {
-        updatedAt = LocalDateTime.now();
+    public void markEdited() {
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
+        updatedAt = now.isAfter(updatedAt) ? now : updatedAt.plus(1, ChronoUnit.MICROS);
     }
 
     public enum Category {
@@ -61,6 +73,7 @@ public class Notice {
     }
 
     public Long getId() { return id; }
+    public long getVersion() { return version; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getContent() { return content; }
@@ -70,6 +83,8 @@ public class Notice {
     public String getAuthorStudentId() { return authorStudentId; }
     public void setAuthorStudentId(String authorStudentId) { this.authorStudentId = authorStudentId; }
     public boolean isPinned() { return pinned; }
+    public boolean isPublicVisible() { return publicVisible; }
+    public void setPublicVisible(boolean publicVisible) { this.publicVisible = publicVisible; }
     public void setPinned(boolean pinned) {
         if (pinned && !this.pinned) {
             this.pinnedAt = LocalDateTime.now();

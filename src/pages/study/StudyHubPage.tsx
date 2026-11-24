@@ -59,6 +59,7 @@ export default function StudyHubPage() {
           <div className="study-hub-title">
             <PageHeading>스터디 자료</PageHeading>
             <p className="study-hub-lead">관심 있는 주제를 골라 순서대로 따라와 보세요. 진도는 이 브라우저에 저장됩니다.</p>
+            {!user && <p className="study-hub-lead"><Link to="/notices">공개 공지 보기</Link> · 회원 전용 공지는 로그인 후 확인할 수 있습니다.</p>}
           </div>
           <Suspense fallback={<div className="study-overview" data-reserve={hasProgress || undefined} aria-hidden="true" />}><StudyHubOverview reserveResume={hasProgress} /></Suspense>
         </div>

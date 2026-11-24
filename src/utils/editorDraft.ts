@@ -12,6 +12,7 @@ export const MAX_DRAFT_AGE_MS = 30 * 24 * 60 * 60 * 1000
 export type DraftFields = {
   title: string
   category: string
+  publicVisible?: boolean
   anonymousName: string
   /** Serialized body (JSON blocks), or '' when empty. */
   content: string
@@ -75,6 +76,7 @@ export function normalizeDraftContent(content: string): string {
 export function draftFieldsEqual(a: DraftFields, b: DraftFields): boolean {
   return a.title.trim() === b.title.trim()
     && a.category === b.category
+    && (a.publicVisible ?? false) === (b.publicVisible ?? false)
     && a.anonymousName.trim() === b.anonymousName.trim()
     && normalizeDraftContent(a.content) === normalizeDraftContent(b.content)
 }
@@ -93,6 +95,7 @@ export function readDraft(key: string, storage: DraftStorage | null = browserSto
     return {
       title: value.title,
       category: typeof value.category === 'string' ? value.category : '',
+      ...(typeof value.publicVisible === 'boolean' ? { publicVisible: value.publicVisible } : {}),
       anonymousName: typeof value.anonymousName === 'string' ? value.anonymousName : '',
       content: value.content,
       savedAt: Number(value.savedAt) || 0,

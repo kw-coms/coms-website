@@ -100,7 +100,8 @@ class RichBodyMediaAttachmentTransactionTest {
     @ParameterizedTest
     @EnumSource(InvalidReference.class)
     void rejectedNoticeEditRollsBackBodyAndEarlierAttachment(InvalidReference reason) {
-        long id = notices.create(ACTOR, new NoticeRequest("원본", "원본 본문", null, false, "GENERAL")).id();
+        var notice = notices.create(ACTOR, new NoticeRequest("원본", "원본 본문", null, false, "GENERAL"));
+        long id = notice.id();
         long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
         long validId = mediaRows.saveAndFlush(media(RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.NOTICE, actorId)).getId();
         long invalidId = invalidReference(reason, actorId);
@@ -108,7 +109,7 @@ class RichBodyMediaAttachmentTransactionTest {
                 + "{\"type\":\"image\",\"mediaId\":" + invalidId + "}]";
 
         assertRejected(() -> notices.update(ACTOR, id,
-                new NoticeRequest("변경", changedBody, null, false, "GENERAL")));
+                new NoticeRequest("변경", changedBody, null, false, "GENERAL", null, notice.version())));
 
         var stored = noticeRows.findById(id).orElseThrow();
         assertThat(stored.getTitle()).isEqualTo("원본");
@@ -220,13 +221,21 @@ class RichBodyMediaAttachmentTransactionTest {
     }
 
     private Member otherMember() {
-        return members.findByStudentId("2026000888").orElseGet(() -> {
+        return member("2026000888", "rich-rollback-other@example.com", Member.Role.USER);
+    }
+
+    private Member noticeAuthor() {
+        return member("2026000889", "rich-rollback-author@example.com", Member.Role.OFFICER);
+    }
+
+    private Member member(String studentId, String email, Member.Role role) {
+        return members.findByStudentId(studentId).orElseGet(() -> {
             Member other = new Member();
-            other.setStudentId("2026000888");
+            other.setStudentId(studentId);
             other.setName("다른 회원");
-            other.setEmail("rich-rollback-other@example.com");
+            other.setEmail(email);
             other.setPassword("unused");
-            other.setRole(Member.Role.USER);
+            other.setRole(role);
             other.setEmailVerified(true);
             return members.save(other);
         });
@@ -250,7 +259,7 @@ class RichBodyMediaAttachmentTransactionTest {
     @Test
     void noticeDeleteRecordsActor() {
         long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
-        Member author = otherMember();
+        Member author = noticeAuthor();
         long mediaId = uploadedBy(author.getId(), RichBodyMedia.Scope.NOTICE);
         long id = notices.create(author.getStudentId(), new NoticeRequest("t", body(mediaId), null, false, "GENERAL")).id();
 
@@ -262,11 +271,12 @@ class RichBodyMediaAttachmentTransactionTest {
     @Test
     void noticeEditOutByManagerRecordsManagerNotUploader() {
         long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
-        Member author = otherMember();
+        Member author = noticeAuthor();
         long mediaId = uploadedBy(author.getId(), RichBodyMedia.Scope.NOTICE);
-        long id = notices.create(author.getStudentId(), new NoticeRequest("t", body(mediaId), null, false, "GENERAL")).id();
+        var notice = notices.create(author.getStudentId(), new NoticeRequest("t", body(mediaId), null, false, "GENERAL"));
+        long id = notice.id();
 
-        notices.update(ACTOR, id, new NoticeRequest("t", "[]", null, false, "GENERAL"));
+        notices.update(ACTOR, id, new NoticeRequest("t", "[]", null, false, "GENERAL", null, notice.version()));
 
         assertDetachedBy(mediaId, actorId, id);
     }

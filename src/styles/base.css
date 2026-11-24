@@ -357,6 +357,13 @@ select {
 		display: inline-flex;
 		text-align: center;
 	}
+
+	@media (max-width: 639px) {
+		.apple-action-primary,
+		.apple-action-secondary {
+			min-height: 44px;
+		}
+	}
 }
 
 .apple-action-primary {

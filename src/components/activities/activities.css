@@ -9,6 +9,10 @@
 	scroll-margin-top: var(--apple-nav-height);
 }
 
+.act-row[id] {
+	scroll-margin-top: calc(var(--apple-nav-height) + 1rem);
+}
+
 /* Header: title left, jump strip right (same split as the study hub) */
 .act-head {
 	display: grid;
@@ -96,6 +100,13 @@
 
 .act-term {
 	scroll-margin-top: calc(var(--apple-nav-height) + 1rem);
+}
+
+@media (max-width: 767px) {
+	.act-term,
+	.act-row[id] {
+		scroll-margin-top: calc(var(--apple-nav-height) + var(--apple-mobile-tabs-height) + env(safe-area-inset-top) + 1rem);
+	}
 }
 
 .act-term-head {
@@ -308,6 +319,18 @@
 	font-weight: 700;
 	text-decoration: underline;
 	text-underline-offset: 3px;
+}
+
+@media (max-width: 639px) {
+	.activities-page .apple-detail-main {
+		padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
+	}
+	.act-guest-note a {
+		display: inline-flex;
+		min-height: 44px;
+		min-width: 44px;
+		align-items: center;
+	}
 }
 
 .act-guest-note a:hover {

@@ -82,6 +82,7 @@ class SiteSettingsControllerTest {
                 semesterLabel,
                 "모집 안내",
                 "상세 일정은 COM's 공식 채널과 학내 공지를 통해 안내됩니다.",
+                "60기", "2만원", "복지관 403호", "지금 60기 상시 모집 중",
                 "COM's",
                 "배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.",
                 List.of(new SiteSettingsResponse.ContactLink("Mail", "mailto:test@example.com")),
@@ -95,7 +96,8 @@ class SiteSettingsControllerTest {
         SiteSettingsResponse publicFields = response(semesterLabel);
         return new AdminSiteSettingsResponse(
                 publicFields.id(), publicFields.semesterLabel(), publicFields.recruitmentStatus(),
-                publicFields.recruitmentPeriod(), publicFields.homeHeroTitle(), publicFields.homeHeroCopy(),
+                publicFields.recruitmentPeriod(), publicFields.recruitCohort(), publicFields.recruitFee(),
+                publicFields.recruitRoom(), publicFields.recruitHeadline(), publicFields.homeHeroTitle(), publicFields.homeHeroCopy(),
                 publicFields.contactLinks(), publicFields.createdAt(), publicFields.updatedAt(), true,
                 "inbox@example.com"
         );

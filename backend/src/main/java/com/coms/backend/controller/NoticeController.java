@@ -8,8 +8,10 @@ import com.coms.backend.dto.PinRequest;
 import com.coms.backend.service.NoticeService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,16 +48,20 @@ public class NoticeController {
                                                      @RequestParam(required = false) Integer page,
                                                      @RequestParam(required = false) Integer size) {
         if (page == null && size == null) {
-            return ResponseEntity.ok(noticeService.list(studentId(authentication)));
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate())
+                    .varyBy("Cookie", "Authorization").body(noticeService.list(studentId(authentication)));
         }
         ListPagination.Resolved resolved = ListPagination.resolve(page, size);
         NoticeService.PagedNotices paged = noticeService.listPaged(studentId(authentication), resolved.page(), resolved.size());
-        return ListPagination.paginated(paged.items(), paged.total());
+        return ResponseEntity.ok().header("X-Total-Count", Long.toString(paged.total()))
+                .cacheControl(CacheControl.noStore().cachePrivate())
+                .varyBy("Cookie", "Authorization").body(paged.items());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<NoticeResponse> get(Authentication authentication, @PathVariable Long id) {
-        return ResponseEntity.ok(noticeService.getAndIncrementView(id, studentId(authentication)));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate())
+                .varyBy("Cookie", "Authorization").body(noticeService.getAndIncrementView(id, studentId(authentication)));
     }
 
     @PostMapping("/{id}/vote")
@@ -66,7 +72,7 @@ public class NoticeController {
     }
 
     private String studentId(Authentication authentication) {
-        return authentication == null ? null : authentication.getName();
+        return authentication == null || authentication instanceof AnonymousAuthenticationToken ? null : authentication.getName();
     }
 
     @PreAuthorize("@perm.has(authentication,'NOTICE_WRITE')")

@@ -289,8 +289,14 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 
 
 test('guest members-only guide, public resources, and study page have no serious accessibility violations', async ({ page }) => {
   await mockOptionalApis(page)
-  await page.goto('/notices')
+  // /notices now shows guests the public notices, so the members-only guide is checked on a page that is still gated.
+  await page.goto('/study/algorithms/battles')
   await expect(page.locator('[data-members-gate]')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
+  await assertNoSeriousViolations(page)
+  await page.route('**/api/notices', (route) => route.fulfill({ json: [{ id: 4, title: '접근성 점검용 공개 공지', content: '안내', category: 'GENERAL', publicVisible: true, author: "COM's 운영진", createdAt: '2026-11-01T10:00:00' }] }))
+  await page.goto('/notices')
+  await expect(page.getByRole('button', { name: /접근성 점검용 공개 공지 COM's 운영진/ })).toBeVisible()
   await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
   await assertNoSeriousViolations(page)
   await page.route('**/api/files', (route) => route.fulfill({ json: [] }))

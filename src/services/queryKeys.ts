@@ -18,7 +18,7 @@ export const queryKeys = {
   },
   notices: {
     all: ['notices'],
-    list: () => [...queryKeys.notices.all, 'list'],
+    list: (viewer = 'guest') => [...queryKeys.notices.all, 'list', viewer],
   },
   sponsors: {
     all: ['sponsors'],

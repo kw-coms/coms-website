@@ -39,6 +39,10 @@ class SiteSettingsServiceTest {
         assertThat(current.semesterLabel()).isEqualTo("2026 Semester Ready");
         assertThat(current.homeHeroCopy()).contains("광운대학교 컴퓨터 학술동아리");
         assertThat(current.recruitmentPeriod()).contains("공식 채널");
+        assertThat(current.recruitCohort()).isEqualTo("60기");
+        assertThat(current.recruitFee()).isEqualTo("2만원");
+        assertThat(current.recruitRoom()).isEqualTo("복지관 403호");
+        assertThat(current.recruitHeadline()).isEqualTo("지금 60기 상시 모집 중");
         assertThat(current.contactLinks()).extracting("label")
                 .contains("Mail");
         assertThat(siteSettingsRepository.count()).isEqualTo(1);
@@ -53,16 +57,28 @@ class SiteSettingsServiceTest {
                 "새 학기 COM's",
                 "함께 공부하고 만드는 운영 공지입니다.",
                 List.of(new SiteSettingsRequest.ContactLinkRequest("  문의 메일  ", "  mailto:test@example.com  ")),
-                "  inbox@example.com  "
+                "  inbox@example.com  ",
+                "  61기  ", "  3만원  ", "  복지관 405호  ", "  지금 61기 모집 중  "
         ));
 
         assertThat(updated.semesterLabel()).isEqualTo("2026-2 운영 중");
         assertThat(updated.recruitmentStatus()).isEqualTo("모집 예정");
+        assertThat(updated.recruitCohort()).isEqualTo("61기");
+        assertThat(updated.recruitFee()).isEqualTo("3만원");
+        assertThat(updated.recruitRoom()).isEqualTo("복지관 405호");
+        assertThat(updated.recruitHeadline()).isEqualTo("지금 61기 모집 중");
+        assertThat(siteSettingsService.current().recruitFee()).isEqualTo("3만원");
         assertThat(updated.contactLinks()).hasSize(1);
         assertThat(updated.contactLinks().get(0).label()).isEqualTo("문의 메일");
         assertThat(updated.contactLinks().get(0).href()).isEqualTo("mailto:test@example.com");
         assertThat(updated.askInboxEmail()).isEqualTo("inbox@example.com");
         assertThat(siteSettingsRepository.count()).isEqualTo(1);
+
+        siteSettingsService.publish(new SiteSettingsRequest(
+                "2026-2 운영 중", "모집 예정", "9월 초 별도 공지", "COM's", "함께 공부합니다.",
+                List.of(new SiteSettingsRequest.ContactLinkRequest("문의", "mailto:test@example.com")), ""));
+        assertThat(siteSettingsService.current().recruitCohort()).isEqualTo("61기");
+        assertThat(siteSettingsService.current().recruitFee()).isEqualTo("3만원");
     }
 
     @Test

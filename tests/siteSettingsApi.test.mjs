@@ -11,6 +11,10 @@ const remote = normalizeSiteSettings({
   semesterLabel: '2026-2 모집',
   recruitmentStatus: '모집 중',
   recruitmentPeriod: '8월 25일 - 9월 5일',
+  recruitCohort: '61기',
+  recruitFee: '3만원',
+  recruitRoom: '복지관 405호',
+  recruitHeadline: '61기 모집 안내',
   homeHeroTitle: 'COM\'s 모집',
   homeHeroCopy: '새 학기 모집 안내입니다.',
   contactLinks: [
@@ -23,6 +27,7 @@ const remote = normalizeSiteSettings({
 
 assert.equal(remote.semesterLabel, '2026-2 모집')
 assert.equal(remote.homeHeroCopy, '새 학기 모집 안내입니다.')
+assert.equal(remote.recruitCohort, '61기')
 assert.deepEqual(remote.contactLinks, [{ label: 'Mail', href: 'mailto:test@example.com' }])
 assert.equal(remote.askEnabled, true)
 assert.equal(Object.hasOwn(remote, 'askInboxEmail'), false)
@@ -38,6 +43,7 @@ const fallback = normalizeSiteSettings({
 
 assert.equal(fallback.semesterLabel, defaultSiteSettings.semesterLabel)
 assert.equal(fallback.homeHeroTitle, defaultSiteSettings.homeHeroTitle)
+assert.equal(fallback.recruitFee, '2만원')
 assert.ok(fallback.contactLinks.length > 0)
 assert.equal(fallback.askEnabled, false)
 
@@ -47,6 +53,10 @@ assert.deepEqual(siteSettingsPayload(admin), {
   semesterLabel: '2026-2 모집',
   recruitmentStatus: '모집 중',
   recruitmentPeriod: '8월 25일 - 9월 5일',
+  recruitCohort: '61기',
+  recruitFee: '3만원',
+  recruitRoom: '복지관 405호',
+  recruitHeadline: '61기 모집 안내',
   homeHeroTitle: 'COM\'s 모집',
   homeHeroCopy: '새 학기 모집 안내입니다.',
   contactLinks: [{ label: 'Mail', href: 'mailto:test@example.com' }],

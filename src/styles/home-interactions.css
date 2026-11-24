@@ -292,6 +292,9 @@ html.coms-booted:root[data-theme-mode='dark'] .coms-cinema-title {
 	   state only: at -120% the bottom edge sat exactly on the viewport top, so the
 	   16px shadow blur leaked into the top-left corner of every page. */
 	transform: translateY(calc(-100% - 1.5rem));
+	display: inline-flex;
+	min-height: 44px;
+	align-items: center;
 	padding: 0.6rem 1rem;
 	margin: 0.5rem;
 	border-radius: 0.5rem;

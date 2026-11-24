@@ -23,10 +23,10 @@ for (const width of [320, 1280]) {
     await mockArchive(page)
     await page.goto('/hackathon')
     await expect(page.getByRole('heading', { name: '해커톤 아카이브', level: 1 })).toBeVisible()
+    // Wait for the API-backed list before taking a snapshot of its heading order.
+    await expect(page.locator('a.hackathon-card')).toHaveCount(4)
     const headings = await page.getByRole('heading', { level: 2 }).allTextContents()
     expect(headings.filter(text => /^\d{4}년$|진행 예정|지금 평가/.test(text))).toEqual(['지금 평가할 수 있어요', '진행 예정 · 진행 중', '2025년'])
-    // 각 행사는 한 곳에만 나온다.
-    await expect(page.locator('a.hackathon-card')).toHaveCount(4)
     const now = page.getByRole('region', { name: '지금 평가할 수 있어요' }).locator('a.hackathon-card')
     await expect(now).toHaveCount(1)
     await expect(now).toHaveAttribute('href', '/hackathon/1')

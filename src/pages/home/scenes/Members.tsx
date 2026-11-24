@@ -35,7 +35,7 @@ export default function Members({ index, member, noticeTitle, onGo, backdrop }: 
             <Slate index={index} name="Members" />
             <CineTitle text="멤버가 되면" />
             <p className="scene-lede" data-cine style={cssVars({ '--i': 2 })}>
-              공지, 커뮤니티와 회원 자료, 활동 도구가 열립니다.
+              공개 공지는 지금 볼 수 있어요. 로그인하면 회원 공지, 커뮤니티와 활동 도구도 열립니다.
             </p>
           </>
         )}

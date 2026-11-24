@@ -70,9 +70,9 @@ public class RichBodyMediaController {
         ContentDisposition disposition = (attachment ? ContentDisposition.attachment() : ContentDisposition.inline())
                 .filename(media.getOriginalName(), StandardCharsets.UTF_8).build();
         // Archive visibility can change while the media URL stays the same.
-        CacheControl cache = media.getScope() == RichBodyMedia.Scope.ARCHIVE
+        CacheControl cache = media.getScope() == RichBodyMedia.Scope.ARCHIVE || media.getScope() == RichBodyMedia.Scope.NOTICE
                 ? CacheControl.noStore().cachePrivate() : BLOB_CACHE;
-        return ResponseEntity.ok().cacheControl(cache).contentType(contentType)
+        return ResponseEntity.ok().cacheControl(cache).varyBy("Cookie", "Authorization").contentType(contentType)
                 .header("X-Content-Type-Options", "nosniff")
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(service.load(media));

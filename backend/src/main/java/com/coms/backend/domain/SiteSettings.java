@@ -19,6 +19,18 @@ public class SiteSettings {
     @Column(name = "recruitment_period", nullable = false, length = 240)
     private String recruitmentPeriod;
 
+    @Column(name = "recruit_cohort", nullable = false, length = 80, columnDefinition = "VARCHAR(80) NOT NULL DEFAULT '60기'")
+    private String recruitCohort = "60기";
+
+    @Column(name = "recruit_fee", nullable = false, length = 80, columnDefinition = "VARCHAR(80) NOT NULL DEFAULT '2만원'")
+    private String recruitFee = "2만원";
+
+    @Column(name = "recruit_room", nullable = false, length = 120, columnDefinition = "VARCHAR(120) NOT NULL DEFAULT '복지관 403호'")
+    private String recruitRoom = "복지관 403호";
+
+    @Column(name = "recruit_headline", nullable = false, length = 120, columnDefinition = "VARCHAR(120) NOT NULL DEFAULT '지금 60기 상시 모집 중'")
+    private String recruitHeadline = "지금 60기 상시 모집 중";
+
     @Column(name = "home_hero_title", nullable = false, length = 120)
     private String homeHeroTitle;
 
@@ -65,6 +77,14 @@ public class SiteSettings {
     public void setRecruitmentStatus(String recruitmentStatus) { this.recruitmentStatus = recruitmentStatus; }
     public String getRecruitmentPeriod() { return recruitmentPeriod; }
     public void setRecruitmentPeriod(String recruitmentPeriod) { this.recruitmentPeriod = recruitmentPeriod; }
+    public String getRecruitCohort() { return recruitCohort; }
+    public void setRecruitCohort(String recruitCohort) { this.recruitCohort = recruitCohort; }
+    public String getRecruitFee() { return recruitFee; }
+    public void setRecruitFee(String recruitFee) { this.recruitFee = recruitFee; }
+    public String getRecruitRoom() { return recruitRoom; }
+    public void setRecruitRoom(String recruitRoom) { this.recruitRoom = recruitRoom; }
+    public String getRecruitHeadline() { return recruitHeadline; }
+    public void setRecruitHeadline(String recruitHeadline) { this.recruitHeadline = recruitHeadline; }
     public String getHomeHeroTitle() { return homeHeroTitle; }
     public void setHomeHeroTitle(String homeHeroTitle) { this.homeHeroTitle = homeHeroTitle; }
     public String getHomeHeroCopy() { return homeHeroCopy; }

@@ -89,7 +89,7 @@ export default function QuickSearchDialog({ onClose }: { onClose: () => void }) 
 
   // The lists the pages themselves load (same keys where a page keeps one, so an open board is
   // not fetched twice). Guests are not asked anything: those routes are for members.
-  const noticesQuery = useQuery({ queryKey: queryKeys.notices.list(), queryFn: () => asList(listNotices), enabled: signedIn })
+  const noticesQuery = useQuery({ queryKey: queryKeys.notices.list(user?.studentId ?? 'guest'), queryFn: () => asList(listNotices), enabled: signedIn })
   const postsQuery = useQuery({ queryKey: queryKeys.community.posts(), queryFn: () => asList(listCommunityPosts), enabled: signedIn })
   const filesQuery = useQuery({ queryKey: ['quick-search', 'files'], queryFn: () => asList(listFiles), enabled: signedIn })
   const pollsQuery = useQuery({ queryKey: ['meeting-polls'], queryFn: () => asList(listMeetingPolls), enabled: signedIn })

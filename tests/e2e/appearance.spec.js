@@ -77,7 +77,7 @@ test('footer has the four Korean sitemap groups and keeps external destinations'
   await expect(sitemap.getByRole('link', { name: '해커톤' }).locator('[data-member-lock]')).toHaveCount(0)
   await expect(sitemap.getByRole('link', { name: /^역대 회장단/ }).locator('[data-member-lock]')).toHaveCount(1)
   await expect(sitemap.getByRole('link', { name: /^팀 프로젝트/ }).locator('[data-member-lock]')).toHaveCount(1)
-  await expect(sitemap.getByRole('link', { name: /^공지/ }).locator('[data-member-lock]')).toHaveCount(1)
+  await expect(sitemap.getByRole('link', { name: /^공지/ }).locator('[data-member-lock]')).toHaveCount(0)
   await expect(sitemap.getByRole('link', { name: '자료실' }).locator('[data-member-lock]')).toHaveCount(0)
   await expect(page.locator('.coms-footer-wordmark')).toHaveAttribute('aria-hidden', 'true')
   await expect(page.locator('.coms-footer-wordmark')).toHaveCSS('-webkit-text-stroke-width', '1px')

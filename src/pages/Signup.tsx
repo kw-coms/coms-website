@@ -472,7 +472,7 @@ export default function Signup({ onBack }: { onBack: () => void }) {
                 <button
                   type="button"
                   onClick={() => setStep('form')}
-                  className="font-semibold text-[var(--app-accent-text)]"
+                  className="min-h-11 font-semibold text-[var(--app-accent-text)] sm:min-h-0"
                 >
                   가입 정보 수정 후 다시 제출
                 </button>

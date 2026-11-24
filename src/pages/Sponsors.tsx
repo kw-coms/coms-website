@@ -225,7 +225,7 @@ function SponsorCard({ sponsor, layout }: {
               href={href}
               target="_blank"
               rel="noreferrer noopener"
-              className="inline-flex items-center gap-1 text-xs font-bold text-[var(--sponsor-accent-text)] underline-offset-2 hover:underline"
+              className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-[var(--sponsor-accent-text)] underline-offset-2 hover:underline sm:min-h-0"
             >
               바로가기
               <ExternalLink size={11} aria-hidden="true" />
@@ -257,7 +257,7 @@ function HowToSection({ howTo }: { howTo: { title: string; bodyHtml: string; con
           {howTo.bankNote}
         </p>
       )}
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap gap-2 max-sm:[&_a]:min-h-11">
         {howTo.contactEmail && (
           <a
             href={`mailto:${howTo.contactEmail}`}

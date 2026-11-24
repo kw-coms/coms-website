@@ -116,12 +116,60 @@ class OperationsSecurityIntegrationTest {
     }
 
     @Test
-    void publicSettingsStayPublicWhileNoticesRequireMembership() throws Exception {
+    void publicSettingsStayPublicWhilePrivateNoticesRequireMembership() throws Exception {
+        mockMvc.perform(get("/api/site-settings"))
+                .andExpect(status().isOk());
+        String privateBody = mockMvc.perform(post("/api/notices")
+                        .cookie(officerCookie).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content(NOTICE_BODY))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long privateId = objectMapper.readTree(privateBody).get("id").asLong();
+        mockMvc.perform(get("/api/notices"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+        mockMvc.perform(get("/api/notices/{id}", privateId)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/notices/{id}", privateId).cookie(userCookie)).andExpect(status().isOk());
+    }
+
+    @Test
+    void publicSettingsAndSelectedNoticesAreAvailableToGuests() throws Exception {
         mockMvc.perform(get("/api/site-settings"))
                 .andExpect(status().isOk());
 
+        String privateBody = mockMvc.perform(post("/api/notices")
+                        .cookie(officerCookie).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON).content(NOTICE_BODY))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long privateId = objectMapper.readTree(privateBody).get("id").asLong();
+        String publicBody = mockMvc.perform(post("/api/notices")
+                        .cookie(officerCookie).header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"공개 공지\",\"content\":\"내용\",\"publicVisible\":true}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long publicId = objectMapper.readTree(publicBody).get("id").asLong();
+        String realAuthor = objectMapper.readTree(publicBody).get("author").asText();
+        assertThat(realAuthor).isNotEqualTo("COM's 운영진");
+
         mockMvc.perform(get("/api/notices"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(publicId))
+                .andExpect(jsonPath("$[1]").doesNotExist())
+                .andExpect(jsonPath("$[0].author").value("COM's 운영진"))
+                .andExpect(jsonPath("$[0].authorStudentId").doesNotExist());
+        mockMvc.perform(get("/api/notices").param("page", "0").param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].author").value("COM's 운영진"));
+        mockMvc.perform(get("/api/notices/" + privateId)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/notices/" + publicId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.author").value("COM's 운영진"))
+                .andExpect(jsonPath("$.authorStudentId").doesNotExist());
+        mockMvc.perform(get("/api/notices/" + publicId).cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.author").value(realAuthor));
+        mockMvc.perform(get("/api/notices").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[1].id").exists());
     }
 
     @Test

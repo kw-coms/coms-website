@@ -203,8 +203,8 @@
 /* The buttons in the header that open it. */
 .coms-quick-open {
 	display: inline-flex;
-	width: 2.25rem;
-	height: 2.25rem;
+	width: 44px;
+	height: 44px;
 	flex: none;
 	align-items: center;
 	justify-content: center;

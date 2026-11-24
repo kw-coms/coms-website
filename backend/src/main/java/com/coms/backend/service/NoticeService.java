@@ -56,7 +56,9 @@ public class NoticeService {
 
     @Transactional(readOnly = true)
     public List<NoticeResponse> list(String studentId) {
-        List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc();
+        List<Notice> notices = studentId == null
+                ? repo.findByPublicVisibleTrueOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc()
+                : repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc();
         Map<Long, VoteSummary> stats = voteStats(notices);
         return notices.stream().map(notice -> toResponse(notice, stats, studentId)).toList();
     }
@@ -69,10 +71,13 @@ public class NoticeService {
      */
     @Transactional(readOnly = true)
     public PagedNotices listPaged(String studentId, int page, int size) {
-        List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(
-                org.springframework.data.domain.PageRequest.of(page, size));
+        var pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        List<Notice> notices = studentId == null
+                ? repo.findByPublicVisibleTrueOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(pageable)
+                : repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(pageable);
         Map<Long, VoteSummary> stats = voteStats(notices);
-        return new PagedNotices(notices.stream().map(notice -> toResponse(notice, stats, studentId)).toList(), repo.count());
+        return new PagedNotices(notices.stream().map(notice -> toResponse(notice, stats, studentId)).toList(),
+                studentId == null ? repo.countByPublicVisibleTrue() : repo.count());
     }
 
     public record PagedNotices(List<NoticeResponse> items, long total) {}
@@ -82,11 +87,11 @@ public class NoticeService {
      * the query instead of loading every row and trimming in memory. Used by the mobile home preview.
      */
     @Transactional(readOnly = true)
-    public List<NoticeResponse> listLimited(int limit) {
+    public List<NoticeResponse> listLimited(String studentId, int limit) {
         List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(
                 org.springframework.data.domain.PageRequest.of(0, limit));
         Map<Long, VoteSummary> stats = voteStats(notices);
-        return notices.stream().map(notice -> toResponse(notice, stats, null)).toList();
+        return notices.stream().map(notice -> toResponse(notice, stats, studentId)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -95,10 +100,13 @@ public class NoticeService {
     }
 
     public NoticeResponse getAndIncrementView(Long id, String studentId) {
-        if (repo.incrementViewCount(id) == 0) {
+        if (studentId != null && repo.incrementViewCount(id) == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         Notice notice = getEntity(id);
+        if (studentId == null && !notice.isPublicVisible()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         return toResponse(notice, voteStats(List.of(notice)), studentId);
     }
 
@@ -125,7 +133,13 @@ public class NoticeService {
 
     public NoticeResponse create(String authorStudentId, NoticeRequest request) {
         Notice notice = new Notice();
-        applyRequest(notice, request, authorName(authorStudentId));
+        Member editor = memberRepository.findByStudentId(authorStudentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        if (!permissionService.has(editor, Permission.NOTICE_WRITE)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        applyRequest(notice, request, editor.getName());
+        notice.setPublicVisible(Boolean.TRUE.equals(request.publicVisible()));
         notice.setAuthorStudentId(authorStudentId);
         Notice saved = repo.save(notice);
         richBodyMediaService.syncAttachments(RichBodyMedia.Scope.NOTICE, saved.getId(), saved.getContent(), authorStudentId);
@@ -158,6 +172,8 @@ public class NoticeService {
             notice.setAuthor(cleaned);
             detail = "author=(custom)";
         }
+        notice.markEdited();
+        repo.flush();
         auditLogService.record(editorStudentId, "NOTICE_AUTHOR_UPDATE", "NOTICE", String.valueOf(notice.getId()), detail, null);
         return toResponse(notice, voteStats(List.of(notice)), editorStudentId);
     }
@@ -169,11 +185,28 @@ public class NoticeService {
     public NoticeResponse update(String authorStudentId, Long id, NoticeRequest request) {
         Notice notice = getEntity(id);
         boolean canManageNotice = requireEditable(authorStudentId, notice);
+        if (request.version() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "공지 버전이 필요합니다. 새로고침 후 다시 시도해주세요.");
+        }
+        if (notice.getVersion() != request.version()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "다른 요청에서 공지를 변경했습니다. 새로고침 후 다시 시도해주세요.");
+        }
+        if (request.publicVisible() != null && request.publicVisible() != notice.isPublicVisible()) {
+            Member editor = memberRepository.findByStudentId(authorStudentId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+            if (!permissionService.has(editor, Permission.NOTICE_WRITE)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+            }
+            notice.setPublicVisible(request.publicVisible());
+        }
         // Keep the displayed author on edits — previously every edit stomped it with the
         // editor's own name, which silently undid 회장 author overrides.
         applyRequest(notice, request, notice.getAuthor(), canManageNotice);
         richBodyMediaService.syncAttachments(RichBodyMedia.Scope.NOTICE, notice.getId(), notice.getContent(),
                 canManageNotice ? authorStudentId : null, true);
+        // Attachment-only edits must also flush a version-checked notice update.
+        notice.markEdited();
+        repo.flush();
         auditLogService.record(authorStudentId, "NOTICE_UPDATE", "NOTICE", String.valueOf(notice.getId()), "title=" + notice.getTitle(), null);
         return toResponse(notice, voteStats(List.of(notice)), authorStudentId);
     }
@@ -181,6 +214,8 @@ public class NoticeService {
     public NoticeResponse setPinned(String authorStudentId, Long id, boolean pinned) {
         Notice notice = getEntity(id);
         notice.setPinned(pinned);
+        notice.markEdited();
+        repo.flush();
         auditLogService.record(authorStudentId, "NOTICE_PIN", "NOTICE", String.valueOf(notice.getId()), "pinned=" + pinned, null);
         return toResponse(notice, voteStats(List.of(notice)), authorStudentId);
     }
@@ -222,12 +257,6 @@ public class NoticeService {
         return canManageNotice || editor.getRole() == Member.Role.ADMIN;
     }
 
-    private String authorName(String studentId) {
-        Member member = memberRepository.findByStudentId(studentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        return member.getName();
-    }
-
     private Notice.Category parseCategory(String value) {
         if (value == null || value.isBlank()) {
             return Notice.Category.GENERAL;
@@ -255,10 +284,12 @@ public class NoticeService {
         VoteSummary votes = voteStats.getOrDefault(notice.getId(), VoteSummary.EMPTY);
         return new NoticeResponse(
                 notice.getId(),
+                notice.getVersion(),
                 notice.getTitle(),
                 notice.getContent(),
-                notice.getAuthor(),
-                notice.getAuthorStudentId(),
+                studentId == null ? "COM's 운영진" : notice.getAuthor(),
+                studentId == null ? null : notice.getAuthorStudentId(),
+                notice.isPublicVisible(),
                 notice.isPinned(),
                 notice.getCategory().name(),
                 notice.getViewCount(),

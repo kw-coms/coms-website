@@ -259,8 +259,8 @@ function App() {
         <Route path="/apps/:workId" element={<WorkDetailPage />} />
         <Route path="/draw" element={<DrawPage />} />
         <Route path="/sponsors" element={<SponsorsPage />} />
-        <Route path="/notices" element={<RequireAuth><NoticesPage /></RequireAuth>} />
-        <Route path="/notices/:id" element={<RequireAuth><NoticesPage /></RequireAuth>} />
+        <Route path="/notices" element={<NoticesPage />} />
+        <Route path="/notices/:id" element={<NoticesPage />} />
         <Route path="/resources" element={<ArchivePage />} />
         <Route path="/resources/:id" element={<ArchivePage />} />
         <Route path="/community" element={<RequireAuth><CommunityPage /></RequireAuth>} />

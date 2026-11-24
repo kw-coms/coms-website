@@ -11,6 +11,9 @@ import java.util.List;
 
 public interface NoticeRepository extends JpaRepository<Notice, Long> {
     List<Notice> findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc();
+    List<Notice> findByPublicVisibleTrueOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc();
+    List<Notice> findByPublicVisibleTrueOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(Pageable pageable);
+    long countByPublicVisibleTrue();
 
     List<Notice> findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(Pageable pageable);
 
@@ -22,4 +25,5 @@ public interface NoticeRepository extends JpaRepository<Notice, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update Notice n set n.viewCount = n.viewCount + 1 where n.id = :id")
     int incrementViewCount(@Param("id") Long id);
+
 }

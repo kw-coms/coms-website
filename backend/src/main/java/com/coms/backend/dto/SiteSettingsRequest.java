@@ -13,8 +13,19 @@ public record SiteSettingsRequest(
         @NotBlank @Size(max = 120) String homeHeroTitle,
         @NotBlank @Size(max = 500) String homeHeroCopy,
         @Valid @Size(max = 5) List<ContactLinkRequest> contactLinks,
-        @Size(max = 254) String askInboxEmail
+        @Size(max = 254) String askInboxEmail,
+        @Size(max = 80) String recruitCohort,
+        @Size(max = 80) String recruitFee,
+        @Size(max = 120) String recruitRoom,
+        @Size(max = 120) String recruitHeadline
 ) {
+    public SiteSettingsRequest(String semesterLabel, String recruitmentStatus, String recruitmentPeriod,
+                               String homeHeroTitle, String homeHeroCopy, List<ContactLinkRequest> contactLinks,
+                               String askInboxEmail) {
+        this(semesterLabel, recruitmentStatus, recruitmentPeriod, homeHeroTitle, homeHeroCopy,
+                contactLinks, askInboxEmail, null, null, null, null);
+    }
+
     public record ContactLinkRequest(
             @NotBlank @Size(max = 80) String label,
             @NotBlank @Size(max = 240) String href

@@ -64,6 +64,7 @@
 @media (max-width: 767px) {
 	:root {
 		--apple-nav-height: 58px;
+		--apple-mobile-tabs-height: 45px;
 	}
 
 	html {
@@ -85,6 +86,7 @@
 	}
 
 	.apple-detail-home-button {
+		min-height: 44px;
 		margin-bottom: 1rem;
 	}
 

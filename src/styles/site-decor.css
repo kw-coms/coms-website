@@ -243,6 +243,7 @@
 
 @media (pointer: coarse), (max-width: 639px) {
 	.coms-footer-link {
+		min-width: 44px;
 		min-height: 44px;
 	}
 }

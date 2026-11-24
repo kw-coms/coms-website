@@ -94,6 +94,24 @@ test.describe('/activities timeline', () => {
     expect(overflow).toBeLessThanOrEqual(1)
   })
 
+  test('mobile activity anchors clear the fixed tabs', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.route('**/api/club-activities/timeline', (route) => route.fulfill({ json: [
+      { id: 101, kind: 'ACTIVITY', title: '진행 중 세미나', resolvedStatus: 'LIVE', eventDate: '2026-11-24', timelineTerm: '2026 2학기' },
+      { id: 102, kind: 'ACTIVITY', title: '예정 세미나', resolvedStatus: 'CONFIRMED', eventDate: '2026-12-01', timelineTerm: '2026 2학기' },
+    ] }))
+    await page.goto('/activities#act-upcoming')
+    const tabs = page.locator('.apple-mobile-tabs')
+    const upcoming = page.locator('#act-upcoming-title')
+    await expect(upcoming).toBeVisible()
+    await expect.poll(async () => (await upcoming.boundingBox())?.y ?? -1).toBeGreaterThan((await tabs.boundingBox()).y + (await tabs.boundingBox()).height)
+
+    await page.locator('#act-upcoming .act-recruit-link[href="#act-db-101"]').click()
+    await expect(page).toHaveURL(/#act-db-101$/)
+    const liveTitle = page.locator('#act-db-101 .act-card-title')
+    await expect.poll(async () => (await liveTitle.boundingBox())?.y ?? -1).toBeGreaterThan((await tabs.boundingBox()).y + (await tabs.boundingBox()).height)
+  })
+
   // The hackathon status and progress come from the clock, not from stored text.
   const hackathonAt = [
     ['before the opening', '2026-11-08T17:00:00+09:00', '예정', '0'],

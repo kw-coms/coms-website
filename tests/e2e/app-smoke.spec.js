@@ -130,7 +130,7 @@ test('archive non-owner vice president cannot see the content edit action', asyn
 
 test('notice author can edit after reassignment but cannot pin or delete', async ({ page }) => {
   await mockAdminApis(page)
-  const notice = { id: 913, title: '이관된 공지', content: '기존 본문', category: 'GENERAL', author: '회원', authorStudentId: 'owner', pinned: true, createdAt: '2026-09-01T00:00:00' }
+  const notice = { id: 913, version: 0, title: '이관된 공지', content: '기존 본문', category: 'GENERAL', author: '회원', authorStudentId: 'owner', pinned: true, createdAt: '2026-09-01T00:00:00' }
   let edited = null
   await signInHint(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { studentId: 'owner', name: '회원', role: 'USER', emailVerified: true } }))
@@ -154,6 +154,7 @@ test('notice author can edit after reassignment but cannot pin or delete', async
   await page.getByRole('button', { name: /수정|저장/ }).last().click()
   await expect.poll(() => edited?.title).toBe('수정된 공지 제목')
   expect(edited.pinned).toBe(true)
+  expect(edited.version).toBe(0)
 })
 
 test('notice write permission does not expose another authors edit action', async ({ page }) => {
@@ -169,6 +170,80 @@ test('notice write permission does not expose another authors edit action', asyn
   await expect(page.getByRole('button', { name: '수정', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '고정', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '삭제', exact: true })).toBeVisible()
+})
+
+test('notice editor sends its loaded version and only changes visibility explicitly', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'ADMIN', permissions: ['notice.write'] } }))
+  let notice = { id: 915, version: 3, updatedAt: '2026-11-24T10:00:00', publicVisible: true, title: '공개 공지', content: '기존 공지 본문', category: 'GENERAL', author: '관리자', pinned: false }
+  const saves = []
+  await page.route('**/api/notices', route => route.fulfill({ json: [notice] }))
+  await page.route('**/api/notices/915', async route => {
+    if (route.request().method() !== 'PUT') return route.fulfill({ json: notice })
+    const body = route.request().postDataJSON()
+    saves.push(body)
+    if (body.version !== notice.version) return route.fulfill({ status: 409, json: {} })
+    notice = { ...notice, ...body, version: notice.version + 1 }
+    return route.fulfill({ json: notice })
+  })
+
+  await page.goto('/notices/915')
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  const visibility = page.getByRole('checkbox', { name: '비회원에게도 공개' })
+  await expect(visibility).toBeChecked()
+  await expect(page.locator('[contenteditable="true"]').first()).toContainText('기존 공지 본문')
+  notice = { ...notice, version: 4, updatedAt: '2026-11-24T10:01:00', publicVisible: false }
+  await page.getByPlaceholder('제목', { exact: true }).fill('편집 중인 제목')
+  await page.getByRole('button', { name: '저장', exact: true }).click()
+  await expect.poll(() => saves[0]).toMatchObject({ version: 3, title: '편집 중인 제목' })
+  expect(saves[0]).not.toHaveProperty('publicVisible')
+  await expect(page.getByText(/새로고침.*다시 시도/)).toBeVisible()
+  await expect(page.getByPlaceholder('제목', { exact: true })).toHaveValue('편집 중인 제목')
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('kwcoms-draft:v1:2020123456:notice:915') || 'null')?.title,
+  )).toBe('편집 중인 제목')
+
+  await page.reload()
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  await page.getByRole('button', { name: '임시 저장본 불러오기', exact: true }).click()
+  await expect(page.getByPlaceholder('제목', { exact: true })).toHaveValue('편집 중인 제목')
+  await expect(page.locator('[contenteditable="true"]').first()).toContainText('기존 공지 본문')
+  await expect(visibility).not.toBeChecked()
+  await visibility.check()
+  await page.getByRole('button', { name: '저장', exact: true }).click()
+  await expect.poll(() => saves[1]).toMatchObject({ version: 4, publicVisible: true })
+})
+
+test('notice editor restores a saved visibility change at the same version', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'ADMIN', permissions: ['notice.write'] } }))
+  const notice = { id: 916, version: 3, updatedAt: '2026-11-24T10:00:00', publicVisible: true, title: '공개 공지', content: '기존 공지 본문', category: 'GENERAL', author: '관리자', pinned: false }
+  let saved
+  await page.route('**/api/notices', route => route.fulfill({ json: [notice] }))
+  await page.route('**/api/notices/916', route => {
+    if (route.request().method() === 'PUT') saved = route.request().postDataJSON()
+    return route.fulfill({ json: notice })
+  })
+
+  await page.goto('/notices/916')
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  const visibility = page.getByRole('checkbox', { name: '비회원에게도 공개' })
+  await expect(visibility).toBeChecked()
+  await expect(page.locator('[contenteditable="true"]').first()).toContainText('기존 공지 본문')
+  await visibility.uncheck()
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('kwcoms-draft:v1:2020123456:notice:916') || 'null')?.publicVisible,
+  )).toBe(false)
+  expect(await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('kwcoms-draft:v1:2020123456:notice:916'))?.baseRevision,
+  )).toBe(notice.updatedAt)
+
+  await page.reload()
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  await expect(visibility).not.toBeChecked()
+  await expect(page.locator('[contenteditable="true"]').first()).toContainText('기존 공지 본문')
+  await page.getByRole('button', { name: '저장', exact: true }).click()
+  await expect.poll(() => saved).toMatchObject({ version: 3, publicVisible: false })
 })
 
 function multipartField(body, name) {
@@ -4535,14 +4610,16 @@ test('admin can set and clear one-date recurring schedule exceptions', async ({ 
   await expect.poll(() => exceptionDelete).toBe('/api/admin/recurring-schedules/3/exceptions/2026-07-20')
 })
 
-test('guest visiting notices sees the members-only guide', async ({ page }) => {
+test('guest visiting notices sees public notices and a login prompt', async ({ page }) => {
   const requests = trackRequests(page, /\/api\/notices/)
+  await page.route('**/api/notices', (route) => route.fulfill({ json: [
+    { id: 7, title: '공개 안내', content: '방문객용', category: 'GENERAL', publicVisible: true, createdAt: '2026-11-01T10:00:00' },
+  ] }))
   await page.goto('/notices')
-  const gate = await expectMembersGate(page, '/notices')
-  await expect(gate.getByText('공지, 홍보, 소모임, 취업공고를 한곳에서 볼 수 있어요.')).toBeVisible()
-  await expect(page.getByText('조회수 검증 공지')).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: '공지사항', exact: true })).toHaveCount(0)
-  expect(requests).toEqual([])
+  await expect(page.getByRole('heading', { name: '공지사항', exact: true })).toBeVisible()
+  await expect(page.getByText('공개 안내').filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByRole('link', { name: '로그인', exact: true })).toBeVisible()
+  expect(requests.length).toBeGreaterThan(0)
 })
 
 test('archive highlights repeat-visit search and category controls', async ({ page }) => {

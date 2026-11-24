@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ArrowUpRight, Megaphone } from 'lucide-react'
 import { navGroups } from '../../data/homeContent'
@@ -21,9 +21,10 @@ type Props = {
   member: boolean
   latestNotice: { id: string | number; title: string } | null
   settings: SiteSettings
+  nextActivity: ReactNode
 }
 
-export default function CompactHome({ member, latestNotice, settings }: Props) {
+export default function CompactHome({ member, latestNotice, settings, nextActivity }: Props) {
   const { hash } = useLocation()
   useEffect(() => {
     if (['#about', '#activities', '#projects', '#recruit'].includes(hash)) {
@@ -39,6 +40,7 @@ export default function CompactHome({ member, latestNotice, settings }: Props) {
           <h1>{settings.homeHeroTitle}</h1>
           <p>{settings.homeHeroCopy}</p>
         </header>
+        {nextActivity}
 
         {member && (
           <section className="compact-home__member" aria-label="멤버 바로가기">

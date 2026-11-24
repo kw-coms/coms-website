@@ -123,7 +123,9 @@ public class SecurityConfig {
                 // community.moderate 권한으로 열리는 중재 화면(신고, 삭제 보관함).
                 auth.requestMatchers("/api/admin/community/**").authenticated();
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
-                auth.requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**").authenticated();
+                // NoticeService filters guest reads by public_visible and returns 404 for private details.
+                auth.requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/*").permitAll();
+                auth.requestMatchers(HttpMethod.GET, "/api/notices/**").authenticated();
                 // 역대 회장단: 공지와 같은 독자(로그인한 회원). 쓰기는 /api/admin/** ADMIN 경계.
                 auth.requestMatchers(HttpMethod.GET, "/api/club-officers").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/notices/*/vote").authenticated();

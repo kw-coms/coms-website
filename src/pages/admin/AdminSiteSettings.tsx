@@ -243,6 +243,10 @@ export default function AdminSiteSettings() {
               <dt className="font-semibold text-[var(--theme-body-muted)]">모집 상태</dt>
               <dd className="mt-1 text-[var(--theme-body-dark)]">{current.recruitmentStatus}</dd>
             </div>
+            <div>
+              <dt className="font-semibold text-[var(--theme-body-muted)]">모집 안내</dt>
+              <dd className="mt-1 text-[var(--theme-body-dark)]">{current.recruitHeadline}</dd>
+            </div>
             <div className="sm:col-span-2">
               <dt className="font-semibold text-[var(--theme-body-muted)]">홈 문구</dt>
               <dd className="mt-1 text-[var(--theme-body-dark)]">{current.homeHeroCopy}</dd>
@@ -260,6 +264,9 @@ export default function AdminSiteSettings() {
           <p className="mt-3 text-sm font-semibold text-[var(--theme-body-dark)]">
             {form.recruitmentStatus || defaultSiteSettings.recruitmentStatus} · {form.recruitmentPeriod || defaultSiteSettings.recruitmentPeriod}
           </p>
+          <p className="mt-2 text-sm text-[var(--theme-body-muted)]">
+            {form.recruitHeadline || defaultSiteSettings.recruitHeadline} · {form.recruitCohort || defaultSiteSettings.recruitCohort} · 회비 {form.recruitFee || defaultSiteSettings.recruitFee} · 동아리방 {form.recruitRoom || defaultSiteSettings.recruitRoom}
+          </p>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -274,6 +281,22 @@ export default function AdminSiteSettings() {
           <label className="text-sm font-semibold text-[var(--theme-body-dark)] sm:col-span-2">
             모집 기간
             <input value={form.recruitmentPeriod} onChange={(e) => update('recruitmentPeriod', e.target.value)} maxLength={240} className="mt-1 w-full rounded-lg border border-[var(--app-hairline)] bg-white px-3 py-2 text-sm outline-none" />
+          </label>
+          <label className="text-sm font-semibold text-[var(--theme-body-dark)]">
+            모집 기수
+            <input value={form.recruitCohort} onChange={(e) => update('recruitCohort', e.target.value)} maxLength={80} className="mt-1 w-full rounded-lg border border-[var(--app-hairline)] bg-white px-3 py-2 text-sm outline-none" />
+          </label>
+          <label className="text-sm font-semibold text-[var(--theme-body-dark)]">
+            모집 제목
+            <input value={form.recruitHeadline} onChange={(e) => update('recruitHeadline', e.target.value)} maxLength={120} className="mt-1 w-full rounded-lg border border-[var(--app-hairline)] bg-white px-3 py-2 text-sm outline-none" />
+          </label>
+          <label className="text-sm font-semibold text-[var(--theme-body-dark)]">
+            회비
+            <input value={form.recruitFee} onChange={(e) => update('recruitFee', e.target.value)} maxLength={80} className="mt-1 w-full rounded-lg border border-[var(--app-hairline)] bg-white px-3 py-2 text-sm outline-none" />
+          </label>
+          <label className="text-sm font-semibold text-[var(--theme-body-dark)]">
+            동아리방
+            <input value={form.recruitRoom} onChange={(e) => update('recruitRoom', e.target.value)} maxLength={120} className="mt-1 w-full rounded-lg border border-[var(--app-hairline)] bg-white px-3 py-2 text-sm outline-none" />
           </label>
           <label className="text-sm font-semibold text-[var(--theme-body-dark)]">
             홈 제목

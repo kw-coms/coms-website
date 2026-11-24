@@ -2,16 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { MessageCircle, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { ASK_FAQS, type AskFaq } from '../../data/askFaq'
+import { askFaqs, type AskFaq } from '../../data/askFaq'
 import { useAuth } from '../../contexts/useAuth'
 import { useModalFocus } from '../../hooks/useModalFocus'
-import { getPublicSiteSettings } from '../../services/siteSettingsApi'
+import { getPublicSiteSettings, type SiteSettings } from '../../services/siteSettingsApi'
 import { sendAsk } from '../../services/askApi'
 import { TOUR_SURFACE_EVENT, type TourSurface } from '../tour/tourState'
 
 type Stage = 'faq' | 'answer' | 'question' | 'email' | 'done'
 
-function AskDialog({ onClose, user, askEnabled, preview = false }: { onClose: () => void; user: { email?: string } | null; askEnabled: boolean; preview?: boolean }) {
+function AskDialog({ onClose, user, askEnabled, settings, preview = false }: { onClose: () => void; user: { email?: string } | null; askEnabled: boolean; settings?: SiteSettings; preview?: boolean }) {
   const [stage, setStage] = useState<Stage>('faq')
   const [selectedFaq, setSelectedFaq] = useState<AskFaq | null>(null)
   const [question, setQuestion] = useState('')
@@ -144,7 +144,7 @@ function AskDialog({ onClose, user, askEnabled, preview = false }: { onClose: ()
           </div>
           {stage === 'faq' && <div className="coms-ask-choices">
             <div className="coms-ask-faq" role="group" aria-label="자주 묻는 질문">
-              {ASK_FAQS.map((faq, index) => <button key={faq.id} ref={index === 0 ? firstFaqRef : undefined} type="button" onClick={() => { if (preview) return; setSelectedFaq(faq); setStage('answer') }}>{faq.question}</button>)}
+              {askFaqs(settings).map((faq, index) => <button key={faq.id} ref={index === 0 ? firstFaqRef : undefined} type="button" onClick={() => { if (preview) return; setSelectedFaq(faq); setStage('answer') }}>{faq.question}</button>)}
             </div>
             <button type="button" className="coms-ask-other" disabled={preview || !askEnabled} onClick={() => setStage('question')}>다른 질문 보내기</button>
             {!preview && <Link to="/contact" onClick={onClose} className="coms-ask-source">행사·프로젝트 협업 제안</Link>}
@@ -251,8 +251,8 @@ export default function AskWidget() {
   return (
     <div className="coms-ask-root">
       <button ref={triggerRef} type="button" className="coms-ask-trigger" data-tour="ask" data-open={open} aria-hidden={open} tabIndex={open ? -1 : 0} aria-expanded={open} aria-controls="coms-ask-panel" onClick={() => { if (!loading && !document.querySelector('[role="dialog"], [role="alertdialog"], .appearance-popover, #mobile-menu, [data-coms-intro], .coms-tour')) setOpen(true) }} aria-label="질문하기"><MessageCircle size={22} aria-hidden="true" /><span>질문하기</span></button>
-      {open && <AskDialog key={user ? `member:${user.studentId || user.id || 'unknown'}` : 'guest'} onClose={() => setOpen(false)} user={user} askEnabled={Boolean(settings?.askEnabled)} />}
-      {!open && tourPreview && <AskDialog key="tour-preview" preview onClose={() => setTourPreview(false)} user={user} askEnabled={Boolean(settings?.askEnabled)} />}
+      {open && <AskDialog key={user ? `member:${user.studentId || user.id || 'unknown'}` : 'guest'} onClose={() => setOpen(false)} user={user} askEnabled={Boolean(settings?.askEnabled)} settings={settings} />}
+      {!open && tourPreview && <AskDialog key="tour-preview" preview onClose={() => setTourPreview(false)} user={user} askEnabled={Boolean(settings?.askEnabled)} settings={settings} />}
     </div>
   )
 }

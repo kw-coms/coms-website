@@ -64,6 +64,10 @@ public class SiteSettingsService {
         settings.setSemesterLabel(required(request.semesterLabel(), "Semester label is required."));
         settings.setRecruitmentStatus(required(request.recruitmentStatus(), "Recruitment status is required."));
         settings.setRecruitmentPeriod(required(request.recruitmentPeriod(), "Recruitment period is required."));
+        if (request.recruitCohort() != null) settings.setRecruitCohort(required(request.recruitCohort(), "Recruit cohort is required."));
+        if (request.recruitFee() != null) settings.setRecruitFee(required(request.recruitFee(), "Recruit fee is required."));
+        if (request.recruitRoom() != null) settings.setRecruitRoom(required(request.recruitRoom(), "Recruit room is required."));
+        if (request.recruitHeadline() != null) settings.setRecruitHeadline(required(request.recruitHeadline(), "Recruit headline is required."));
         settings.setHomeHeroTitle(required(request.homeHeroTitle(), "Home hero title is required."));
         settings.setHomeHeroCopy(required(request.homeHeroCopy(), "Home hero copy is required."));
         settings.setContactLinksJson(writeContactLinks(normalizeContactLinks(request.contactLinks())));
@@ -97,6 +101,10 @@ public class SiteSettingsService {
                 settings.getSemesterLabel(),
                 settings.getRecruitmentStatus(),
                 settings.getRecruitmentPeriod(),
+                settings.getRecruitCohort(),
+                settings.getRecruitFee(),
+                settings.getRecruitRoom(),
+                settings.getRecruitHeadline(),
                 settings.getHomeHeroTitle(),
                 settings.getHomeHeroCopy(),
                 readContactLinks(settings.getContactLinksJson()),
@@ -110,7 +118,8 @@ public class SiteSettingsService {
         SiteSettingsResponse publicFields = toResponse(settings);
         return new AdminSiteSettingsResponse(
                 publicFields.id(), publicFields.semesterLabel(), publicFields.recruitmentStatus(),
-                publicFields.recruitmentPeriod(), publicFields.homeHeroTitle(), publicFields.homeHeroCopy(),
+                publicFields.recruitmentPeriod(), publicFields.recruitCohort(), publicFields.recruitFee(),
+                publicFields.recruitRoom(), publicFields.recruitHeadline(), publicFields.homeHeroTitle(), publicFields.homeHeroCopy(),
                 publicFields.contactLinks(), publicFields.createdAt(), publicFields.updatedAt(),
                 publicFields.askEnabled(), settings.getAskInboxEmail()
         );

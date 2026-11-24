@@ -1,7 +1,10 @@
-import { Fragment, type ReactNode } from 'react'
-import { useNavigate, useLocation, type NavigateOptions, type To } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { Fragment, useEffect, useState, type ReactNode } from 'react'
+import { Link, useNavigate, useLocation, type NavigateOptions, type To } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowRight, CalendarDays } from 'lucide-react'
 import { listNotices } from '../../services/noticeApi'
+import { listClubActivityTimeline } from '../../services/clubActivityApi'
+import { nextActivity } from '../../data/nextActivity'
 import { defaultSiteSettings, getPublicSiteSettings } from '../../services/siteSettingsApi'
 import { scrollToTopInstant } from '../../utils/themeColors'
 import { isFullPageLink } from '../../utils/fullPageLink'
@@ -24,6 +27,9 @@ import CompactHome from './CompactHome'
 
 const LATEST_NOTICE_QUERY_KEY = ['app-shell', 'latest-notice']
 const SITE_SETTINGS_QUERY_KEY = ['site-settings', 'public']
+const ACTIVITY_TIMELINE_QUERY_KEY = ['home', 'activity-timeline']
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000
+const DAY_MS = 24 * 60 * 60 * 1000
 
 function SceneEffects({ member }: { member: boolean }) {
   useSceneProgress()
@@ -42,6 +48,22 @@ export default function HomeView() {
   const calm = useCalm()
   const homeLayout = useHomeLayout()
   const member = Boolean(user)
+  const queryClient = useQueryClient()
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    let timeoutId: number
+    const scheduleMidnight = () => {
+      const current = Date.now()
+      const nextMidnight = Math.floor((current + KST_OFFSET_MS) / DAY_MS + 1) * DAY_MS - KST_OFFSET_MS
+      timeoutId = window.setTimeout(() => {
+        setNow(Date.now())
+        void queryClient.invalidateQueries({ queryKey: ACTIVITY_TIMELINE_QUERY_KEY })
+        scheduleMidnight()
+      }, nextMidnight - current)
+    }
+    scheduleMidnight()
+    return () => window.clearTimeout(timeoutId)
+  }, [queryClient])
   const latestNoticeQuery = useQuery({
     queryKey: LATEST_NOTICE_QUERY_KEY,
     queryFn: listNotices,
@@ -57,6 +79,28 @@ export default function HomeView() {
     queryFn: getPublicSiteSettings,
   })
   const siteSettings = siteSettingsQuery.data ?? defaultSiteSettings
+  const activityQuery = useQuery({
+    queryKey: ACTIVITY_TIMELINE_QUERY_KEY,
+    queryFn: async () => {
+      const items = await listClubActivityTimeline()
+      return Array.isArray(items) ? items : []
+    },
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+  const activity = activityQuery.data ? nextActivity(activityQuery.data, now) ?? null : null
+  const nextActivityStrip = activity && (
+    <div className="home-next-activity">
+      <Link to="/activities#act-upcoming" className="scene-notice">
+        <CalendarDays size={15} aria-hidden="true" />
+        <span className="scene-notice__tag">다음 일정</span>
+        <span className="scene-notice__title">{activity.title}</span>
+        <span className="scene-notice__tag">{activity.live ? '진행 중' : activity.days === 0 ? '오늘' : `D-${activity.days}`}</span>
+        <ArrowRight size={14} aria-hidden="true" />
+      </Link>
+    </div>
+  )
 
   const openPanel = (id: string) => {
     const el = document.getElementById(id)
@@ -134,6 +178,7 @@ export default function HomeView() {
         copy={siteSettings.homeHeroCopy === defaultSiteSettings.homeHeroCopy ? null : siteSettings.homeHeroCopy}
         semester={siteSettings.semesterLabel === defaultSiteSettings.semesterLabel ? null : siteSettings.semesterLabel}
         noticeTitle={member ? latestNotice?.title || '동아리 공지사항 보기' : '모집 일정 및 지원 안내'}
+        nextActivity={nextActivityStrip}
         onMore={() => openPanel('about')}
         onApply={() => goPageTop('/recruit')}
         onNotice={openNotice}
@@ -147,7 +192,7 @@ export default function HomeView() {
   }
 
   if (homeLayout === 'compact') return (
-    <CompactHome member={member} latestNotice={latestNotice} settings={siteSettings} />
+    <CompactHome member={member} latestNotice={latestNotice} settings={siteSettings} nextActivity={nextActivityStrip} />
   )
 
   return (

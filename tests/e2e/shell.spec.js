@@ -1,9 +1,70 @@
 import { expect, test } from '@playwright/test'
-import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
+import { mockActivityTimeline, mockAdminApis, mockOptionalApis } from './visualSupport.js'
+import { doneEvent, summary } from '../hackathonFixture.mjs'
 
 test.beforeEach(async ({ page }) => {
   await mockOptionalApis(page)
   await page.addInitScript(() => sessionStorage.setItem('coms.intro.played:v1', '1'))
+})
+
+test.describe('mobile tap targets', () => {
+  test.use({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', serviceWorkers: 'block' })
+
+  const surfaces = [
+    ['/', '.scene-frame__link, .scene-hubcard__link, .scene-chip'],
+    ['/signup', '#main-content .apple-action-secondary, #main-content form button, #main-content form input:not([type="hidden"])'],
+    ['/hackathon', '.hackathon-card'],
+    ['/sponsors', 'a[href="https://example.com/sponsor"], a[href="https://example.com/contact"], a[href="mailto:sponsors@example.com"]'],
+    ['/activities', '.apple-mobile-tab, .apple-detail-home-button, .act-guest-note a, .act-jump a, .act-recruit-link'],
+  ]
+
+  for (const [path, selector] of surfaces) {
+    test(`${path} controls are at least 44 by 44 at 390px`, async ({ page }) => {
+      await mockActivityTimeline(page)
+      await page.route('**/api/site-settings', (route) => route.fulfill({ json: {} }))
+      await page.route('**/api/hackathon/events', (route) => route.fulfill({ json: [summary(doneEvent)] }))
+      await page.route('**/api/sponsors/page', (route) => route.fulfill({ json: {
+        settings: { howToSection: { contactLink: 'https://example.com/contact', contactEmail: 'sponsors@example.com' } },
+      } }))
+      if (path === '/sponsors') {
+        await mockAdminApis(page)
+        await page.route('**/api/sponsors', (route) => route.fulfill({ json: [{
+          id: 1, name: '후원', sponsors: [{ id: 1, name: '테스트 후원자', linkUrl: 'https://example.com/sponsor', anonymous: false }],
+        }] }))
+      }
+      await page.goto(path)
+
+      const skip = page.getByRole('link', { name: '본문으로 건너뛰기' })
+      await skip.focus()
+      await expect(skip).toBeInViewport()
+      const targets = page.locator(`${selector}, .coms-skip-link, .coms-quick-open, .apple-global-nav-menu, .coms-footer-link`)
+      await expect(page.locator(selector).first()).toBeVisible()
+      if (path === '/sponsors') await expect(page.locator(selector)).toHaveCount(3)
+      const tooSmall = await targets.evaluateAll((nodes) => nodes.flatMap((node) => {
+        const { width, height } = node.getBoundingClientRect()
+        if (!width || !height || (width >= 44 && height >= 44)) return []
+        return [`${node.textContent.trim() || node.getAttribute('aria-label') || node.id}: ${width}×${height}`]
+      }))
+      expect(tooSmall).toEqual([])
+    })
+  }
+
+  test('the last activities card can scroll above both floating buttons', async ({ page }) => {
+    await mockActivityTimeline(page)
+    await page.route('**/api/site-settings', (route) => route.fulfill({ json: {} }))
+    await page.goto('/activities')
+    const main = page.locator('.activities-page main')
+    const card = main.locator('.coms-cta').last()
+    await expect(card).toBeVisible()
+    await main.evaluate((node) => window.scrollBy(0, node.getBoundingClientRect().bottom - window.innerHeight))
+    await expect(page.locator('.coms-to-top.is-visible')).toBeVisible()
+    await expect(page.getByRole('button', { name: '질문하기' })).toBeVisible()
+    await expect.poll(() => card.evaluate((node) => {
+      const top = document.querySelector('.coms-to-top.is-visible')
+      const chat = document.querySelector('.coms-ask-trigger')
+      return node.getBoundingClientRect().bottom <= Math.min(top.getBoundingClientRect().top, chat.getBoundingClientRect().top)
+    })).toBe(true)
+  })
 })
 
 const headers = [
