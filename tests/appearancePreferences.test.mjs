@@ -97,3 +97,8 @@ for (const mode of ['light', 'dark']) {
 const buildConfig = readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8')
 assert.ok(buildConfig.includes('**/LegacyIntroCanvas-*.js'), 'the optional canvas must stay out of the service worker install precache')
 console.log('appearance preference contracts passed')
+
+// An unreachable surface must terminate and fall back to the extreme with more contrast.
+assert.equal(preferences.getAccentTokens('#808080', 'dark', 'standard', ['#ffffff'])['--app-accent-text'], '#000000')
+assert.equal(preferences.getAccentTokens('#808080', 'light', 'standard', ['#000000'])['--app-accent-text'], '#ffffff')
+assert.ok(preferences.getAccentTokens('#808080', 'dark', 'standard', ['color-mix(in srgb, red 50%, blue)', 'var(--x)'])['--app-accent-text'])

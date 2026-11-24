@@ -167,15 +167,19 @@ export function getAccentTokens(
   const soft = mixHex(accent, dark ? '#17191f' : '#ffffff', vivid ? (dark ? 0.62 : 0.78) : (dark ? 0.8 : 0.88))
   const readableInk = dark ? '#ffffff' : '#000000'
   let text = mixHex(accent, readableInk, vivid ? (dark ? 0.52 : 0.62) : (dark ? 0.28 : 0.08))
-  if (surfaces.length) {
+  // Only plain hex surfaces are measurable; color-mix()/var() tokens are skipped.
+  const measurable = surfaces.filter((surface) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(surface.trim()))
+  if (measurable.length) {
     // The most demanding surface bounds contrast on the other surfaces and accent badges.
-    const luminances = [...surfaces, soft].map(relativeLuminance)
+    const luminances = [...measurable, soft].map(relativeLuminance)
     const background = dark ? Math.max(...luminances) : Math.min(...luminances)
     const contrast = (ink: string) => {
       const foreground = relativeLuminance(ink)
       return dark ? (foreground + 0.05) / (background + 0.05) : (background + 0.05) / (foreground + 0.05)
     }
-    while (contrast(text) < 4.7) text = mixHex(text, readableInk, 0.16)
+    for (let step = 0; step < 12 && contrast(text) < 4.7; step += 1) text = mixHex(text, readableInk, 0.16)
+    // Unreachable on this surface: fall back to whichever extreme contrasts more.
+    if (contrast(text) < 4.7) text = (background + 0.05) / 0.05 > 1.05 / (background + 0.05) ? '#000000' : '#ffffff'
   }
   return {
     '--app-accent': accent,
