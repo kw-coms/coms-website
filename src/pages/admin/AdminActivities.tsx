@@ -14,6 +14,8 @@ import AdminActivityCategories from './AdminActivityCategories'
 import AdminActivityRow from './AdminActivityRow'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
+import { ActivityTimelineFields } from './ActivityTimelineFields'
+import { selectedTerm } from './activityTimelineForm'
 
 const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
@@ -32,6 +34,14 @@ export default function AdminActivities() {
     title: '',
     description: '',
     eventDate: '',
+    endDate: '',
+    startTime: '',
+    endTime: '',
+    dateUndecided: false,
+    showOnTimeline: false,
+    timelineStatus: '',
+    timelineTerm: '',
+    dateLabel: '',
     image: null,
     images: [],
     files: [],
@@ -52,7 +62,7 @@ export default function AdminActivities() {
         setCategories(list)
         setForm((prev) => (prev.category || list.length === 0 ? prev : { ...prev, category: list[0].key }))
       })
-      .catch(() => {})
+      .catch((err) => showToast({ message: err.message || '활동 분류를 불러오지 못했습니다.', tone: 'error' }))
   }
 
   useEffect(() => {
@@ -72,7 +82,7 @@ export default function AdminActivities() {
 
   const submit = async (event) => {
     event.preventDefault()
-    if (!form.title.trim() || !form.eventDate) return
+    if (!form.title.trim() || (!form.dateUndecided && !form.eventDate)) return
     // React nulls event.currentTarget once this handler yields at the first await.
     const formEl = event.currentTarget
     setSaving(true)
@@ -85,6 +95,14 @@ export default function AdminActivities() {
         title: form.title.trim(),
         description: form.description.trim(),
         eventDate: form.eventDate,
+        endDate: form.endDate,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        dateUndecided: form.dateUndecided,
+        showOnTimeline: form.showOnTimeline,
+        timelineStatus: form.timelineStatus,
+        timelineTerm: selectedTerm(form),
+        dateLabel: form.dateLabel.trim(),
         image: form.image,
       })
       // The record exists from here on, so it is listed and the form cleared whatever happens
@@ -106,7 +124,10 @@ export default function AdminActivities() {
           attachmentError = err.message || '첨부를 올리지 못했습니다.'
         }
         // Re-fetch the list so the new media counts are reflected.
-        const refreshed = await listClubActivities().catch(() => null)
+        const refreshed = await listClubActivities().catch((err) => {
+          showToast({ message: err.message || '첨부 후 활동 목록을 새로고침하지 못했습니다.', tone: 'error' })
+          return null
+        })
         if (Array.isArray(refreshed)) setItems(refreshed)
       }
       if (attachmentError) {
@@ -117,7 +138,7 @@ export default function AdminActivities() {
       formEl.reset()
       if (imageInputRef.current) imageInputRef.current.value = ''
       if (filesInputRef.current) filesInputRef.current.value = ''
-      setForm((prev) => ({ ...prev, title: '', description: '', eventDate: '', image: null, images: [], files: [] }))
+      setForm((prev) => ({ ...prev, title: '', description: '', eventDate: '', endDate: '', startTime: '', endTime: '', dateUndecided: false, showOnTimeline: false, timelineStatus: '', timelineTerm: '', dateLabel: '', image: null, images: [], files: [] }))
     } catch (err) {
       setError(err.message || '활동 기록 등록 중 오류가 발생했습니다.')
     } finally {
@@ -150,7 +171,7 @@ export default function AdminActivities() {
 
       <form onSubmit={submit} className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold text-[var(--theme-body-dark)]">활동 기록 등록</h2><Link to="/activity-log" className="text-sm font-semibold text-[var(--app-accent-text)] underline">사진과 서식을 쓰는 활동 글쓰기</Link></div>
-        <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">회원에게만 보이는 실제 활동 기록과 일정을 등록합니다. 사진 여러 장과 파일 첨부를 함께 올릴 수 있습니다.</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">활동과 일정을 등록합니다. 타임라인에 표시하면 방문자에게 제목·내용·날짜가 공개됩니다.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
             활동 제목
@@ -167,9 +188,23 @@ export default function AdminActivities() {
               type="date"
               value={form.eventDate}
               onChange={(event) => setForm((prev) => ({ ...prev, eventDate: event.target.value }))}
+              disabled={form.dateUndecided}
               className={inputClass}
             />
           </label>
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+            종료일 (선택)
+            <input type="date" value={form.endDate} min={form.eventDate || undefined} disabled={form.dateUndecided} onChange={(event) => setForm((prev) => ({ ...prev, endDate: event.target.value }))} className={inputClass} />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+            시작 시각 (선택)
+            <input type="time" value={form.startTime} disabled={form.dateUndecided} onChange={(event) => setForm((prev) => ({ ...prev, startTime: event.target.value }))} className={inputClass} />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+            종료 시각 (선택)
+            <input type="time" value={form.endTime} disabled={form.dateUndecided} onChange={(event) => setForm((prev) => ({ ...prev, endTime: event.target.value }))} className={inputClass} />
+          </label>
+          <ActivityTimelineFields value={form} onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))} />
           <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
             활동 종류
             <select
@@ -247,7 +282,7 @@ export default function AdminActivities() {
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <button
             type="submit"
-            disabled={saving || !form.title.trim() || !form.eventDate}
+            disabled={saving || !form.title.trim() || (!form.dateUndecided && !form.eventDate) || (!!form.endDate && form.endDate < form.eventDate)}
             className="shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50"
           >
             {saving ? '등록 중...' : '활동 등록'}

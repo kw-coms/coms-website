@@ -7,6 +7,8 @@ import {
   uploadClubActivityFile,
   uploadClubActivityImages,
 } from '../../services/clubActivityApi'
+import { ActivityTimelineFields } from './ActivityTimelineFields'
+import { selectedTerm } from './activityTimelineForm'
 
 const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
@@ -17,8 +19,15 @@ type ActivityItem = {
   categoryName?: string
   title?: string
   description?: string
-  eventDate?: string
-  endDate?: string
+  eventDate?: string | null
+  endDate?: string | null
+  startTime?: string | null
+  endTime?: string | null
+  timelineStatus?: string | null
+  resolvedStatus?: string | null
+  showOnTimeline?: boolean
+  timelineTerm?: string | null
+  dateLabel?: string | null
   kind?: string
   imageInfos?: MediaInfo[]
   fileInfos?: MediaInfo[]
@@ -31,6 +40,25 @@ function multiDayEndDate(item: ActivityItem) {
   return item.endDate && item.endDate !== item.eventDate ? item.endDate : ''
 }
 
+const statusNames: Record<string, string> = { PLANNED: '예정', CONFIRMED: '확정', LIVE: '진행 중', DONE: '완료' }
+
+function draftFor(item: ActivityItem) {
+  return {
+    category: item.category,
+    title: item.title || '',
+    description: item.description || '',
+    eventDate: item.eventDate || '',
+    endDate: multiDayEndDate(item),
+    startTime: item.startTime || '',
+    endTime: item.endTime || '',
+    dateUndecided: !item.eventDate,
+    showOnTimeline: !!item.showOnTimeline,
+    timelineStatus: item.timelineStatus || '',
+    timelineTerm: item.timelineTerm || '',
+    dateLabel: item.dateLabel || '',
+  }
+}
+
 export default function AdminActivityRow({ item, categories, onDelete, onUpdated }: {
   item: ActivityItem
   categories: { key?: string; name: string }[]
@@ -40,31 +68,19 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [rowError, setRowError] = useState('')
-  const [draft, setDraft] = useState({
-    category: item.category,
-    title: item.title,
-    description: item.description || '',
-    eventDate: item.eventDate || '',
-    endDate: multiDayEndDate(item),
-  })
+  const [draft, setDraft] = useState(() => draftFor(item))
   const imageInputRef = useRef(null)
   const fileInputRef = useRef(null)
 
   const startEdit = () => {
-    setDraft({
-      category: item.category,
-      title: item.title,
-      description: item.description || '',
-      eventDate: item.eventDate || '',
-      endDate: multiDayEndDate(item),
-    })
+    setDraft(draftFor(item))
     setRowError('')
     setEditing(true)
   }
 
   const saveEdit = async () => {
-    if (!draft.title.trim() || !draft.eventDate) return
-    if (draft.endDate && draft.endDate < draft.eventDate) {
+    if (!draft.title.trim() || (!draft.dateUndecided && !draft.eventDate)) return
+    if (!draft.dateUndecided && draft.endDate && draft.endDate < draft.eventDate) {
       setRowError('종료일은 활동 날짜와 같거나 이후여야 합니다.')
       return
     }
@@ -75,10 +91,17 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
         category: draft.category,
         title: draft.title.trim(),
         description: draft.description,
-        eventDate: draft.eventDate,
+        eventDate: draft.dateUndecided ? undefined : draft.eventDate,
         // Always sent: the server resets endDate to eventDate when a PATCH carries only
         // eventDate, which collapsed a multi-day schedule to one day on any edit here.
-        endDate: draft.endDate || draft.eventDate,
+        endDate: draft.dateUndecided ? undefined : (draft.endDate || draft.eventDate),
+        startTime: draft.startTime,
+        endTime: draft.endTime,
+        dateUndecided: draft.dateUndecided,
+        showOnTimeline: draft.showOnTimeline,
+        timelineStatus: draft.timelineStatus,
+        timelineTerm: selectedTerm(draft),
+        dateLabel: draft.dateLabel.trim(),
       })
       onUpdated(updated)
       setEditing(false)
@@ -162,11 +185,12 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
         <div className="min-w-0">
           <p className="font-semibold text-[var(--theme-body-dark)]">{item.title}</p>
           <p className="text-xs text-[var(--theme-body-muted)]">
-            {item.kind === 'SCHEDULE' ? '일정' : '활동'} · {categoryName} · {item.eventDate}
+            {item.kind === 'SCHEDULE' ? '일정' : '활동'} · {categoryName} · {item.dateLabel || item.eventDate || '날짜 미정'}
             {multiDayEndDate(item) && ` ~ ${item.endDate}`}
             {(item.imageInfos?.length ?? 0) > 0 && ` · 사진 ${item.imageInfos.length}장`}
             {(item.fileInfos?.length ?? 0) > 0 && ` · 첨부 ${item.fileInfos.length}개`}
           </p>
+          <span className="mt-1 inline-block rounded border border-[var(--app-hairline)] px-2 py-0.5 text-xs font-semibold">{statusNames[item.resolvedStatus || ''] || '상태 확인 중'}{item.showOnTimeline ? ' · 타임라인 표시' : ''}</span>
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <button
@@ -203,6 +227,7 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
               type="date"
               value={draft.eventDate}
               onChange={(event) => setDraft((prev) => ({ ...prev, eventDate: event.target.value }))}
+              disabled={draft.dateUndecided}
               className={ADMIN_INPUT_CLASS}
             />
           </label>
@@ -213,9 +238,19 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
               value={draft.endDate}
               min={draft.eventDate || undefined}
               onChange={(event) => setDraft((prev) => ({ ...prev, endDate: event.target.value }))}
+              disabled={draft.dateUndecided}
               className={ADMIN_INPUT_CLASS}
             />
           </label>
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+            시작 시각 (선택)
+            <input type="time" value={draft.startTime} disabled={draft.dateUndecided} onChange={(event) => setDraft((prev) => ({ ...prev, startTime: event.target.value }))} className={ADMIN_INPUT_CLASS} />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+            종료 시각 (선택)
+            <input type="time" value={draft.endTime} disabled={draft.dateUndecided} onChange={(event) => setDraft((prev) => ({ ...prev, endTime: event.target.value }))} className={ADMIN_INPUT_CLASS} />
+          </label>
+          <ActivityTimelineFields value={draft} onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))} />
           <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
             활동 분류
             <select
@@ -303,7 +338,7 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
             <button
               type="button"
               onClick={saveEdit}
-              disabled={busy || !draft.title.trim() || !draft.eventDate}
+              disabled={busy || !draft.title.trim() || (!draft.dateUndecided && !draft.eventDate) || (!!draft.endDate && draft.endDate < draft.eventDate)}
               className="shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50"
             >
               {busy ? '저장 중...' : '변경 저장'}
