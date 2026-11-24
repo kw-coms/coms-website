@@ -20,7 +20,10 @@ const writes = []
 let permissionRefreshes = 0
 globalThis.fetch = async (url, options = {}) => {
   const path = String(url)
-  if (path === '/api/admin/permissions') return Response.json(matrix)
+  if (path === '/api/admin/permissions') {
+    if (options.method === 'PUT') matrix.allowed = JSON.parse(options.body).allowed
+    return Response.json(matrix)
+  }
   if (path === '/api/admin/permissions/overrides') return Response.json(
     Object.keys(overrides.get(member.studentId) || {}).length
       ? [{ ...member, overrides: overrides.get(member.studentId) }] : []
@@ -68,6 +71,17 @@ await act(async () => { save.click() })
 await flush()
 assert.deepEqual(writes[1], { studentId: member.studentId, body: { overrides: {} } }, '기본 removes the override')
 assert.equal(permissionRefreshes, 2)
+
+// Saving role defaults updates the selected member's baseline without losing their draft.
+await act(async () => { effect.value = 'REVOKE'; effect.dispatchEvent(new window.Event('change', { bubbles: true })) })
+const roleToggle = host.querySelector('input[aria-label="회원 — 공개 범위"]')
+await act(async () => { roleToggle.click() })
+const saveRoles = [...host.querySelectorAll('button')].find(button => button.textContent === '저장')
+await act(async () => { saveRoles.click() })
+await flush()
+assert.match(host.textContent, /직급 기본: 허용/)
+assert.equal(effect.value, 'REVOKE', 'an unsaved member override survives a role-matrix save')
+assert.equal(save.disabled, false)
 
 const search = host.querySelector('input[aria-label="개인별 권한 회원 검색"]')
 await act(async () => {

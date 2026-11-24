@@ -210,13 +210,14 @@ export default function AdminPermissions() {
         {dirty && <span className="text-xs text-[var(--theme-body-muted)]">저장하지 않은 변경이 있습니다.</span>}
       </div>
       </div>
-      <MemberPermissions permissions={matrix.permissions} refreshPermissions={refreshPermissions} />
+      <MemberPermissions permissions={matrix.permissions} roleGrants={matrix.allowed} refreshPermissions={refreshPermissions} />
     </section>
   )
 }
 
-function MemberPermissions({ permissions, refreshPermissions }: {
+function MemberPermissions({ permissions, roleGrants, refreshPermissions }: {
   permissions: PermissionDescriptor[]
+  roleGrants: Allowed
   refreshPermissions: () => void
 }) {
   const [query, setQuery] = useState('')
@@ -356,7 +357,7 @@ function MemberPermissions({ permissions, refreshPermissions }: {
           </div>
           <div className="space-y-2">
             {permissions.map((permission) => {
-              const base = detail.rolePermissions.includes(permission.key)
+              const base = detail.role === 'ADMIN' || (roleGrants[detail.role] || []).includes(permission.key)
               const effect = draft[permission.key] || ''
               return <div key={permission.key} className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--app-hairline)] py-2">
                 <div className="min-w-0">

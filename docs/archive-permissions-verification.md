@@ -73,6 +73,8 @@ Only the role matrix is cached. Individual overrides are not cached in the servi
 
 The backend matrix covers PUBLIC/MEMBERS/OFFICERS/SELECTED for guest, ASSOCIATE, USER, OFFICER, VICE_PRESIDENT, selected member, uploader and ADMIN on list/detail/download/inline/attachment/mobile/vote paths. Rich-media inline/download use the same full matrix. Guest writes remain 401. Tests also cover member override GRANT/REVOKE/reset, non-ADMIN 403, next-request behavior with the same token, audit rows, and ADMIN immunity.
 
+The final individual-permission UI regression also verifies that saving the role matrix updates the selected member's role-derived labels immediately while preserving an unsaved override draft.
+
 Frontend checks cover all filter/sort modes and secondary attachments; fail-closed permissions; account switch/logout and delayed old responses; selected-recipient serialization; individual permission controls; owner/permission buttons; mobile overflow and 44px actions; guest navigation; upload retry; initial-load blocking; and concurrent edit/upload state preservation.
 
 Independent security review found and repaired stale-row privacy overwrites, retained private state after logout, and visibility-editor permission mismatches. Existing shared helpers and design tokens were reused; duplicate size formatting and actor-less read overloads were removed.
