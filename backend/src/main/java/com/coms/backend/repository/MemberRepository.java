@@ -15,9 +15,9 @@ import java.util.Optional;
 
 public interface MemberRepository extends JpaRepository<Member, Long> {
     @Query("select m from Member m where "
-            + "(:search is null or lower(m.name) like :search or m.studentId like :search "
-            + "or lower(m.email) like :search or lower(m.department) like :search "
-            + "or m.phone like :search or m.generation like :search) "
+            + "(:search is null or lower(m.name) like :search escape '!' or m.studentId like :search escape '!' "
+            + "or lower(m.email) like :search escape '!' or lower(m.department) like :search escape '!' "
+            + "or m.phone like :search escape '!' or m.generation like :search escape '!') "
             + "and (:role is null or m.role = :role) "
             + "and (:verified is null or m.emailVerified = :verified)")
     Page<Member> searchAdminMembers(@Param("search") String search,

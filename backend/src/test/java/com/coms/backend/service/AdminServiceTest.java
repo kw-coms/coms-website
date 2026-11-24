@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.EligibleMember;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.AdminMemberCreateRequest;
+import com.coms.backend.dto.LoginAuditResponse;
 import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.repository.ArchiveFileVoteRepository;
 import com.coms.backend.repository.ClubActivityVoteRepository;
@@ -118,6 +119,36 @@ class AdminServiceTest {
                 .getContent()).extracting(MemberResponse::studentId).containsExactly("2026000003");
         assertThat(realAdminService.listMembers(0, 20, "b@example.com", null, null)
                 .getContent()).extracting(MemberResponse::studentId).containsExactly("2026000002");
+    }
+
+    @Test
+    void memberSearchMatchesGenerationSuffixAndTreatsWildcardsLiterally() {
+        Member gen12 = existingMember("2026000001", "김가람", "a@example.com");
+        gen12.setGeneration("12");
+        realMemberRepository.save(gen12);
+        realMemberRepository.save(existingMember("2026000002", "김나래", "b@example.com"));
+        Member underscore = existingMember("2026000003", "박_다솜", "c@example.com");
+        realMemberRepository.save(underscore);
+
+        assertThat(realAdminService.listMembers(0, 20, "12기", null, null).getContent())
+                .extracting(MemberResponse::studentId).containsExactly("2026000001");
+        assertThat(realAdminService.listMembers(0, 20, "%", null, null).getContent()).isEmpty();
+        assertThat(realAdminService.listMembers(0, 20, "_", null, null).getContent())
+                .extracting(MemberResponse::studentId).containsExactly("2026000003");
+        assertThat(realAdminService.listMembers(0, 20, "박_다", null, null).getContent()).hasSize(1);
+    }
+
+    @Test
+    void loginAuditUnpagedSizeReturnsEveryLoggedInMember() {
+        Member a = existingMember("2026000001", "김가람", "a@example.com");
+        a.setLastLoginAt(LocalDateTime.of(2026, 1, 1, 9, 0));
+        realMemberRepository.save(a);
+        Member b = existingMember("2026000002", "김나래", "b@example.com");
+        b.setLastLoginAt(LocalDateTime.of(2026, 1, 2, 9, 0));
+        realMemberRepository.save(b);
+
+        assertThat(realAdminService.listLoginAudit(0, Integer.MAX_VALUE).getContent())
+                .extracting(LoginAuditResponse::studentId).containsExactly("2026000002", "2026000001");
     }
 
     @Test

@@ -226,6 +226,10 @@ public class AdminController {
     @GetMapping("/login-audit")
     public ResponseEntity<List<LoginAuditResponse>> loginAudit(@RequestParam(required = false) Integer page,
                                                                @RequestParam(required = false) Integer size) {
+        if (page == null && size == null) {
+            // Legacy contract: no paging params returns the full list as a bare array.
+            return ResponseEntity.ok(adminService.listLoginAudit(0, Integer.MAX_VALUE).getContent());
+        }
         ListPagination.Resolved resolved = ListPagination.resolve(page, size);
         var result = adminService.listLoginAudit(resolved.page(), resolved.size());
         return ListPagination.paginated(result.getContent(), result.getTotalElements());

@@ -126,10 +126,17 @@ public class AdminService {
             case "UNVERIFIED" -> false;
             default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바른 인증 상태를 선택해주세요.");
         };
-        String normalizedSearch = search == null || search.isBlank() ? null
-                : "%" + search.trim().toLowerCase(Locale.ROOT) + "%";
+        String normalizedSearch = likePattern(search);
         return memberRepository.searchAdminMembers(normalizedSearch, selectedRole, verified,
                 PageRequest.of(page, size, Sort.by("id"))).map(this::toResponse);
+    }
+
+    /** "12기" matches generation 12; %, _ and the escape char match literally (query uses escape '!'). */
+    private static String likePattern(String search) {
+        if (search == null || search.isBlank()) return null;
+        String term = search.trim().toLowerCase(Locale.ROOT);
+        if (term.length() > 1 && term.endsWith("기")) term = term.substring(0, term.length() - 1).trim();
+        return "%" + term.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
     }
 
     public MemberResponse createMember(AdminMemberCreateRequest request) {
