@@ -88,21 +88,21 @@ class ArchiveVisibilityIntegrationTest {
                 ArchiveFile.Visibility.OFFICERS, officersId,
                 ArchiveFile.Visibility.SELECTED, selectedId
         );
+        Map<Long, Long> attachmentIds = archiveService.list(ids.get(Member.Role.ADMIN)).stream()
+                .collect(java.util.stream.Collectors.toMap(file -> file.id(), file -> file.attachments().get(0).id()));
         for (Viewer viewer : viewers) {
             JsonNode list = body(get("/api/files"), viewer.id());
             for (var entry : rows.entrySet()) {
                 boolean allowed = viewer.visible().contains(entry.getKey());
                 assertThat(list.toString().contains("\"id\":" + entry.getValue() + ","))
                         .as("list %s %s", viewer.id(), entry.getKey()).isEqualTo(allowed);
-                for (String path : List.of("/api/files/%d", "/api/files/%d/download", "/api/files/%d/inline")) {
+                for (String path : List.of("/api/files/%d", "/api/files/%d/download", "/api/files/%d/inline",
+                        "/api/files/%d/attachments/" + attachmentIds.get(entry.getValue()) + "/download")) {
                     assertThat(status(get(path.formatted(entry.getValue())), viewer.id()))
                             .as("%s %s %s", viewer.id(), entry.getKey(), path)
                             .isEqualTo(allowed ? 200 : 404);
                 }
             }
-            assertThat(status(get("/api/files/%d/attachments/%d/download".formatted(selectedId, attachmentId)), viewer.id()))
-                    .as("attachment %s", viewer.id())
-                    .isEqualTo(viewer.visible().contains(ArchiveFile.Visibility.SELECTED) ? 200 : 404);
             if (viewer.id() != null) {
                 JsonNode mobile = body(get("/api/mobile/v1/home"), viewer.id());
                 for (var entry : rows.entrySet()) {
@@ -113,6 +113,12 @@ class ArchiveVisibilityIntegrationTest {
                             .contentType(MediaType.APPLICATION_JSON).content("{\"value\":1}"), viewer.id()))
                             .as("vote %s %s", viewer.id(), entry.getKey())
                             .isEqualTo(viewer.visible().contains(entry.getKey()) ? 200 : 404);
+                }
+            } else {
+                assertThat(status(get("/api/mobile/v1/home"), null)).isEqualTo(401);
+                for (Long id : rows.values()) {
+                    assertThat(status(post("/api/files/%d/vote".formatted(id))
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"value\":1}"), null)).isEqualTo(401);
                 }
             }
         }
