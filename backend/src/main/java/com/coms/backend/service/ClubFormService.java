@@ -59,7 +59,13 @@ public class ClubFormService {
 
     @Transactional
     public Form save(Long id, Write request) {
+        return save(id, request, false);
+    }
+
+    @Transactional
+    public Form save(Long id, Write request, boolean studyOnly) {
         if (request == null || request.category() == null) throw invalid("접수 종류를 선택해 주세요.");
+        if (studyOnly && request.category() != Category.STUDY) throw studyForbidden();
         Long eventId = request.hackathonEventId();
         if (eventId != null && (request.category() != Category.HACKATHON || !events.existsById(eventId)))
             throw invalid("연결할 해커톤을 다시 선택해 주세요.");
@@ -76,6 +82,7 @@ public class ClubFormService {
         }
 
         Form current = require(id, true);
+        if (studyOnly && current.category() != Category.STUDY) throw studyForbidden();
         if (request.version() == null || current.version() != request.version())
             throw conflict("접수 양식이 변경되었습니다. 새로고침한 뒤 다시 시도해 주세요.");
         if (count(id) > 0 && (!current.questions().equals(fields) || current.category() != request.category()
@@ -92,7 +99,13 @@ public class ClubFormService {
 
     @Transactional
     public void delete(Long id) {
-        require(id, true);
+        delete(id, false);
+    }
+
+    @Transactional
+    public void delete(Long id, boolean studyOnly) {
+        Form form = require(id, true);
+        if (studyOnly && form.category() != Category.STUDY) throw studyForbidden();
         if (count(id) > 0) throw conflict("응답을 받은 양식은 접수를 닫아 보관해 주세요.");
         jdbc.sql("DELETE FROM club_forms WHERE id = :id").param("id", id).update();
     }
@@ -161,7 +174,13 @@ public class ClubFormService {
 
     @Transactional(readOnly = true)
     public Responses responses(Long id, int page) {
-        require(id, false);
+        return responses(id, page, false);
+    }
+
+    @Transactional(readOnly = true)
+    public Responses responses(Long id, int page, boolean studyOnly) {
+        Form form = require(id, false);
+        if (studyOnly && form.category() != Category.STUDY) throw studyForbidden();
         if (page < 0 || page > 100_000) throw invalid("페이지 번호를 확인해 주세요.");
         List<ResponseRow> rows = jdbc.sql("""
                 SELECT m.name, m.student_id, r.answers_json, r.submitted_at
@@ -172,6 +191,40 @@ public class ClubFormService {
                 .query((rs, row) -> new ResponseRow(rs.getString("name"), rs.getString("student_id"),
                         decode(rs.getString("answers_json"), ANSWERS), rs.getObject("submitted_at", OffsetDateTime.class).toInstant())).list();
         return new Responses(rows, page, count(id));
+    }
+
+    @Transactional(readOnly = true)
+    public Aggregates aggregates(Long id) {
+        return aggregates(id, false);
+    }
+
+    @Transactional(readOnly = true)
+    public Aggregates aggregates(Long id, boolean studyOnly) {
+        Form form = require(id, false);
+        if (studyOnly && form.category() != Category.STUDY) throw studyForbidden();
+        List<ResponseRow> rows = jdbc.sql("""
+                SELECT m.name, m.student_id, r.answers_json, r.submitted_at
+                FROM club_form_responses r JOIN members m ON r.member_id = m.id
+                WHERE r.form_id = :id ORDER BY r.submitted_at DESC, r.member_id DESC
+                """).param("id", id).query((rs, row) -> new ResponseRow(
+                rs.getString("name"), rs.getString("student_id"),
+                decode(rs.getString("answers_json"), ANSWERS),
+                rs.getObject("submitted_at", OffsetDateTime.class).toInstant())).list();
+        List<QuestionAggregate> questions = form.questions().stream().map(question -> {
+            if (question.kind() == Kind.SINGLE || question.kind() == Kind.MULTIPLE) {
+                Map<String, Long> counts = new LinkedHashMap<>();
+                question.options().forEach(option -> counts.put(option, 0L));
+                rows.forEach(row -> row.answers().getOrDefault(question.id(), List.of())
+                        .forEach(answer -> counts.computeIfPresent(answer, (key, count) -> count + 1)));
+                return new QuestionAggregate(question.id(), question.label(), question.kind(), counts, List.of());
+            }
+            List<TextAnswer> answers = rows.stream()
+                    .filter(row -> !row.answers().getOrDefault(question.id(), List.of()).isEmpty())
+                    .map(row -> new TextAnswer(row.name(), row.studentId(), row.answers().get(question.id()).getFirst()))
+                    .toList();
+            return new QuestionAggregate(question.id(), question.label(), question.kind(), Map.of(), answers);
+        }).toList();
+        return new Aggregates(id, rows.size(), questions);
     }
 
     private OwnResponse ownResponse(Long formId, long memberId) {
@@ -280,4 +333,5 @@ public class ClubFormService {
     private static ResponseStatusException invalid(String message) { return new ResponseStatusException(HttpStatus.BAD_REQUEST, message); }
     private static ResponseStatusException conflict(String message) { return new ResponseStatusException(HttpStatus.CONFLICT, message); }
     private static ResponseStatusException notFound() { return new ResponseStatusException(HttpStatus.NOT_FOUND, "접수 양식을 찾을 수 없습니다."); }
+    private static ResponseStatusException studyForbidden() { return new ResponseStatusException(HttpStatus.FORBIDDEN, "스터디 설문 관리 권한이 없습니다."); }
 }

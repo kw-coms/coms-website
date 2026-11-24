@@ -196,7 +196,7 @@ export default function Admin({ onBack }: { onBack: () => void }) {
             {canManageContent(permissions) && resolvedActiveTab === 'activities' && <AdminActivities />}
             {canManageContent(permissions) && resolvedActiveTab === 'external-opportunities' && <AdminExternalOpportunities />}
             {canManageProjects(permissions) && resolvedActiveTab === 'projects' && <AdminAppCatalog />}
-            {isSensitiveAdmin && resolvedActiveTab === 'club-forms' && <AdminClubForms />}
+            {(isSensitiveAdmin || canManageContent(permissions)) && resolvedActiveTab === 'club-forms' && <AdminClubForms />}
             {isSensitiveAdmin && resolvedActiveTab === 'hackathon' && <AdminHackathon />}
             {isSensitiveAdmin && resolvedActiveTab === 'team-projects' && <AdminTeamProjects />}
             {isSensitiveAdmin && resolvedActiveTab === 'club-officers' && <AdminClubOfficers />}

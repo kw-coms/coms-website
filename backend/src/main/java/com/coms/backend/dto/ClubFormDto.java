@@ -10,7 +10,7 @@ import java.util.Map;
 public final class ClubFormDto {
     private ClubFormDto() {}
 
-    public enum Category { HACKATHON, TEAM_PROJECT, OTHER }
+    public enum Category { HACKATHON, TEAM_PROJECT, OTHER, STUDY }
     public enum Kind { SHORT, LONG, SINGLE, MULTIPLE }
 
     @Schema(name = "ClubFormQuestion")
@@ -38,4 +38,10 @@ public final class ClubFormDto {
     public record ResponseRow(String name, String studentId, Map<String, List<String>> answers, Instant submittedAt) {}
     @Schema(name = "ClubFormResponses")
     public record Responses(List<ResponseRow> items, int page, long total) {}
+    @Schema(name = "ClubFormTextAnswer")
+    public record TextAnswer(String name, String studentId, String value) {}
+    @Schema(name = "ClubFormQuestionAggregate")
+    public record QuestionAggregate(String id, String label, Kind kind, Map<String, Long> counts, List<TextAnswer> answers) {}
+    @Schema(name = "ClubFormAggregates")
+    public record Aggregates(Long formId, long total, List<QuestionAggregate> questions) {}
 }

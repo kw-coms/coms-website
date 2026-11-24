@@ -1,6 +1,6 @@
 import { request, requestNoContent } from './apiClient'
 
-export const FORM_CATEGORIES = { HACKATHON: '해커톤', TEAM_PROJECT: '팀 프로젝트', OTHER: '동아리 활동' }
+export const FORM_CATEGORIES = { HACKATHON: '해커톤', TEAM_PROJECT: '팀 프로젝트', OTHER: '동아리 활동', STUDY: '스터디 수요조사' }
 export const QUESTION_KINDS = { SHORT: '짧은 답변', LONG: '긴 답변', SINGLE: '하나 선택', MULTIPLE: '여러 개 선택' }
 export type FormCategory = keyof typeof FORM_CATEGORIES
 export type QuestionKind = keyof typeof QUESTION_KINDS
@@ -13,6 +13,7 @@ type OwnResponse = { answers: Answers; submittedAt: string }
 type FormView = { form: ClubForm; response: OwnResponse | null }
 type ResponseRow = OwnResponse & { name: string; studentId: string }
 type Responses = { items: ResponseRow[]; page: number; total: number }
+export type ClubFormAggregates = { formId: number; total: number; questions: Array<{ id: string; label: string; kind: QuestionKind; counts: Record<string, number>; answers: Array<{ name: string; studentId: string; value: string }> }> }
 
 const path = '/api/club-forms'
 const admin = '/api/admin/club-forms'
@@ -25,6 +26,7 @@ export const saveClubForm = (id: number | undefined, form: ClubFormWrite): Promi
   request(id === undefined ? admin : admin + '/' + id, { method: id === undefined ? 'POST' : 'PUT', body: JSON.stringify(form) })
 export const deleteClubForm = (id: number): Promise<void> => requestNoContent(admin + '/' + id, { method: 'DELETE' })
 export const listClubFormResponses = (id: number, page: number): Promise<Responses> => request(admin + '/' + id + '/responses?page=' + page)
+export const getClubFormAggregates = (id: number): Promise<ClubFormAggregates> => request(admin + '/' + id + '/aggregates')
 
 export function isFormCategory(value: string | null): value is FormCategory {
   return value !== null && Object.hasOwn(FORM_CATEGORIES, value)

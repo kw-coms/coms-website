@@ -134,6 +134,11 @@ assert.equal(canManageContent(of('ASSOCIATE')), false)
 assert.equal(canModerateCommunity(of('ASSOCIATE')), false)
 assert.deepEqual(adminTabsForRole('ASSOCIATE', of('ASSOCIATE'), tabs), [])
 
+const studyFormsTab = [{ id: 'club-forms' }]
+assert.deepEqual(adminTabsForRole('USER', [PERMISSIONS.activityWrite], studyFormsTab), studyFormsTab)
+assert.deepEqual(adminTabsForRole('USER', of('USER'), studyFormsTab), [])
+assert.equal(defaultOperationsTab('USER', [PERMISSIONS.activityWrite], 'club-forms'), 'club-forms')
+
 // ---- 회장이 조정한 매트릭스를 그대로 따르는지(기본값이 아니라 서버가 준 집합이 답이다).
 const officerWithModeration = [...of('OFFICER'), PERMISSIONS.communityModerate]
 assert.equal(canModerateCommunity(officerWithModeration), true)
