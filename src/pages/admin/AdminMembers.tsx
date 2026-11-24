@@ -11,12 +11,19 @@ import RoleTag from '../../components/common/RoleTag'
 import { Download } from 'lucide-react'
 import { downloadMembersCsv } from './memberCsv'
 import { ListCount, ListSearch, ListSelect, SortDirectionButton } from '../../components/common/ListTools'
-import { compareNumber, compareRank, compareText, matchesQuery, sortedBy, type SortDirection } from '../../utils/listTools'
+import { compareNumber, compareRank, compareText, sortedBy, type SortDirection } from '../../utils/listTools'
+
+const PAGE_SIZE = 30
 
 const CREATE_MEMBER_ROLES = ['ASSOCIATE', 'USER', 'OFFICER', 'VICE_PRESIDENT']
 const ROLE_FILTER_OPTIONS = [
   { value: 'ALL', label: '전체 역할' },
   ...ASSIGNABLE_ROLES.map((role) => ({ value: role as string, label: ROLE_LABELS[role] })),
+]
+const STATUS_FILTER_OPTIONS = [
+  { value: 'ALL', label: '전체 인증 상태' },
+  { value: 'VERIFIED', label: '이메일 인증' },
+  { value: 'UNVERIFIED', label: '이메일 미인증' },
 ]
 const MEMBER_SORT_OPTIONS = [
   { value: 'default', label: '기본 순서' },
@@ -48,7 +55,11 @@ function parseInterests(raw) {
 
 
 export default function AdminMembers({ currentUser }: { currentUser: { studentId?: string } }) {
-  const { members, loading, error, refetch, addMember, updateRole, updateGeneration, removeMember, resetPassword } = useAdminMembers()
+  const [page, setPage] = useState(0)
+  const [query, setQuery] = useState('')
+  const [roleFilter, setRoleFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const { members, total, loading, fetching, error, refetch, addMember, updateRole, updateGeneration, removeMember, resetPassword } = useAdminMembers({ page, size: PAGE_SIZE, search: query, role: roleFilter, status: statusFilter })
   const [expanded, setExpanded] = useState(null)
   // The roster (명부), to show who is on it. The same list the 명부 인증 tab loads; if it cannot
   // be loaded the mark is simply left out.
@@ -76,24 +87,17 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
   const [createError, setCreateError] = useState('')
   const [creating, setCreating] = useState(false)
   const createSubmitInFlightRef = useRef(false)
-  const [query, setQuery] = useState('')
-  const [roleFilter, setRoleFilter] = useState('ALL')
   const [sortKey, setSortKey] = useState('default')
   const [direction, setDirection] = useState<SortDirection>('asc')
 
-  // What the list shows: narrowed by the search and the role, then ordered. "기본 순서" is the
-  // order the server sent.
+  // Search and filters are applied by the server before pagination; sort only orders this page.
   const visibleMembers = useMemo(() => {
-    const narrowed = members.filter((member) => (
-      (roleFilter === 'ALL' || (member.role || 'USER') === roleFilter)
-      && matchesQuery(query, [member.name, member.studentId, member.email, member.department, member.phone, member.generation && `${member.generation}기`])
-    ))
-    if (sortKey === 'name') return sortedBy(narrowed, (a, b) => compareText(a.name, b.name, direction))
-    if (sortKey === 'studentId') return sortedBy(narrowed, (a, b) => compareText(a.studentId, b.studentId, direction))
-    if (sortKey === 'generation') return sortedBy(narrowed, (a, b) => compareNumber(a.generation, b.generation, direction))
-    if (sortKey === 'role') return sortedBy(narrowed, (a, b) => compareRank(a.role || 'USER', b.role || 'USER', ASSIGNABLE_ROLES, direction))
-    return narrowed
-  }, [members, query, roleFilter, sortKey, direction])
+    if (sortKey === 'name') return sortedBy(members, (a, b) => compareText(a.name, b.name, direction))
+    if (sortKey === 'studentId') return sortedBy(members, (a, b) => compareText(a.studentId, b.studentId, direction))
+    if (sortKey === 'generation') return sortedBy(members, (a, b) => compareNumber(a.generation, b.generation, direction))
+    if (sortKey === 'role') return sortedBy(members, (a, b) => compareRank(a.role || 'USER', b.role || 'USER', ASSIGNABLE_ROLES, direction))
+    return members
+  }, [members, sortKey, direction])
 
   const handleCreateChange = (event) => {
     const { name, value } = event.target
@@ -177,6 +181,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
     if (!(await confirmDialog({ message: `${member.name} 회원을 삭제하시겠습니까?`, tone: 'danger' }))) return
     try {
       await removeMember(member.id)
+      if (members.length === 1 && page > 0) setPage(page - 1)
     } catch (err) {
       showToast({ message: err.message || '삭제 중 오류가 발생했습니다.', tone: 'error' })
     }
@@ -198,11 +203,11 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
   const handleExport = async () => {
     if (visibleMembers.length === 0) return
     const ok = await confirmDialog({
-      message: `화면에 보이는 회원 ${visibleMembers.length}명의 이름, 학번, 이메일, 전화번호를 CSV 파일로 내려받습니다.\n개인정보이니 필요한 곳에만 쓰고, 쓴 뒤에는 지워 주세요.`,
+      message: `현재 페이지의 회원 ${visibleMembers.length}명의 이름, 학번, 이메일, 전화번호를 CSV 파일로 내려받습니다.\n개인정보이니 필요한 곳에만 쓰고, 쓴 뒤에는 지워 주세요.`,
     })
     if (!ok) return
     downloadMembersCsv(visibleMembers)
-    showToast({ message: `회원 ${visibleMembers.length}명을 CSV로 내려받았습니다.`, tone: 'success' })
+    showToast({ message: `현재 페이지 회원 ${visibleMembers.length}명을 CSV로 내려받았습니다.`, tone: 'success' })
   }
 
   const createMemberPanel = (
@@ -310,14 +315,13 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
   return (
     <div className="space-y-3">
       {createMemberPanel}
-      {members.length === 0 && <p className="text-sm text-[var(--theme-body-muted)]">회원이 없습니다.</p>}
-      {members.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2" role="search" aria-label="회원 목록 찾기">
-          <ListSearch value={query} onChange={setQuery} placeholder="이름, 학번, 이메일, 학과, 전화번호" label="회원 검색" />
-          <ListSelect value={roleFilter} onChange={setRoleFilter} options={ROLE_FILTER_OPTIONS} label="역할로 거르기" />
-          <ListSelect value={sortKey} onChange={setSortKey} options={MEMBER_SORT_OPTIONS} label="정렬 기준" />
+      <div className="flex flex-wrap items-center gap-2" role="search" aria-label="회원 목록 찾기">
+          <ListSearch value={query} onChange={(value) => { setQuery(value); setPage(0) }} placeholder="이름, 학번, 이메일, 학과, 전화번호" label="회원 검색" />
+          <ListSelect value={roleFilter} onChange={(value) => { setRoleFilter(value); setPage(0) }} options={ROLE_FILTER_OPTIONS} label="역할로 거르기" />
+          <ListSelect value={statusFilter} onChange={(value) => { setStatusFilter(value); setPage(0) }} options={STATUS_FILTER_OPTIONS} label="인증 상태로 거르기" />
+          <ListSelect value={sortKey} onChange={setSortKey} options={MEMBER_SORT_OPTIONS} label="현재 페이지 정렬 기준" />
           <SortDirectionButton direction={direction} onChange={setDirection} disabled={sortKey === 'default'} />
-          <ListCount shown={visibleMembers.length} total={members.length} />
+          <ListCount shown={visibleMembers.length} total={total} />
           <button
             type="button"
             onClick={handleExport}
@@ -325,11 +329,11 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
             className="apple-action-secondary inline-flex min-h-10 items-center gap-1.5 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Download size={13} aria-hidden="true" />
-            CSV 내보내기
+            현재 페이지 CSV 내보내기
           </button>
-        </div>
-      )}
-      {members.length > 0 && visibleMembers.length === 0 && (
+      </div>
+      {fetching && <p role="status" className="text-xs text-[var(--theme-body-muted)]">회원 목록을 갱신하는 중...</p>}
+      {visibleMembers.length === 0 && (
         <p className="text-sm text-[var(--theme-body-muted)]">조건에 맞는 회원이 없습니다.</p>
       )}
       {visibleMembers.map((member) => {
@@ -435,6 +439,11 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
           </div>
         )
       })}
+      <div className="flex items-center justify-between gap-3" aria-label="회원 목록 페이지">
+        <button type="button" onClick={() => setPage((current) => current - 1)} disabled={page === 0 || fetching} className="apple-action-secondary px-3 py-2 text-sm disabled:opacity-50">이전</button>
+        <span className="text-sm text-[var(--theme-body-muted)]">{page + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))} 페이지</span>
+        <button type="button" onClick={() => setPage((current) => current + 1)} disabled={(page + 1) * PAGE_SIZE >= total || fetching} className="apple-action-secondary px-3 py-2 text-sm disabled:opacity-50">다음</button>
+      </div>
     </div>
   )
 }

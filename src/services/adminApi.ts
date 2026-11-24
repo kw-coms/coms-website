@@ -1,7 +1,16 @@
-import { request, requestNoContent } from './apiClient'
+import { request, requestNoContent, requestWithTotal } from './apiClient'
 
 export async function listMembers() {
   return request('/api/admin/members')
+}
+
+export async function listMembersPage(page: number, size: number, search: string, role: string, status: string) {
+  const params = new URLSearchParams({ page: String(page), size: String(size) })
+  if (search.trim()) params.set('search', search.trim())
+  if (role !== 'ALL') params.set('role', role)
+  if (status !== 'ALL') params.set('status', status)
+  const result = await requestWithTotal(`/api/admin/members?${params}`)
+  return { members: Array.isArray(result.items) ? result.items : [], total: result.total }
 }
 
 export async function createMember(payload) {

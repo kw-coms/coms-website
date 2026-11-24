@@ -29,6 +29,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.Optional;
 
@@ -96,6 +97,45 @@ class AdminServiceTest {
     void setUp() {
         realMemberRepository.deleteAll();
         realEligibleMemberRepository.deleteAll();
+    }
+
+    @Test
+    void memberSearchFiltersBeforePagingAndKeepsLegacyFullList() {
+        realMemberRepository.save(existingMember("2026000001", "김가람", "a@example.com"));
+        realMemberRepository.save(existingMember("2026000002", "김나래", "b@example.com"));
+        Member unverified = existingMember("2026000003", "김다솜", "c@example.com");
+        unverified.setEmailVerified(false);
+        realMemberRepository.save(unverified);
+        realMemberRepository.save(existingMember("2026000004", "박가람", "d@example.com"));
+
+        assertThat(realAdminService.listMembers()).hasSize(4);
+        var first = realAdminService.listMembers(0, 1, "김", "USER", "VERIFIED");
+        var second = realAdminService.listMembers(1, 1, "김", "USER", "VERIFIED");
+        assertThat(first.getTotalElements()).isEqualTo(2);
+        assertThat(first.getContent()).extracting(MemberResponse::studentId).containsExactly("2026000001");
+        assertThat(second.getContent()).extracting(MemberResponse::studentId).containsExactly("2026000002");
+        assertThat(realAdminService.listMembers(0, 20, "2026000003", null, "UNVERIFIED")
+                .getContent()).extracting(MemberResponse::studentId).containsExactly("2026000003");
+        assertThat(realAdminService.listMembers(0, 20, "b@example.com", null, null)
+                .getContent()).extracting(MemberResponse::studentId).containsExactly("2026000002");
+    }
+
+    @Test
+    void loginAuditReadsOnlyOneDatabasePage() {
+        Member older = existingMember("2026000001", "김가람", "a@example.com");
+        older.setLastLoginAt(LocalDateTime.of(2026, 1, 1, 9, 0));
+        realMemberRepository.save(older);
+        Member newer = existingMember("2026000002", "김나래", "b@example.com");
+        newer.setLastLoginAt(LocalDateTime.of(2026, 1, 2, 9, 0));
+        realMemberRepository.save(newer);
+        realMemberRepository.save(existingMember("2026000003", "김다솜", "c@example.com"));
+
+        var audit = realAdminService.listLoginAudit(0, 1);
+        assertThat(audit.getTotalElements()).isEqualTo(2);
+        assertThat(audit.getContent()).singleElement()
+                .satisfies(row -> assertThat(row.studentId()).isEqualTo("2026000002"));
+        assertThat(realAdminService.listLoginAudit(1, 1).getContent()).singleElement()
+                .satisfies(row -> assertThat(row.studentId()).isEqualTo("2026000001"));
     }
 
     @Test

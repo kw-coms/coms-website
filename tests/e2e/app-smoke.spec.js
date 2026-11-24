@@ -33,7 +33,7 @@ test('archive edit preserves its file and offers explicit author reassignment', 
     file = { ...file, title: multipartField(body, 'title'), description: multipartField(body, 'description') }
     await route.fulfill({ json: file })
   })
-  await page.route('**/api/admin/members', route => route.fulfill({ json: [{ studentId: '2026123456', name: '박채현' }] }))
+  await page.route((url) => url.pathname === '/api/admin/members', route => route.fulfill({ json: [{ studentId: '2026123456', name: '박채현' }] }))
   await page.route('**/api/files/910/author', async route => {
     const body = route.request().postDataJSON()
     authors.push(body)
@@ -333,7 +333,7 @@ test('home section cards lead where they say', async ({ page }) => {
 // here are made up.
 test('admin member list and roster can be searched and ordered', async ({ page }) => {
   await mockAdminApis(page)
-  await page.route('**/api/admin/members', route => route.fulfill({ json: [
+  await page.route((url) => url.pathname === '/api/admin/members', route => route.fulfill({ json: [
     { id: 1, studentId: '2020123456', name: '관리자', email: 'admin@example.com', emailVerified: true, department: '컴퓨터정보공학부', generation: '58', phone: '01000000001', role: 'ADMIN' },
     { id: 2, studentId: '2023000002', name: '홍길동', email: 'hong@example.com', emailVerified: true, department: '소프트웨어학부', generation: '61', phone: '01000000002', role: 'USER' },
     { id: 3, studentId: '2022000003', name: '김철수', email: 'kim@example.com', emailVerified: false, department: '전자공학과', generation: '60', phone: '01000000003', role: 'OFFICER' },
@@ -389,7 +389,7 @@ test('admin member list and roster can be searched and ordered', async ({ page }
 // spreadsheet file after a confirmation. The people here are made up.
 test('admin roster marks who has signed up and the member list exports as CSV', async ({ page }) => {
   await mockAdminApis(page)
-  await page.route('**/api/admin/members', route => route.fulfill({ json: [
+  await page.route((url) => url.pathname === '/api/admin/members', route => route.fulfill({ json: [
     { id: 1, studentId: '2020123456', name: '관리자', email: 'admin@example.com', emailVerified: true, department: '컴퓨터정보공학부', generation: '58', phone: '01000000001', role: 'ADMIN' },
     { id: 2, studentId: '2023000002', name: '홍길동', email: 'hong@example.com', emailVerified: true, department: '소프트웨어학부', generation: '61', phone: '01000000002', role: 'USER' },
     { id: 3, studentId: 'G2019-12', name: '졸업선배', email: 'old@example.com', emailVerified: true, department: '', generation: '41', phone: '', role: 'USER' },
@@ -416,7 +416,7 @@ test('admin roster marks who has signed up and the member list exports as CSV', 
   const tools = page.getByRole('search', { name: '회원 목록 찾기' })
   await tools.getByLabel('회원 검색').fill('example.com')
   await tools.getByLabel('정렬 기준').selectOption('name')
-  const exportButton = tools.getByRole('button', { name: 'CSV 내보내기' })
+  const exportButton = tools.getByRole('button', { name: '현재 페이지 CSV 내보내기' })
 
   // Declining the confirmation downloads nothing.
   await exportButton.click()
@@ -940,7 +940,7 @@ test('president adds a verified member from member management', async ({ page })
   let postedMember = null
   let postCount = 0
 
-  await page.route('**/api/admin/members', async (route) => {
+  await page.route((url) => url.pathname === '/api/admin/members', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({ status: 200, json: members })
       return
@@ -1063,7 +1063,7 @@ test('admin password reset accepts simple temporary passwords without complexity
   let promptMessage
   let resetPayload = null
 
-  await page.route('**/api/admin/members', (route) => route.fulfill({
+  await page.route((url) => url.pathname === '/api/admin/members', (route) => route.fulfill({
     status: 200,
     json: [
       {

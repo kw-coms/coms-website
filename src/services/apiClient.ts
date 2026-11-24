@@ -317,6 +317,16 @@ export async function request(path, options: RequestInit = {}) {
   return data
 }
 
+export async function requestWithTotal(path: string): Promise<{ items: unknown; total: number }> {
+  const fetchOnce = () => fetchOrNetworkError(apiUrl(path), { credentials: 'include' })
+  const generationBeforeRequest = refreshGeneration
+  let response = await fetchOnce()
+  response = await recoverFromAuthFailure(path, response, generationBeforeRequest, fetchOnce)
+  if (!response.ok) await throwApiError(response)
+  const items = await response.json().catch(() => null)
+  return { items, total: Number(response.headers.get('X-Total-Count') ?? (Array.isArray(items) ? items.length : 0)) }
+}
+
 export async function requestNoContent(path, options: RequestInit = {}) {
   const isFormData = options.body instanceof FormData
   const headers = (options.body && !isFormData)

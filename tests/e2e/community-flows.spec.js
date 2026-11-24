@@ -145,7 +145,7 @@ test('admin member management updates member roles in place', async ({ page }) =
   ]
   const rolePayloads = []
 
-  await page.route('**/api/admin/members', (route) => route.fulfill({ status: 200, json: members }))
+  await page.route((url) => url.pathname === '/api/admin/members', (route) => route.fulfill({ status: 200, json: members }))
   await page.route('**/api/admin/members/2/role', async (route) => {
     const payload = route.request().postDataJSON()
     rolePayloads.push(payload)

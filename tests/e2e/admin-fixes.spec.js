@@ -181,7 +181,7 @@ test.describe('operator panel', () => {
 
   test('the member list marks who is on the roster and links to the roster tab and back', async ({ page }) => {
     await mockAdminApis(page)
-    await page.route('**/api/admin/members', (route) => route.fulfill({
+    await page.route((url) => url.pathname === '/api/admin/members', (route) => route.fulfill({
       json: [
         { id: 1, studentId: '2020123456', name: '관리자', email: 'a@example.com', emailVerified: true, role: 'ADMIN' },
         { id: 2, studentId: '2023000002', name: '홍길동', email: 'h@example.com', emailVerified: true, role: 'USER' },

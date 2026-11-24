@@ -4,12 +4,28 @@ import com.coms.backend.domain.Member;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 public interface MemberRepository extends JpaRepository<Member, Long> {
+    @Query("select m from Member m where "
+            + "(:search is null or lower(m.name) like :search or m.studentId like :search "
+            + "or lower(m.email) like :search or lower(m.department) like :search "
+            + "or m.phone like :search or m.generation like :search) "
+            + "and (:role is null or m.role = :role) "
+            + "and (:verified is null or m.emailVerified = :verified)")
+    Page<Member> searchAdminMembers(@Param("search") String search,
+                                    @Param("role") Member.Role role,
+                                    @Param("verified") Boolean verified,
+                                    Pageable pageable);
+
+    Page<Member> findByLastLoginAtNotNull(Pageable pageable);
     Optional<Member> findByStudentId(String studentId);
 
     // Serializes concurrent verification-code confirms so attempt counters can't be

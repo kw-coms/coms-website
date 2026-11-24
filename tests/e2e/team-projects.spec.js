@@ -48,7 +48,7 @@ async function installFakeApi(page) {
   const all = (body, name) => [...body.matchAll(new RegExp(`name="${name}"\\r\\n\\r\\n([\\s\\S]*?)\\r\\n--`, 'g'))].map(match => match[1])
 
   await page.route('**/api/auth/me', route => route.fulfill({ json: USERS[db.me] }))
-  await page.route('**/api/admin/members', route => route.fulfill({ json: PEOPLE }))
+  await page.route((url) => url.pathname === '/api/admin/members', route => route.fulfill({ json: PEOPLE }))
   await page.route(/\/api\/(admin\/)?team-projects(\/.*)?(\?.*)?$/, async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname.replace('/api/admin/team-projects', '/api/team-projects').replace(/^\/api\/team-projects/, '')
