@@ -41,7 +41,8 @@ test.describe('operator panel', () => {
     await mockOfficer(page, ['operations.panel', 'activity.write'])
     await page.goto('/admin')
     const nav = page.getByRole('navigation', { name: '운영 패널 메뉴' })
-    await expect(nav.getByRole('tab')).toHaveText(['활동 관리', '외부 일정'])
+    // activity.write also manages STUDY-category forms (스터디 수요조사), so that tab is permitted too.
+    await expect(nav.getByRole('tab')).toHaveText(['활동 관리', '외부 일정', '신청·수요조사'])
     await expect(nav.getByRole('tablist', { name: '콘텐츠' })).toBeVisible()
     for (const group of ['사람', '사이트', '시스템']) await expect(nav.getByRole('tablist', { name: group })).toHaveCount(0)
     // A forbidden tab in the address falls back to the first permitted one.
