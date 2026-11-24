@@ -59,7 +59,7 @@
 		.activity-board-shell, .activity-board-card, .activity-log-card, .activity-compose-side-card,
 		.club-event-list-card, .club-event-entry-card, .club-event-status-card, .club-event-upload-panel,
 		.hackathon-card, .hackathon-intro, .hackathon-identity, .hackathon-project, .of-card, .tp-card, .coms-error-state,
-		section.shape-cut, .appearance-auth-panel,
+		.appearance-auth-panel,
 		:where(article, section, aside, details, form, div, li, ul).border:is(.rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl)
 	) {
 		--legacy-surface-shadow: var(--appearance-card-frame);
@@ -79,11 +79,11 @@
 		box-shadow: var(--appearance-card-frame);
 	}
 
-	& :is(.appearance-auth-panel, section.shape-cut) {
+	& .appearance-auth-panel {
 		background-color: var(--appearance-card-bg) !important;
 	}
 
-	& :is(.appearance-auth-frame, div.shape-cut:has(> section.shape-cut)) {
+	& .appearance-auth-frame {
 		--legacy-surface-shadow: none;
 		background-color: transparent !important;
 		box-shadow: none !important;
@@ -258,7 +258,7 @@
 :root[data-appearance-theme='retro'] {
 	/* Paint the existing heading rows so the window bars reuse their spacing. */
 	& :is(.study-card-head, .act-card-title, .act-founding-title, .apple-board-hero .page-heading,
-		.appearance-auth-panel .page-heading, section.shape-cut > .page-heading,
+		.appearance-auth-panel .page-heading,
 		.coms-confirm-title, .coms-tour-title, .coms-visual-bar, .coms-ask-header, .nav-col-title, .apple-footer-directory h3,
 		.appearance-popover > :first-child,
 		[role='dialog'] > :is(h1, h2, h3, header)) {
@@ -269,7 +269,7 @@
 	}
 
 	& :is(.study-card-head, .apple-board-hero .page-heading, .appearance-auth-panel .page-heading,
-		section.shape-cut > .page-heading, [role='dialog'] > header) :is(h1, h2, h3, .page-crumb, .study-card-sub) {
+		[role='dialog'] > header) :is(h1, h2, h3, .page-crumb, .study-card-sub) {
 		color: var(--appearance-titlebar-text);
 	}
 
