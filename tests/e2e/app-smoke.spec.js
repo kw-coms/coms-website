@@ -4535,14 +4535,16 @@ test('admin can set and clear one-date recurring schedule exceptions', async ({ 
   await expect.poll(() => exceptionDelete).toBe('/api/admin/recurring-schedules/3/exceptions/2026-07-20')
 })
 
-test('guest visiting notices sees the members-only guide', async ({ page }) => {
+test('guest visiting notices sees public notices and a login prompt', async ({ page }) => {
   const requests = trackRequests(page, /\/api\/notices/)
+  await page.route('**/api/notices', (route) => route.fulfill({ json: [
+    { id: 7, title: '공개 안내', content: '방문객용', category: 'GENERAL', publicVisible: true, createdAt: '2026-11-01T10:00:00' },
+  ] }))
   await page.goto('/notices')
-  const gate = await expectMembersGate(page, '/notices')
-  await expect(gate.getByText('공지, 홍보, 소모임, 취업공고를 한곳에서 볼 수 있어요.')).toBeVisible()
-  await expect(page.getByText('조회수 검증 공지')).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: '공지사항', exact: true })).toHaveCount(0)
-  expect(requests).toEqual([])
+  await expect(page.getByRole('heading', { name: '공지사항', exact: true })).toBeVisible()
+  await expect(page.getByText('공개 안내').filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByRole('link', { name: '로그인', exact: true })).toBeVisible()
+  expect(requests.length).toBeGreaterThan(0)
 })
 
 test('archive highlights repeat-visit search and category controls', async ({ page }) => {

@@ -1,7 +1,12 @@
 package com.coms.backend.controller;
 
+import com.coms.backend.domain.ArchiveFile;
 import com.coms.backend.domain.Member;
+import com.coms.backend.domain.Notice;
+import com.coms.backend.domain.StudyGroup;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.NoticeRepository;
+import com.coms.backend.repository.StudyGroupRepository;
 import com.coms.backend.security.JwtTokenProvider;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +48,8 @@ class RichBodyMediaControllerIntegrationTest {
     @Autowired JwtTokenProvider jwt;
     @Autowired com.coms.backend.repository.RichBodyMediaRepository media;
     @Autowired com.coms.backend.repository.ArchiveFileRepository archives;
+    @Autowired NoticeRepository notices;
+    @Autowired StudyGroupRepository groups;
 
     private Cookie member;
     private Cookie officer;
@@ -121,15 +128,59 @@ class RichBodyMediaControllerIntegrationTest {
                 .andExpect(status().isOk());
     }
 
-    @Test void attachedSponsorMediaIsPublicWhileAttachedNoticeMediaIsHiddenFromAnonymous() throws Exception {
+    @Test void guestNoticeMediaFollowsItsOwnNoticeVisibility() throws Exception {
         long sponsorId = uploadId("sponsor", admin);
-        long noticeId = uploadId("notice", officer);
+        long publicMediaId = uploadId("notice", officer);
+        long privateMediaId = uploadId("notice", officer);
+        var publicNotice = notice(true);
+        var privateNotice = notice(false);
         media.findById(sponsorId).orElseThrow().attach(1L, java.time.LocalDateTime.now());
-        media.findById(noticeId).orElseThrow().attach(2L, java.time.LocalDateTime.now());
+        media.findById(publicMediaId).orElseThrow().attach(publicNotice.getId(), java.time.LocalDateTime.now());
+        media.findById(privateMediaId).orElseThrow().attach(privateNotice.getId(), java.time.LocalDateTime.now());
         mvc.perform(get("/api/rich-media/{id}", sponsorId)).andExpect(status().isOk());
-        mvc.perform(get("/api/rich-media/{id}", noticeId)).andExpect(status().isNotFound());
-        mvc.perform(get("/api/rich-media/{id}", noticeId).cookie(member)).andExpect(status().isOk())
-                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("private")));
+        for (String path : new String[]{"/api/rich-media/{id}", "/api/rich-media/{id}/download"}) {
+            mvc.perform(get(path, publicMediaId)).andExpect(status().isOk())
+                    .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
+            mvc.perform(get(path, privateMediaId)).andExpect(status().isNotFound());
+            mvc.perform(get(path, privateMediaId).cookie(member)).andExpect(status().isOk());
+        }
+        publicNotice.setPublicVisible(false);
+        notices.saveAndFlush(publicNotice);
+        mvc.perform(get("/api/rich-media/{id}", publicMediaId)).andExpect(status().isNotFound());
+    }
+
+    @Test void studyGroupMediaStaysPrivateOnTheSharedPublicNoticeMediaRoutes() throws Exception {
+        var group = new StudyGroup();
+        group.setName("자료 열람 테스트");
+        group.setTerm("2026-2");
+        group.setStatus(StudyGroup.Status.ACTIVE);
+        group.setLeaderStudentId("2026000101");
+        group.setCreatedBy("2026000101");
+        var archive = archive(ArchiveFile.Visibility.GROUP);
+        archive.setStudyGroupId(groups.saveAndFlush(group).getId());
+        archives.saveAndFlush(archive);
+
+        long groupMediaId = uploadId("archive", member);
+        long publicMediaId = uploadId("notice", officer);
+        media.findById(groupMediaId).orElseThrow().attach(archive.getId(), java.time.LocalDateTime.now());
+        media.findById(publicMediaId).orElseThrow().attach(notice(true).getId(), java.time.LocalDateTime.now());
+
+        Cookie nonMember = cookie("2026000114");
+        for (String path : new String[]{"/api/rich-media/{id}", "/api/rich-media/{id}/download"}) {
+            mvc.perform(get(path, publicMediaId)).andExpect(status().isOk());
+            mvc.perform(get(path, groupMediaId)).andExpect(status().isNotFound());
+            mvc.perform(get(path, groupMediaId).cookie(nonMember)).andExpect(status().isNotFound());
+            mvc.perform(get(path, groupMediaId).cookie(member)).andExpect(status().isOk());
+        }
+    }
+
+    private Notice notice(boolean publicVisible) {
+        var notice = new Notice();
+        notice.setTitle("테스트 공지");
+        notice.setContent("본문");
+        notice.setAuthor("운영진");
+        notice.setPublicVisible(publicVisible);
+        return notices.saveAndFlush(notice);
     }
 
     @org.junit.jupiter.params.ParameterizedTest

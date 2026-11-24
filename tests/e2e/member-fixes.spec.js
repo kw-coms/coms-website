@@ -978,7 +978,8 @@ test.describe('review regressions', () => {
         releaseLogout()
         await logoutClick
       }
-      await expectMembersGate(page, editor === 'post' ? '/community' : '/notices')
+      if (editor === 'post') await expectMembersGate(page, '/community')
+      else await expect(page.getByText('공개된 공지만 표시됩니다.')).toBeVisible()
       await expect(page.getByPlaceholder('제목', { exact: true })).toHaveCount(0)
       await expect.poll(() => memberKeys(page, '2020123456')).toEqual([])
       await page.waitForTimeout(3300)

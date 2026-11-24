@@ -56,7 +56,9 @@ public class NoticeService {
 
     @Transactional(readOnly = true)
     public List<NoticeResponse> list(String studentId) {
-        List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc();
+        List<Notice> notices = studentId == null
+                ? repo.findByPublicVisibleTrueOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc()
+                : repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc();
         Map<Long, VoteSummary> stats = voteStats(notices);
         return notices.stream().map(notice -> toResponse(notice, stats, studentId)).toList();
     }
@@ -69,10 +71,13 @@ public class NoticeService {
      */
     @Transactional(readOnly = true)
     public PagedNotices listPaged(String studentId, int page, int size) {
-        List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(
-                org.springframework.data.domain.PageRequest.of(page, size));
+        var pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        List<Notice> notices = studentId == null
+                ? repo.findByPublicVisibleTrueOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(pageable)
+                : repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(pageable);
         Map<Long, VoteSummary> stats = voteStats(notices);
-        return new PagedNotices(notices.stream().map(notice -> toResponse(notice, stats, studentId)).toList(), repo.count());
+        return new PagedNotices(notices.stream().map(notice -> toResponse(notice, stats, studentId)).toList(),
+                studentId == null ? repo.countByPublicVisibleTrue() : repo.count());
     }
 
     public record PagedNotices(List<NoticeResponse> items, long total) {}
@@ -82,11 +87,11 @@ public class NoticeService {
      * the query instead of loading every row and trimming in memory. Used by the mobile home preview.
      */
     @Transactional(readOnly = true)
-    public List<NoticeResponse> listLimited(int limit) {
+    public List<NoticeResponse> listLimited(String studentId, int limit) {
         List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(
                 org.springframework.data.domain.PageRequest.of(0, limit));
         Map<Long, VoteSummary> stats = voteStats(notices);
-        return notices.stream().map(notice -> toResponse(notice, stats, null)).toList();
+        return notices.stream().map(notice -> toResponse(notice, stats, studentId)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -95,10 +100,14 @@ public class NoticeService {
     }
 
     public NoticeResponse getAndIncrementView(Long id, String studentId) {
-        if (repo.incrementViewCount(id) == 0) {
+        int updated = studentId == null ? repo.incrementPublicViewCount(id) : repo.incrementViewCount(id);
+        if (updated == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         Notice notice = getEntity(id);
+        if (studentId == null && !notice.isPublicVisible()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         return toResponse(notice, voteStats(List.of(notice)), studentId);
     }
 
@@ -125,7 +134,13 @@ public class NoticeService {
 
     public NoticeResponse create(String authorStudentId, NoticeRequest request) {
         Notice notice = new Notice();
-        applyRequest(notice, request, authorName(authorStudentId));
+        Member editor = memberRepository.findByStudentId(authorStudentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        if (!permissionService.has(editor, Permission.NOTICE_WRITE)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        applyRequest(notice, request, editor.getName());
+        notice.setPublicVisible(Boolean.TRUE.equals(request.publicVisible()));
         notice.setAuthorStudentId(authorStudentId);
         Notice saved = repo.save(notice);
         richBodyMediaService.syncAttachments(RichBodyMedia.Scope.NOTICE, saved.getId(), saved.getContent(), authorStudentId);
@@ -169,6 +184,14 @@ public class NoticeService {
     public NoticeResponse update(String authorStudentId, Long id, NoticeRequest request) {
         Notice notice = getEntity(id);
         boolean canManageNotice = requireEditable(authorStudentId, notice);
+        if (request.publicVisible() != null && request.publicVisible() != notice.isPublicVisible()) {
+            Member editor = memberRepository.findByStudentId(authorStudentId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+            if (!permissionService.has(editor, Permission.NOTICE_WRITE)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+            }
+            notice.setPublicVisible(request.publicVisible());
+        }
         // Keep the displayed author on edits — previously every edit stomped it with the
         // editor's own name, which silently undid 회장 author overrides.
         applyRequest(notice, request, notice.getAuthor(), canManageNotice);
@@ -222,12 +245,6 @@ public class NoticeService {
         return canManageNotice || editor.getRole() == Member.Role.ADMIN;
     }
 
-    private String authorName(String studentId) {
-        Member member = memberRepository.findByStudentId(studentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        return member.getName();
-    }
-
     private Notice.Category parseCategory(String value) {
         if (value == null || value.isBlank()) {
             return Notice.Category.GENERAL;
@@ -258,7 +275,8 @@ public class NoticeService {
                 notice.getTitle(),
                 notice.getContent(),
                 notice.getAuthor(),
-                notice.getAuthorStudentId(),
+                studentId == null ? null : notice.getAuthorStudentId(),
+                notice.isPublicVisible(),
                 notice.isPinned(),
                 notice.getCategory().name(),
                 notice.getViewCount(),

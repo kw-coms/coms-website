@@ -1,6 +1,6 @@
 import PageHeading from '../components/PageHeading'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify'
 import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Pin, PinOff, Search, Sparkles, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
 import { getNotice, createNotice, updateNotice, deleteNotice, voteNotice, pinNotice, updateNoticeAuthor } from '../services/noticeApi'
@@ -9,6 +9,7 @@ import { confirmDialog } from '../components/common/ConfirmDialog'
 import AuthorChangeDialog from '../components/common/AuthorChangeDialog'
 import { Skeleton, SkeletonLine, SkeletonGroup } from '../components/common/Skeleton'
 import ErrorState from '../components/common/ErrorState'
+import { AuthCheckFailed } from '../components/MembersGate'
 import { fetchLinkPreview, searchYoutubeVideos } from '../services/communityApi'
 import { useAuth } from '../contexts/useAuth'
 import { NoticeCategory } from '../contract/enums'
@@ -115,7 +116,7 @@ function noticeCategoryMeta(value) {
 }
 
 type NoticeFormProps = {
-  initialNotice?: { id?: number; title?: string; category?: string; content?: string; [key: string]: unknown } | null
+  initialNotice?: { id?: number; title?: string; category?: string; content?: string; publicVisible?: boolean; [key: string]: unknown } | null
   defaultCategory?: string
   onCancel: () => void
   onSave: (saved: unknown) => void
@@ -128,7 +129,7 @@ function NoticeForm(props: NoticeFormProps) {
 }
 
 function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: NoticeFormProps) {
-  const { user } = useAuth()
+  const { user, permissions } = useAuth()
   const storageKey = draftStorageKey(user?.studentId, 'notice', initialNotice?.id)
   const [stored] = useState(() => readDraft(storageKey))
   const [baseRevision] = useState(() => initialNotice ? draftRevision(initialNotice) : undefined)
@@ -139,6 +140,7 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
   const [formData, setFormData] = useState({
     title: restored?.title ?? (initialNotice?.title || ''),
     category: restored?.category || savedCategory,
+    publicVisible: restored?.publicVisible ?? initialNotice?.publicVisible ?? false,
   })
   const [editorKey, setEditorKey] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -153,16 +155,16 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
   const draft = useEditorDraft({
     storageKey,
     baseRevision,
-    baseline: () => ({ title: initialNotice?.title || '', category: savedCategory, anonymousName: '', content: serializeRichBody(originalBlocks) }),
+    baseline: () => ({ title: initialNotice?.title || '', category: savedCategory, publicVisible: initialNotice?.publicVisible ?? false, anonymousName: '', content: serializeRichBody(originalBlocks) }),
     current: () => {
       const blocks = editorApiRef.current?.getBlocks()
-      return { title: formData.title, category: formData.category, anonymousName: '', content: serializeRichBody(blocks ?? initialBlocks) }
+      return { title: formData.title, category: formData.category, publicVisible: formData.publicVisible, anonymousName: '', content: serializeRichBody(blocks ?? initialBlocks) }
     },
     hasPending: () => (editorApiRef.current?.getBlocks() || []).some((block) => block.type !== 'text' && block.status !== 'saved' && block.file),
     paused: Boolean(pendingDraft),
   })
   const applyDraft = (picked) => {
-    setFormData({ title: picked.title, category: picked.category || savedCategory })
+    setFormData({ title: picked.title, category: picked.category || savedCategory, publicVisible: picked.publicVisible ?? initialNotice?.publicVisible ?? false })
     setInitialBlocks(parseRichBodyBlocks(picked.content))
     setEditorKey((key) => key + 1)
     setRestored(picked)
@@ -175,7 +177,7 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
   const discardDraft = () => {
     draft.reset()
     setRestored(null)
-    setFormData({ title: initialNotice?.title || '', category: savedCategory })
+    setFormData({ title: initialNotice?.title || '', category: savedCategory, publicVisible: initialNotice?.publicVisible ?? false })
     setInitialBlocks(savedBlocks())
     setEditorKey((key) => key + 1)
   }
@@ -228,6 +230,7 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
         fetchLinkPreview={fetchLinkPreview}
       />
       <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
+        {canWriteNotice(permissions) && <label className="flex min-h-12 items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={formData.publicVisible} onChange={(e) => setFormData((p) => ({ ...p, publicVisible: e.target.checked }))} />비회원에게도 공개</label>}
         <select
           value={formData.category}
           onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))}
@@ -250,6 +253,13 @@ function NoticeEditor({ initialNotice, defaultCategory, onCancel, onSave }: Noti
 }
 
 export default function Notices() {
+  const { user, loading, authError } = useAuth()
+  if (loading) return <SkeletonGroup label="공지사항을 불러오는 중"><div className="min-h-48" /></SkeletonGroup>
+  if (authError) return <AuthCheckFailed />
+  return <NoticeBoard key={user?.studentId ?? 'guest'} />
+}
+
+function NoticeBoard() {
   const { id: urlId } = useParams()
   const navigate = useNavigate()
   const { user, permissions: effectivePermissions, displayPermissions } = useAuth()
@@ -461,6 +471,7 @@ export default function Notices() {
               <span className="coms-icon coms-board-icon" aria-hidden="true"><Megaphone size={22} strokeWidth={2} /></span>
               <PageHeading className="apple-display mt-2 text-4xl sm:text-5xl">{headerTitle}</PageHeading>
               <p className="apple-copy mt-3 max-w-xl text-base sm:text-lg">공지, 홍보, 소모임, 취업공고를 한 화면에서 빠르게 확인하고 검색합니다.</p>
+              {!user && <p className="apple-copy mt-2 text-sm">공개된 공지만 표시됩니다. <Link to="/login" state={{ from: location }} className="font-bold underline">로그인</Link>하면 회원 전용 공지도 볼 수 있습니다.</p>}
             </div>
             {(!urlId && visibleMode === 'list') ? (
               isAdmin && <button type="button" onClick={() => setMode('write')} className="apple-action-primary justify-self-start px-5 py-2.5 text-sm md:justify-self-end">공지 작성</button>
@@ -780,7 +791,7 @@ export default function Notices() {
               )}
             </div>
             <div className="flex items-center justify-center border-t border-[var(--app-hairline)] bg-[#fafafa] px-4 py-4 sm:px-5">
-              <button
+              {user && <button
                 type="button"
                 onClick={handleNoticeVote}
                 disabled={voting}
@@ -788,7 +799,7 @@ export default function Notices() {
               >
                 <ThumbsUp size={16} />
                 추천 {selectedNotice.upvotes ?? 0}
-              </button>
+              </button>}
             </div>
             <div className="grid grid-cols-2 gap-2 border-t border-[var(--app-hairline)] px-4 py-4 sm:flex sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2.5 sm:px-5">
               <button type="button" onClick={backToList} className="apple-action-secondary inline-flex min-h-12 items-center justify-center px-4 py-2 text-sm max-md:col-span-2 sm:min-h-0">

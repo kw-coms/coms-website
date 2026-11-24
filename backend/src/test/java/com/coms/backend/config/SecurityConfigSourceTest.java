@@ -30,7 +30,10 @@ class SecurityConfigSourceTest {
     void noticeMutationsRequireAdminAndArchiveUploadRequiresLogin() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
 
-        assertThat(source).contains("auth.requestMatchers(HttpMethod.GET, \"/api/notices\", \"/api/notices/**\").authenticated()");
+        String guestNoticeReads = "auth.requestMatchers(HttpMethod.GET, \"/api/notices\", \"/api/notices/*\").permitAll()";
+        String memberNoticeReads = "auth.requestMatchers(HttpMethod.GET, \"/api/notices/**\").authenticated()";
+        assertThat(source).contains(guestNoticeReads, memberNoticeReads);
+        assertThat(source.indexOf(guestNoticeReads)).isLessThan(source.indexOf(memberNoticeReads));
         assertThat(source).doesNotContain("auth.requestMatchers(HttpMethod.GET, \"/api/notices\", \"/api/notices/**\").permitAll()");
         // 공지 내용 수정은 회장 또는 명시 작성자(owner) 서비스 게이트 — URL 규칙은
         // 로그인 경계까지만 낮춘다. 익명 요청은 여전히 못 들어온다.

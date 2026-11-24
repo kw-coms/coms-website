@@ -19,14 +19,15 @@ test.describe('lock icons', () => {
     await nav(page).getByRole('button', { name: '멤버', exact: true }).click()
     const panel = page.locator('#nav-panel')
     const column = (name) => panel.getByRole('region', { name })
-    for (const label of ['공지', '커뮤니티', '활동 기록', '월별 일정', '회지·인기투표', '신청·수요조사', '팀 프로젝트']) {
+    for (const label of ['커뮤니티', '활동 기록', '월별 일정', '회지·인기투표', '신청·수요조사', '팀 프로젝트']) {
       await expect(column('멤버').getByRole('button', { name: new RegExp(`^${label}`) }).locator(LOCK), label).toHaveCount(1)
     }
     await expect(column('멤버').getByRole('button')).toHaveCount(9)
-    await expect(column('멤버').locator(LOCK)).toHaveCount(7)
+    await expect(column('멤버').locator(LOCK)).toHaveCount(6)
+    await expect(column('멤버').getByRole('button', { name: /^공지/ }).locator(LOCK)).toHaveCount(0)
     await expect(column('멤버').getByRole('button', { name: '자료실' }).locator(LOCK)).toHaveCount(0)
     await expect(column('멤버').getByRole('button', { name: '해커톤' }).locator(LOCK)).toHaveCount(0)
-    await expect(panel.getByRole('button', { name: '공지 (회원 전용)' })).toBeVisible()
+    await expect(panel.getByRole('button', { name: '공지' })).toBeVisible()
     // Public entries have none.
     await expect(column('배움').locator(LOCK)).toHaveCount(0)
     // 동아리 is public except 역대 회장단.
@@ -47,11 +48,12 @@ test.describe('lock icons', () => {
     await page.getByRole('button', { name: '메뉴 열기' }).click()
     const menu = page.locator('#mobile-menu')
     const section = (name) => menu.getByRole('region', { name })
-    for (const label of ['공지', '커뮤니티']) {
+    for (const label of ['커뮤니티']) {
       await expect(menu.getByRole('button', { name: new RegExp(`^${label}`) }).locator(LOCK), label).toHaveCount(1)
     }
     await expect(menu.getByRole('button', { name: /^후원/ }).locator(LOCK)).toHaveCount(0)
-    await expect(section('멤버').locator(LOCK)).toHaveCount(7)
+    await expect(section('멤버').locator(LOCK)).toHaveCount(6)
+    await expect(section('멤버').getByRole('button', { name: /^공지/ }).locator(LOCK)).toHaveCount(0)
     await expect(section('멤버').getByRole('button', { name: '자료실' }).locator(LOCK)).toHaveCount(0)
     await expect(section('멤버').getByRole('button', { name: '해커톤' }).locator(LOCK)).toHaveCount(0)
     const tools = section('도구')
@@ -69,7 +71,7 @@ test.describe('lock icons', () => {
     await page.getByRole('button', { name: '빠른 이동 열기' }).first().click()
     const dialog = page.getByRole('dialog', { name: '빠른 이동' })
     await dialog.getByRole('combobox', { name: '어디로 갈까요?' }).fill('공지')
-    await expect(dialog.getByRole('option', { name: /공지사항/ }).locator(LOCK)).toHaveCount(1)
+    await expect(dialog.getByRole('option', { name: /공지사항/ }).locator(LOCK)).toHaveCount(0)
     await dialog.getByRole('combobox', { name: '어디로 갈까요?' }).fill('자료실')
     await expect(dialog.getByRole('option', { name: /자료실/ }).locator(LOCK)).toHaveCount(0)
     await dialog.getByRole('combobox', { name: '어디로 갈까요?' }).fill('프로젝트')
@@ -94,8 +96,8 @@ test.describe('lock icons', () => {
     await mockOptionalApis(page)
     await page.goto('/about')
     await nav(page).getByRole('button', { name: '멤버', exact: true }).click()
-    await page.locator('#nav-panel').getByRole('button', { name: /^공지/ }).click()
-    await expectMembersGate(page, '/notices')
+    await page.locator('#nav-panel').getByRole('button', { name: /^커뮤니티/ }).click()
+    await expectMembersGate(page, '/community')
   })
 })
 
@@ -103,10 +105,11 @@ test.describe('guide screen', () => {
   test('the login link carries the page as `from`, and the recruit link is offered', async ({ page }) => {
     await skipIntro(page)
     await mockOptionalApis(page)
+    await page.route('**/api/notices', (route) => route.fulfill({ json: [{ id: 4, title: '공개 공지', content: '안내', category: 'GENERAL', publicVisible: true, createdAt: '2026-11-01T10:00:00' }] }))
     await page.goto('/notices')
-    const gate = await expectMembersGate(page, '/notices')
-    await expect(gate.getByText('공지, 홍보, 소모임, 취업공고를 한곳에서 볼 수 있어요.')).toBeVisible()
-    await gate.getByRole('link', { name: '로그인', exact: true }).click()
+    await expect(page.getByText('공개 공지').filter({ visible: true }).first()).toBeVisible()
+    await expect(page.getByText('공개된 공지만 표시됩니다.')).toBeVisible()
+    await page.getByRole('link', { name: '로그인', exact: true }).click()
     await expect(page).toHaveURL(/\/login$/)
     expect(await page.evaluate(() => history.state?.usr?.from?.pathname)).toBe('/notices')
   })

@@ -67,6 +67,50 @@ class NoticeServiceTest {
     }
 
     @Test
+    void guestReadsOnlyPublicNoticesAndCannotOpenPrivateDetail() {
+        var privateNotice = noticeService.create("2026123000", new NoticeRequest("비공개", "내용", null, false, null));
+        var publicNotice = noticeService.create("2026123000", new NoticeRequest("공개", "내용", null, false, null, true));
+
+        assertThat(noticeService.list(null)).extracting("id").containsExactly(publicNotice.id());
+        assertThat(noticeService.listPaged(null, 0, 10).total()).isEqualTo(1);
+        assertThat(noticeService.list("2026123000")).hasSize(2);
+        assertThat(noticeService.getAndIncrementView(publicNotice.id(), null).authorStudentId()).isNull();
+        assertThatThrownBy(() -> noticeService.getAndIncrementView(privateNotice.id(), null))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode().value()).isEqualTo(404));
+        assertThat(noticeRepository.findById(privateNotice.id()).orElseThrow().getViewCount()).isZero();
+    }
+
+    @Test
+    void guestCannotDownloadMediaFromPrivateNotice() {
+        var file = richBodyMediaService.upload(RichBodyMedia.Scope.NOTICE, RichBodyMedia.Kind.FILE,
+                new MockMultipartFile("file", "guide.pdf", "application/pdf", "%PDF-1.4 guide".getBytes()), "2026123000");
+        String body = "[{\"type\":\"file\",\"fileId\":" + file.getId() + "}]";
+        var notice = noticeService.create("2026123000", new NoticeRequest("비공개", body, null, false, null));
+
+        assertThatThrownBy(() -> richBodyMediaService.get(file.getId(), null))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode().value()).isEqualTo(404));
+
+        noticeService.update("2026123000", notice.id(),
+                new NoticeRequest("공개", body, null, false, null, true));
+        assertThat(richBodyMediaService.get(file.getId(), null).getOwnerId()).isEqualTo(notice.id());
+    }
+
+    @Test
+    void authorWithoutNoticeWriteCannotChangeVisibility() {
+        memberRepository.save(user("2026000001", "선택회원"));
+        var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
+        noticeService.updateAuthor("2026123000", notice.id(), null, "2026000001");
+
+        assertThatThrownBy(() -> noticeService.update("2026000001", notice.id(),
+                new NoticeRequest("수정", "내용", null, false, null, true)))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode().value()).isEqualTo(403));
+        assertThat(noticeRepository.findById(notice.id()).orElseThrow().isPublicVisible()).isFalse();
+    }
+
+    @Test
     void noticeWritePermissionDoesNotAllowEditingAnotherAuthorsContent() {
         var notice = noticeService.create("2026123000", new NoticeRequest("원본", "원본 내용", null, false, "GENERAL"));
         for (Member.Role role : java.util.List.of(Member.Role.OFFICER, Member.Role.VICE_PRESIDENT)) {
@@ -153,7 +197,7 @@ class NoticeServiceTest {
 
     @Test
     void listExposesEngagementCountsWithViewerVote() {
-        var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
+        var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null, true));
         noticeService.vote("2026123000", notice.id(), 1);
 
         assertThat(noticeService.list("2026123000"))
@@ -265,20 +309,20 @@ class NoticeServiceTest {
         // Pinned rows sort first in both paths, so the pin has to survive the page boundary.
         var pinned = noticeService.create("2026123000", new NoticeRequest("고정 공지", "내용", null, true, null));
 
-        var all = noticeService.list(null);
+        var all = noticeService.list("2026123000");
         assertThat(all).hasSize(6);
         assertThat(all.get(0).id()).isEqualTo(pinned.id());
 
-        var firstPage = noticeService.listPaged(null, 0, 2);
+        var firstPage = noticeService.listPaged("2026123000", 0, 2);
         assertThat(firstPage.total()).isEqualTo(6);
         assertThat(firstPage.items()).extracting("id").containsExactly(all.get(0).id(), all.get(1).id());
 
-        var secondPage = noticeService.listPaged(null, 1, 2);
+        var secondPage = noticeService.listPaged("2026123000", 1, 2);
         assertThat(secondPage.total()).isEqualTo(6);
         assertThat(secondPage.items()).extracting("id").containsExactly(all.get(2).id(), all.get(3).id());
 
         // A page past the end is empty, not an error — the pager relies on total, not a 404.
-        assertThat(noticeService.listPaged(null, 9, 2).items()).isEmpty();
+        assertThat(noticeService.listPaged("2026123000", 9, 2).items()).isEmpty();
     }
 
     private Member admin(String studentId, String name) {

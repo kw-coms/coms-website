@@ -1,13 +1,15 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { listNotices } from '../services/noticeApi'
 import { queryKeys } from '../services/queryKeys'
-
-const noticesQueryKey = queryKeys.notices.list()
+import { useAuth } from '../contexts/useAuth'
 
 export function useNotices() {
+  const { user, loading: authLoading, authError } = useAuth()
+  const noticesQueryKey = queryKeys.notices.list(user?.studentId ?? 'guest')
   const queryClient = useQueryClient()
   const query = useQuery({
     queryKey: noticesQueryKey,
+    enabled: !authLoading && !authError,
     queryFn: async () => {
       const data = await listNotices()
       return Array.isArray(data) ? data : []

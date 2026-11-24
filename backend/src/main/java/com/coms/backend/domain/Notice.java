@@ -35,6 +35,9 @@ public class Notice {
     @Column(nullable = false)
     private boolean pinned = false;
 
+    @Column(name = "public_visible", nullable = false)
+    private boolean publicVisible = false;
+
     @Column(name = "pinned_at")
     private LocalDateTime pinnedAt;
 
@@ -70,6 +73,8 @@ public class Notice {
     public String getAuthorStudentId() { return authorStudentId; }
     public void setAuthorStudentId(String authorStudentId) { this.authorStudentId = authorStudentId; }
     public boolean isPinned() { return pinned; }
+    public boolean isPublicVisible() { return publicVisible; }
+    public void setPublicVisible(boolean publicVisible) { this.publicVisible = publicVisible; }
     public void setPinned(boolean pinned) {
         if (pinned && !this.pinned) {
             this.pinnedAt = LocalDateTime.now();

@@ -8,8 +8,12 @@ public record NoticeRequest(
         @NotBlank String content,
         @Size(max = 255) String author,
         Boolean pinned,
-        String category
+        String category,
+        Boolean publicVisible
 ) {
+    public NoticeRequest(String title, String content, String author, Boolean pinned, String category) {
+        this(title, content, author, pinned, category, null);
+    }
     public NoticeRequest {
         // Jackson 3 maps a missing/null value onto a primitive boolean as HTTP 500; default false.
         pinned = pinned != null && pinned;
