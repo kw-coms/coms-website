@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
+import { mockActivityTimeline, mockAdminApis, mockOptionalApis } from './visualSupport.js'
 
 // The dev server has no /member-media files (nginx serves them to signed-in members only), so members get a tiny 800x1 image (a w-descriptor srcset scales naturalWidth, a 1x1 would read as 0 wide).
 const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAyAAAAABCAAAAAADA5W6AAAAEElEQVR4nGNoGAWjYBTgBADvwJAQO9LiUwAAAABJRU5ErkJggg==', 'base64')
@@ -7,6 +7,7 @@ const PHOTO_COUNT = 13
 
 async function signInAsMember(page) {
   await mockAdminApis(page)
+  await mockActivityTimeline(page)
   await page.route('**/member-media/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL }))
 }
 

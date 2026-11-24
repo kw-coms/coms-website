@@ -1,22 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { asMember, mockOptionalApis, trackRequests } from './visualSupport.js'
+import { asMember, mockActivityTimeline as mockTimeline, mockOptionalApis, trackRequests } from './visualSupport.js'
 
 // Fixes from the public-pages audit: recruit facts, activities for guests, 404, recruit form, next steps,
 // quick search over study content, study hub weight.
 
 const skipIntro = (page) => page.addInitScript(() => window.sessionStorage.setItem('coms.intro.played:v1', '1'))
 const setTheme = (page, theme) => page.addInitScript((mode) => { try { localStorage.setItem('kwcoms-theme-mode:v2', mode) } catch { /* storage blocked */ } }, theme)
-const timelineItems = [
-  ['고급 C 프로그래밍 스터디', 'CONFIRMED', '스터디'],
-  ['해커톤 결과 · 시상 공지', 'DONE', '해커톤'],
-  ['아두이노 · 알고리즘 스터디', 'PLANNED', '스터디'],
-  ['팀 프로젝트', 'PLANNED', '프로젝트'],
-  ['종강총회 · 에버랜드', 'PLANNED', '행사'],
-].map(([title, resolvedStatus, kindLabel], index) => ({
-  id: index + 1, title, resolvedStatus, kindLabel, kind: 'ACTIVITY',
-  timelineTerm: '2026 2학기', dateLabel: '2026 2학기', description: title,
-}))
-const mockTimeline = (page) => page.route('**/api/club-activities/timeline', (route) => route.fulfill({ status: 200, json: timelineItems }))
 
 test.describe('recruit facts (item 1)', () => {
   for (const path of ['/recruit', '/recruit-notice']) {

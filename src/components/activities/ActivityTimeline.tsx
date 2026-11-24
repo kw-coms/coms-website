@@ -300,13 +300,12 @@ export default function ActivityTimeline() {
   useEffect(() => {
     if (loading) return undefined
     let active = true
-    const refresh = () => listClubActivityTimeline()
+    // One fetch per visit: statuses change by the day, so polling a public endpoint every minute buys nothing.
+    listClubActivityTimeline()
       .then((items) => { if (active) { setDbResult({ owner: memberId, items: Array.isArray(items) ? items : [] }); setTimelineError(false) } })
       .catch(() => { if (active) { setDbResult({ owner: memberId, items: [] }); setTimelineError(true) } })
       .finally(() => { if (active) setTimelineLoading(false) })
-    refresh()
-    const timer = window.setInterval(refresh, HACKATHON_TICK_MS)
-    return () => { active = false; window.clearInterval(timer) }
+    return () => { active = false }
   }, [loading, memberId])
 
   const { sections, upcoming, hasUndatedUpcoming, liveTerms } = useMemo(
