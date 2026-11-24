@@ -80,8 +80,8 @@ interface ScheduleItem {
   kind?: string
   id?: string | number
   title?: string
-  eventDate?: string
-  endDate?: string
+  eventDate?: string | null
+  endDate?: string | null
   startTime?: string
   endTime?: string
   colorHex?: string

@@ -6,6 +6,7 @@ import com.coms.backend.domain.ClubActivityImage;
 import com.coms.backend.domain.ClubActivityVote;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.ClubActivityResponse;
+import com.coms.backend.dto.ClubActivityTimelineResponse;
 import com.coms.backend.repository.ClubActivityFileRepository;
 import com.coms.backend.repository.ClubActivityImageRepository;
 import com.coms.backend.repository.ClubActivityRepository;
@@ -93,6 +94,21 @@ public class ClubActivityService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<ClubActivityTimelineResponse> timeline(boolean authenticated) {
+        Map<String, String> categories = categoryService.keyToNameMap();
+        return repository.findByShowOnTimelineTrue().stream().map(activity -> new ClubActivityTimelineResponse(
+                activity.getId(), activity.getTitle(), activity.getKind().name(), activity.getCategory(),
+                categories.getOrDefault(activity.getCategory(), activity.getCategory()),
+                activity.getTimelineKindLabel() == null ? categories.getOrDefault(activity.getCategory(), activity.getCategory()) : activity.getTimelineKindLabel(),
+                activity.getDescription(),
+                ClubActivityTimelineStatus.resolve(activity), activity.getEventDate(), activity.getEndDate(),
+                activity.getStartTime() == null ? null : activity.getStartTime().toString(),
+                activity.getEndTime() == null ? null : activity.getEndTime().toString(), activity.getDateLabel(),
+                activity.getTimelineTerm() == null ? ClubActivityTimelineStatus.term(activity.getEventDate()) : activity.getTimelineTerm(),
+                authenticated ? activity.getMemberFacts() : null)).toList();
+    }
+
     public ClubActivityResponse getAndIncrementView(Long id, String studentId) {
         if (repository.incrementViewCount(id) == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
@@ -157,18 +173,25 @@ public class ClubActivityService {
                                        String colorHex,
                                        MultipartFile image,
                                        String creatorStudentId) throws IOException {
+        return create(kind, category, title, description, eventDate, endDate, startTime, endTime,
+                colorHex, image, creatorStudentId, null, null, null, null, null);
+    }
+
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
+    public ClubActivityResponse create(String kind, String category, String title, String description,
+                                       LocalDate eventDate, LocalDate endDate, String startTime, String endTime,
+                                       String colorHex, MultipartFile image, String creatorStudentId,
+                                       String timelineStatus, Boolean showOnTimeline, String timelineTerm,
+                                       String dateLabel, String memberFacts) throws IOException {
         ClubActivity.Kind parsedKind = parseKind(kind);
         String categoryKey = resolveCategory(category);
         if (title == null || title.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Activity title is required.");
         }
-        if (eventDate == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Activity date is required.");
-        }
         LocalDate normalizedEndDate = normalizeEndDate(eventDate, endDate);
         LocalTime parsedStartTime = parseTime(startTime);
         LocalTime parsedEndTime = parseTime(endTime);
-        validateTimeRange(parsedStartTime, parsedEndTime);
+        validateTimeRange(eventDate, normalizedEndDate, parsedStartTime, parsedEndTime);
         String normalizedColor = normalizeColorHex(colorHex);
 
         Member member = memberRepository.findByStudentId(creatorStudentId)
@@ -184,6 +207,11 @@ public class ClubActivityService {
         activity.setStartTime(parsedStartTime);
         activity.setEndTime(parsedEndTime);
         activity.setColorHex(normalizedColor);
+        activity.setTimelineStatus(normalizeTimelineStatus(timelineStatus));
+        activity.setShowOnTimeline(Boolean.TRUE.equals(showOnTimeline));
+        activity.setTimelineTerm(normalizeTerm(timelineTerm, eventDate));
+        activity.setDateLabel(optionalText(dateLabel, 40, "날짜 표시 문구"));
+        activity.setMemberFacts(optionalText(memberFacts, MAX_DESCRIPTION_LENGTH, "회원 전용 정보"));
         activity.setCreatedBy(creatorStudentId);
         activity.setCreatedByName(member.getName());
         activity.setCreatedAt(LocalDateTime.now());
@@ -256,12 +284,24 @@ public class ClubActivityService {
                                        String endTime,
                                        String colorHex,
                                        String editorStudentId) {
+        return update(id, kind, category, title, description, eventDate, endDate, startTime, endTime,
+                colorHex, editorStudentId, null, null, null, null, null, false);
+    }
+
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
+    public ClubActivityResponse update(Long id, String kind, String category, String title,
+                                       String description, LocalDate eventDate, LocalDate endDate,
+                                       String startTime, String endTime, String colorHex, String editorStudentId,
+                                       String timelineStatus, Boolean showOnTimeline, String timelineTerm,
+                                       String dateLabel, String memberFacts, boolean dateUndecided) {
         ClubActivity activity = get(id);
         if (kind != null && !kind.isBlank()) {
             activity.setKind(parseKind(kind));
         }
         if (category != null && !category.isBlank()) {
-            activity.setCategory(resolveCategory(category));
+            String nextCategory = resolveCategory(category);
+            if (!nextCategory.equals(activity.getCategory())) activity.setTimelineKindLabel(null);
+            activity.setCategory(nextCategory);
         }
         if (title != null) {
             if (title.isBlank()) {
@@ -272,27 +312,37 @@ public class ClubActivityService {
         if (description != null) {
             activity.setDescription(description.isBlank() ? null : boundedText(description, MAX_DESCRIPTION_LENGTH, "설명"));
         }
-        if (eventDate != null) {
+        if (dateUndecided) {
+            activity.setEventDate(null);
+            activity.setEndDate(null);
+            activity.setStartTime(null);
+            activity.setEndTime(null);
+        } else if (eventDate != null) {
             activity.setEventDate(eventDate);
             if (endDate == null) {
                 activity.setEndDate(eventDate);
             }
         }
-        if (endDate != null) {
+        if (!dateUndecided && endDate != null) {
             activity.setEndDate(normalizeEndDate(activity.getEventDate(), endDate));
-        } else if (activity.getEndDate() == null) {
+        } else if (!dateUndecided && activity.getEndDate() == null) {
             activity.setEndDate(activity.getEventDate());
         }
-        if (startTime != null) {
+        if (!dateUndecided && startTime != null) {
             activity.setStartTime(parseTime(startTime));
         }
-        if (endTime != null) {
+        if (!dateUndecided && endTime != null) {
             activity.setEndTime(parseTime(endTime));
         }
         if (colorHex != null) {
             activity.setColorHex(normalizeColorHex(colorHex));
         }
-        validateTimeRange(activity.getStartTime(), activity.getEndTime());
+        if (timelineStatus != null) activity.setTimelineStatus(normalizeTimelineStatus(timelineStatus));
+        if (showOnTimeline != null) activity.setShowOnTimeline(showOnTimeline);
+        if (timelineTerm != null) activity.setTimelineTerm(normalizeTerm(timelineTerm, activity.getEventDate()));
+        if (dateLabel != null) activity.setDateLabel(optionalText(dateLabel, 40, "날짜 표시 문구"));
+        if (memberFacts != null) activity.setMemberFacts(optionalText(memberFacts, MAX_DESCRIPTION_LENGTH, "회원 전용 정보"));
+        validateTimeRange(activity.getEventDate(), activity.getEndDate(), activity.getStartTime(), activity.getEndTime());
         activity.setUpdatedAt(LocalDateTime.now());
         ClubActivity saved = repository.save(activity);
         return toResponse(saved, editorStudentId);
@@ -450,10 +500,11 @@ public class ClubActivityService {
     }
 
     private LocalDate normalizeEndDate(LocalDate eventDate, LocalDate endDate) {
-        LocalDate normalized = endDate == null ? eventDate : endDate;
-        if (normalized == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Activity end date is required.");
+        if (eventDate == null) {
+            if (endDate != null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "시작일 없이 종료일을 지정할 수 없습니다.");
+            return null;
         }
+        LocalDate normalized = endDate == null ? eventDate : endDate;
         if (normalized.isBefore(eventDate)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "종료일은 시작일과 같거나 이후여야 합니다.");
         }
@@ -471,10 +522,48 @@ public class ClubActivityService {
         }
     }
 
-    private void validateTimeRange(LocalTime startTime, LocalTime endTime) {
-        if (startTime != null && endTime != null && endTime.isBefore(startTime)) {
+    private void validateTimeRange(LocalDate eventDate, LocalDate endDate, LocalTime startTime, LocalTime endTime) {
+        if (eventDate == null && (startTime != null || endTime != null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "날짜 없이 시간을 지정할 수 없습니다.");
+        }
+        if (eventDate != null && eventDate.equals(endDate)
+                && startTime != null && endTime != null && endTime.isBefore(startTime)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "종료 시간은 시작 시간 이후여야 합니다.");
         }
+    }
+
+    private String normalizeTimelineStatus(String value) {
+        if (value == null || value.isBlank()) return null;
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("PLANNED", "CONFIRMED", "LIVE", "DONE").contains(normalized)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "타임라인 상태가 올바르지 않습니다.");
+        }
+        return normalized;
+    }
+
+    private String normalizeTerm(String value, LocalDate eventDate) {
+        if (value == null || value.isBlank()) return ClubActivityTimelineStatus.term(eventDate);
+        String term = value.trim();
+        if (!term.matches("[0-9]{4} (1학기|여름방학|2학기|겨울방학)")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학기가 올바르지 않습니다.");
+        }
+        return term;
+    }
+
+    private String optionalText(String value, int maxLength, String label) {
+        return value == null || value.isBlank() ? null : boundedText(value, maxLength, label);
+    }
+
+    @Transactional(readOnly = true)
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
+    public Map<String, String> statusPreview(LocalDate eventDate, LocalDate endDate, String startTime, String endTime) {
+        LocalDate normalizedEnd = normalizeEndDate(eventDate, endDate);
+        LocalTime start = parseTime(startTime);
+        LocalTime end = parseTime(endTime);
+        validateTimeRange(eventDate, normalizedEnd, start, end);
+        return Map.of("resolvedStatus", ClubActivityTimelineStatus.resolve(null, eventDate, normalizedEnd,
+                start, end, LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"))),
+                "timelineTerm", Optional.ofNullable(ClubActivityTimelineStatus.term(eventDate)).orElse(""));
     }
 
     private String resolveCategory(String value) {
@@ -604,7 +693,13 @@ public class ClubActivityService {
                 votes.upvotes(),
                 votes.myVote(studentId),
                 activity.getCreatedAt(),
-                activity.getUpdatedAt()
+                activity.getUpdatedAt(),
+                activity.getTimelineStatus(),
+                ClubActivityTimelineStatus.resolve(activity),
+                activity.isShowOnTimeline(),
+                activity.getTimelineTerm() == null ? ClubActivityTimelineStatus.term(activity.getEventDate()) : activity.getTimelineTerm(),
+                activity.getDateLabel(),
+                activity.getMemberFacts()
         );
     }
 

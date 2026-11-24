@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { asMember, mockOptionalApis, trackRequests } from './visualSupport.js'
+import { asMember, mockActivityTimeline as mockTimeline, mockOptionalApis, trackRequests } from './visualSupport.js'
 
 // Fixes from the public-pages audit: recruit facts, activities for guests, 404, recruit form, next steps,
 // quick search over study content, study hub weight.
@@ -53,6 +53,7 @@ test.describe('recruit facts (item 1)', () => {
 test.describe('/activities for guests (items 2, 3)', () => {
   test('no drafting notes and no meeting agenda; every entry stays', async ({ page }) => {
     await mockOptionalApis(page)
+    await mockTimeline(page)
     await page.goto('/activities')
     const timeline = page.locator('#timeline')
     await expect(page.locator('#act-fall').getByRole('heading', { name: '개강총회' })).toBeVisible()
@@ -66,6 +67,7 @@ test.describe('/activities for guests (items 2, 3)', () => {
 
   test('a member sees the agenda line', async ({ page }) => {
     await mockOptionalApis(page)
+    await mockTimeline(page)
     await asMember(page)
     await page.route('**/member-media/**', (route) => route.fulfill({ status: 404, body: '' }))
     await page.goto('/activities')
@@ -76,6 +78,7 @@ test.describe('/activities for guests (items 2, 3)', () => {
   test('one login notice, quiet slots that are not focusable, no photo request', async ({ page }) => {
     const photoRequests = trackRequests(page, /\/member-media\//)
     await mockOptionalApis(page)
+    await mockTimeline(page)
     await page.goto('/activities')
     const notice = page.getByTestId('act-photo-notice')
     await expect(notice).toBeVisible()
@@ -90,6 +93,14 @@ test.describe('/activities for guests (items 2, 3)', () => {
     await expect(page.locator('#timeline .act-photo-locked a, #timeline .act-photo-locked button')).toHaveCount(0)
     await expect(slots.first()).toHaveAttribute('aria-hidden', 'true')
     expect(photoRequests).toEqual([])
+  })
+
+  test('shows static activities and an inline notice if timeline loading fails', async ({ page }) => {
+    await mockOptionalApis(page)
+    await page.route('**/api/club-activities/timeline', (route) => route.fulfill({ status: 503, body: '' }))
+    await page.goto('/activities')
+    await expect(page.locator('#act-fall').getByRole('heading', { name: '개강총회' })).toBeVisible()
+    await expect(page.locator('#timeline')).toContainText('활동 일정을 불러오지 못했습니다')
   })
 
 })

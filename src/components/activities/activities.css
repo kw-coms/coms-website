@@ -43,8 +43,8 @@
 }
 
 .act-jump {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
+	display: flex;
+	flex-wrap: wrap;
 	overflow: hidden;
 	border: 1px solid var(--app-hairline);
 	border-radius: 18px;
@@ -54,6 +54,7 @@
 .act-jump a {
 	display: flex;
 	flex-direction: column;
+	flex: 1 1 8.5rem;
 	gap: 0.25rem;
 	padding: 1rem 1.25rem;
 	color: var(--app-text);

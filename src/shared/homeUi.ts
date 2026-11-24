@@ -72,7 +72,7 @@ export function parseLocalDate(value) {
 
 export function formatActivityDate(value) {
   const date = parseLocalDate(value)
-  if (!date) return value || ''
+  if (!date) return value || '날짜 미정'
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
 }
 

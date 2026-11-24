@@ -4,6 +4,7 @@ import com.coms.backend.domain.ClubActivity;
 import com.coms.backend.domain.ClubActivityFile;
 import com.coms.backend.domain.ClubActivityImage;
 import com.coms.backend.dto.ClubActivityResponse;
+import com.coms.backend.dto.ClubActivityTimelineResponse;
 import com.coms.backend.dto.EngagementVoteRequest;
 import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.ClubActivityService;
@@ -17,6 +18,7 @@ import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,6 +38,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/club-activities")
@@ -59,6 +62,22 @@ public class ClubActivityController {
         return ListPagination.paginate(clubActivityService.list(authentication.getName()), page, size);
     }
 
+    @GetMapping("/timeline")
+    public ResponseEntity<List<ClubActivityTimelineResponse>> timeline(Authentication authentication) {
+        return ResponseEntity.ok(clubActivityService.timeline(authentication != null
+                && authentication.isAuthenticated() && !(authentication instanceof AnonymousAuthenticationToken)));
+    }
+
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
+    @GetMapping("/status-preview")
+    public ResponseEntity<Map<String, String>> statusPreview(
+            @RequestParam(value = "eventDate", required = false) LocalDate eventDate,
+            @RequestParam(value = "endDate", required = false) LocalDate endDate,
+            @RequestParam(value = "startTime", required = false) String startTime,
+            @RequestParam(value = "endTime", required = false) String endTime) {
+        return ResponseEntity.ok(clubActivityService.statusPreview(eventDate, endDate, startTime, endTime));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ClubActivityResponse> get(Authentication authentication, @PathVariable Long id) {
         return ResponseEntity.ok(clubActivityService.getAndIncrementView(id, authentication.getName()));
@@ -78,13 +97,33 @@ public class ClubActivityController {
             @RequestParam(value = "category", defaultValue = "GENERAL") String category,
             @RequestParam("title") String title,
             @RequestParam(value = "description", required = false) String description,
-            @RequestParam("eventDate") LocalDate eventDate,
+            @RequestParam(value = "eventDate", required = false) LocalDate eventDate,
             @RequestParam(value = "endDate", required = false) LocalDate endDate,
             @RequestParam(value = "startTime", required = false) String startTime,
             @RequestParam(value = "endTime", required = false) String endTime,
             @RequestParam(value = "colorHex", required = false) String colorHex,
             @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "timelineStatus", required = false) String timelineStatus,
+            @RequestParam(value = "showOnTimeline", required = false) Boolean showOnTimeline,
+            @RequestParam(value = "timelineTerm", required = false) String timelineTerm,
+            @RequestParam(value = "dateLabel", required = false) String dateLabel,
+            @RequestParam(value = "memberFacts", required = false) String memberFacts,
+            @RequestParam(value = "dateUndecided", required = false) Boolean dateUndecided,
             Authentication authentication) throws IOException {
+        ClubActivityResponse response = clubActivityService.create(kind, category, title, description,
+                Boolean.TRUE.equals(dateUndecided) ? null : eventDate,
+                Boolean.TRUE.equals(dateUndecided) ? null : endDate,
+                Boolean.TRUE.equals(dateUndecided) ? null : startTime,
+                Boolean.TRUE.equals(dateUndecided) ? null : endTime,
+                colorHex, image, authentication.getName(),
+                timelineStatus, showOnTimeline, timelineTerm, dateLabel, memberFacts);
+        auditClubActivity(authentication.getName(), response, "CREATE");
+        return ResponseEntity.ok(response);
+    }
+
+    public ResponseEntity<ClubActivityResponse> create(String kind, String category, String title,
+            String description, LocalDate eventDate, LocalDate endDate, String startTime, String endTime,
+            String colorHex, MultipartFile image, Authentication authentication) throws IOException {
         ClubActivityResponse response = clubActivityService.create(kind, category, title, description,
                 eventDate, endDate, startTime, endTime, colorHex, image, authentication.getName());
         auditClubActivity(authentication.getName(), response, "CREATE");
@@ -104,7 +143,23 @@ public class ClubActivityController {
             @RequestParam(value = "startTime", required = false) String startTime,
             @RequestParam(value = "endTime", required = false) String endTime,
             @RequestParam(value = "colorHex", required = false) String colorHex,
+            @RequestParam(value = "timelineStatus", required = false) String timelineStatus,
+            @RequestParam(value = "showOnTimeline", required = false) Boolean showOnTimeline,
+            @RequestParam(value = "timelineTerm", required = false) String timelineTerm,
+            @RequestParam(value = "dateLabel", required = false) String dateLabel,
+            @RequestParam(value = "memberFacts", required = false) String memberFacts,
+            @RequestParam(value = "dateUndecided", required = false, defaultValue = "false") boolean dateUndecided,
             Authentication authentication) {
+        ClubActivityResponse response = clubActivityService.update(id, kind, category, title, description,
+                eventDate, endDate, startTime, endTime, colorHex, authentication.getName(),
+                timelineStatus, showOnTimeline, timelineTerm, dateLabel, memberFacts, dateUndecided);
+        auditClubActivity(authentication.getName(), response, "UPDATE");
+        return ResponseEntity.ok(response);
+    }
+
+    public ResponseEntity<ClubActivityResponse> update(Long id, String kind, String category, String title,
+            String description, LocalDate eventDate, LocalDate endDate, String startTime, String endTime,
+            String colorHex, Authentication authentication) {
         ClubActivityResponse response = clubActivityService.update(id, kind, category, title, description,
                 eventDate, endDate, startTime, endTime, colorHex, authentication.getName());
         auditClubActivity(authentication.getName(), response, "UPDATE");

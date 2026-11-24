@@ -12,3 +12,8 @@ export function activityImagesFor(item) {
   }
   return []
 }
+
+export function activityDateMatchesRange(eventDate, fromDate, toDate) {
+  if (!fromDate && !toDate) return true
+  return Boolean(eventDate) && (!fromDate || eventDate >= fromDate) && (!toDate || eventDate <= toDate)
+}

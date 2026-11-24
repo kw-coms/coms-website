@@ -13,8 +13,11 @@ import {
   timelinePhotos,
 } from '../../data/activityTimeline'
 import type { TimelineEvent, TimelinePhoto, TimelineStatus } from '../../data/activityTimeline'
+import { mergeActivityTimeline } from '../../data/activityTimelineMerge'
+import type { PublicTimelineActivity } from '../../data/activityTimelineMerge'
 import { RECRUIT_FACTS, recruitSummary } from '../../data/recruitFacts'
 import { useAuth } from '../../contexts/useAuth'
+import { listClubActivityTimeline } from '../../services/clubActivityApi'
 import './activities.css'
 
 const photoById = new Map(timelinePhotos.map((p) => [p.id, p]))
@@ -211,7 +214,7 @@ function FallSpine({ events, now, onOpen }: { events: TimelineEvent[]; now: numb
   return (
     <ol className="act-spine">
       {events.map((event) => {
-        const status = resolveStatus(event, now)
+        const status = event.fromDb ? event.status : resolveStatus(event, now)
         const photo = event.photoId ? photoById.get(event.photoId) : undefined
         return (
           <li key={event.id} className="act-row" data-status={status}>
@@ -277,6 +280,10 @@ export default function ActivityTimeline() {
   const now = useNow(HACKATHON_TICK_MS)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [openId, setOpenIdState] = useState<string | null>(null)
+  const [dbResult, setDbResult] = useState<{ owner: string; items: PublicTimelineActivity[] }>({ owner: '', items: [] })
+  const [timelineLoading, setTimelineLoading] = useState(true)
+  const [timelineError, setTimelineError] = useState(false)
+  const memberId = String(user?.studentId ?? '')
 
   const setOpenId = useCallback((id: string | null) => setOpenIdState(id), [])
   const open = useCallback((id: string) => setOpenIdState(id), [])
@@ -290,10 +297,20 @@ export default function ActivityTimeline() {
     return () => { document.body.style.overflow = prev }
   }, [openId])
 
-  const spring = useMemo(() => timelineEvents.filter((e) => e.term === 'spring'), [])
-  const fall = useMemo(() => timelineEvents.filter((e) => e.term === 'fall'), [])
-  const fallLive = fall.some((e) => resolveStatus(e, now) === 'live')
-  const upcoming = useMemo(() => timelineEvents.filter((e) => e.term === 'upcoming'), [])
+  useEffect(() => {
+    if (loading) return undefined
+    let active = true
+    // One fetch per visit: statuses change by the day, so polling a public endpoint every minute buys nothing.
+    listClubActivityTimeline()
+      .then((items) => { if (active) { setDbResult({ owner: memberId, items: Array.isArray(items) ? items : [] }); setTimelineError(false) } })
+      .catch(() => { if (active) { setDbResult({ owner: memberId, items: [] }); setTimelineError(true) } })
+      .finally(() => { if (active) setTimelineLoading(false) })
+    return () => { active = false }
+  }, [loading, memberId])
+
+  const { sections, upcoming, hasUndatedUpcoming, liveTerms } = useMemo(
+    () => mergeActivityTimeline(dbResult.owner === memberId ? dbResult.items : [], now, timelineEvents), [dbResult, memberId, now])
+  const spring = sections.find((section) => section.id === 'act-spring')?.events ?? []
 
   return (
     <section className="coms-sec coms-sec-top act-timeline" id="timeline" aria-labelledby="act-timeline-title">
@@ -304,11 +321,16 @@ export default function ActivityTimeline() {
             <p className="act-lede">1학기에 했던 활동, 2학기 활동, 앞으로 예정된 일정을 시간 순서로 모았습니다.</p>
           </div>
           <nav className="act-jump" aria-label="타임라인 구간 바로가기">
-            <a href="#act-spring"><b>{spring.length}</b><span>2026 1학기 · 완료</span></a>
-            <a href="#act-fall"><b>{fall.length}</b><span>2026 2학기{fallLive ? ' · 진행 중' : ''}</span></a>
-            <a href="#act-upcoming"><b>{upcoming.length}</b><span>예정</span></a>
+            {sections.map((section) => <a key={section.id} href={`#${section.id}`}>
+              <b>{section.id === 'act-summer' ? summerClubs.length + section.events.length : section.events.length}</b>
+              <span>{section.term}{liveTerms.has(section.term) ? ' · 진행 중' : ''}</span>
+            </a>)}
+            {!timelineLoading && upcoming.length > 0 && <a href="#act-upcoming"><b>{upcoming.length}</b><span>예정</span></a>}
           </nav>
         </header>
+
+        {timelineError && <p className="act-note" role="status">활동 일정을 불러오지 못했습니다. 기존 활동 기록은 계속 볼 수 있습니다.</p>}
+        {timelineLoading && <p className="act-note" role="status">활동 일정을 불러오는 중입니다.</p>}
 
         {!user && !loading && (
           <p className="act-guest-note" data-testid="act-photo-notice">
@@ -316,31 +338,19 @@ export default function ActivityTimeline() {
           </p>
         )}
 
-        <section className="act-term" id="act-spring" aria-labelledby="act-spring-title">
+        {sections.map((section) => <section key={section.id} className="act-term" id={section.id} aria-labelledby={`${section.id}-title`}>
           <div className="act-term-head">
-            <h3 id="act-spring-title" className="act-term-title">2026 1학기</h3>
-            <StatusBadge status="done" />
+            <h3 id={`${section.id}-title`} className="act-term-title">{section.id === 'act-summer' ? '2026 여름방학 소모임' : section.term}</h3>
+            {liveTerms.has(section.term) ? <StatusBadge status="live" /> : section.id === 'act-spring' || section.id === 'act-summer' ? <StatusBadge status="done" /> : null}
           </div>
-          <SpringGrid events={spring} onOpen={open} />
-        </section>
+          {section.id === 'act-spring' && <SpringGrid events={spring.filter((event) => !event.fromDb)} onOpen={open} />}
+          {section.id === 'act-summer' && <SummerClubs onOpen={open} />}
+          {section.id !== 'act-summer' && section.id !== 'act-spring' && <FallSpine events={section.events} now={now} onOpen={open} />}
+          {(section.id === 'act-spring' || section.id === 'act-summer') && section.events.some((event) => event.fromDb) &&
+            <FallSpine events={section.events.filter((event) => event.fromDb)} now={now} onOpen={open} />}
+        </section>)}
 
-        <section className="act-term" id="act-summer" aria-labelledby="act-summer-title">
-          <div className="act-term-head">
-            <h3 id="act-summer-title" className="act-term-title">2026 여름방학 소모임</h3>
-            <StatusBadge status="done" />
-          </div>
-          <SummerClubs onOpen={open} />
-        </section>
-
-        <section className="act-term" id="act-fall" aria-labelledby="act-fall-title">
-          <div className="act-term-head">
-            <h3 id="act-fall-title" className="act-term-title">2026 2학기</h3>
-            {fallLive && <StatusBadge status="live" />}
-          </div>
-          <FallSpine events={fall} now={now} onOpen={open} />
-        </section>
-
-        <section className="act-term" id="act-upcoming" aria-labelledby="act-upcoming-title">
+        {!timelineLoading && upcoming.length > 0 && <section className="act-term" id="act-upcoming" aria-labelledby="act-upcoming-title">
           <div className="act-term-head">
             <h3 id="act-upcoming-title" className="act-term-title">예정</h3>
             <StatusBadge status="planned" />
@@ -348,22 +358,22 @@ export default function ActivityTimeline() {
           <ul className="act-grid act-grid-planned">
             {upcoming.map((event) => (
               <li key={event.id} className="act-card act-card-planned" data-has-photo="false">
-                <EventBody event={event} status="planned">
+                <EventBody event={event} status={event.status}>
                   <p className="act-when">{event.dateLabel}</p>
                 </EventBody>
               </li>
             ))}
           </ul>
-          <p className="act-note">예정 항목의 날짜는 미정입니다.</p>
+          {hasUndatedUpcoming && <p className="act-note">예정 항목의 날짜는 미정입니다.</p>}
+        </section>}
 
-          <aside className="act-recruit" aria-labelledby="act-recruit-title">
+        <aside className="act-recruit" aria-labelledby="act-recruit-title">
             <div>
               <h4 id="act-recruit-title" className="act-recruit-title">{RECRUIT_FACTS.headline}</h4>
               <p className="act-card-text">{recruitSummary}</p>
             </div>
             <Link to="/recruit" className="act-recruit-link">지원 안내 보기 <ArrowRight size={16} aria-hidden="true" /></Link>
-          </aside>
-        </section>
+        </aside>
       </div>
       <Lightbox dialogRef={dialogRef} openId={openId} setOpenId={setOpenId} />
     </section>
