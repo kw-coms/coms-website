@@ -89,7 +89,7 @@ export default function HomeView() {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   })
-  const activity = activityQuery.isSuccess ? nextActivity(activityQuery.data, now) ?? null : null
+  const activity = activityQuery.data ? nextActivity(activityQuery.data, now) ?? null : null
   const nextActivityStrip = activity && (
     <div className="home-next-activity">
       <Link to="/activities#act-upcoming" className="scene-notice">
