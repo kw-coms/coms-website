@@ -23,9 +23,11 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -56,6 +58,8 @@ public class OpportunitySources {
     private static final String SESAC_NAME = "청년취업사관학교 새싹";
     private static final String BOOSTCAMP_KEY = "naver-boostcamp";
     private static final String BOOSTCAMP_NAME = "네이버 부스트캠프";
+    private static final String DEVPOST_NAME = "Devpost";
+    private static final String WEVITY_NAME = "위비티";
 
     private static final String CODEFORCES_API = "https://codeforces.com/api/contest.list?gym=false";
     private static final String ATCODER_PAGE = "https://atcoder.jp/contests/?lang=en";
@@ -71,6 +75,12 @@ public class OpportunitySources {
     private static final String BOOSTCAMP_BLOG = "https://blog.naver.com/boostcamp_official/";
     private static final String BOOSTCAMP_RSS = "https://rss.blog.naver.com/boostcamp_official.xml";
     private static final String RSS_ACCEPT = "application/rss+xml, application/xml, text/xml";
+    private static final String DEVPOST_API = "https://devpost.com/api/hackathons?status%5B%5D=open&page=";
+    private static final String WEVITY_LIST = "https://www.wevity.com/?c=find&s=1&gub=1&cidx=";
+    private static final String WEVITY_DETAIL = "https://www.wevity.com/?c=find&s=1&gbn=view&ix=";
+    // 20 = 웹/모바일/IT, 21 = 게임/소프트웨어
+    private static final List<String> WEVITY_CATEGORIES = List.of("20", "21");
+    private static final int DEVPOST_PAGES = 2;
 
     private static final Pattern ICPC_LINK = Pattern.compile("https://icpckorea\\.org/archives/([1-9]\\d{0,10})/?");
     private static final Pattern BOOSTCAMP_POST = Pattern.compile(
@@ -80,7 +90,21 @@ public class OpportunitySources {
     private static final Pattern BOOSTCAMP_OTHER = Pattern.compile(
             "다시\\s*보기|수료생|인터뷰|현장\\s*스케치|프리\\s*코스|스터디|가산점"
                     + "|시상식|기업\\s*파트너|파트너\\s*기업|채용\\s*공고|(?:모집|운영)\\s*(?:취소|중단)");
-    private static final Pattern ATCODER_PATH = Pattern.compile("/contests/([a-z0-9_-]{1,100})");
+    private static final Pattern DEVPOST_LINK = Pattern.compile("https://([a-z0-9][a-z0-9-]{0,62})\\.devpost\\.com/?");
+    private static final Pattern DEVPOST_PERIOD = Pattern.compile(
+            "([A-Z][a-z]{2}) (\\d{1,2})(?:, (20\\d{2}))? - (?:([A-Z][a-z]{2}) )?(\\d{1,2}), (20\\d{2})");
+    private static final DateTimeFormatter MONTH = DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH);
+    private static final Pattern WEVITY_ID = Pattern.compile("\\?c=find&s=1&gub=1&cidx=\\d{1,3}&gbn=view(?:&gp=\\d{1,3})?&ix=([1-9]\\d{0,10})");
+    private static final Pattern D_DAY = Pattern.compile("D-(\\d{1,3})(?!\\d)|D-?DAY", Pattern.CASE_INSENSITIVE);
+    private static final Pattern HACKATHON_TITLE = Pattern.compile(
+            "해커톤|해카톤|아이디어톤|프롬프톤|메이커톤|게임\\s*잼|hackathon|game\\s*jam", Pattern.CASE_INSENSITIVE);
+    private static final Pattern DEVELOPER_TITLE = Pattern.compile(
+            "개발|프로그래밍|코딩|소프트웨어|(?<![A-Za-z])SW(?![A-Za-z])|알고리즘|보안|데이터|경진대회|웹|앱",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern NON_DEVELOPER_TITLE = Pattern.compile(
+            "영상|광고|UCC|사진|미술|디자인|그래픽|시나리오|웹툰|문학|글쓰기|논문|교정|서포터즈|기자단|체험단|e-?스포츠|이스포츠|창업",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern ATCODER_PATH =Pattern.compile("/contests/([a-z0-9_-]{1,100})");
     private static final Pattern DUID = Pattern.compile("[?&]DUID=([1-9]\\d{0,10})(?:&|$)");
     private static final Pattern SSAFY_ID = Pattern.compile("javascript:goViewPage\\(([1-9]\\d{0,10})\\);?");
     private static final Pattern SESAC_ID = Pattern.compile("[?&]crsSn=([1-9]\\d{0,10})(?:&|$)");
@@ -118,7 +142,120 @@ public class OpportunitySources {
                 new Source("ssafy", SSAFY_NAME, this::ssafyRecruiting),
                 new Source("sw-maestro", SOMA_NAME, () -> parseSoma(html(SOMA_PAGE))),
                 new Source("sesac", SESAC_NAME, this::sesacCourses),
-                new Source(BOOSTCAMP_KEY, BOOSTCAMP_NAME, () -> parseBoostcamp(download(BOOSTCAMP_RSS, RSS_ACCEPT), dateToday())));
+                new Source(BOOSTCAMP_KEY, BOOSTCAMP_NAME, () -> parseBoostcamp(download(BOOSTCAMP_RSS, RSS_ACCEPT), dateToday())),
+                new Source("devpost", DEVPOST_NAME, this::devpostHackathons),
+                new Source("wevity", WEVITY_NAME, this::wevityContests));
+    }
+
+    private List<OpportunityNotice> devpostHackathons() {
+        List<OpportunityNotice> items = new ArrayList<>();
+        for (int page = 1; page <= DEVPOST_PAGES; page++) {
+            items.addAll(parseDevpost(download(DEVPOST_API + page, "application/json"), dateToday()));
+        }
+        return unique(items);
+    }
+
+    private List<OpportunityNotice> wevityContests() {
+        List<OpportunityNotice> items = new ArrayList<>();
+        for (String category : WEVITY_CATEGORIES) {
+            items.addAll(parseWevity(html(WEVITY_LIST + category), dateToday()));
+        }
+        return unique(items);
+    }
+
+    private static List<OpportunityNotice> unique(List<OpportunityNotice> items) {
+        Set<String> seen = new HashSet<>();
+        return items.stream().filter(item -> seen.add(item.externalId())).limit(MAX_ITEMS).toList();
+    }
+
+    /** Open online Devpost hackathons. The link must stay on a devpost.com subdomain. */
+    static List<OpportunityNotice> parseDevpost(String response, LocalDate today) {
+        try {
+            JsonNode rows = JSON.readTree(response).path("hackathons");
+            if (!rows.isArray()) {
+                throw unavailable();
+            }
+            List<OpportunityNotice> items = new ArrayList<>();
+            for (JsonNode row : rows) {
+                long id = row.path("id").asLong();
+                Matcher link = DEVPOST_LINK.matcher(row.path("url").asText());
+                if (id < 1 || !"open".equals(row.path("open_state").asText()) || row.path("invite_only").asBoolean(true)
+                        || !"online".equalsIgnoreCase(row.path("displayed_location").path("location").asText())
+                        || !link.matches()) {
+                    continue;
+                }
+                Dates period = devpostPeriod(row.path("submission_period_dates").asText());
+                if (period == null || LocalDate.parse(period.end()).isBefore(today)) {
+                    continue;
+                }
+                add(items, notice("devpost", Long.toString(id), DEVPOST_NAME, "https://" + link.group(1) + ".devpost.com/",
+                        HACKATHON, row.path("title").asText(), period, null, null));
+            }
+            return items;
+        } catch (IOException invalidResponse) {
+            throw unavailable();
+        }
+    }
+
+    /** "Oct 30 - Dec 04, 2026", "Nov 11 - 30, 2026", "Nov 11, 2026 - Jan 11, 2027". */
+    static Dates devpostPeriod(String text) {
+        Matcher m = DEVPOST_PERIOD.matcher(text);
+        if (!m.matches()) {
+            return null;
+        }
+        try {
+            int startMonth = MONTH.parse(m.group(1)).get(ChronoField.MONTH_OF_YEAR);
+            int endMonth = m.group(4) == null ? startMonth : MONTH.parse(m.group(4)).get(ChronoField.MONTH_OF_YEAR);
+            int endYear = Integer.parseInt(m.group(6));
+            int startYear = m.group(3) != null ? Integer.parseInt(m.group(3)) : startMonth > endMonth ? endYear - 1 : endYear;
+            LocalDate start = LocalDate.of(startYear, startMonth, Integer.parseInt(m.group(2)));
+            LocalDate end = LocalDate.of(endYear, endMonth, Integer.parseInt(m.group(5)));
+            return start.isAfter(end) ? null : new Dates(start.toString(), end.toString());
+        } catch (DateTimeException invalidDate) {
+            return null;
+        }
+    }
+
+    /**
+     * Developer contests from the wevity IT and software listings. The list only shows a D-day, so an open
+     * listing gets a deadline of today + D and an upcoming one gets no dates for the reviewer to fill in.
+     */
+    static List<OpportunityNotice> parseWevity(Document page, LocalDate today) {
+        if (page.selectFirst("ul.list") == null) {
+            throw unavailable();
+        }
+        List<OpportunityNotice> items = new ArrayList<>();
+        for (Element row : page.select("ul.list > li")) {
+            Element link = row.selectFirst(".tit > a[href]");
+            if (link == null) {
+                continue;
+            }
+            Matcher id = WEVITY_ID.matcher(link.attr("href"));
+            String title = titleWithout(link, ".stat");
+            String state = text(row.selectFirst(".day .dday"));
+            if (!id.matches() || NON_DEVELOPER_TITLE.matcher(title).find()
+                    || !(HACKATHON_TITLE.matcher(title).find() || DEVELOPER_TITLE.matcher(title).find())) {
+                continue;
+            }
+            Dates application = null;
+            if (state.equals("접수중") || state.equals("마감임박")) {
+                Matcher left = D_DAY.matcher(text(row.selectFirst(".day")));
+                if (!left.find()) {
+                    continue;
+                }
+                int days = left.group(1) == null ? 0 : Integer.parseInt(left.group(1));
+                application = new Dates(null, today.plusDays(days).toString());
+            } else if (!state.equals("접수예정")) {
+                continue;
+            }
+            String category = HACKATHON_TITLE.matcher(title).find() ? HACKATHON : CONTEST;
+            add(items, notice("wevity", id.group(1), WEVITY_NAME, WEVITY_DETAIL + id.group(1), category, title,
+                    application, null, null));
+            if (items.size() == MAX_ITEMS) {
+                break;
+            }
+        }
+        return items;
     }
 
     static List<OpportunityNotice> parseCodeforces(String response, Instant now) {
