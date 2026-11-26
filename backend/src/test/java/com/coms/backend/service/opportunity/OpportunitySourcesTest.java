@@ -158,4 +158,81 @@ class OpportunitySourcesTest {
                 List.of("- 모집기간 : 2026년 10월 26일(월) ~ 11월 9일(월) 17시"), 2026).end())
                 .isEqualTo("2026-11-09T17:00");
     }
+
+    @Test
+    void devpostKeepsOpenOnlineHackathonsOnDevpostLinks() {
+        LocalDate today = LocalDate.parse("2026-11-26");
+        String api = """
+                {"hackathons":[
+                  {"id":1,"title":"Synthetic Online Jam","url":"https://synthetic-jam.devpost.com/","open_state":"open",
+                   "invite_only":false,"displayed_location":{"location":"Online"},"submission_period_dates":"Oct 30 - Dec 04, 2026"},
+                  {"id":2,"title":"Same Month","url":"https://same.devpost.com","open_state":"open",
+                   "invite_only":false,"displayed_location":{"location":"Online"},"submission_period_dates":"Nov 11 - 30, 2026"},
+                  {"id":3,"title":"In Person","url":"https://campus.devpost.com/","open_state":"open",
+                   "invite_only":false,"displayed_location":{"location":"Durham University"},"submission_period_dates":"Nov 11 - 30, 2026"},
+                  {"id":4,"title":"Invite Only","url":"https://invite.devpost.com/","open_state":"open",
+                   "invite_only":true,"displayed_location":{"location":"Online"},"submission_period_dates":"Nov 11 - 30, 2026"},
+                  {"id":5,"title":"Foreign Link","url":"https://example.com/devpost.com/","open_state":"open",
+                   "invite_only":false,"displayed_location":{"location":"Online"},"submission_period_dates":"Nov 11 - 30, 2026"},
+                  {"id":6,"title":"Already Over","url":"https://over.devpost.com/","open_state":"open",
+                   "invite_only":false,"displayed_location":{"location":"Online"},"submission_period_dates":"Oct 01 - 20, 2026"}
+                ]}
+                """;
+        var items = OpportunitySources.parseDevpost(api, today);
+        assertThat(items).extracting(OpportunityNotice::externalId).containsExactly("1", "2");
+        assertThat(items.getFirst()).satisfies(item -> {
+            assertThat(item.category()).isEqualTo("HACKATHON");
+            assertThat(item.sourceUrl()).isEqualTo("https://synthetic-jam.devpost.com/");
+            assertThat(item.applicationStart()).isEqualTo("2026-10-30");
+            assertThat(item.applicationEnd()).isEqualTo("2026-12-04");
+        });
+        assertThat(items.get(1).sourceUrl()).isEqualTo("https://same.devpost.com/");
+        assertThat(OpportunitySources.devpostPeriod("Foo 30 - Dec 04, 2026")).isNull();
+        assertThat(OpportunitySources.devpostPeriod("Nov 11, 2026 - Jan 11, 2027"))
+                .isEqualTo(new OpportunityScheduleText.Dates("2026-11-11", "2027-01-11"));
+        assertThat(OpportunitySources.devpostPeriod("Dec 20 - Jan 05, 2027"))
+                .isEqualTo(new OpportunityScheduleText.Dates("2026-12-20", "2027-01-05"));
+        assertThat(OpportunitySources.devpostPeriod("Feb 30 - Mar 02, 2027")).isNull();
+        assertThat(OpportunitySources.devpostPeriod("Ongoing")).isNull();
+    }
+
+    @Test
+    void wevityKeepsDeveloperContestsAndDerivesDeadlineFromDday() {
+        LocalDate today = LocalDate.parse("2026-11-26");
+        String list = """
+                <ul class="list">
+                  <li class="top"><div class="tit">공모전명</div></li>
+                  <li><div class="tit"><a href="?c=find&s=1&gub=1&cidx=21&gbn=view&gp=1&ix=111884">2026 바이브코딩 해커톤 <span class='stat new'>신규</span></a></div>
+                    <div class="day">D-10 <span class="dday ing">접수중</span></div></li>
+                  <li><div class="tit"><a href="?c=find&s=1&gub=1&cidx=20&gbn=view&gp=1&ix=112565">제5회 AI 경진대회</a></div>
+                    <div class="day">D-4 <span class="dday soon">마감임박</span></div></li>
+                  <li><div class="tit"><a href="?c=find&s=1&gub=1&cidx=21&gbn=view&gp=1&ix=112600">AI 게임 개발 공모전</a></div>
+                    <div class="day">D-40 <span class="dday future">접수예정</span></div></li>
+                  <li><div class="tit"><a href="?c=find&s=1&gub=1&cidx=20&gbn=view&gp=1&ix=112700">영상처리 창업 해커톤</a></div>
+                    <div class="day">D-DAY <span class="dday soon">마감임박</span></div></li>
+                  <li><div class="tit"><a href="?c=find&s=1&gub=1&cidx=21&gbn=view&gp=1&ix=112700">영상처리 창업 해커톤</a></div>
+                    <div class="day">D-DAY <span class="dday soon">마감임박</span></div></li>
+                  <li><div class="tit"><a href="?c=find&s=1&gub=1&cidx=20&gbn=view&gp=1&ix=112589">AI 영상 공모전</a></div>
+                    <div class="day">D-40 <span class="dday ing">접수중</span></div></li>
+                  <li><div class="tit"><a href="?c=find&s=1&gub=1&cidx=20&gbn=view&gp=1&ix=112001">앱 개발 공모전</a></div>
+                    <div class="day"><span class="dday end">마감</span></div></li>
+                  <li><div class="tit"><a href="https://example.com/?ix=1">외부 해커톤</a></div>
+                    <div class="day">D-3 <span class="dday ing">접수중</span></div></li>
+                </ul>
+                """;
+        var items = OpportunitySources.parseWevity(Jsoup.parse(list), today);
+        assertThat(items).extracting(OpportunityNotice::externalId)
+                .containsExactly("111884", "112565", "112600", "112700", "112700");
+        assertThat(items.get(3).category()).isEqualTo("HACKATHON");
+        assertThat(items.get(3).applicationEnd()).isEqualTo("2026-11-26");
+        assertThat(items.get(0)).satisfies(item -> {
+            assertThat(item.title()).isEqualTo("2026 바이브코딩 해커톤");
+            assertThat(item.category()).isEqualTo("HACKATHON");
+            assertThat(item.sourceUrl()).isEqualTo("https://www.wevity.com/?c=find&s=1&gbn=view&ix=111884");
+            assertThat(item.applicationEnd()).isEqualTo("2026-12-06");
+        });
+        assertThat(items.get(1).category()).isEqualTo("CONTEST");
+        assertThat(items.get(1).applicationEnd()).isEqualTo("2026-11-30");
+        assertThat(items.get(2).applicationEnd()).isNull();
+    }
 }
