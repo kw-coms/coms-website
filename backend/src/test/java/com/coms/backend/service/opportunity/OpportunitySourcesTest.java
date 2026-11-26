@@ -166,7 +166,7 @@ class OpportunitySourcesTest {
                 {"hackathons":[
                   {"id":1,"title":"Synthetic Online Jam","url":"https://synthetic-jam.devpost.com/","open_state":"open",
                    "invite_only":false,"displayed_location":{"location":"Online"},"submission_period_dates":"Oct 30 - Dec 04, 2026"},
-                  {"id":2,"title":"Same Month","url":"https://same.devpost.com/","open_state":"open",
+                  {"id":2,"title":"Same Month","url":"https://same.devpost.com","open_state":"open",
                    "invite_only":false,"displayed_location":{"location":"Online"},"submission_period_dates":"Nov 11 - 30, 2026"},
                   {"id":3,"title":"In Person","url":"https://campus.devpost.com/","open_state":"open",
                    "invite_only":false,"displayed_location":{"location":"Durham University"},"submission_period_dates":"Nov 11 - 30, 2026"},
@@ -186,6 +186,8 @@ class OpportunitySourcesTest {
             assertThat(item.applicationStart()).isEqualTo("2026-10-30");
             assertThat(item.applicationEnd()).isEqualTo("2026-12-04");
         });
+        assertThat(items.get(1).sourceUrl()).isEqualTo("https://same.devpost.com/");
+        assertThat(OpportunitySources.devpostPeriod("Foo 30 - Dec 04, 2026")).isNull();
         assertThat(OpportunitySources.devpostPeriod("Nov 11, 2026 - Jan 11, 2027"))
                 .isEqualTo(new OpportunityScheduleText.Dates("2026-11-11", "2027-01-11"));
         assertThat(OpportunitySources.devpostPeriod("Dec 20 - Jan 05, 2027"))
@@ -206,6 +208,10 @@ class OpportunitySourcesTest {
                     <div class="day">D-4 <span class="dday soon">마감임박</span></div></li>
                   <li><div class="tit"><a href="?c=find&s=1&gub=1&cidx=21&gbn=view&gp=1&ix=112600">AI 게임 개발 공모전</a></div>
                     <div class="day">D-40 <span class="dday future">접수예정</span></div></li>
+                  <li><div class="tit"><a href="?c=find&s=1&gub=1&cidx=20&gbn=view&gp=1&ix=112700">영상처리 창업 해커톤</a></div>
+                    <div class="day">D-DAY <span class="dday soon">마감임박</span></div></li>
+                  <li><div class="tit"><a href="?c=find&s=1&gub=1&cidx=21&gbn=view&gp=1&ix=112700">영상처리 창업 해커톤</a></div>
+                    <div class="day">D-DAY <span class="dday soon">마감임박</span></div></li>
                   <li><div class="tit"><a href="?c=find&s=1&gub=1&cidx=20&gbn=view&gp=1&ix=112589">AI 영상 공모전</a></div>
                     <div class="day">D-40 <span class="dday ing">접수중</span></div></li>
                   <li><div class="tit"><a href="?c=find&s=1&gub=1&cidx=20&gbn=view&gp=1&ix=112001">앱 개발 공모전</a></div>
@@ -215,7 +221,10 @@ class OpportunitySourcesTest {
                 </ul>
                 """;
         var items = OpportunitySources.parseWevity(Jsoup.parse(list), today);
-        assertThat(items).extracting(OpportunityNotice::externalId).containsExactly("111884", "112565", "112600");
+        assertThat(items).extracting(OpportunityNotice::externalId)
+                .containsExactly("111884", "112565", "112600", "112700", "112700");
+        assertThat(items.get(3).category()).isEqualTo("HACKATHON");
+        assertThat(items.get(3).applicationEnd()).isEqualTo("2026-11-26");
         assertThat(items.get(0)).satisfies(item -> {
             assertThat(item.title()).isEqualTo("2026 바이브코딩 해커톤");
             assertThat(item.category()).isEqualTo("HACKATHON");

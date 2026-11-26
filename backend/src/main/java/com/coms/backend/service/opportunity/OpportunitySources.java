@@ -233,8 +233,10 @@ public class OpportunitySources {
             Matcher id = WEVITY_ID.matcher(link.attr("href"));
             String title = titleWithout(link, ".stat");
             String state = text(row.selectFirst(".day .dday"));
-            if (!id.matches() || NON_DEVELOPER_TITLE.matcher(title).find()
-                    || !(HACKATHON_TITLE.matcher(title).find() || DEVELOPER_TITLE.matcher(title).find())) {
+            boolean hackathon = HACKATHON_TITLE.matcher(title).find();
+            // A hackathon title wins over the exclusions ("영상처리 AI 해커톤", "창업 해커톤").
+            if (!id.matches() || !(hackathon
+                    || DEVELOPER_TITLE.matcher(title).find() && !NON_DEVELOPER_TITLE.matcher(title).find())) {
                 continue;
             }
             Dates application = null;
@@ -248,7 +250,7 @@ public class OpportunitySources {
             } else if (!state.equals("접수예정")) {
                 continue;
             }
-            String category = HACKATHON_TITLE.matcher(title).find() ? HACKATHON : CONTEST;
+            String category = hackathon ? HACKATHON : CONTEST;
             add(items, notice("wevity", id.group(1), WEVITY_NAME, WEVITY_DETAIL + id.group(1), category, title,
                     application, null, null));
             if (items.size() == MAX_ITEMS) {
