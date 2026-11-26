@@ -58,7 +58,7 @@ public class OpportunitySources {
     private static final String SESAC_NAME = "청년취업사관학교 새싹";
     private static final String BOOSTCAMP_KEY = "naver-boostcamp";
     private static final String BOOSTCAMP_NAME = "네이버 부스트캠프";
-    private static final String DEVPOST_NAME = "Devpost";
+    private static final String DEVPOST_NAME = "Devpost (해외·온라인)";
     private static final String WEVITY_NAME = "위비티";
 
     private static final String CODEFORCES_API = "https://codeforces.com/api/contest.list?gym=false";

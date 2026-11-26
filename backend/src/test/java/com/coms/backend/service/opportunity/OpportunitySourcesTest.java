@@ -182,6 +182,7 @@ class OpportunitySourcesTest {
         assertThat(items).extracting(OpportunityNotice::externalId).containsExactly("1", "2");
         assertThat(items.getFirst()).satisfies(item -> {
             assertThat(item.category()).isEqualTo("HACKATHON");
+            assertThat(item.sourceName()).isEqualTo("Devpost (해외·온라인)");
             assertThat(item.sourceUrl()).isEqualTo("https://synthetic-jam.devpost.com/");
             assertThat(item.applicationStart()).isEqualTo("2026-10-30");
             assertThat(item.applicationEnd()).isEqualTo("2026-12-04");
